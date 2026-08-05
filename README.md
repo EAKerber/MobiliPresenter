@@ -5,6 +5,7 @@ Apresentador modular de mobiliário baseado em sequências de imagens pré-rende
 ## Estado publicado
 
 - versão: **V7.0-I5**
+- URL canônica: **https://mobilipresenter.netlify.app/**
 - finalidade atual: validação mobile pelo Netlify
 - composição de referência: gaveteiro de 399 mm à esquerda + balcão de 780 mm à direita
 - amplitude angular: yaw de -95° a +95°, passo de 5°, 39 poses
@@ -13,8 +14,8 @@ Apresentador modular de mobiliário baseado em sequências de imagens pré-rende
 
 ## Páginas publicadas
 
-- `/` — viewer mobile da composição
-- `/manufacturing.html` — estado semântico e fabril da V7.0-I5
+- `https://mobilipresenter.netlify.app/` — viewer mobile da composição
+- `https://mobilipresenter.netlify.app/manufacturing.html` — estado semântico e fabril da V7.0-I5
 
 O preview hospedado é um artefato leve para validação pelo celular. Ele usa dois spritesheets WebP alinhados e não substitui o snapshot técnico completo da iteração.
 
