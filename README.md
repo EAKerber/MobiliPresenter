@@ -2,6 +2,17 @@
 
 Apresentador modular de mobiliário baseado em sequências de imagens pré-renderizadas, composição multimódulo e metadados físicos em milímetros.
 
+## Fase atual
+
+O projeto entrou em **reavaliação de escopo e priorização**. A V7.0-I5 permanece publicada e verificável, mas novos incrementos funcionais estão suspensos até a definição do novo fluxo prioritário.
+
+Documentos de entrada:
+
+- `docs/current/BASELINE-V7-I5.md` — capacidades e limites comprovados;
+- `docs/planning/SCOPE-REASSESSMENT.md` — perguntas e entregáveis da fase;
+- `docs/planning/DECISION-LOG.md` — decisões e propostas em aberto;
+- `docs/history/V7-LINEAGE.md` — conhecimento recuperado das entregas ZIP.
+
 ## Estado publicado
 
 - versão: **V7.0-I5**
@@ -19,7 +30,17 @@ Apresentador modular de mobiliário baseado em sequências de imagens pré-rende
 
 O preview hospedado é um artefato leve para validação pelo celular. Ele usa dois spritesheets WebP alinhados e não substitui o snapshot técnico completo da iteração.
 
-## Integridade dos artefatos
+## Linha de base técnica recuperada
+
+A fonte mais completa localizada é `balcao-360-v7-i5.zip`:
+
+- tamanho: 30.001.308 bytes;
+- arquivos: 2.904;
+- SHA-256: `5ba5672ebc4625b99892dc80b1ae859ed9c406eccf5ba284d523d04129948d5a`.
+
+A promoção dessa fonte para uma estrutura ativa no Git será decidida durante o planejamento, depois de separar fontes, derivados, fixtures e assets pesados.
+
+## Integridade dos artefatos publicados
 
 ### Preview Netlify
 
@@ -27,7 +48,7 @@ O preview hospedado é um artefato leve para validação pelo celular. Ele usa d
 - tamanho: 70.551 bytes
 - SHA-256: `38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae`
 
-### Snapshot técnico completo
+### Snapshot técnico reduzido
 
 - artefato: `mobilipresenter-v7.0-i5-preview.zip`
 - tamanho: 942.520 bytes
