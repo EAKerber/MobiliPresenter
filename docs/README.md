@@ -7,8 +7,9 @@ Esta árvore separa fatos do sistema, decisões aceitas, propostas em discussão
 1. `README.md` — versão publicada e URL canônica;
 2. `AGENTS.md` — governança, limites e protocolo Git;
 3. `docs/current/BASELINE-V7-I5.md` — capacidades e limites comprovados;
-4. `docs/planning/SCOPE-REASSESSMENT.md` — fase atual e perguntas abertas;
-5. `docs/planning/DECISION-LOG.md` — decisões tomadas durante o planejamento.
+4. `docs/current/COLOR-ASSET-PIPELINE.md` — assets de cor existentes, origem por gama e lacunas de proveniência;
+5. `docs/planning/SCOPE-REASSESSMENT.md` — fase atual e perguntas abertas;
+6. `docs/planning/DECISION-LOG.md` — decisões tomadas durante o planejamento.
 
 ## Classes documentais
 
