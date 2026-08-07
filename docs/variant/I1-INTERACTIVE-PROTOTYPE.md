@@ -33,16 +33,27 @@ A largura operacional é `3550 mm`, conforme D-014.
 
 As áreas clicáveis e recortes em `data/i1-layout.json` são provisórios e derivados visualmente da referência. Eles servem para validar a experiência e não constituem geometria de fabricação.
 
-## Assets
+## Assets e preservação do fonte
 
-O protótipo inclui cópias WebP provisórias de:
+O protótipo usa cópias WebP provisórias de:
 
 - composição completa;
 - referência do empreendimento.
 
-O manifesto registra tamanho, SHA-256 e origem. Para contornar transporte binário sem depender de upload manual, as duas imagens são incorporadas como Base64 em `prototype/assets.js`; continuam não sendo renders finais.
+As duas imagens são incorporadas como Base64 em `prototype/assets.js`; continuam não sendo renders finais.
 
-## Execução local
+Para preservar o incremento como uma unidade verificável sem depender de upload binário manual, os arquivos executáveis do I1 são guardados em `variant/fixed-view/i1-package/` como um ZIP fragmentado em Base64. O manifesto declara tamanho e SHA-256 de cada fragmento e do artefato integral. `materialize_i1.py` valida todos os hashes, rejeita paths ZIP inseguros e só então restaura os arquivos legíveis.
+
+## Materialização e execução local
+
+Na raiz do repositório:
+
+```bash
+python3 variant/fixed-view/materialize_i1.py --verify-only
+python3 variant/fixed-view/materialize_i1.py
+```
+
+Depois:
 
 ```bash
 cd variant/fixed-view
@@ -51,6 +62,8 @@ python3 -m http.server 8080 --directory prototype
 ```
 
 Abrir `http://localhost:8080`.
+
+Uma segunda materialização exige `--force`; sem essa opção, o script recusa sobrescrever arquivos existentes.
 
 ## Gates
 
@@ -61,6 +74,14 @@ python3 tests/browser_smoke_i1.py
 ```
 
 O teste de navegador requer Playwright para Python e Chromium.
+
+## Integridade do pacote
+
+- artefato: `mobilipresenter-fixed-view-i1-runtime.zip`;
+- tamanho: `65.820 bytes`;
+- SHA-256: `47a4f4cae188e778f98c58f39764606f4705300be95dca756199b333e9652e1e`;
+- sete fragmentos Base64;
+- extração máxima aceita pelo materializador: `5 MiB`.
 
 ## Não objetivos
 
