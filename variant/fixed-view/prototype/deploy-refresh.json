@@ -1,0 +1,6 @@
+{
+  "branch": "variant/fixed-view-i3-visual-calibration",
+  "purpose": "manual Netlify redeploy trigger",
+  "requestedAt": "2026-08-07T14:10:00-03:00",
+  "behaviorChange": false
+}
