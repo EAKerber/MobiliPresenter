@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "FixedViewVisualLayers 0.1",
+  "cameraId": "reserva-cachoeirinha-fixed-camera-provisional",
+  "compositionMode": "fixed-camera-2d-layers",
+  "policies": {
+    "realisticAssetMayReplaceStructuralFallback": true,
+    "structuralFallbackRequiredWhenRealisticAssetMissing": true,
+    "missingRealisticAssetMustRemainDiagnosable": true,
+    "moduleVisibilityControlledByCommercialSelection": true,
+    "preserveTopologyGate": true,
+    "fabricationGeometryRequiredForVisualAsset": false
+  },
+  "environment": [
+    {"id":"base-environment","role":"clean-room-background","status":"pending","requiredForRealisticMode":true,"notes":"Parede, piso e arquitetura sem marcenaria selecionável."},
+    {"id":"fixed-appliances","role":"illustrative-appliances","status":"provisional","requiredForRealisticMode":true,"notes":"Eletrodomésticos podem ser inferidos pelos vãos; não representam modelo comercial específico."},
+    {"id":"countertop-and-sink","role":"non-module-context","status":"provisional","requiredForRealisticMode":true}
+  ],
+  "moduleLayers": [
+    {"moduleId":"upper-laundry","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer"},
+    {"moduleId":"lower-stove","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer"},
+    {"moduleId":"lower-sink","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer","topologyGate":"4-drawers-2-doors"},
+    {"moduleId":"refrigerator-side-panel","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer"},
+    {"moduleId":"upper-stove","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer"},
+    {"moduleId":"upper-sink","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer","topologyGate":"doors-flap-microwave-niche"},
+    {"moduleId":"upper-refrigerator","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer"},
+    {"moduleId":"lighting","asset":null,"status":"pending-realistic-overlay","fallback":"topology-renderer"}
+  ],
+  "fallbackLayers": [
+    {"id":"freestanding-stove","asset":null,"status":"pending-realistic-overlay","fallback":"illustrative-vector","activeWhen":{"moduleDisabled":"lower-stove"}}
+  ],
+  "acceptance": {
+    "perLayer": [
+      "camera alignment matches calibration evidence space",
+      "transparent background or explicit mask",
+      "module topology matches semantic contract",
+      "no undeclared neighboring module baked into layer",
+      "source and transformation provenance recorded"
+    ],
+    "wholeScene": [
+      "all enabled modules visible",
+      "disabled modules absent except declared fallbacks",
+      "occlusion order consistent",
+      "reference comparison reviewed visually"
+    ]
+  }
+}
