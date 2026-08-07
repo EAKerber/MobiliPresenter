@@ -1,0 +1,46 @@
+name: Fixed View I2
+
+on:
+  push:
+    branches:
+      - "variant/fixed-view-i2-*"
+    paths:
+      - "variant/fixed-view/**"
+      - ".github/workflows/fixed-view-i2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate I2 contracts
+        working-directory: variant/fixed-view
+        run: python3 tools/validate_i2.py
+
+      - name: Run fixed-view tests
+        working-directory: variant/fixed-view
+        run: python3 -m unittest discover -s tests -p "test_*.py"
+
+      - name: Check JavaScript syntax
+        working-directory: variant/fixed-view
+        run: |
+          node --check prototype/app.js
+          node --check prototype/i2/data-loader.js
+          node --check prototype/i2/renderer.js
+          node --check prototype/i2/app.js
