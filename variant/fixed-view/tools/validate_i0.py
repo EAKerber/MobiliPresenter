@@ -74,6 +74,9 @@ def validate() -> list[str]:
     require("scene" in back["preserve"], "back transition must preserve the scene")
 
     reference_ids = {ref["id"] for ref in references_doc["references"]}
+    require(assembly["projectContext"]["referenceId"] in reference_ids, "project context must reference known evidence")
+    for candidate in assembly["wallEnvelope"]["candidates"]:
+        require(candidate["sourceId"] in reference_ids, f"unknown wall-envelope source: {candidate['sourceId']}")
     for module in modules:
         for candidate in module["measurementCandidates"]:
             require(candidate["sourceId"] in reference_ids, f"unknown measurement source: {candidate['sourceId']}")
@@ -82,6 +85,8 @@ def validate() -> list[str]:
 
     manifest = json.loads((ASSETS / "manifest.json").read_text(encoding="utf-8"))
     require(manifest["archivePolicy"] == "identity-first", "reference archive policy mismatch")
+    manifest_ids = {asset["id"] for asset in manifest["assets"]}
+    require({"plant-context-upload", "plant-kitchen-upload"}.issubset(manifest_ids), "plant identities must be registered")
     for asset in manifest["assets"]:
         require(asset["bytes"] > 0, f"invalid asset byte count: {asset['id']}")
         require(len(asset["sha256"]) == 64, f"invalid asset sha256: {asset['id']}")
