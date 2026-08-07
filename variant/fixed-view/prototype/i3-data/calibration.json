@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "FixedViewVisualCalibration 0.1",
+  "id": "reserva-cachoeirinha-fixed-camera-provisional",
+  "status": "presentation-calibrated-not-fabrication-ready",
+  "camera": {
+    "mode": "fixed",
+    "metricCalibration": false,
+    "source": "user-provided composition references",
+    "replacementAllowed": true
+  },
+  "evidenceSpace": {
+    "kind": "reference-image-pixels",
+    "width": 1423,
+    "height": 810,
+    "metricMeaning": "none"
+  },
+  "metricEnvelope": {
+    "wallWidthMm": 3550,
+    "status": "accepted-for-planning",
+    "policy": "global-envelope-only",
+    "pixelToMmConversionAllowed": false
+  },
+  "policies": {
+    "fabricationUseAllowed": false,
+    "deriveMissingDimensionsFromPixels": false,
+    "preserveModuleTopology": true,
+    "preferLatestModuleSheets": true,
+    "appliancesMayBeIllustrative": true,
+    "unknownValuesRemainUnknown": true
+  },
+  "groups": [
+    {"id":"laundry","moduleIds":["upper-laundry"],"confidence":"medium"},
+    {"id":"lower-run","moduleIds":["lower-stove","lower-sink"],"confidence":"high"},
+    {"id":"upper-run","moduleIds":["upper-stove","upper-sink"],"confidence":"high"},
+    {"id":"refrigerator-stack","moduleIds":["refrigerator-side-panel","upper-refrigerator"],"confidence":"high"},
+    {"id":"lighting-run","moduleIds":["lighting"],"confidence":"medium"}
+  ],
+  "placements": [
+    {"moduleId":"upper-laundry","rect":{"x":145,"y":75,"width":215,"height":225},"confidence":"medium","basis":"visual match to supplied full composition and module 01 sheets"},
+    {"moduleId":"lower-stove","rect":{"x":485,"y":485,"width":220,"height":270},"confidence":"high","basis":"clearly bounded appliance/module opening in supplied composition and module 02 sheets"},
+    {"moduleId":"lower-sink","rect":{"x":695,"y":485,"width":355,"height":270},"confidence":"high","basis":"clearly bounded lower run; topology locked to four drawers plus two doors"},
+    {"moduleId":"refrigerator-side-panel","rect":{"x":1014,"y":70,"width":48,"height":690},"confidence":"medium","basis":"thin technical panel is visually subtle; position supported by module 04 sheet"},
+    {"moduleId":"upper-stove","rect":{"x":495,"y":78,"width":220,"height":225},"confidence":"high","basis":"module 05 bounds visible in supplied composition"},
+    {"moduleId":"upper-sink","rect":{"x":700,"y":78,"width":350,"height":225},"confidence":"high","basis":"module 06 bounds visible in supplied composition"},
+    {"moduleId":"upper-refrigerator","rect":{"x":1040,"y":65,"width":230,"height":245},"confidence":"high","basis":"module 07 bounds visible above refrigerator"},
+    {"moduleId":"lighting","rect":{"x":690,"y":285,"width":370,"height":34},"confidence":"medium","basis":"lighting location visible; exact extent intentionally provisional"}
+  ],
+  "fallbacks": [
+    {"id":"freestanding-stove","when":{"moduleDisabled":"lower-stove"},"rect":{"x":485,"y":468,"width":220,"height":287},"confidence":"medium","basis":"visual fallback inferred from furniture opening; appliance identity is illustrative"}
+  ],
+  "replacementTriggers": [
+    "better frontal composition image",
+    "reliable wall/equipment dimensions",
+    "direct Promob export or camera-matched render",
+    "clean module overlays or masks"
+  ]
+}
