@@ -53,3 +53,7 @@ Parede vazia e composição pré-carregada devem continuar modeláveis até test
 ## D-013 — Evidência imperfeita não vira fato
 
 Fotografias da planta, anotações manuscritas e screenshots técnicos podem iniciar o trabalho, mas medidas e associações conflitantes permanecem provisórias.
+
+## D-014 — Largura operacional da parede
+
+A variante usa `3550 mm` como largura operacional da parede da composição. A leitura derivada de `3573 mm` permanece registrada para rastreabilidade, mas a diferença de `23 mm` é aceita diante da ausência de medidas exatas. Esta decisão permite posicionamento e planejamento em milímetros, sem declarar a cota como medição de obra ou dimensão liberada para fabricação/instalação.
