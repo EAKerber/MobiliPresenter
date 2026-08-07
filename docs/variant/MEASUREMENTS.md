@@ -1,7 +1,7 @@
 # Leituras provisórias da planta
 
 **Status:** não autoritativo.  
-**Fonte principal:** fotografia `plant-kitchen-readable`.
+**Fonte principal:** fotografia `plant-kitchen-upload`.
 
 ## Parede candidata da composição
 
