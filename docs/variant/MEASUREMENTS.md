@@ -1,21 +1,30 @@
-# Leituras provisórias da planta
+# Leituras e decisão da planta
 
-**Status:** não autoritativo.  
+**Status:** `3550 mm` aceito para planejamento; demais leituras permanecem evidência.  
 **Fonte principal:** fotografia `plant-kitchen-upload`.
 
-## Parede candidata da composição
+## Largura operacional da composição
 
-A planta apresenta três indícios próximos, mas não idênticos:
+A largura adotada nesta variante é **3550 mm**. A escolha foi confirmada pelo usuário e pode ser usada para coordenadas, proporções e posicionamento do próximo protótipo.
 
-| Evidência | Leitura | Status |
+| Evidência | Leitura | Tratamento |
 |---|---:|---|
-| anotação manuscrita total | `3550 mm` | provided, baixa/média confiança |
-| segmento manuscrito A | `739 mm` | provided, baixa confiança |
-| segmento manuscrito B | `2834 mm` | provided, média confiança |
-| soma A + B | `3573 mm` | derived |
-| diferença entre 3573 e 3550 | `23 mm` | derived, conflito |
+| anotação manuscrita total | `3550 mm` | selecionada para planejamento |
+| segmento manuscrito A | `739 mm` | evidência preservada |
+| segmento manuscrito B | `2834 mm` | evidência preservada |
+| soma A + B | `3573 mm` | derivada, não selecionada |
+| diferença para a cota adotada | `23 mm` | aceita na incerteza atual |
 
-A proximidade com a soma nominal dos módulos superiores vistos nas referências é sugestiva, mas não confirma endpoints, folgas ou espessura de paredes.
+A diferença de `23 mm` não bloqueia o desenvolvimento porque as referências não possuem precisão suficiente para justificar uma reconciliação mais fina. A leitura de `3573 mm` não é apagada nem tratada como erro; permanece como trilha de proveniência.
+
+## Limite da decisão
+
+`3550 mm` é uma **cota operacional de planejamento**, não uma medição de obra. Antes de fabricação, instalação ou validação de folgas reais, ainda será necessário confirmar:
+
+- os pontos físicos inicial e final da parede útil;
+- espessuras e irregularidades de paredes;
+- shafts, rodapés, eletros e demais interferências;
+- folgas de montagem e acabamento.
 
 ## Cotas impressas visíveis
 
@@ -29,16 +38,13 @@ A proximidade com a soma nominal dos módulos superiores vistos nas referências
 
 Há anotações manuscritas próximas a shafts/equipamentos, aparentemente `695`, `856`, `690` e `86`. A leitura e os endpoints são incertos; o I0 não as converte em geometria.
 
-## Consequência para a implementação
-
-O contrato usa um envelope candidato:
+## Contrato vigente
 
 ```json
 {
-  "wallWidthMm": null,
-  "candidates": [3550, 3573],
-  "status": "unverified"
+  "wallWidthMm": 3550,
+  "status": "accepted-for-planning",
+  "acceptedDifferenceMm": 23,
+  "retainedObservationMm": 3573
 }
 ```
-
-A próxima etapa pode trabalhar em coordenadas normalizadas. Conversão para milímetros deve aguardar confirmação da parede útil, dos pontos inicial/final e das interferências.
