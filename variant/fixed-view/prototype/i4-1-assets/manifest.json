@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "FixedViewSpriteAsset 0.1",
+  "id": "module03-realistic-gianduia-proof",
+  "moduleId": "lower-sink",
+  "catalogNumber": "03",
+  "status": "presentation-proof-not-fabrication-ready",
+  "sceneAsset": "./i4-1-assets/module03-sprite.b64",
+  "detailAsset": "./i4-1-assets/module03-detail.b64",
+  "mime": "image/webp",
+  "canvas": {"width": 1423, "height": 810},
+  "scenePlacement": {"x": 695, "y": 500, "width": 355, "height": 231},
+  "topologyGate": {"drawers": 4, "doors": 2},
+  "source": {
+    "name": "1000101452.jpg",
+    "sha256": "c3820f5f7d945cd27687e845cdddee3829f66ef8f05ad77fc5cefdb182a6b460",
+    "provenance": "user-provided module 03 sheet",
+    "cropPx": [927, 353, 1168, 510],
+    "processing": [
+      "crop module 03 from supplied fixed-view composition",
+      "remove red annotation pixels by local inpainting",
+      "remove annotation point by local clone patch",
+      "resample into fixed-camera presentation placement",
+      "place on transparent 1423x810 canvas"
+    ]
+  },
+  "derived": {
+    "sceneSha256": "44695fb0f24f972b1d88193ad449b04aa1f3f260c685e33aa8a2d48e99f62262",
+    "detailSha256": "42187cf78d445ff81839a249eaeb9ce62bc0c7ad8caeddf9d350c4381536e83e"
+  },
+  "policies": {
+    "preserveModuleTopology": true,
+    "deriveMetricDimensionsFromPixels": false,
+    "colorTransformReady": false,
+    "fallbackRequiredWhenAssetFails": true
+  }
+}
