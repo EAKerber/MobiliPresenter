@@ -42,19 +42,26 @@
     "lastEnabledHighlight": true
   },
   "wallEnvelope": {
-    "widthMm": null,
-    "status": "unverified",
+    "widthMm": 3550,
+    "status": "accepted-for-planning",
+    "sourceId": "plant-kitchen-upload",
+    "decisionId": "D-014",
+    "decisionBasis": "User selected 3550 mm; the 23 mm difference from the derived 3573 mm reading is acceptable given the current measurement uncertainty.",
+    "acceptedDifferenceMm": 23,
     "candidates": [
       {
         "value": 3550,
         "sourceId": "plant-kitchen-upload",
-        "status": "provided"
+        "status": "selected",
+        "origin": "provided"
       },
       {
         "value": 3573,
         "sourceId": "plant-kitchen-upload",
-        "status": "derived",
-        "derivation": "739 + 2834"
+        "status": "retained-for-traceability",
+        "origin": "derived",
+        "derivation": "739 + 2834",
+        "differenceFromSelectedMm": 23
       }
     ]
   },
