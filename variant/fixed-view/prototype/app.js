@@ -14,7 +14,7 @@ Promise.all([
   loadReferenceAsset("./i2-assets/project-reference.b64"),
   loadReferenceAsset("./i2-assets/reference-composition.b64"),
   loadJson("./i3-data/calibration.json")
-]).then(([projectImage, referenceComposition, calibration]) => {
+]).then(async ([projectImage, referenceComposition, calibration]) => {
   window.MOBILI_I1_ASSETS = Object.freeze({
     projectImage: `data:image/webp;base64,${projectImage}`,
     referenceComposition: `data:image/webp;base64,${referenceComposition}`
@@ -32,9 +32,10 @@ Promise.all([
     actions.prepend(chip);
   }
 
-  return import("./i2/app.js");
+  await import("./i2/app.js");
+  await import("./i4/realistic-reference.js");
 }).catch(error => {
-  console.error("Falha ao iniciar MobiliPresenter I3.", error);
+  console.error("Falha ao iniciar MobiliPresenter I4.", error);
   const target = document.querySelector("#diagnostics-summary");
-  if (target) target.textContent = "Falha ao carregar os contratos, referências ou calibração I3. Consulte o console.";
+  if (target) target.textContent = "Falha ao carregar contratos, referências ou a camada visual I4. Consulte o console.";
 });
