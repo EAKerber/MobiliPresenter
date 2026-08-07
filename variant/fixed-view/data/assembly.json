@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "FixedViewAssembly 0.1",
+  "id": "reserva-cachoeirinha-kitchen-laundry",
+  "projectContext": {
+    "name": "RNI Reserva Cachoeirinha",
+    "referenceId": "ref-02-condominium"
+  },
+  "camera": {
+    "mode": "fixed",
+    "status": "unverified",
+    "asset": null
+  },
+  "regions": {
+    "catalog": {
+      "role": "module-list-or-detail"
+    },
+    "scene": {
+      "role": "persistent-composition"
+    },
+    "configuration": {
+      "role": "presets-and-modifiers"
+    },
+    "project": {
+      "role": "development-context"
+    }
+  },
+  "initialCompositionPolicy": {
+    "selected": null,
+    "candidates": [
+      "empty",
+      "preset"
+    ],
+    "status": "undecided"
+  },
+  "selectionPolicy": {
+    "checkboxAffectsVisual": true,
+    "checkboxAffectsCommercial": true,
+    "nameOpensDetail": true,
+    "thumbnailOpensDetail": true,
+    "sceneModuleOpensDetail": true,
+    "sceneRemainsVisibleInDetail": true,
+    "lastEnabledHighlight": true
+  },
+  "wallEnvelope": {
+    "widthMm": null,
+    "status": "unverified",
+    "candidates": [
+      {
+        "value": 3550,
+        "sourceId": "plant-kitchen-readable",
+        "status": "provided"
+      },
+      {
+        "value": 3573,
+        "sourceId": "plant-kitchen-readable",
+        "status": "derived",
+        "derivation": "739 + 2834"
+      }
+    ]
+  },
+  "moduleOrder": [
+    "upper-laundry",
+    "lower-stove",
+    "lower-sink",
+    "refrigerator-side-panel",
+    "upper-stove",
+    "upper-sink",
+    "upper-refrigerator",
+    "lighting"
+  ],
+  "defaultEnabledModuleIds": []
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "FixedViewRules 0.1",
+  "rules": [
+    {
+      "id": "lighting-requires-refrigerator-side-panel",
+      "kind": "dependency",
+      "when": {"moduleEnabled": "lighting"},
+      "requires": {"moduleEnabled": "refrigerator-side-panel"},
+      "severity": "blocking",
+      "message": "A iluminação requer a lateral da geladeira (item 04).",
+      "affectedOperations": ["finalize", "quote"],
+      "resolution": {"type": "offer-enable-module", "moduleId": "refrigerator-side-panel"}
+    },
+    {
+      "id": "lower-handle-recommendation",
+      "kind": "recommendation",
+      "when": {"placementClass": "lower"},
+      "recommendedOneOf": ["two-hole-handle"],
+      "severity": "warning",
+      "message": "Módulos inferiores recomendam alça de dois furos.",
+      "customerOverrideAllowed": true
+    },
+    {
+      "id": "upper-opening-recommendation",
+      "kind": "recommendation",
+      "when": {"placementClass": "upper"},
+      "recommendedOneOf": ["one-hole-point", "pass-through"],
+      "severity": "warning",
+      "message": "Módulos superiores recomendam ponto de um furo ou abertura passante.",
+      "customerOverrideAllowed": true
+    }
+  ]
+}

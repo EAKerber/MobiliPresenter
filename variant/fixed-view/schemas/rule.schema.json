@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "FixedViewRules-0.1",
+  "type": "object",
+  "required": ["schemaVersion", "rules"],
+  "properties": {
+    "schemaVersion": {"const": "FixedViewRules 0.1"},
+    "rules": {
+      "type": "array",
+      "items": {"type": "object", "required": ["id", "kind", "severity", "message"]}
+    }
+  },
+  "additionalProperties": false
+}

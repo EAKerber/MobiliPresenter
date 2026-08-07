@@ -1,44 +1,38 @@
 # Documentação do MobiliPresenter
 
-Esta árvore separa fatos do sistema, decisões aceitas, propostas em discussão e material histórico. Um agente novo não deve tratar todos os documentos como igualmente autoritativos.
+Esta árvore separa fatos do sistema, decisões aceitas, propostas e material histórico.
 
-## Ordem de leitura
+## Esta branch
 
-1. `README.md` — versão publicada e URL canônica;
-2. `AGENTS.md` — governança, limites e protocolo Git;
-3. `docs/current/BASELINE-V7-I5.md` — capacidades e limites comprovados;
-4. `docs/current/COLOR-ASSET-PIPELINE.md` — assets de cor existentes, origem por gama e lacunas de proveniência;
-5. `docs/planning/SCOPE-REASSESSMENT.md` — fase atual e perguntas abertas;
-6. `docs/planning/DECISION-LOG.md` — decisões tomadas durante o planejamento.
+`variant/fixed-view-modular-showcase` é uma linha alternativa sem intenção de merge. A documentação autoritativa da variante começa em `docs/variant/README.md`.
 
-## Classes documentais
+## Ordem de leitura da variante
 
-### `current/`
+1. `README.md`;
+2. `AGENTS.md`;
+3. `docs/variant/README.md`;
+4. `docs/variant/SCOPE.md`;
+5. `docs/variant/DECISIONS.md`;
+6. `docs/variant/REFERENCE-INVENTORY.md`;
+7. `docs/variant/MEASUREMENTS.md`;
+8. `variant/fixed-view/README.md`.
 
-Fatos verificados sobre a linha de base atual. Não contém desejos futuros nem decisões ainda abertas.
+## Classes documentais herdadas
 
-### `planning/`
+- `current/` — baseline verificada da linha V7;
+- `planning/` — discussão da linha principal;
+- `history/` — evidências recuperadas;
+- `variant/` — decisões e contratos desta linha alternativa.
 
-Hipóteses, alternativas e decisões pendentes. Todo documento desta pasta deve declarar seu status. Nada aqui autoriza implementação automaticamente.
-
-### `decisions/`
-
-ADRs e decisões aceitas. Uma decisão só entra nesta pasta depois de aprovação explícita ou integração de uma PR que registre essa aprovação.
-
-### `history/`
-
-Evidências recuperadas das entregas ZIP, linhagem de versões, correções e técnicas anteriormente exploradas. Material histórico não prevalece sobre `current/` ou `decisions/`.
-
-## Regra de autoridade
-
-Em caso de conflito:
+## Autoridade na variante
 
 ```text
-contrato executável e teste atual
-→ decisão aceita
-→ baseline current
-→ planejamento
+teste e contrato em variant/fixed-view
+→ docs/variant/DECISIONS.md
+→ docs/variant/SCOPE.md
+→ inventário de referências
+→ planejamento herdado
 → histórico
 ```
 
-Dados físicos, comerciais ou construtivos desconhecidos continuam `null`, `unverified` ou equivalentes. Documentação não deve converter inferência em fato.
+Dados desconhecidos permanecem `null`, `unverified` ou equivalentes.

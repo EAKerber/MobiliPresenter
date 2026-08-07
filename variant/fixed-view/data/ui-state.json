@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "FixedViewUiState 0.1",
+  "states": {
+    "composition-list": {
+      "catalogRegion": "module-list",
+      "sceneRegion": "composition-visible",
+      "configurationRegion": "presets-visible",
+      "projectRegion": "project-context-visible"
+    },
+    "module-detail": {
+      "catalogRegion": "module-detail-with-back",
+      "sceneRegion": "composition-visible-selected-highlight",
+      "configurationRegion": "presets-visible",
+      "projectRegion": "project-context-visible"
+    }
+  },
+  "transitions": [
+    {
+      "from": "composition-list",
+      "event": "open-module-detail",
+      "to": "module-detail",
+      "preserve": [
+        "enabledModuleIds",
+        "selectedPresets",
+        "scene"
+      ]
+    },
+    {
+      "from": "module-detail",
+      "event": "back-to-list",
+      "to": "composition-list",
+      "preserve": [
+        "enabledModuleIds",
+        "selectedModuleId",
+        "selectedPresets",
+        "scene",
+        "catalogScrollPosition"
+      ]
+    }
+  ]
+}

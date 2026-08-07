@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "FixedViewReferences 0.1",
+  "references": [
+    {"id": "ref-01-module-detail", "kind": "commercial-detail", "status": "provided", "archivedAsset": null},
+    {"id": "ref-02-condominium", "kind": "project-context", "status": "provided", "archivedAsset": null},
+    {"id": "ref-03-full-composition", "kind": "full-scene", "status": "provided", "archivedAsset": null},
+    {"id": "ref-09-layout-wireframe", "kind": "ux-wireframe", "status": "provided", "archivedAsset": null},
+    {"id": "tech-upper-800-494-350", "kind": "technical-screenshot", "status": "provided", "moduleAssociation": null},
+    {"id": "tech-upper-1200-800-400", "kind": "technical-screenshot", "status": "provided", "moduleAssociation": null},
+    {"id": "tech-upper-800-700-400", "kind": "technical-screenshot", "status": "provided", "moduleAssociation": null},
+    {"id": "tech-lower-1200-760-530", "kind": "technical-screenshot", "status": "provided", "moduleAssociation": null},
+    {"id": "tech-lower-790-760-530", "kind": "technical-screenshot", "status": "provided", "moduleAssociation": null},
+    {
+      "id": "plant-context-upload",
+      "kind": "floor-plan",
+      "status": "provided",
+      "fileIdentity": {
+        "uploadedName": "8dd1fea2-5acc-4f04-be75-5fd9508b7636.png",
+        "bytes": 774079,
+        "sha256": "0ce48bf11e672579a8aa1fe25627de2c235488a22bf0d3c681c49b0bc464e4c8",
+        "archiveStatus": "identity-recorded-binary-not-promoted"
+      }
+    },
+    {
+      "id": "plant-kitchen-upload",
+      "kind": "floor-plan",
+      "status": "provided",
+      "fileIdentity": {
+        "uploadedName": "21f7ec78-9fd3-4ef0-bc4e-8a8f10a7de3e.png",
+        "bytes": 909342,
+        "sha256": "d0e0183450b38b3138ef67f918b4b9a751f74ddd53d3406741d44a586e7746d6",
+        "archiveStatus": "identity-and-observations-recorded-binary-not-promoted"
+      }
+    }
+  ],
+  "measurementObservations": [
+    {"id": "wall-total-handwritten", "valueMm": 3550, "status": "provided", "confidence": "low-medium", "sourceId": "plant-kitchen-upload"},
+    {"id": "wall-segment-a", "valueMm": 739, "status": "provided", "confidence": "low", "sourceId": "plant-kitchen-upload"},
+    {"id": "wall-segment-b", "valueMm": 2834, "status": "provided", "confidence": "medium", "sourceId": "plant-kitchen-upload"},
+    {"id": "wall-segments-sum", "valueMm": 3573, "status": "derived", "confidence": "low-medium", "sourceId": "plant-kitchen-upload", "formula": "739 + 2834"}
+  ]
+}

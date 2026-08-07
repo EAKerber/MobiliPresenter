@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "FixedViewModules-0.1",
+  "type": "object",
+  "required": ["schemaVersion", "modules"],
+  "properties": {
+    "schemaVersion": {"const": "FixedViewModules 0.1"},
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "catalogNumber",
+          "name",
+          "placementClass",
+          "commercialSelectable",
+          "visualSelectable",
+          "dimensionsMm",
+          "measurementCandidates",
+          "detail",
+          "visualAssets"
+        ],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "catalogNumber": {"type": "string", "pattern": "^[0-9]{2}$"},
+          "commercialSelectable": {"const": true},
+          "visualSelectable": {"const": true},
+          "dimensionsMm": {"type": ["object", "null"]},
+          "measurementCandidates": {"type": "array"},
+          "detail": {"type": "object", "not": {"required": ["price"]}}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

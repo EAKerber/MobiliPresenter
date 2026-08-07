@@ -1,73 +1,42 @@
-# MobiliPresenter
+# MobiliPresenter — variante Fixed View Modular Showcase
 
-Apresentador modular de mobiliário baseado em sequências de imagens pré-renderizadas, composição multimódulo e metadados físicos em milímetros.
+> **Branch isolada:** `variant/fixed-view-modular-showcase`  
+> **Integração prevista:** nenhuma. Esta linha existe para atender um escopo alternativo sem alterar a baseline V7.0-I5 nem o preview publicado em `main`.
 
-## Fase atual
+Esta variante explora um montador comercial e visual de ambiente em câmera fixa. O usuário ativa módulos por checklist, acompanha a composição realista continuamente, abre detalhes sem perder a cena e ajusta presets de frentes, puxadores e aparência.
 
-O projeto entrou em **reavaliação de escopo e priorização**. A V7.0-I5 permanece publicada e verificável, mas novos incrementos funcionais estão suspensos até a definição do novo fluxo prioritário.
+## Estado
 
-Documentos de entrada:
+A **Variante I0** prepara o solo. Ela contém:
 
-- `docs/current/BASELINE-V7-I5.md` — capacidades e limites comprovados;
-- `docs/planning/SCOPE-REASSESSMENT.md` — perguntas e entregáveis da fase;
-- `docs/planning/DECISION-LOG.md` — decisões e propostas em aberto;
-- `docs/history/V7-LINEAGE.md` — conhecimento recuperado das entregas ZIP.
+- escopo e decisões aceitas;
+- inventário das referências disponíveis;
+- identidade criptográfica das duas plantas e medições provisórias com conflitos explícitos;
+- catálogo inicial dos módulos 01–08;
+- contratos preliminares de montagem, presets, regras e estado de interface;
+- validador e testes de consistência.
 
-## Estado publicado
+Os binários das plantas ainda não foram promovidos para esta branch; tamanho, nome e SHA-256 impedem que futuras cópias semelhantes sejam aceitas silenciosamente como equivalentes.
 
-- versão: **V7.0-I5**
-- URL canônica: **https://mobilipresenter.netlify.app/**
-- finalidade atual: validação mobile pelo Netlify
-- composição de referência: gaveteiro de 399 mm à esquerda + balcão de 780 mm à direita
-- amplitude angular: yaw de -95° a +95°, passo de 5°, 39 poses
-- controles publicados: rotação, presets angulares e visibilidade independente das instâncias
-- camada fabril: resumo parcial; dados desconhecidos permanecem explícitos e não são inventados
+Ainda não há interface funcional nem render final nesta branch.
 
-## Páginas publicadas
+## Ordem de leitura
 
-- `https://mobilipresenter.netlify.app/` — viewer mobile da composição
-- `https://mobilipresenter.netlify.app/manufacturing.html` — estado semântico e fabril da V7.0-I5
+```text
+AGENTS.md
+→ docs/variant/README.md
+→ docs/variant/SCOPE.md
+→ docs/variant/DECISIONS.md
+→ docs/variant/REFERENCE-INVENTORY.md
+→ docs/variant/MEASUREMENTS.md
+→ variant/fixed-view/README.md
+```
 
-O preview hospedado é um artefato leve para validação pelo celular. Ele usa dois spritesheets WebP alinhados e não substitui o snapshot técnico completo da iteração.
+## Validação local
 
-## Linha de base técnica recuperada
+```bash
+python3 variant/fixed-view/tools/validate_i0.py
+python3 -m unittest discover -s variant/fixed-view/tests -p "test_*.py"
+```
 
-A fonte mais completa localizada é `balcao-360-v7-i5.zip`:
-
-- tamanho: 30.001.308 bytes;
-- arquivos: 2.904;
-- SHA-256: `5ba5672ebc4625b99892dc80b1ae859ed9c406eccf5ba284d523d04129948d5a`.
-
-A promoção dessa fonte para uma estrutura ativa no Git será decidida durante o planejamento, depois de separar fontes, derivados, fixtures e assets pesados.
-
-## Integridade dos artefatos publicados
-
-### Preview Netlify
-
-- artefato: `mobilipresenter-v7.0-i5-netlify-spritesheet.zip`
-- tamanho: 70.551 bytes
-- SHA-256: `38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae`
-
-### Snapshot técnico reduzido
-
-- artefato: `mobilipresenter-v7.0-i5-preview.zip`
-- tamanho: 942.520 bytes
-- SHA-256: `c158d68afff547b9c3ef83e16b2963c692b10bba65f439cbf9da261a80dd1d83`
-
-## Publicação determinística
-
-O Netlify usa a branch `main`, executa `python3 deploy.py` e publica a pasta `site`.
-
-O preview é versionado em fragmentos Base64 acompanhados de manifesto. Durante o build, `deploy.py`:
-
-1. valida o tamanho e o SHA-256 de cada fragmento;
-2. reconstrói o ZIP;
-3. valida tamanho e SHA-256 do artefato integral;
-4. rejeita membros ZIP inseguros;
-5. extrai o site somente após todas as verificações.
-
-Uma divergência interrompe o deploy em vez de publicar conteúdo parcial ou silenciosamente diferente.
-
-## Governança Git
-
-Este repositório é exclusivo do projeto MobiliPresenter. Operações em qualquer outro repositório exigem confirmação explícita no chat ativo. O protocolo completo para agentes está em `AGENTS.md`.
+A linha publicada continua documentada na branch `main`. Nada nesta variante deve ser promovido para `main` sem uma nova autorização explícita.

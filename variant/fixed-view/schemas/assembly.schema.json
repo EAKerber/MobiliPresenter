@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "FixedViewAssembly-0.1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "camera",
+    "regions",
+    "initialCompositionPolicy",
+    "selectionPolicy",
+    "wallEnvelope",
+    "moduleOrder"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "FixedViewAssembly 0.1"},
+    "camera": {
+      "type": "object",
+      "properties": {"mode": {"const": "fixed"}},
+      "required": ["mode"]
+    },
+    "selectionPolicy": {
+      "type": "object",
+      "properties": {
+        "checkboxAffectsVisual": {"const": true},
+        "checkboxAffectsCommercial": {"const": true},
+        "sceneRemainsVisibleInDetail": {"const": true}
+      },
+      "required": [
+        "checkboxAffectsVisual",
+        "checkboxAffectsCommercial",
+        "sceneRemainsVisibleInDetail"
+      ]
+    },
+    "moduleOrder": {"type": "array", "items": {"type": "string"}},
+    "wallEnvelope": {"type": "object"}
+  },
+  "additionalProperties": true
+}
