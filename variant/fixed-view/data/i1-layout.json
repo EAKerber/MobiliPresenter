@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "FixedViewLayout 0.1",
+  "id": "reserva-cachoeirinha-i1-provisional",
+  "status": "provisional-visual-layout",
+  "sourceReferenceId": "ref-03-full-composition",
+  "wallEnvelope": {
+    "widthMm": 3550,
+    "status": "accepted-for-planning"
+  },
+  "referenceImage": {
+    "assetId": "referenceComposition",
+    "viewBox": {
+      "width": 1423,
+      "height": 810
+    }
+  },
+  "baseModes": [
+    {
+      "id": "neutral-wall",
+      "name": "Parede neutra",
+      "description": "Cena abstrata sem módulos ativos."
+    },
+    {
+      "id": "reference-context",
+      "name": "Contexto de referência",
+      "description": "Referência completa aparece suavizada como guia provisória."
+    }
+  ],
+  "placements": [
+    {"moduleId": "upper-laundry", "sceneRect": {"x": 145, "y": 75, "width": 215, "height": 225}, "zIndex": 20},
+    {"moduleId": "lower-stove", "sceneRect": {"x": 485, "y": 485, "width": 220, "height": 270}, "zIndex": 30},
+    {"moduleId": "lower-sink", "sceneRect": {"x": 695, "y": 485, "width": 355, "height": 270}, "zIndex": 31},
+    {"moduleId": "refrigerator-side-panel", "sceneRect": {"x": 1014, "y": 70, "width": 48, "height": 690}, "zIndex": 18},
+    {"moduleId": "upper-stove", "sceneRect": {"x": 495, "y": 78, "width": 220, "height": 225}, "zIndex": 21},
+    {"moduleId": "upper-sink", "sceneRect": {"x": 700, "y": 78, "width": 350, "height": 225}, "zIndex": 22},
+    {"moduleId": "upper-refrigerator", "sceneRect": {"x": 1040, "y": 65, "width": 230, "height": 245}, "zIndex": 23},
+    {"moduleId": "lighting", "sceneRect": {"x": 690, "y": 285, "width": 370, "height": 34}, "zIndex": 40}
+  ],
+  "notes": [
+    "Retângulos são hit areas e recortes provisórios derivados visualmente da referência.",
+    "Eles não representam cotas de fabricação nem limites finais de render.",
+    "A câmera e os ativos finais continuam pendentes."
+  ]
+}
