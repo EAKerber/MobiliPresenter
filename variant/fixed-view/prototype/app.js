@@ -33,9 +33,9 @@ Promise.all([
   }
 
   await import("./i2/app.js");
-  await import("./i4/realistic-reference.js");
+  await import("./i4-1/module03-sprite.js");
 }).catch(error => {
-  console.error("Falha ao iniciar MobiliPresenter I4.", error);
+  console.error("Falha ao iniciar MobiliPresenter I4.1.", error);
   const target = document.querySelector("#diagnostics-summary");
-  if (target) target.textContent = "Falha ao carregar contratos, referências ou a camada visual I4. Consulte o console.";
+  if (target) target.textContent = "Falha ao carregar contratos, referências ou o sprite I4.1. Consulte o console.";
 });
