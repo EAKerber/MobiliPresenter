@@ -46,4 +46,4 @@ jobs:
           node --check prototype/i2/data-loader.js
           node --check prototype/i2/renderer.js
           node --check prototype/i2/app.js
-          node --check prototype/i4/realistic-reference.js
+          node --check prototype/i4-1/module03-sprite.js
