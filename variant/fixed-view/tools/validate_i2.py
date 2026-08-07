@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,7 @@ def validate() -> list[str]:
     layout = load_json("layout.json")
     presets = load_json("presets.json")
     references = load_json("references.json")
+    visual_assets = load_json("visual-assets.json")
 
     ids = [module["id"] for module in modules]
     require(len(ids) == len(set(ids)) == 8, "I2 must expose eight unique modules")
@@ -76,6 +79,16 @@ def validate() -> list[str]:
     require(presets["policies"]["priceInModuleDetail"] is False, "price must remain outside detail")
     require(references["appliances"]["status"] == "illustrative", "reference appliance policy mismatch")
 
+    visual_by_id = {item["id"]: item for item in visual_assets["assets"]}
+    for asset_id in ("project-reference", "reference-composition"):
+        item = visual_by_id[asset_id]
+        b64_path = PROTOTYPE / item["runtimePath"].removeprefix("./")
+        encoded = b64_path.read_text(encoding="ascii").strip()
+        decoded = base64.b64decode(encoded, validate=True)
+        require(decoded[:4] == b"RIFF" and decoded[8:12] == b"WEBP", f"{asset_id} must decode as WebP")
+        require(hashlib.sha256(decoded).hexdigest() == item["derivedSha256"], f"{asset_id} derived SHA mismatch")
+    require(visual_by_id["project-reference"]["source"]["provenance"] == "user-provided", "project image must retain user provenance")
+
     required_files = [
         PROTOTYPE / "i2" / "data-loader.js",
         PROTOTYPE / "i2" / "renderer.js",
@@ -99,6 +112,7 @@ def validate() -> list[str]:
         "18 mm MDF policy validated",
         "item 03 topology: 4 drawers + 2 doors validated",
         "item 02 freestanding stove fallback validated",
+        "user-provided visual assets validated",
         "I2 topology-driven runtime validated",
     ]
 
