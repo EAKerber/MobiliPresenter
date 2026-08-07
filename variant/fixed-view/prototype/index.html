@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MobiliPresenter — Variante fixa I1</title>
+  <meta name="description" content="Protótipo interativo da variante de composição modular em câmera fixa.">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Variante paralela · I1 funcional</p>
+      <h1>MobiliPresenter</h1>
+    </div>
+    <div class="topbar-actions">
+      <span class="status-chip">Parede operacional: 3550 mm</span>
+      <button id="reset-all" class="button button-secondary" type="button">Limpar seleção</button>
+      <button id="enable-all" class="button button-primary" type="button">Conjunto completo</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="catalog-panel panel" aria-label="Catálogo e detalhamento">
+      <section id="catalog-list-view" class="catalog-view">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Módulos</p>
+            <h2>Seleção visual e comercial</h2>
+          </div>
+          <span id="selection-count" class="counter">0/8</span>
+        </div>
+        <p class="panel-help">Marque para incluir. Clique no nome ou na miniatura para ver detalhes sem perder a cena.</p>
+        <div id="module-list" class="module-list"></div>
+      </section>
+
+      <section id="catalog-detail-view" class="catalog-view" hidden>
+        <button id="back-to-list" class="back-button" type="button">← Voltar aos módulos</button>
+        <div id="module-detail"></div>
+      </section>
+    </aside>
+
+    <section class="scene-panel panel" aria-label="Composição visual">
+      <div class="scene-toolbar">
+        <div>
+          <p class="eyebrow">Cena fixa</p>
+          <h2>Composição da cozinha e lavanderia</h2>
+        </div>
+        <div class="segmented" role="group" aria-label="Modo de contexto">
+          <button type="button" data-base-mode="neutral-wall" class="is-active">Parede neutra</button>
+          <button type="button" data-base-mode="reference-context">Contexto de referência</button>
+        </div>
+      </div>
+
+      <div id="scene-wrap" class="scene-wrap" data-base-mode="neutral-wall">
+        <div class="neutral-scene" aria-hidden="true">
+          <div class="tile-grid"></div>
+          <div class="appliance appliance-washer"></div>
+          <div class="appliance appliance-tub"></div>
+          <div class="appliance appliance-oven"></div>
+          <div class="appliance appliance-fridge"></div>
+          <div class="counter-line"></div>
+        </div>
+        <img class="reference-context" src="./assets/reference-composition.webp" alt="" aria-hidden="true">
+        <svg id="module-scene" class="module-scene" viewBox="0 0 1423 810" role="img" aria-label="Módulos ativos na composição">
+          <defs id="scene-defs"></defs>
+          <g id="scene-modules"></g>
+          <g id="scene-hit-areas"></g>
+        </svg>
+        <div id="scene-empty-state" class="scene-empty-state">
+          <strong>Parede disponível</strong>
+          <span>Ative módulos na lista para montar a composição.</span>
+        </div>
+      </div>
+
+      <div class="scene-footer">
+        <div id="diagnostics-summary" class="diagnostics-summary" aria-live="polite"></div>
+        <button id="finalize-button" class="button button-primary" type="button">Revisar composição</button>
+      </div>
+    </section>
+
+    <aside class="options-column">
+      <section class="project-panel panel">
+        <p class="eyebrow">Empreendimento</p>
+        <img id="project-image" alt="RNI Reserva Cachoeirinha">
+        <h2>RNI Reserva Cachoeirinha</h2>
+        <p>Referência contextual provisória do projeto.</p>
+      </section>
+
+      <section class="config-panel panel" aria-label="Configuração">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuração</p>
+            <h2>Presets e ajustes</h2>
+          </div>
+        </div>
+
+        <fieldset>
+          <legend>Cor das frentes</legend>
+          <div id="color-options" class="swatches"></div>
+          <p class="field-note">As caixas permanecem brancas.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Abertura recomendada</legend>
+          <button id="apply-recommended" class="button button-secondary button-full" type="button">Aplicar preset recomendado</button>
+          <p class="field-note">Inferiores priorizam alças; superiores priorizam ponto ou passante.</p>
+        </fieldset>
+
+        <fieldset id="selected-module-config" disabled>
+          <legend>Módulo em foco</legend>
+          <p id="selected-module-name" class="selected-module-name">Selecione um módulo</p>
+          <label for="opening-select">Tipo de abertura</label>
+          <select id="opening-select"></select>
+          <p id="opening-recommendation" class="field-note"></p>
+        </fieldset>
+
+        <section class="commercial-summary">
+          <h3>Resumo comercial</h3>
+          <p><strong id="commercial-count">0</strong> módulos incluídos</p>
+          <p id="modifier-count">Nenhum modificador ativo</p>
+          <p class="field-note">Preço não integra o detalhamento nesta variante.</p>
+        </section>
+
+        <section id="issues-list" class="issues-list" aria-live="polite"></section>
+      </section>
+    </aside>
+  </main>
+
+  <template id="module-row-template">
+    <article class="module-row">
+      <label class="check-wrap">
+        <input type="checkbox">
+        <span class="custom-check" aria-hidden="true"></span>
+      </label>
+      <button class="module-open" type="button">
+        <span class="module-thumb"></span>
+        <span class="module-copy">
+          <span class="module-number"></span>
+          <strong class="module-name"></strong>
+          <small class="module-status"></small>
+        </span>
+      </button>
+      <span class="module-badge" hidden></span>
+    </article>
+  </template>
+
+  <script src="./assets.js"></script>
+  <script src="./runtime-data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
