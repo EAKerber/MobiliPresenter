@@ -26,10 +26,15 @@ class I0ContractsTest(unittest.TestCase):
         ui = json.loads((ROOT / "data" / "ui-state.json").read_text(encoding="utf-8"))
         self.assertEqual(ui["states"]["module-detail"]["sceneRegion"], "composition-visible-selected-highlight")
 
-    def test_wall_conflict_is_not_silently_resolved(self) -> None:
+    def test_wall_width_uses_explicit_user_decision(self) -> None:
         assembly = json.loads((ROOT / "data" / "assembly.json").read_text(encoding="utf-8"))
-        self.assertIsNone(assembly["wallEnvelope"]["widthMm"])
-        self.assertEqual({c["value"] for c in assembly["wallEnvelope"]["candidates"]}, {3550, 3573})
+        wall = assembly["wallEnvelope"]
+        self.assertEqual(wall["widthMm"], 3550)
+        self.assertEqual(wall["status"], "accepted-for-planning")
+        self.assertEqual(wall["acceptedDifferenceMm"], 23)
+        self.assertEqual({candidate["value"] for candidate in wall["candidates"]}, {3550, 3573})
+        retained = next(candidate for candidate in wall["candidates"] if candidate["value"] == 3573)
+        self.assertEqual(retained["status"], "retained-for-traceability")
 
 
 if __name__ == "__main__":
