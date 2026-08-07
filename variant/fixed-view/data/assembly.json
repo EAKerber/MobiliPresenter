@@ -47,12 +47,12 @@
     "candidates": [
       {
         "value": 3550,
-        "sourceId": "plant-kitchen-readable",
+        "sourceId": "plant-kitchen-upload",
         "status": "provided"
       },
       {
         "value": 3573,
-        "sourceId": "plant-kitchen-readable",
+        "sourceId": "plant-kitchen-upload",
         "status": "derived",
         "derivation": "739 + 2834"
       }
