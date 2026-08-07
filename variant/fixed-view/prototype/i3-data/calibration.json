@@ -20,6 +20,18 @@
     "policy": "global-envelope-only",
     "pixelToMmConversionAllowed": false
   },
+  "architecture": {
+    "laundryColumn": {
+      "role": "fixed-environment-obstruction",
+      "wallSpanMm": 739,
+      "internalProjectionMm": 206,
+      "heightMm": null,
+      "dimensionStatus": "user-confirmed",
+      "positionStatus": "reference-calibrated",
+      "source": "user-provided floor plan plus explicit measurement",
+      "notes": "Structural column behind the laundry sink/tank. It remains present independently of module selection. Exact camera-space placement may be recalibrated without changing these confirmed dimensions."
+    }
+  },
   "policies": {
     "fabricationUseAllowed": false,
     "deriveMissingDimensionsFromPixels": false,
