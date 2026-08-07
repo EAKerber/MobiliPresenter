@@ -1,13 +1,17 @@
 [build]
-  command = "python3 deploy.py"
-  publish = "site"
-
-[[headers]]
-  for = "/*.webp"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+  publish = "variant/fixed-view/prototype"
 
 [[headers]]
   for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.css"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
