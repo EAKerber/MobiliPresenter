@@ -23,10 +23,10 @@
 - iluminação depende do painel 04;
 - a cena permanece visível no estado de detalhe;
 - dimensões conflitantes ficam em `measurementCandidates`;
-- planta candidata preserva 3550 e 3573 sem escolher silenciosamente;
+- largura operacional usa 3550 mm por decisão explícita; 3573 mm permanece como observação derivada e a diferença de 23 mm fica registrada;
 - referências binárias têm tamanho e SHA-256;
 - validador e testes passam sem dependências externas.
 
 ## Encerramento do I0
 
-O I0 termina com solo estruturado, não com interface. O próximo recorte deve ser escolhido após confirmar a parede útil e decidir se o primeiro protótipo será um wireframe interativo ou já incorporará um ambiente realista provisório.
+O I0 termina com solo estruturado, não com interface. A largura de 3550 mm já permite iniciar o próximo protótipo; a confirmação de obra continua necessária apenas antes de decisões fabricáveis ou de instalação. O próximo recorte deve decidir entre wireframe interativo e ambiente realista provisório.
