@@ -7,6 +7,10 @@ async function loadJson(path) {
 }
 
 export async function loadI2Data() {
+  const calibrationPromise = window.MOBILI_I3_CALIBRATION
+    ? Promise.resolve(window.MOBILI_I3_CALIBRATION)
+    : loadJson("./i3-data/calibration.json");
+
   const [moduleDocs, assembly, rules, baseLayout, presets, references, calibration] = await Promise.all([
     Promise.all(MODULE_IDS.map(id => loadJson(`./i2-data/module-${id}.json`))),
     loadJson("./i2-data/assembly.json"),
@@ -14,7 +18,7 @@ export async function loadI2Data() {
     loadJson("./i2-data/layout.json"),
     loadJson("./i2-data/presets.json"),
     loadJson("./i2-data/references.json"),
-    loadJson("./i3-data/calibration.json")
+    calibrationPromise
   ]);
 
   const modules = moduleDocs.map(doc => doc.module);
