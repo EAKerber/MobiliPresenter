@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "FixedViewI1Package 1.0",
+  "artifact": "mobilipresenter-fixed-view-i1-runtime.zip",
+  "decodedBytes": 65820,
+  "sha256": "47a4f4cae188e778f98c58f39764606f4705300be95dca756199b333e9652e1e",
+  "base64Length": 87760,
+  "chunkSize": 14000,
+  "chunkCount": 7,
+  "chunks": [
+    {
+      "path": "variant/fixed-view/i1-package/chunks/000.b64",
+      "chars": 14000,
+      "sha256": "2072c0c7188e74b972ca0f1580aa7e44b4a49e6433b440323875192b7976f634"
+    },
+    {
+      "path": "variant/fixed-view/i1-package/chunks/001.b64",
+      "chars": 14000,
+      "sha256": "3d3f55b37b8e49fce43515fb46724a587bb84a156e238a9f943322019a680f83"
+    },
+    {
+      "path": "variant/fixed-view/i1-package/chunks/002.b64",
+      "chars": 14000,
+      "sha256": "d25ecb7009f7aa45c397edd54802349fe7b38874545c224eda67b13b6d3f2f25"
+    },
+    {
+      "path": "variant/fixed-view/i1-package/chunks/003.b64",
+      "chars": 14000,
+      "sha256": "d1e47c61be8ea7c9e7535d7f0f9ff814d4136d4d9fb054d914993369a3c13141"
+    },
+    {
+      "path": "variant/fixed-view/i1-package/chunks/004.b64",
+      "chars": 14000,
+      "sha256": "c66d8580ae3fe6c5e144d4498e498ae46f0e76127d974af929d296bbbdcf4874"
+    },
+    {
+      "path": "variant/fixed-view/i1-package/chunks/005.b64",
+      "chars": 14000,
+      "sha256": "f84b81f08e510106de1be7139d8550b49e4d551e1a0f4b73da42a2d7229a2138"
+    },
+    {
+      "path": "variant/fixed-view/i1-package/chunks/006.b64",
+      "chars": 3760,
+      "sha256": "2765de0fcb755c3ceceafbc321e61954a2b1d1f9dbe061ad25871a50d3d03d39"
+    }
+  ],
+  "extractRoot": "repository-root",
+  "contents": [
+    "variant/fixed-view/prototype/",
+    "variant/fixed-view/tools/build_i1.py",
+    "variant/fixed-view/tools/validate_i1.py",
+    "variant/fixed-view/tests/test_i1_contracts.py",
+    "variant/fixed-view/tests/browser_smoke_i1.py",
+    "variant/fixed-view/reports/browser-smoke-i1.json"
+  ]
+}
