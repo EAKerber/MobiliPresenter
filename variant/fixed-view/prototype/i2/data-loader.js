@@ -6,22 +6,14 @@ async function loadJson(path) {
   return response.json();
 }
 
-async function loadText(path) {
-  const response = await fetch(path, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Falha ao carregar ${path}: ${response.status}`);
-  return (await response.text()).trim();
-}
-
 export async function loadI2Data() {
-  const [moduleDocs, assembly, rules, layout, presets, references, projectBase64, compositionBase64] = await Promise.all([
+  const [moduleDocs, assembly, rules, layout, presets, references] = await Promise.all([
     Promise.all(MODULE_IDS.map(id => loadJson(`./i2-data/module-${id}.json`))),
     loadJson("./i2-data/assembly.json"),
     loadJson("./i2-data/rules.json"),
     loadJson("./i2-data/layout.json"),
     loadJson("./i2-data/presets.json"),
-    loadJson("./i2-data/references.json"),
-    loadText("./i2-assets/project-reference.b64"),
-    loadText("./i2-assets/reference-composition.b64")
+    loadJson("./i2-data/references.json")
   ]);
 
   const modules = moduleDocs.map(doc => doc.module);
@@ -38,11 +30,6 @@ export async function loadI2Data() {
     rules: rules.rules,
     layout,
     presets,
-    references,
-    visualAssets: {
-      projectImage: `data:image/webp;base64,${projectBase64}`,
-      referenceComposition: `data:image/webp;base64,${compositionBase64}`,
-      provenance: "user-provided references; compressed to WebP for prototype delivery"
-    }
+    references
   };
 }
