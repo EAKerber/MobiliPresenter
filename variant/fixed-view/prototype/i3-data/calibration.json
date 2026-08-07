@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "FixedViewVisualCalibration 0.1",
+  "schemaVersion": "FixedViewVisualCalibration 0.2",
   "id": "reserva-cachoeirinha-fixed-camera-provisional",
   "status": "presentation-calibrated-not-fabrication-ready",
   "camera": {
@@ -29,6 +29,14 @@
       "dimensionStatus": "user-confirmed",
       "positionStatus": "reference-calibrated",
       "source": "user-provided floor plan plus explicit measurement",
+      "cameraRect": {
+        "x": 255,
+        "y": 0,
+        "width": 245,
+        "height": 810,
+        "confidence": "low",
+        "basis": "visual anchor behind laundry sink/tank; may move without changing the confirmed 739 x 206 mm dimensions"
+      },
       "notes": "Structural column behind the laundry sink/tank. It remains present independently of module selection. Exact camera-space placement may be recalibrated without changing these confirmed dimensions."
     }
   },
@@ -51,7 +59,7 @@
     {"moduleId":"upper-laundry","rect":{"x":145,"y":75,"width":215,"height":225},"confidence":"medium","basis":"visual match to supplied full composition and module 01 sheets"},
     {"moduleId":"lower-stove","rect":{"x":485,"y":485,"width":220,"height":270},"confidence":"high","basis":"clearly bounded appliance/module opening in supplied composition and module 02 sheets"},
     {"moduleId":"lower-sink","rect":{"x":695,"y":485,"width":355,"height":270},"confidence":"high","basis":"clearly bounded lower run; topology locked to four drawers plus two doors"},
-    {"moduleId":"refrigerator-side-panel","rect":{"x":1014,"y":70,"width":48,"height":690},"confidence":"medium","basis":"thin technical panel is visually subtle; position supported by module 04 sheet"},
+    {"moduleId":"refrigerator-side-panel","rect":{"x":1049,"y":70,"width":10,"height":690},"confidence":"medium","basis":"presentation width constrained to the visually thin 18 mm panel from module 04 references; exact camera x remains calibratable"},
     {"moduleId":"upper-stove","rect":{"x":495,"y":78,"width":220,"height":225},"confidence":"high","basis":"module 05 bounds visible in supplied composition"},
     {"moduleId":"upper-sink","rect":{"x":700,"y":78,"width":350,"height":225},"confidence":"high","basis":"module 06 bounds visible in supplied composition"},
     {"moduleId":"upper-refrigerator","rect":{"x":1040,"y":65,"width":230,"height":245},"confidence":"high","basis":"module 07 bounds visible above refrigerator"},
