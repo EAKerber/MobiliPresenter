@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "MobiliPresenterUserArtifactManifest 1.0",
+  "status": "verified-ci-source",
+  "source": {
+    "branch": "renderer/fixed-view-realistic-v1",
+    "commit": "e2864a0b2e0ce89aeb27c8216699bf68f0b868a8",
+    "workflowRunId": 31341138087,
+    "workflowArtifacts": [
+      {"id":9045878504,"name":"viewer-next-visual-baseline","digest":"sha256:fbd11102a045259664a023ff9a8e39fc8b71dfa0a7f872cbe5237d37e2131c06"},
+      {"id":9045878725,"name":"viewer-next-fidelity-overlay","digest":"sha256:643441ca5d568baabfad4b7b4a595f1a7465de7f7bde36cce5c4e58d27a7bc37"}
+    ]
+  },
+  "durableFilesAlreadyMaterialized": [
+    "readability-report.json",
+    "fidelity-evidence.json"
+  ],
+  "durableBinaryPublisher": {
+    "workflow": ".github/workflows/viewer-next.yml",
+    "targetBranch": "tmp/fh06-user-artifacts",
+    "targetPathPattern": "artifacts/fh06/<source-short-sha>/",
+    "expectedFiles": [
+      "visual/renderer-baseline.png",
+      "fidelity/fidelity-overlay-1x.png",
+      "fidelity/readability-crops/*",
+      "fh06-<source-short-sha>-verified-bundle.zip"
+    ]
+  },
+  "invalidated": [
+    {"name":"round-20-fh06-candidate.zip","reason":"local staging copy measured only 22 bytes"}
+  ]
+}
