@@ -25,16 +25,16 @@ function definitionFor(item) {
   return definition;
 }
 
-function <=(actual, limit, epsilon = 1e-9) {
+function assertAtMost(actual, limit, epsilon = 1e-9) {
   assert.ok(actual <= limit + epsilon, `${actual} > ${limit}`);
 }
 
 test("every active appliance/fixture has deterministic fit inside its authorized body envelope", () => {
   for (const item of applianceItems) {
     const fit = resolveApplianceFit(currentSceneBase, item, definitionFor(item));
-    <=(fit.fittedMm.width, fit.envelopeMm.width);
-    <=(fit.fittedMm.height, fit.envelopeMm.height);
-    <=(fit.fittedMm.depth, fit.envelopeMm.depth);
+    assertAtMost(fit.fittedMm.width, fit.envelopeMm.width);
+    assertAtMost(fit.fittedMm.height, fit.envelopeMm.height);
+    assertAtMost(fit.fittedMm.depth, fit.envelopeMm.depth);
     assert.ok(fit.offsetMm.every(value => value >= -1e-9), `${item.id}: negative fit offset`);
   }
 });
