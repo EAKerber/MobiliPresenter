@@ -1,5 +1,11 @@
 import { aabbSize } from "../core/math.js";
-import type { DimensionTripleMm, ModuleGeometry, SceneEntityBase, ScenePackage, SourceBinding } from "./model.js";
+import type {
+  DimensionTripleMm,
+  ModuleGeometry,
+  SceneEntityBase,
+  ScenePackage,
+  SourceBinding
+} from "./model.js";
 import { MOBILIPRESENTER_COORDINATE_SYSTEM, SCENE_PACKAGE_SCHEMA_VERSION } from "./model.js";
 
 export interface ValidationIssue {
@@ -54,6 +60,33 @@ function validateBindings(bindings: readonly SourceBinding[]): ValidationIssue[]
   return issues;
 }
 
+function validateHostGraph(scene: ScenePackage): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const entities = [...scene.environment, ...scene.items, ...scene.modules];
+  const byId = new Map(entities.map(entity => [entity.id, entity] as const));
+
+  for (const entity of entities) {
+    if (entity.hostId && !byId.has(entity.hostId)) {
+      issues.push({ code: "HOST_NOT_FOUND", path: `${entity.id}.hostId`, detail: entity.hostId });
+    }
+  }
+
+  const state = new Map<string, "visiting" | "done">();
+  const visit = (id: string): void => {
+    if (state.get(id) === "done") return;
+    if (state.get(id) === "visiting") {
+      issues.push({ code: "HOST_CYCLE", path: id, detail: "host dependency graph must be acyclic" });
+      return;
+    }
+    state.set(id, "visiting");
+    const hostId = byId.get(id)?.hostId;
+    if (hostId && byId.has(hostId)) visit(hostId);
+    state.set(id, "done");
+  };
+  for (const id of byId.keys()) visit(id);
+  return issues;
+}
+
 export function validateScenePackage(scene: ScenePackage): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (scene.schemaVersion !== SCENE_PACKAGE_SCHEMA_VERSION) issues.push({ code: "SCENE_SCHEMA_UNSUPPORTED", path: "schemaVersion", detail: scene.schemaVersion });
@@ -64,15 +97,23 @@ export function validateScenePackage(scene: ScenePackage): ValidationIssue[] {
   if (!(scene.camera.nearMm > 0 && scene.camera.farMm > scene.camera.nearMm)) issues.push({ code: "CAMERA_CLIP_INVALID", path: "camera", detail: "near/far clip range invalid" });
 
   const entityIds = new Set<string>();
-  const entities = [...scene.environment, ...scene.modules];
-  for (const entity of entities) {
-    const path = entity.kind === "module" ? `modules[${scene.modules.indexOf(entity)}]` : `environment[${scene.environment.indexOf(entity)}]`;
-    if (entityIds.has(entity.id)) issues.push({ code: "ENTITY_ID_DUPLICATE", path: `${path}.id`, detail: entity.id });
-    entityIds.add(entity.id);
-    issues.push(...validateEntityBase(entity, path));
-    if (entity.kind === "module") issues.push(...validateModule(entity, path));
+  const groups = [
+    ["environment", scene.environment],
+    ["items", scene.items],
+    ["modules", scene.modules]
+  ] as const;
+  for (const [groupName, group] of groups) {
+    for (let index = 0; index < group.length; index++) {
+      const entity = group[index]!;
+      const path = `${groupName}[${index}]`;
+      if (entityIds.has(entity.id)) issues.push({ code: "ENTITY_ID_DUPLICATE", path: `${path}.id`, detail: entity.id });
+      entityIds.add(entity.id);
+      issues.push(...validateEntityBase(entity, path));
+      if (entity.kind === "module") issues.push(...validateModule(entity, path));
+    }
   }
-  for (const entity of entities) if (entity.hostId && !entityIds.has(entity.hostId)) issues.push({ code: "HOST_NOT_FOUND", path: `${entity.id}.hostId`, detail: entity.hostId });
+
+  issues.push(...validateHostGraph(scene));
   issues.push(...validateBindings(scene.sourceBindings));
   return issues;
 }
