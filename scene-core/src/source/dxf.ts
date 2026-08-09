@@ -59,8 +59,8 @@ function envelopeFromLayers(layers: readonly DxfLayerInventory[], origin: readon
   const absoluteMax: [number, number, number] = [-Infinity, -Infinity, -Infinity];
   for (const layer of layers) {
     for (let axis = 0; axis < 3; axis++) {
-      absoluteMin[axis] = Math.min(absoluteMin[axis], layer.min[axis]!);
-      absoluteMax[axis] = Math.max(absoluteMax[axis], layer.max[axis]!);
+      absoluteMin[axis] = Math.min(absoluteMin[axis]!, layer.min[axis]!);
+      absoluteMax[axis] = Math.max(absoluteMax[axis]!, layer.max[axis]!);
     }
   }
   const min = localFromAbsolute(absoluteMin, origin);
