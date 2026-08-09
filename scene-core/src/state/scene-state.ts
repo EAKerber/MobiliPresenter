@@ -7,15 +7,12 @@ import type {
   SemanticLayer,
   VisibilityIntent
 } from "../contracts/model.js";
+import type { RigidTransform } from "../core/math.js";
+import { composeTransforms } from "../core/math.js";
 
 export type AnySceneEntity = EnvironmentGeometry | ModuleGeometry | SceneItem;
 
-export type VisibilityReason =
-  | "visible"
-  | "intent-off"
-  | "default-hidden"
-  | "host-hidden"
-  | "host-missing";
+export type VisibilityReason = "visible" | "intent-off" | "default-hidden" | "host-hidden" | "host-missing";
 
 export interface EffectiveVisibility {
   readonly entityId: string;
@@ -43,6 +40,31 @@ export function listControllables(scene: ScenePackage): readonly AnySceneEntity[
   return allSceneEntities(scene).filter(entityIsControllable);
 }
 
+export function resolveWorldTransforms(scene: ScenePackage): ReadonlyMap<string, RigidTransform> {
+  const entities = new Map(allSceneEntities(scene).map(entity => [entity.id, entity] as const));
+  const resolved = new Map<string, RigidTransform>();
+  const visiting = new Set<string>();
+
+  const resolveOne = (entity: AnySceneEntity): RigidTransform => {
+    const cached = resolved.get(entity.id);
+    if (cached) return cached;
+    if (visiting.has(entity.id)) throw new Error(`TRANSFORM_DEPENDENCY_CYCLE:${entity.id}`);
+    visiting.add(entity.id);
+    let world = entity.transform;
+    if (entity.mountPolicy === "hosted" && entity.hostId) {
+      const host = entities.get(entity.hostId);
+      if (!host) throw new Error(`HOST_NOT_FOUND:${entity.hostId}`);
+      world = composeTransforms(resolveOne(host), entity.transform);
+    }
+    visiting.delete(entity.id);
+    resolved.set(entity.id, world);
+    return world;
+  };
+
+  for (const entity of entities.values()) resolveOne(entity);
+  return resolved;
+}
+
 export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<string, EffectiveVisibility> {
   const entities = new Map(allSceneEntities(scene).map(entity => [entity.id, entity] as const));
   const resolved = new Map<string, EffectiveVisibility>();
@@ -54,11 +76,8 @@ export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<str
     if (visiting.has(entity.id)) throw new Error(`VISIBILITY_DEPENDENCY_CYCLE:${entity.id}`);
     visiting.add(entity.id);
 
-    let effectiveVisible = entity.visibilityIntent === "on" ||
-      (entity.visibilityIntent === "auto" && entity.defaultVisible);
-    let reason: VisibilityReason = effectiveVisible
-      ? "visible"
-      : entity.visibilityIntent === "off" ? "intent-off" : "default-hidden";
+    let effectiveVisible = entity.visibilityIntent === "on" || (entity.visibilityIntent === "auto" && entity.defaultVisible);
+    let reason: VisibilityReason = effectiveVisible ? "visible" : entity.visibilityIntent === "off" ? "intent-off" : "default-hidden";
 
     if (entity.mountPolicy === "hosted") {
       const host = entity.hostId ? entities.get(entity.hostId) : undefined;
@@ -81,11 +100,7 @@ export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<str
   return resolved;
 }
 
-export function setVisibilityIntent(
-  scene: ScenePackage,
-  entityId: string,
-  visibilityIntent: VisibilityIntent
-): ScenePackage {
+export function setVisibilityIntent(scene: ScenePackage, entityId: string, visibilityIntent: VisibilityIntent): ScenePackage {
   let found = false;
   const update = <T extends AnySceneEntity>(entity: T): T => {
     if (entity.id !== entityId) return entity;
