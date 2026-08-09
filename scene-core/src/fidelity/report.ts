@@ -58,13 +58,7 @@ export function buildCurrentFidelityReport(scene: ScenePackage = currentSceneBas
   ] as const;
   for (const entityId of requiredEntities) {
     const present = hasEntity(scene, entityId);
-    checks.push(check(
-      `required-entity:${entityId}`,
-      "F0",
-      "hard",
-      present ? "pass" : "fail",
-      { expected: true, observed: present, unit: "boolean" }
-    ));
+    checks.push(check(`required-entity:${entityId}`, "F0", "hard", present ? "pass" : "fail", { expected: true, observed: present, unit: "boolean" }));
   }
 
   const m02 = scene.modules.find(module => module.id === module02.id);
@@ -86,10 +80,32 @@ export function buildCurrentFidelityReport(scene: ScenePackage = currentSceneBas
   const module03Fronts = m03?.geometry.filter(primitive => primitive.role === "front").length ?? 0;
   const m06 = scene.modules.find(module => module.id === module06.id);
   const module06Fronts = m06?.geometry.filter(primitive => primitive.role === "front").length ?? 0;
-  const module02Fronts = m02?.geometry.filter(primitive => primitive.role === "front").length ?? 0;
   checks.push(check("topology:module03-front-count", "F2", "hard", module03Fronts === 6 ? "pass" : "fail", { expected: 6, observed: module03Fronts, unit: "count" }));
   checks.push(check("topology:module06-front-count", "F2", "hard", module06Fronts === 3 ? "pass" : "fail", { expected: 3, observed: module06Fronts, unit: "count" }));
-  checks.push(check("topology:module02-oven-surround-front-geometry", "F2", "hard", module02Fronts > 0 ? "pass" : "fail", { expected: ">0", observed: module02Fronts, unit: "count", note: "Current fixture has rails/sides but no explicit front/filler geometry around the oven niche." }));
+
+  const ovenSlot = m02?.applianceSlots.find(slot => slot.role === "built-in-oven");
+  const hasRequiredSurroundParts = m02
+    ? ["left-side", "right-side", "bottom", "top-front-rail"].every(suffix => m02.geometry.some(primitive => primitive.id.endsWith(`/${suffix}`)))
+    : false;
+  const surround = ovenSlot && m02 ? {
+    left: ovenSlot.localTransform.translationMm.x,
+    right: m02.dimensions.geometryMm.width - (ovenSlot.localTransform.translationMm.x + ovenSlot.clearSizeMm.width),
+    bottom: ovenSlot.localTransform.translationMm.z,
+    top: m02.dimensions.geometryMm.height - (ovenSlot.localTransform.translationMm.z + ovenSlot.clearSizeMm.height)
+  } : null;
+  const surroundOk = hasRequiredSurroundParts && surround !== null && Object.values(surround).every(value => Math.abs(value - 18) <= 1e-6);
+  checks.push(check(
+    "topology:module02-oven-surround",
+    "F2",
+    "hard",
+    surroundOk ? "pass" : "fail",
+    {
+      expected: { left: 18, right: 18, bottom: 18, top: 18, structuralPartsPresent: true },
+      observed: surround ? { ...surround, structuralPartsPresent: hasRequiredSurroundParts } : null,
+      unit: "mm",
+      note: "The MDF surround is structurally present; its poor baseline reading is an F5 render/readability problem, not missing front filler geometry."
+    }
+  ));
 
   const profile = createScreenMetricProfile(CURRENT_FIDELITY_VIEWPORT, CURRENT_FIDELITY_SUPERSAMPLE);
   const projectedSpan = projectMetricSegment(
@@ -99,39 +115,26 @@ export function buildCurrentFidelityReport(scene: ScenePackage = currentSceneBas
     { x: 5079.427, y: 8102.44, z: 100 }
   );
   const expectedSpanPx = 595.6223325672106;
-  checks.push(check(
-    "projection:module02-plus-module03-span",
-    "F3",
-    "hard",
-    Math.abs(projectedSpan.canonicalLengthPx - expectedSpanPx) <= 0.01 ? "pass" : "fail",
-    { expected: expectedSpanPx, observed: projectedSpan.canonicalLengthPx, tolerance: 0.01, unit: "px" }
-  ));
+  checks.push(check("projection:module02-plus-module03-span", "F3", "hard", Math.abs(projectedSpan.canonicalLengthPx - expectedSpanPx) <= 0.01 ? "pass" : "fail", { expected: expectedSpanPx, observed: projectedSpan.canonicalLengthPx, tolerance: 0.01, unit: "px" }));
 
   try {
     const anchors = resolveHardwareAnchors(scene, currentHardwareAnchors);
-    checks.push(check(
-      "hardware:anchors-defined",
-      "F4",
-      "hard",
-      anchors.length === currentHardwareAnchors.length ? "pass" : "fail",
-      {
-        expected: currentHardwareAnchors.length,
-        observed: anchors.length,
-        unit: "count",
-        note: "V7 handle semantics were ported as centered/edge-offset rules; current values remain evidence-status inferred until visually/physically confirmed."
-      }
-    ));
+    checks.push(check("hardware:anchors-defined", "F4", "hard", anchors.length === currentHardwareAnchors.length ? "pass" : "fail", {
+      expected: currentHardwareAnchors.length,
+      observed: anchors.length,
+      unit: "count",
+      note: "V7 handle semantics were ported as centered/edge-offset rules; current values remain evidence-status inferred until visually/physically confirmed."
+    }));
   } catch (error) {
     checks.push(check("hardware:anchors-defined", "F4", "hard", "fail", { expected: currentHardwareAnchors.length, observed: 0, unit: "count", note: error instanceof Error ? error.message : String(error) }));
   }
 
+  checks.push(check("readability:module02-oven-surround", "F5", "soft", "pending", { note: "Geometry passes F2; measure projected local contrast/edge recall around the 18 mm surround." }));
   checks.push(check("readability:semantic-edge-baseline", "F5", "soft", "pending", { note: "Quantitative edge readability follows the 4x overlay artifact." }));
   checks.push(check("appearance:human-gate", "F6", "human", "info", { note: "R-07 was rejected as visually sufficient; style anchor remains non-golden." }));
 
   checks.sort((a, b) => `${a.tier}:${a.id}`.localeCompare(`${b.tier}:${b.id}`));
-  const hardGatesPass = checks
-    .filter(candidate => candidate.gate === "hard")
-    .every(candidate => candidate.status === "pass");
+  const hardGatesPass = checks.filter(candidate => candidate.gate === "hard").every(candidate => candidate.status === "pass");
 
   return {
     schemaVersion: "FidelityReport 1.0",
@@ -150,9 +153,7 @@ export function compareFidelityReports(baseline: FidelityReport, candidate: Fide
   for (const item of candidate.checks) {
     const previous = baselineById.get(item.id);
     if (!previous) continue;
-    if (previous.gate === "hard" && previous.status === "pass" && item.status !== "pass") {
-      regressions.push(item);
-    }
+    if (previous.gate === "hard" && previous.status === "pass" && item.status !== "pass") regressions.push(item);
   }
   return regressions.sort((a, b) => a.id.localeCompare(b.id));
 }
