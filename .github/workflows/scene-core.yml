@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-      - architecture/fixed-view-scene-core-v1
+      - "architecture/**"
+      - "renderer/**"
     paths:
       - "scene-core/**"
       - "scene-source/**"
