@@ -1,0 +1,4 @@
+scene-core/node_modules/
+scene-core/dist/
+scene-core/**/__pycache__/
+*.pyc

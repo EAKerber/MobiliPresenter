@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "PromobDxfSourceProfile 0.1.0",
+  "sceneId": "traditional-complete",
+  "unit": "mm",
+  "coordinateSystem": {
+    "xAxis": "right",
+    "yAxis": "depth",
+    "zAxis": "up"
+  },
+  "sources": {
+    "placementLines": {
+      "name": "tradicional completo por layer c linhas.dxf",
+      "bytes": 2619943,
+      "sha256": "0f688f680911df23b56b7dc7d9d6a6824abe47a05a31bd9c4c790ff2169f62b1",
+      "entityType": "LINE",
+      "usedLayers": 151,
+      "coordinateFrame": "promob-absolute",
+      "authority": "placement"
+    },
+    "surfaceFaces": {
+      "name": "tradicional completoface modulo.dxf",
+      "bytes": 1926553,
+      "sha256": "aa0433ca2fb3829765db45e1c2f1239bfb34d940da96b2f9eaed2d8e6b95071d",
+      "entityType": "3DFACE",
+      "usedLayers": 148,
+      "coordinateFrame": "translated-scene",
+      "authority": "surface-geometry",
+      "toAbsoluteTranslationMm": [1568.684, 8650.44, 0.0]
+    }
+  },
+  "translationEvidence": [
+    {
+      "role": "fridge-side-panel",
+      "placementLayer": "LAYER114",
+      "surfaceLayer": "LAYER112",
+      "sizeMm": [18.0, 610.0, 2400.0]
+    },
+    {
+      "role": "module06-left-side",
+      "placementLayer": "LAYER79",
+      "surfaceLayer": "LAYER77",
+      "sizeMm": [18.0, 400.0, 800.0]
+    },
+    {
+      "role": "module06-microwave-shelf",
+      "placementLayer": "LAYER78",
+      "surfaceLayer": "LAYER76",
+      "sizeMm": [596.0, 394.0, 18.0]
+    },
+    {
+      "role": "module03-left-component",
+      "placementLayer": "LAYER7",
+      "surfaceLayer": "LAYER7",
+      "sizeMm": [400.0, 530.0, 18.0]
+    }
+  ],
+  "policy": {
+    "placement": "placementLines",
+    "surfaceGeometry": "surfaceFaces",
+    "layerNumbersAreSemanticIds": false,
+    "sourceBindingsRequired": true
+  }
+}

@@ -1,0 +1,119 @@
+import { aabbSize } from "../core/math.js";
+import type {
+  DimensionTripleMm,
+  ModuleGeometry,
+  SceneEntityBase,
+  ScenePackage,
+  SourceBinding
+} from "./model.js";
+import { MOBILIPRESENTER_COORDINATE_SYSTEM, SCENE_PACKAGE_SCHEMA_VERSION } from "./model.js";
+
+export interface ValidationIssue {
+  readonly code: string;
+  readonly path: string;
+  readonly detail: string;
+}
+
+function positiveDimensions(value: DimensionTripleMm): boolean {
+  return value.width > 0 && value.height > 0 && value.depth > 0;
+}
+
+function validateEntityBase(entity: SceneEntityBase, path: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!entity.id.trim()) issues.push({ code: "ENTITY_ID_EMPTY", path: `${path}.id`, detail: "id must be non-empty" });
+  if (entity.mountPolicy === "hosted" && !entity.hostId) issues.push({ code: "HOST_REQUIRED", path: `${path}.hostId`, detail: "hosted entity requires hostId" });
+  if (entity.mountPolicy === "standalone" && entity.hostId) issues.push({ code: "HOST_FORBIDDEN", path: `${path}.hostId`, detail: "standalone entity cannot declare hostId" });
+  if (entity.hostId === entity.id) issues.push({ code: "SELF_HOST_FORBIDDEN", path: `${path}.hostId`, detail: "entity cannot host itself" });
+  return issues;
+}
+
+function validateModule(module: ModuleGeometry, path: string): ValidationIssue[] {
+  const issues = validateEntityBase(module, path);
+  if (!positiveDimensions(module.dimensions.geometryMm)) issues.push({ code: "GEOMETRY_DIMENSIONS_INVALID", path: `${path}.dimensions.geometryMm`, detail: "geometry dimensions must be positive" });
+  const structuralSize = aabbSize(module.structuralEnvelope);
+  if (structuralSize.x <= 0 || structuralSize.y <= 0 || structuralSize.z <= 0) issues.push({ code: "STRUCTURAL_ENVELOPE_INVALID", path: `${path}.structuralEnvelope`, detail: "structural envelope must have positive volume" });
+
+  const ids = new Set<string>();
+  for (let i = 0; i < module.geometry.length; i++) {
+    const primitive = module.geometry[i]!;
+    if (ids.has(primitive.id)) issues.push({ code: "GEOMETRY_ID_DUPLICATE", path: `${path}.geometry[${i}].id`, detail: primitive.id });
+    ids.add(primitive.id);
+    if (primitive.primitive === "box") {
+      if (!positiveDimensions(primitive.sizeMm)) issues.push({ code: "BOX_DIMENSIONS_INVALID", path: `${path}.geometry[${i}].sizeMm`, detail: "box dimensions must be positive" });
+    } else if (!(primitive.sizeMm[0] > 0 && primitive.sizeMm[1] > 0)) {
+      issues.push({ code: "FACE_DIMENSIONS_INVALID", path: `${path}.geometry[${i}].sizeMm`, detail: "face dimensions must be positive" });
+    }
+  }
+  return issues;
+}
+
+function validateBindings(bindings: readonly SourceBinding[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const ids = new Set<string>();
+  for (let i = 0; i < bindings.length; i++) {
+    const binding = bindings[i]!;
+    if (ids.has(binding.id)) issues.push({ code: "SOURCE_BINDING_ID_DUPLICATE", path: `sourceBindings[${i}].id`, detail: binding.id });
+    ids.add(binding.id);
+    if (!binding.sourceFingerprint.startsWith("sha256:")) issues.push({ code: "SOURCE_FINGERPRINT_INVALID", path: `sourceBindings[${i}].sourceFingerprint`, detail: "expected sha256:<digest>" });
+    if (!binding.sourceSelector.layer && !binding.sourceSelector.entityType) issues.push({ code: "SOURCE_SELECTOR_EMPTY", path: `sourceBindings[${i}].sourceSelector`, detail: "at least one selector field is required" });
+  }
+  return issues;
+}
+
+function validateHostGraph(scene: ScenePackage): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const entities = [...scene.environment, ...scene.items, ...scene.modules];
+  const byId = new Map(entities.map(entity => [entity.id, entity] as const));
+
+  for (const entity of entities) {
+    if (entity.hostId && !byId.has(entity.hostId)) {
+      issues.push({ code: "HOST_NOT_FOUND", path: `${entity.id}.hostId`, detail: entity.hostId });
+    }
+  }
+
+  const state = new Map<string, "visiting" | "done">();
+  const visit = (id: string): void => {
+    if (state.get(id) === "done") return;
+    if (state.get(id) === "visiting") {
+      issues.push({ code: "HOST_CYCLE", path: id, detail: "host dependency graph must be acyclic" });
+      return;
+    }
+    state.set(id, "visiting");
+    const hostId = byId.get(id)?.hostId;
+    if (hostId && byId.has(hostId)) visit(hostId);
+    state.set(id, "done");
+  };
+  for (const id of byId.keys()) visit(id);
+  return issues;
+}
+
+export function validateScenePackage(scene: ScenePackage): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (scene.schemaVersion !== SCENE_PACKAGE_SCHEMA_VERSION) issues.push({ code: "SCENE_SCHEMA_UNSUPPORTED", path: "schemaVersion", detail: scene.schemaVersion });
+  if (JSON.stringify(scene.coordinateSystem) !== JSON.stringify(MOBILIPRESENTER_COORDINATE_SYSTEM)) issues.push({ code: "COORDINATE_SYSTEM_UNSUPPORTED", path: "coordinateSystem", detail: "expected canonical x-right/y-depth/z-up millimeter system" });
+  if (scene.camera.mode !== "fixed") issues.push({ code: "CAMERA_MODE_INVALID", path: "camera.mode", detail: "camera must be fixed" });
+  if (scene.camera.projection !== "perspective") issues.push({ code: "CAMERA_PROJECTION_INVALID", path: "camera.projection", detail: "Scene Core 0.1 requires fixed perspective camera" });
+  if (!(scene.camera.fovYDeg > 0 && scene.camera.fovYDeg < 180)) issues.push({ code: "CAMERA_FOV_INVALID", path: "camera.fovYDeg", detail: "FOV must be between 0 and 180 degrees" });
+  if (!(scene.camera.nearMm > 0 && scene.camera.farMm > scene.camera.nearMm)) issues.push({ code: "CAMERA_CLIP_INVALID", path: "camera", detail: "near/far clip range invalid" });
+
+  const entityIds = new Set<string>();
+  const groups = [
+    ["environment", scene.environment],
+    ["items", scene.items],
+    ["modules", scene.modules]
+  ] as const;
+  for (const [groupName, group] of groups) {
+    for (let index = 0; index < group.length; index++) {
+      const entity = group[index]!;
+      const path = `${groupName}[${index}]`;
+      if (entityIds.has(entity.id)) issues.push({ code: "ENTITY_ID_DUPLICATE", path: `${path}.id`, detail: entity.id });
+      entityIds.add(entity.id);
+      issues.push(...validateEntityBase(entity, path));
+      if (entity.kind === "module") issues.push(...validateModule(entity, path));
+    }
+  }
+
+  issues.push(...validateHostGraph(scene));
+  issues.push(...validateBindings(scene.sourceBindings));
+  return issues;
+}

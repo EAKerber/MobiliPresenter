@@ -21,9 +21,9 @@
   },
   "development": {
     "initiative": "Scene Core 0.1",
-    "phase": "architecture-bootstrap",
-    "checkpoint": "SC-00",
-    "nextTransition": "plan-scene-core-0.1",
+    "phase": "review",
+    "checkpoint": "SC-07",
+    "nextTransition": "review-and-integrate-scene-core-0.1",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
@@ -35,10 +35,6 @@
   "operations": {
     "toolboxPhase": "phase-1-integrity",
     "canonicalState": "ops/state/project.json",
-    "commands": [
-      "status",
-      "doctor",
-      "verify"
-    ]
+    "commands": ["status", "doctor", "verify"]
   }
 }
