@@ -1,4 +1,5 @@
-import type { DimensionTripleMm, Vec3 } from "./model.js";
+import type { Vec3 } from "../core/math.js";
+import type { DimensionTripleMm } from "./model.js";
 
 export const APPEARANCE_PACKAGE_SCHEMA_VERSION = "AppearancePackage 0.1.0" as const;
 export const APPLIANCE_DEFINITION_SCHEMA_VERSION = "ApplianceDefinition 0.1.0" as const;
