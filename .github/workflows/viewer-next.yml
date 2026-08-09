@@ -1,0 +1,43 @@
+name: Viewer Next
+
+on:
+  push:
+    branches:
+      - "renderer/**"
+    paths:
+      - "viewer-next/**"
+      - "scene-core/**"
+      - ".github/workflows/viewer-next.yml"
+  pull_request:
+    paths:
+      - "viewer-next/**"
+      - "scene-core/**"
+      - ".github/workflows/viewer-next.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Scene Core toolchain
+        working-directory: scene-core
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Install Viewer Next toolchain
+        working-directory: viewer-next
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Viewer Next
+        working-directory: viewer-next
+        run: npm run verify
