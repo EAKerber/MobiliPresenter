@@ -27,7 +27,25 @@ Antes de uma transição significativa ou quando houver suspeita de divergência
 python3 tools/agent.py verify
 ```
 
-Todos os comandos acima são read-only e aceitam `--json`.
+Para preparar uma transição de checkpoint sem escrever:
+
+```bash
+python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION>
+```
+
+A escrita de checkpoint é deliberada e limitada ao estado operacional:
+
+```bash
+python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION> --apply
+```
+
+Para produzir um handoff derivado, sem criar uma nova fonte de verdade:
+
+```bash
+python3 tools/agent.py handoff --json
+```
+
+`status`, `verify` e `handoff` aceitam `--remote`; quando `gh` não estiver disponível, o estado remoto deve permanecer `unknown`, nunca ser inventado como green.
 
 Autoridades:
 
@@ -35,7 +53,8 @@ Autoridades:
 - artefato publicado: `snapshot/mobile/manifest.json`;
 - regras permanentes: este arquivo;
 - decisões arquiteturais: ADRs e documentação explicativa;
-- histórico: Git.
+- histórico: Git;
+- PR/CI: GitHub observado, não duplicado em arquivo local.
 
 Não promover automaticamente permissões ou autorizações efêmeras de um chat para política permanente do repositório.
 
@@ -55,7 +74,9 @@ Regras:
 2. uma API informar sucesso não substitui readback;
 3. divergência entre esperado e observado interrompe a operação;
 4. procedimentos recorrentes ou de alto risco devem migrar gradualmente para a toolbox, não crescer indefinidamente neste arquivo;
-5. a toolbox não cria estado paralelo quando Git, manifests ou contratos já são autoridade suficiente.
+5. a toolbox não cria estado paralelo quando Git, manifests ou contratos já são autoridade suficiente;
+6. checkpoint deve acompanhar transições reais para impedir drift entre `ops/state/project.json`, PR e execução;
+7. `handoff` é snapshot derivado e nunca substitui as autoridades acima.
 
 ## 4. Protocolo Git determinístico
 
@@ -71,6 +92,6 @@ Regras:
 
 ## 5. Integridade de domínio
 
-1. Dados físicos ou comerciais desconhecidos não devem ser inventados; devem permanecer `null`, `unverified` ou equivalentes.
+1. Dados físicos ou comerciais desconhecidos não devem ser inventados; devem permanecer `null`, `unverified`, `inferred` ou equivalentes.
 2. Câmera fixa é requisito de produto; não reabrir navegação 3D livre sem decisão explícita do usuário.
 3. Para montagem, geometria observada/validada prevalece sobre dimensão nominal conflitante, mas ambas devem permanecer rastreáveis.
