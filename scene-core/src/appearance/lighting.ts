@@ -1,18 +1,19 @@
 import type {
   AppearancePackage,
-  ApplianceEmitterDefinition,
-  RelativeLight
+  RelativeLight,
+  SemanticEmitterDefinition
 } from "../contracts/appearance.js";
 import type { ScenePackage } from "../contracts/model.js";
 import { resolveEffectiveVisibility } from "../state/scene-state.js";
 
-export interface ActiveSemanticEmitter extends ApplianceEmitterDefinition {
+export interface ActiveSemanticEmitter extends SemanticEmitterDefinition {
   readonly instanceId: string;
   readonly entityId: string;
   readonly definitionId: string;
 }
 
 export interface ResolvedLighting {
+  readonly environment: AppearancePackage["lighting"]["environment"];
   readonly baseRig: readonly RelativeLight[];
   readonly semanticEmitters: readonly ActiveSemanticEmitter[];
   readonly post: AppearancePackage["lighting"]["post"];
@@ -20,7 +21,10 @@ export interface ResolvedLighting {
 
 export function resolveLighting(scene: ScenePackage, appearance: AppearancePackage): ResolvedLighting {
   const visibility = resolveEffectiveVisibility(scene);
-  const definitions = new Map(appearance.applianceDefinitions.map(definition => [definition.id, definition] as const));
+  const definitions = new Map([
+    ...appearance.applianceDefinitions.map(definition => [definition.id, definition] as const),
+    ...appearance.accessoryDefinitions.map(definition => [definition.id, definition] as const)
+  ]);
   const semanticEmitters: ActiveSemanticEmitter[] = [];
 
   for (const item of scene.items) {
@@ -39,6 +43,7 @@ export function resolveLighting(scene: ScenePackage, appearance: AppearancePacka
 
   semanticEmitters.sort((a, b) => a.instanceId.localeCompare(b.instanceId));
   return {
+    environment: appearance.lighting.environment,
     baseRig: appearance.lighting.baseRig,
     semanticEmitters,
     post: appearance.lighting.post
