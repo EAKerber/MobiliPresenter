@@ -16,6 +16,7 @@ export * from "./fidelity/report.js";
 export * from "./fixtures/current-camera.js";
 export * from "./fixtures/current-geometry.js";
 export * from "./fixtures/current-context.js";
+export * from "./fixtures/current-laundry.js";
 export * from "./fixtures/current-appearance.js";
 export * from "./fixtures/current-scene.js";
 export * from "./fixtures/current-fidelity.js";
