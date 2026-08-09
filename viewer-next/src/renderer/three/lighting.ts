@@ -23,13 +23,13 @@ import {
   PointLight,
   RectAreaLight,
   Scene,
-  Vector3,
   WebGLRenderer
 } from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { PMREMGenerator } from "three";
 import { resolveApplianceFit } from "./appliances.js";
 import { sceneDirectionToThree, sceneVectorToThree } from "./coordinates.js";
+import { configureDirectionalShadowForScene } from "./shadows.js";
 
 export const BLOOM_LAYER = 1;
 
@@ -100,6 +100,7 @@ function createBaseRig(scenePackage: ScenePackage, appearance: AppearancePackage
         light.shadow.mapSize.set(2048, 2048);
         light.shadow.bias = -0.00015;
         light.shadow.normalBias = 0.8;
+        configureDirectionalShadowForScene(light, scenePackage);
       }
       lights.set(definition.id, light);
       root.add(light, light.target);
