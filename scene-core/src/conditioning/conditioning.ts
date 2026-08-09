@@ -2,7 +2,7 @@ import type { GeometryPrimitive, ScenePackage } from "../contracts/model.js";
 import type { RigidTransform, Vec3 } from "../core/math.js";
 import { applyTransform, composeTransforms, norm, rotateVector, vec3 } from "../core/math.js";
 import { projectPoint } from "../core/camera.js";
-import { resolveEffectiveVisibility } from "../state/scene-state.js";
+import { resolveEffectiveVisibility, resolveWorldTransforms } from "../state/scene-state.js";
 
 export interface ConditioningBuffers {
   readonly widthPx: number;
@@ -58,14 +58,22 @@ function singleFace(entityId: string, primitive: Extract<GeometryPrimitive, { pr
 
 function collectFaces(scene: ScenePackage): RasterFace[] {
   const visibility = resolveEffectiveVisibility(scene);
-  const entities = [...scene.environment, ...scene.modules]
+  const worldTransforms = resolveWorldTransforms(scene);
+  const renderEntities = [
+    ...scene.environment.map(entity => ({ id: entity.id, geometry: entity.geometry })),
+    ...scene.items.filter(item => item.geometry !== undefined).map(item => ({ id: item.id, geometry: item.geometry ?? [] })),
+    ...scene.modules.map(entity => ({ id: entity.id, geometry: entity.geometry }))
+  ]
     .filter(entity => visibility.get(entity.id)?.effectiveVisible)
     .sort((a, b) => a.id.localeCompare(b.id));
+
   const faces: RasterFace[] = [];
-  for (const entity of entities) {
+  for (const entity of renderEntities) {
+    const worldTransform = worldTransforms.get(entity.id);
+    if (!worldTransform) throw new Error(`WORLD_TRANSFORM_NOT_FOUND:${entity.id}`);
     for (const primitive of entity.geometry) {
-      if (primitive.primitive === "box") faces.push(...boxFaces(entity.id, primitive, entity.transform));
-      else faces.push(singleFace(entity.id, primitive, entity.transform));
+      if (primitive.primitive === "box") faces.push(...boxFaces(entity.id, primitive, worldTransform));
+      else faces.push(singleFace(entity.id, primitive, worldTransform));
     }
   }
   return faces;
