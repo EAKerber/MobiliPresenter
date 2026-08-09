@@ -20,7 +20,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +47,13 @@ jobs:
         working-directory: viewer-next
         run: npm run verify
 
+      - name: Generate readability probe specification
+        working-directory: scene-core
+        run: |
+          npm run build
+          node tools/fidelity-readability-spec.mjs /tmp/mobilipresenter-readability-spec.json
+          python -m json.tool /tmp/mobilipresenter-readability-spec.json > /dev/null
+
       - name: Start Viewer Next preview
         working-directory: viewer-next
         run: |
@@ -65,9 +72,18 @@ jobs:
         working-directory: viewer-next
         run: python3 tests/browser_smoke.py
 
-      - name: Browser fidelity overlay 4x
+      - name: Browser fidelity evidence 4x
         working-directory: viewer-next
         run: python3 tests/fidelity_smoke.py
+
+      - name: Measure semantic seam readability
+        working-directory: viewer-next
+        run: |
+          python3 tests/readability_probe.py \
+            /tmp/mobilipresenter-fidelity-clean-4x.png \
+            /tmp/mobilipresenter-readability-spec.json \
+            /tmp/mobilipresenter-readability-report.json
+          python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
 
       - name: Stage visual evidence
         if: always()
@@ -86,14 +102,23 @@ jobs:
             cp /tmp/mobilipresenter-viewer-next.log viewer-next/artifacts/preview.log
             cp /tmp/mobilipresenter-viewer-next.log viewer-next/fidelity-artifacts/preview.log
           fi
-          if [ -f /tmp/mobilipresenter-fidelity-4x.png ]; then
-            cp /tmp/mobilipresenter-fidelity-4x.png viewer-next/fidelity-artifacts/fidelity-overlay-4x.png
+          if [ -f /tmp/mobilipresenter-fidelity-clean-4x.png ]; then
+            cp /tmp/mobilipresenter-fidelity-clean-4x.png viewer-next/fidelity-artifacts/fidelity-clean-4x.png
+          fi
+          if [ -f /tmp/mobilipresenter-fidelity-overlay-4x.png ]; then
+            cp /tmp/mobilipresenter-fidelity-overlay-4x.png viewer-next/fidelity-artifacts/fidelity-overlay-4x.png
           fi
           if [ -f /tmp/mobilipresenter-fidelity-evidence.json ]; then
             cp /tmp/mobilipresenter-fidelity-evidence.json viewer-next/fidelity-artifacts/fidelity-evidence.json
           fi
           if [ -f /tmp/mobilipresenter-fidelity-dom.html ]; then
             cp /tmp/mobilipresenter-fidelity-dom.html viewer-next/fidelity-artifacts/fidelity-dom.html
+          fi
+          if [ -f /tmp/mobilipresenter-readability-spec.json ]; then
+            cp /tmp/mobilipresenter-readability-spec.json viewer-next/fidelity-artifacts/readability-spec.json
+          fi
+          if [ -f /tmp/mobilipresenter-readability-report.json ]; then
+            cp /tmp/mobilipresenter-readability-report.json viewer-next/fidelity-artifacts/readability-report.json
           fi
 
       - name: Upload visual baseline
@@ -102,14 +127,14 @@ jobs:
         with:
           name: viewer-next-visual-baseline
           path: viewer-next/artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload fidelity overlay
+      - name: Upload fidelity evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: viewer-next-fidelity-overlay
           path: viewer-next/fidelity-artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
