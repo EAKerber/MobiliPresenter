@@ -49,6 +49,14 @@ export interface PlanarMetricGridSpec {
 const p = (origin: Vec3, uAxis: Vec3, vAxis: Vec3, u: number, v: number): Vec3 =>
   add(origin, add(mul(uAxis, u), mul(vAxis, v)));
 
+const optionalEntityId = (entityId: string | undefined): { readonly entityId: string } | {} =>
+  entityId === undefined ? {} : { entityId };
+
+const optionalStatus = (
+  status: FidelityLine3["status"] | undefined
+): { readonly status: NonNullable<FidelityLine3["status"]> } | {} =>
+  status === undefined ? {} : { status };
+
 export function createPlanarMetricGrid(spec: PlanarMetricGridSpec): readonly FidelityLine3[] {
   const minor = spec.minorStepMm ?? 100;
   const major = spec.majorStepMm ?? 500;
@@ -112,6 +120,8 @@ const EDGE_INDICES = [
   [0, 4], [1, 5], [2, 6], [3, 7]
 ] as const;
 
+const FACE_EDGE_INDICES = [[0, 1], [1, 2], [2, 3], [3, 0]] as const;
+
 export function createAabbOverlay(
   id: string,
   box: Aabb3,
@@ -120,13 +130,13 @@ export function createAabbOverlay(
   status?: FidelityLine3["status"]
 ): readonly FidelityLine3[] {
   const corners = aabbCorners(box).map(point => applyTransform(transform, point));
-  return EDGE_INDICES.map(([a, b], index) => ({
+  return EDGE_INDICES.map(([a, b], index): FidelityLine3 => ({
     id: `${id}/edge/${index}`,
-    role: "aabb" as const,
+    role: "aabb",
     aMm: corners[a]!,
     bMm: corners[b]!,
-    entityId,
-    status
+    ...optionalEntityId(entityId),
+    ...optionalStatus(status)
   }));
 }
 
@@ -138,10 +148,11 @@ export function createAxesOverlay(
 ): readonly FidelityLine3[] {
   const origin = applyTransform(transform, { x: 0, y: 0, z: 0 });
   const endpoint = (local: Vec3) => applyTransform(transform, local);
+  const entity = optionalEntityId(entityId);
   return [
-    { id: `${id}/x`, role: "axis-x", aMm: origin, bMm: endpoint({ x: lengthMm, y: 0, z: 0 }), entityId },
-    { id: `${id}/y`, role: "axis-y", aMm: origin, bMm: endpoint({ x: 0, y: lengthMm, z: 0 }), entityId },
-    { id: `${id}/z`, role: "axis-z", aMm: origin, bMm: endpoint({ x: 0, y: 0, z: lengthMm }), entityId }
+    { id: `${id}/x`, role: "axis-x", aMm: origin, bMm: endpoint({ x: lengthMm, y: 0, z: 0 }), ...entity },
+    { id: `${id}/y`, role: "axis-y", aMm: origin, bMm: endpoint({ x: 0, y: lengthMm, z: 0 }), ...entity },
+    { id: `${id}/z`, role: "axis-z", aMm: origin, bMm: endpoint({ x: 0, y: 0, z: lengthMm }), ...entity }
   ];
 }
 
@@ -166,18 +177,21 @@ function faceWireframe(
 ): readonly FidelityLine3[] {
   const primitiveWorld = composeTransforms(entityTransform, primitive.localTransform);
   const [uMm, vMm] = primitive.sizeMm;
-  const local = [
+  const local: readonly Vec3[] = [
     { x: 0, y: 0, z: 0 },
     mul(primitive.uAxis, uMm),
     add(mul(primitive.uAxis, uMm), mul(primitive.vAxis, vMm)),
     mul(primitive.vAxis, vMm)
   ];
   const points = local.map(point => applyTransform(primitiveWorld, point));
-  return [[0, 1], [1, 2], [2, 3], [3, 0]].map(([a, b], index) => ({
+  return FACE_EDGE_INDICES.map(([a, b], index): FidelityLine3 => ({
     id: `${primitive.id}/wire/${index}`,
-    role: "wireframe" as const,
-    aMm: points[a]!, bMm: points[b]!, entityId, geometryId: primitive.id,
-    status: "confirmed" as const
+    role: "wireframe",
+    aMm: points[a]!,
+    bMm: points[b]!,
+    entityId,
+    geometryId: primitive.id,
+    status: "confirmed"
   }));
 }
 
@@ -221,5 +235,13 @@ export function createDimensionLine(
   metricMm: number,
   entityId?: string
 ): FidelityLine3 {
-  return { id, role: "dimension", aMm, bMm, metricMm, entityId, status: "confirmed" };
+  return {
+    id,
+    role: "dimension",
+    aMm,
+    bMm,
+    metricMm,
+    status: "confirmed",
+    ...optionalEntityId(entityId)
+  };
 }
