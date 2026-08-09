@@ -1,4 +1,4 @@
-import type { AppearancePackage } from "../contracts/appearance.js";
+import type { AppearancePackage, SemanticEmitterDefinition } from "../contracts/appearance.js";
 import type { ScenePackage } from "../contracts/model.js";
 
 export interface AppearanceValidationIssue {
@@ -29,7 +29,7 @@ export function validateAppearancePackage(appearance: AppearancePackage): Appear
 
   const slotResolvable = (slot: string): boolean => materialIds.has(slot) || appearance.assignments.defaultsBySlot[slot] !== undefined;
 
-  const validateEmitters = (emitters: readonly AppearancePackage["applianceDefinitions"][number]["emitters"], path: string): void => {
+  const validateEmitters = (emitters: readonly SemanticEmitterDefinition[], path: string): void => {
     for (let e = 0; e < emitters.length; e++) {
       const emitter = emitters[e]!;
       if (!(emitter.colorTemperatureK >= 1000 && emitter.colorTemperatureK <= 12000)) issues.push({ code: "EMITTER_TEMPERATURE_INVALID", path: `${path}.emitters[${e}]`, detail: String(emitter.colorTemperatureK) });
