@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "ReadabilityReport 1.0",
+  "status": "MEASURED",
+  "source": {
+    "branch": "renderer/fixed-view-realistic-v1",
+    "headSha": "ba3f7c16807b82490edc464848375d93aa54520c",
+    "workflow": "Viewer Next",
+    "workflowRunId": 31340682567,
+    "artifactId": 9045745516,
+    "artifactName": "viewer-next-fidelity-overlay",
+    "artifactDigest": "sha256:47aad59d7fb5e68c05fa07296059b648182b6167f271196298f54b7bd6d99e6d"
+  },
+  "supersampleFactor": 4,
+  "capturePolicy": "grouped-targeted-off-axis-4x-crops",
+  "summary": {
+    "meanEdgeRecall": 0.8932291666666666,
+    "medianProbeContrast": 0.07058823529411765,
+    "medianProbeEdgeOffsetCanonicalPx": 1.875
+  },
+  "probes": [
+    {"id":"module03/drawer-seam/1-2","role":"front-seam","edgeRecall":1.0,"medianPeakContrast":0.02156862745098039,"p10PeakContrast":0.02156862745098039,"medianEdgeOffsetCanonicalPx":0.5,"p95EdgeOffsetCanonicalPx":0.5},
+    {"id":"module03/drawer-seam/2-3","role":"front-seam","edgeRecall":1.0,"medianPeakContrast":0.02156862745098039,"p10PeakContrast":0.02156862745098039,"medianEdgeOffsetCanonicalPx":0.5,"p95EdgeOffsetCanonicalPx":0.5},
+    {"id":"module03/drawer-seam/3-4","role":"front-seam","edgeRecall":1.0,"medianPeakContrast":0.02156862745098039,"p10PeakContrast":0.02156862745098039,"medianEdgeOffsetCanonicalPx":0.5,"p95EdgeOffsetCanonicalPx":0.5},
+    {"id":"module03/door-seam","role":"front-seam","edgeRecall":1.0,"medianPeakContrast":0.11941921568627452,"p10PeakContrast":0.10588235294117648,"medianEdgeOffsetCanonicalPx":0.25,"p95EdgeOffsetCanonicalPx":0.25},
+    {"id":"module01/door-seam","role":"front-seam","edgeRecall":1.0,"medianPeakContrast":0.08,"p10PeakContrast":0.05004078431372548,"medianEdgeOffsetCanonicalPx":3.0,"p95EdgeOffsetCanonicalPx":3.0},
+    {"id":"module06/door-left-center-seam","role":"front-seam","edgeRecall":1.0,"medianPeakContrast":0.06117647058823529,"p10PeakContrast":0.041014901960784306,"medianEdgeOffsetCanonicalPx":2.5,"p95EdgeOffsetCanonicalPx":2.5},
+    {"id":"module02/oven-surround-left","role":"oven-surround","edgeRecall":0.7291666666666666,"medianPeakContrast":0.10014666666666668,"p10PeakContrast":0.004091372549019608,"medianEdgeOffsetCanonicalPx":3.0,"p95EdgeOffsetCanonicalPx":3.75},
+    {"id":"module02/oven-surround-right","role":"oven-surround","edgeRecall":0.4166666666666667,"medianPeakContrast":0.010390588235294126,"p10PeakContrast":0.0,"medianEdgeOffsetCanonicalPx":3.75,"p95EdgeOffsetCanonicalPx":3.75}
+  ],
+  "policy": {
+    "softGate": true,
+    "measurement": "peak local sRGB-luma gradient inside metric seam corridor",
+    "textureAwayFromExpectedSeamDoesNotScore": true,
+    "full4xFramebufferRequired": false,
+    "purpose": "FH-06 regression baseline"
+  }
+}
