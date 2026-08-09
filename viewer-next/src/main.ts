@@ -24,6 +24,7 @@ import { buildThreeLighting, installNeutralRoomEnvironment } from "./renderer/th
 import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
 import { createSelectiveBloomPipeline } from "./renderer/three/post.js";
 import { buildThreeScene } from "./renderer/three/scene-adapter.js";
+import { applyFh06VisualRefinements } from "./renderer/three/visual-refinements.js";
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (appElement === null) throw new Error("APP_ROOT_NOT_FOUND");
@@ -74,6 +75,7 @@ const adapter = buildThreeScene(
   (entityId, slot) => materials.resolve(entityId, slot)
 );
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
+applyFh06VisualRefinements(adapter, materials);
 adapter.scene.background = new Color(0xf3f2ee);
 
 if (fidelityOverlayMode && !fidelityCrop) {
