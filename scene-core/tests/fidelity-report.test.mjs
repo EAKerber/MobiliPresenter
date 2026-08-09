@@ -19,7 +19,7 @@ test("current candidate report records fixed completeness and remaining hard-gat
   assert.equal(byId.get("topology:module02-oven-surround-front-geometry")?.status, "fail");
   assert.equal(byId.get("metric:module02-plus-module03-span")?.status, "pass");
   assert.equal(byId.get("projection:module02-plus-module03-span")?.status, "pass");
-  assert.equal(byId.get("hardware:anchors-defined")?.status, "pending");
+  assert.equal(byId.get("hardware:anchors-defined")?.status, "pass");
 });
 
 test("hard-gate comparison reports pass-to-fail regressions only", () => {
