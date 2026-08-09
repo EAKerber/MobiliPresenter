@@ -22,13 +22,16 @@ const appElement = document.querySelector<HTMLElement>("#app");
 if (appElement === null) throw new Error("APP_ROOT_NOT_FOUND");
 const app: HTMLElement = appElement;
 
-const fidelityMode = new URLSearchParams(window.location.search).get("fidelity") === "1";
+const query = new URLSearchParams(window.location.search);
+const fidelityMode = query.get("fidelity") === "1";
+const fidelityOverlayMode = fidelityMode && query.get("overlay") === "1";
 
 app.dataset.rendererBackend = "three-webgl2";
 app.dataset.rendererReady = "false";
 app.dataset.frameRendered = "false";
 app.dataset.sceneId = currentSceneBase.sceneId;
-app.dataset.fidelityOverlay = fidelityMode ? "true" : "false";
+app.dataset.fidelityMode = fidelityMode ? "true" : "false";
+app.dataset.fidelityOverlay = fidelityOverlayMode ? "true" : "false";
 
 const renderer = new WebGLRenderer({
   antialias: true,
@@ -50,7 +53,7 @@ const adapter = buildThreeScene(
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
 adapter.scene.background = new Color(0xf3f2ee);
 
-if (fidelityMode) {
+if (fidelityOverlayMode) {
   const fidelityLines = createCurrentFidelityOverlayLines();
   const fidelityOverlay = buildFidelityOverlay(fidelityLines, { xray: true, opacity: 0.72 });
   fidelityOverlay.renderOrder = 10_000;
