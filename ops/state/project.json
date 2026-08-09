@@ -22,8 +22,8 @@
   "development": {
     "initiative": "Scene Core 0.1",
     "phase": "implementation",
-    "checkpoint": "SC-05",
-    "nextTransition": "implement-sc-06-appearance-conditioning",
+    "checkpoint": "SC-06",
+    "nextTransition": "implement-sc-07-portability-proof",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
