@@ -16,29 +16,20 @@ export interface CoordinateSystem {
 }
 
 export const MOBILIPRESENTER_COORDINATE_SYSTEM: CoordinateSystem = {
-  unit: "mm",
-  xAxis: "right",
-  yAxis: "depth",
-  zAxis: "up",
-  handedness: "right-handed"
+  unit: "mm", xAxis: "right", yAxis: "depth", zAxis: "up", handedness: "right-handed"
 };
 
 export type EntityKind = "environment" | "module" | "appliance" | "fixture" | "accessory";
 export type VisibilityIntent = "auto" | "on" | "off";
 export type MountPolicy = "standalone" | "hosted";
+export type GeometryRole = "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "wall" | "column" | "other";
 
-export interface DimensionTripleMm {
-  readonly width: number;
-  readonly height: number;
-  readonly depth: number;
-}
-
+export interface DimensionTripleMm { readonly width: number; readonly height: number; readonly depth: number; }
 export interface DimensionEvidence {
   readonly source: "promob-property" | "promob-dxf" | "technical-sheet" | "calibrated" | "inferred";
   readonly status: "confirmed" | "provided" | "calibrated" | "inferred" | "conflicted";
   readonly reference: string;
 }
-
 export interface GeometryDimensions {
   readonly nominalMm?: DimensionTripleMm;
   readonly geometryMm: DimensionTripleMm;
@@ -46,14 +37,28 @@ export interface GeometryDimensions {
   readonly evidence: readonly DimensionEvidence[];
 }
 
-export interface SurfaceGeometry {
+export interface GeometryPrimitiveBase {
   readonly id: string;
-  readonly role: "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "other";
+  readonly role: GeometryRole;
   readonly localTransform: RigidTransform;
-  readonly sizeMm: DimensionTripleMm;
   readonly materialSlot?: string;
   readonly sourceBindingIds: readonly string[];
 }
+
+export interface BoxGeometry extends GeometryPrimitiveBase {
+  readonly primitive: "box";
+  readonly sizeMm: DimensionTripleMm;
+}
+
+export interface FaceGeometry extends GeometryPrimitiveBase {
+  readonly primitive: "face";
+  readonly uAxis: Vec3;
+  readonly vAxis: Vec3;
+  readonly normal: Vec3;
+  readonly sizeMm: readonly [number, number];
+}
+
+export type GeometryPrimitive = BoxGeometry | FaceGeometry;
 
 export interface ApplianceSlot {
   readonly id: string;
@@ -79,7 +84,7 @@ export interface ModuleGeometry extends SceneEntityBase {
   readonly dimensions: GeometryDimensions;
   readonly structuralEnvelope: Aabb3;
   readonly renderEnvelope: Aabb3;
-  readonly surfaces: readonly SurfaceGeometry[];
+  readonly geometry: readonly GeometryPrimitive[];
   readonly applianceSlots: readonly ApplianceSlot[];
 }
 
@@ -87,17 +92,14 @@ export interface EnvironmentGeometry extends SceneEntityBase {
   readonly kind: "environment";
   readonly schemaVersion: typeof ENVIRONMENT_GEOMETRY_SCHEMA_VERSION;
   readonly structuralEnvelope: Aabb3;
-  readonly surfaces: readonly SurfaceGeometry[];
+  readonly geometry: readonly GeometryPrimitive[];
 }
 
 export interface SourceBinding {
   readonly schemaVersion: typeof SOURCE_BINDING_SCHEMA_VERSION;
   readonly id: string;
   readonly sourceFingerprint: string;
-  readonly sourceSelector: {
-    readonly layer?: string;
-    readonly entityType?: "3DFACE" | "LINE";
-  };
+  readonly sourceSelector: { readonly layer?: string; readonly entityType?: "3DFACE" | "LINE"; };
   readonly targetEntityId: string;
   readonly targetRole: string;
 }
@@ -128,8 +130,5 @@ export interface ScenePackage {
 }
 
 export function identityTransform(): RigidTransform {
-  return {
-    translationMm: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0, w: 1 }
-  };
+  return { translationMm: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } };
 }
