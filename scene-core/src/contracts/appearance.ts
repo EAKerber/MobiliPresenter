@@ -22,6 +22,7 @@ export type FitPolicy =
   | "under-cab-fit"
   | "letterbox-allowed-within-slot"
   | "fit-to-environment-envelope"
+  | "fit-to-source-envelope-preserve-front-proportions"
   | "fixture-adjustable-preserve-basin-language"
   | "stone-cutout-dependent"
   | "allow-small-nonuniform-scale-depth<=3%";
