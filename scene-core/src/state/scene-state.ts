@@ -65,6 +65,24 @@ export function resolveWorldTransforms(scene: ScenePackage): ReadonlyMap<string,
   return resolved;
 }
 
+export function resolveItemPlacementTransform(scene: ScenePackage, item: SceneItem): RigidTransform {
+  if (item.mountPolicy === "standalone") return item.transform;
+  if (!item.hostId) throw new Error(`HOST_REQUIRED:${item.id}`);
+  const host = scene.modules.find(module => module.id === item.hostId)
+    ?? scene.environment.find(entity => entity.id === item.hostId)
+    ?? scene.items.find(entity => entity.id === item.hostId);
+  if (!host) throw new Error(`HOST_NOT_FOUND:${item.hostId}`);
+  const world = resolveWorldTransforms(scene);
+  const hostWorld = world.get(host.id);
+  if (!hostWorld) throw new Error(`WORLD_TRANSFORM_NOT_FOUND:${host.id}`);
+
+  if (!item.slotId) return composeTransforms(hostWorld, item.transform);
+  if (host.kind !== "module") throw new Error(`SLOT_HOST_MUST_BE_MODULE:${item.hostId}`);
+  const slot = host.applianceSlots.find(candidate => candidate.id === item.slotId);
+  if (!slot) throw new Error(`SLOT_NOT_FOUND:${item.slotId}`);
+  return composeTransforms(composeTransforms(hostWorld, slot.localTransform), item.transform);
+}
+
 export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<string, EffectiveVisibility> {
   const entities = new Map(allSceneEntities(scene).map(entity => [entity.id, entity] as const));
   const resolved = new Map<string, EffectiveVisibility>();
