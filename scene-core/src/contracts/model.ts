@@ -22,6 +22,7 @@ export const MOBILIPRESENTER_COORDINATE_SYSTEM: CoordinateSystem = {
 export type EntityKind = "environment" | "module" | "appliance" | "fixture" | "accessory";
 export type VisibilityIntent = "auto" | "on" | "off";
 export type MountPolicy = "standalone" | "hosted";
+export type SemanticLayer = 0 | 1 | 2;
 export type GeometryRole = "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "wall" | "column" | "other";
 
 export interface DimensionTripleMm { readonly width: number; readonly height: number; readonly depth: number; }
@@ -74,8 +75,15 @@ export interface SceneEntityBase {
   readonly transform: RigidTransform;
   readonly visibilityIntent: VisibilityIntent;
   readonly defaultVisible: boolean;
+  readonly controllable: boolean;
   readonly mountPolicy: MountPolicy;
   readonly hostId?: string;
+}
+
+export interface SceneItem extends SceneEntityBase {
+  readonly kind: "appliance" | "fixture" | "accessory";
+  readonly definitionId: string;
+  readonly slotId?: string;
 }
 
 export interface ModuleGeometry extends SceneEntityBase {
@@ -133,6 +141,7 @@ export interface ScenePackage {
   readonly camera: FixedPerspectiveCamera;
   readonly presentationFrame?: PresentationFrame;
   readonly environment: readonly EnvironmentGeometry[];
+  readonly items: readonly SceneItem[];
   readonly modules: readonly ModuleGeometry[];
   readonly sourceBindings: readonly SourceBinding[];
 }
