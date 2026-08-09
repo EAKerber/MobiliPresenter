@@ -19,14 +19,18 @@ export interface ResolvedLighting {
   readonly post: AppearancePackage["lighting"]["post"];
 }
 
+interface EmitterOwnerDefinition {
+  readonly id: string;
+  readonly emitters: readonly SemanticEmitterDefinition[];
+}
+
 export function resolveLighting(scene: ScenePackage, appearance: AppearancePackage): ResolvedLighting {
   const visibility = resolveEffectiveVisibility(scene);
-  const definitions = new Map([
-    ...appearance.applianceDefinitions.map(definition => [definition.id, definition] as const),
-    ...appearance.accessoryDefinitions.map(definition => [definition.id, definition] as const)
-  ]);
-  const semanticEmitters: ActiveSemanticEmitter[] = [];
+  const definitions = new Map<string, EmitterOwnerDefinition>();
+  for (const definition of appearance.applianceDefinitions) definitions.set(definition.id, definition);
+  for (const definition of appearance.accessoryDefinitions) definitions.set(definition.id, definition);
 
+  const semanticEmitters: ActiveSemanticEmitter[] = [];
   for (const item of scene.items) {
     if (!visibility.get(item.id)?.effectiveVisible) continue;
     const definition = definitions.get(item.definitionId);
