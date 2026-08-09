@@ -108,7 +108,7 @@ export interface FixedPerspectiveCamera {
   readonly id: string;
   readonly mode: "fixed";
   readonly projection: "perspective";
-  readonly transform: RigidTransform;
+  readonly positionMm: Vec3;
   readonly targetMm: Vec3;
   readonly up: Vec3;
   readonly fovYDeg: number;
@@ -119,11 +119,19 @@ export interface FixedPerspectiveCamera {
   readonly evidenceRefs: readonly string[];
 }
 
+export interface PresentationFrame {
+  readonly preferredAspectRatio: number;
+  readonly fit: "contain" | "cover";
+  readonly cropAllowed: boolean;
+  readonly safeAreaNormalized: readonly [number, number, number, number];
+}
+
 export interface ScenePackage {
   readonly schemaVersion: typeof SCENE_PACKAGE_SCHEMA_VERSION;
   readonly sceneId: string;
   readonly coordinateSystem: CoordinateSystem;
   readonly camera: FixedPerspectiveCamera;
+  readonly presentationFrame?: PresentationFrame;
   readonly environment: readonly EnvironmentGeometry[];
   readonly modules: readonly ModuleGeometry[];
   readonly sourceBindings: readonly SourceBinding[];
