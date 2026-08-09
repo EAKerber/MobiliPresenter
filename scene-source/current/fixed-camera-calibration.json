@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "FixedCameraCalibration 0.1.0",
+  "sceneId": "traditional-complete",
+  "projection": "perspective",
+  "fixed": true,
+  "assumption": "camera optical axis parallel to +Y, image axes parallel to project X/Z",
+  "image": {
+    "width": 1865,
+    "height": 967,
+    "sha256": "a78628ae5088d243888b7e23ea4b80d1f54659c41097a837c882a73b5e915049",
+    "role": "Promob colored segmentation/calibration view"
+  },
+  "cameraProjectPositionMm": [4195.34622668872, 3994.363841842559, 1126.2401832635298],
+  "principalPointPx": [863.1665758956676, 471.57428526002843],
+  "principalPointNormalized": [0.46282390128454026, 0.4876673063702466],
+  "focalLengthPxAtCalibrationViewport": 1218.7460918656088,
+  "fovDeg": {
+    "horizontal": 74.84142159661417,
+    "vertical": 43.2783582964253
+  },
+  "fit": {
+    "observationCount": 10,
+    "centerRmsPx": 2.509059009785441,
+    "centerMaxPx": 4.2822852229987225,
+    "perspectiveSizeRmsPx": 0.8914173705740879,
+    "orthographicSizeRmsPx": 2.9806261369628904
+  },
+  "status": "calibrated-not-provided-by-promob"
+}
