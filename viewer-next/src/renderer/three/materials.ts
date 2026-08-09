@@ -2,6 +2,7 @@ import type { AppearancePackage, MaterialDefinition } from "@mobilipresenter/sce
 import { resolveMaterial, resolveMaterialId } from "@mobilipresenter/scene-core";
 import {
   DoubleSide,
+  FrontSide,
   Material,
   Mesh,
   MeshPhysicalMaterial,
@@ -20,7 +21,7 @@ function createThreeMaterial(definition: MaterialDefinition): PbrMaterial {
     transparent: definition.opacity < 1 || definition.transmission > 0,
     opacity: definition.opacity,
     depthWrite: !(definition.transmission > 0 || definition.opacity < 0.5),
-    side: definition.transmission > 0 ? DoubleSide : undefined
+    side: definition.transmission > 0 ? DoubleSide : FrontSide
   };
 
   const material = physical
