@@ -7,6 +7,13 @@ import { glassDivider, module03WithSink, module04, module05, module07 } from "..
 import { module02, module06 } from "../dist/src/fixtures/current-geometry.js";
 import { resolveItemPlacementTransform, resolveWorldTransforms } from "../dist/src/state/scene-state.js";
 
+function assertVecAlmost(actual, expected, epsilon = 1e-9) {
+  assert.ok(actual);
+  for (const key of ["x", "y", "z"]) {
+    assert.ok(Math.abs(actual[key] - expected[key]) <= epsilon, `${key}: ${actual[key]} != ${expected[key]}`);
+  }
+}
+
 test("current scene includes full validated context without provisional 600mm depth", () => {
   assert.deepEqual(validateScenePackage(currentSceneBase), []);
   const moduleIds = currentSceneBase.modules.map(module => module.id);
@@ -49,7 +56,7 @@ test("sink is promoted from DXF geometry as hosted default fixture", () => {
   assert.equal(sink?.hostId, module03WithSink.id);
   assert.equal(sink?.slotId, sinkSlot.id);
   if (!sink) throw new Error("sink fixture missing");
-  assert.deepEqual(resolveItemPlacementTransform(currentSceneBase, sink).translationMm, {
+  assertVecAlmost(resolveItemPlacementTransform(currentSceneBase, sink).translationMm, {
     x: 4280.044,
     y: 8184.396,
     z: 680.8759
@@ -76,15 +83,15 @@ test("standalone washer and fridge use Promob source placement and target envelo
   assert.equal(fridge?.mountPolicy, "standalone");
 });
 
-test("hosted accessory geometry resolves exactly to audited DXF world coordinates", () => {
+test("hosted accessory geometry resolves to audited DXF world coordinates within floating tolerance", () => {
   const world = resolveWorldTransforms(currentSceneBase);
   const stoveStone = currentSceneBase.items.find(item => item.id.endsWith("stove-countertop"));
   const sinkStone = currentSceneBase.items.find(item => item.id.endsWith("sink-countertop"));
   const led = currentSceneBase.items.find(item => item.id.endsWith("under-cab-led-06"));
   assert.ok(stoveStone && sinkStone && led);
-  assert.deepEqual(world.get(stoveStone.id)?.translationMm, { x: 3071.739, y: 8100.44, z: 858.9999 });
-  assert.deepEqual(world.get(sinkStone.id)?.translationMm, { x: 3862.749, y: 8100.438, z: 859 });
-  assert.deepEqual(world.get(led.id)?.translationMm, { x: 3879.427, y: 8250.44, z: 1559.09 });
+  assertVecAlmost(world.get(stoveStone.id)?.translationMm, { x: 3071.739, y: 8100.44, z: 858.9999 });
+  assertVecAlmost(world.get(sinkStone.id)?.translationMm, { x: 3862.749, y: 8100.438, z: 859 });
+  assertVecAlmost(world.get(led.id)?.translationMm, { x: 3879.427, y: 8250.44, z: 1559.09 });
 });
 
 test("washer fantasy language fits source envelope rather than enforcing reference dimensions", () => {
