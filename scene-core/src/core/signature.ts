@@ -35,7 +35,9 @@ export function sceneGeometryDigest(scene: ScenePackage): string {
       transform: entity.transform,
       hostId: entity.hostId ?? null,
       slotId: entity.slotId ?? null,
-      definitionId: entity.definitionId
+      definitionId: entity.definitionId,
+      targetEnvelopeMm: entity.targetEnvelopeMm ?? null,
+      geometry: entity.geometry ?? []
     })),
     modules: scene.modules.map(entity => ({
       id: entity.id,
