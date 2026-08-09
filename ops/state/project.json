@@ -10,7 +10,7 @@
   },
   "git": {
     "controlBranch": "main",
-    "activeDevelopmentBranch": "architecture/fixed-view-scene-core-v1",
+    "activeDevelopmentBranch": "renderer/fixed-view-realistic-v1",
     "publishedBranch": "main"
   },
   "published": {
@@ -20,13 +20,14 @@
     "artifactSha256": "38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae"
   },
   "development": {
-    "initiative": "Scene Core 0.1",
-    "phase": "review",
-    "checkpoint": "SC-07",
-    "nextTransition": "review-and-integrate-scene-core-0.1",
+    "initiative": "Fixed View Renderer 0.1",
+    "phase": "planning",
+    "checkpoint": "R-00",
+    "nextTransition": "plan-renderer-0.1",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
+      "scene-core-0.1-is-integrated-foundation",
       "geometry-wins-for-assembly-preserve-nominal",
       "runtime-rendering-must-be-deterministic",
       "llm-is-authoring-or-enhancement-not-runtime-geometry-authority"
