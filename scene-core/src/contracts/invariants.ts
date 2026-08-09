@@ -68,6 +68,9 @@ function validateItem(item: SceneItem, path: string): ValidationIssue[] {
   if (!item.definitionId.trim()) issues.push({ code: "ITEM_DEFINITION_ID_EMPTY", path: `${path}.definitionId`, detail: "definitionId must be non-empty" });
   if (item.targetEnvelopeMm && !positiveDimensions(item.targetEnvelopeMm)) issues.push({ code: "TARGET_ENVELOPE_INVALID", path: `${path}.targetEnvelopeMm`, detail: "target envelope must be positive" });
   if (item.geometry) issues.push(...validateGeometry(item.geometry, `${path}.geometry`));
+  if (item.placementStatus && (!item.evidenceRefs || item.evidenceRefs.length === 0)) {
+    issues.push({ code: "PLACEMENT_EVIDENCE_REQUIRED", path: `${path}.evidenceRefs`, detail: "placementStatus requires evidenceRefs" });
+  }
   return issues;
 }
 
@@ -128,6 +131,26 @@ function validateHostGraph(scene: ScenePackage): ValidationIssue[] {
   return issues;
 }
 
+function validateSubstitutionGroups(scene: ScenePackage): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const groups = scene.substitutionGroups ?? [];
+  const entities = new Set([...scene.environment, ...scene.items, ...scene.modules].map(entity => entity.id));
+  const ids = new Set<string>();
+  const replacements = new Set<string>();
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i]!;
+    const path = `substitutionGroups[${i}]`;
+    if (ids.has(group.id)) issues.push({ code: "SUBSTITUTION_GROUP_ID_DUPLICATE", path: `${path}.id`, detail: group.id });
+    ids.add(group.id);
+    if (group.primaryEntityId === group.replacementEntityId) issues.push({ code: "SUBSTITUTION_SELF_REFERENCE", path, detail: group.primaryEntityId });
+    if (!entities.has(group.primaryEntityId)) issues.push({ code: "SUBSTITUTION_PRIMARY_NOT_FOUND", path: `${path}.primaryEntityId`, detail: group.primaryEntityId });
+    if (!entities.has(group.replacementEntityId)) issues.push({ code: "SUBSTITUTION_REPLACEMENT_NOT_FOUND", path: `${path}.replacementEntityId`, detail: group.replacementEntityId });
+    if (replacements.has(group.replacementEntityId)) issues.push({ code: "SUBSTITUTION_REPLACEMENT_DUPLICATE", path: `${path}.replacementEntityId`, detail: group.replacementEntityId });
+    replacements.add(group.replacementEntityId);
+  }
+  return issues;
+}
+
 export function validateScenePackage(scene: ScenePackage): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (scene.schemaVersion !== SCENE_PACKAGE_SCHEMA_VERSION) issues.push({ code: "SCENE_SCHEMA_UNSUPPORTED", path: "schemaVersion", detail: scene.schemaVersion });
@@ -160,6 +183,7 @@ export function validateScenePackage(scene: ScenePackage): ValidationIssue[] {
   }
 
   issues.push(...validateHostGraph(scene));
+  issues.push(...validateSubstitutionGroups(scene));
   issues.push(...validateBindings(scene.sourceBindings));
   return issues;
 }
