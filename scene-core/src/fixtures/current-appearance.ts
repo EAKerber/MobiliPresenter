@@ -24,12 +24,12 @@ export const currentAppearance: AppearancePackage = {
       role: "laundry-washer",
       appearanceFamily: "front-load-silver",
       nominalAppearanceMm: { width: 600, height: 850, depth: 660 },
-      fitPolicy: "allow-small-nonuniform-scale-depth<=3%",
+      fitPolicy: "fit-to-source-envelope-preserve-front-proportions",
       assetPolicy: "normalized-external-allowed",
       requiredVisualFeatures: ["large-smoked-circular-door", "upper-horizontal-control-band", "silver-satin-body"],
       materialSlots: ["inox-brushed", "black-glass"],
       emitters: [],
-      sourceHints: ["Electrolux LSW11 official dimensional/style anchor"]
+      sourceHints: ["Electrolux LSW11 is a style anchor only; Promob source envelope governs scene fit"]
     }),
     appliance({
       id: "AP-TANK-01",
