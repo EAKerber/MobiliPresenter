@@ -5,7 +5,8 @@ import { currentAppearance } from "../dist/src/fixtures/current-appearance.js";
 import { currentSceneBase } from "../dist/src/fixtures/current-scene.js";
 import { glassDivider, module03WithSink, module04, module05, module07 } from "../dist/src/fixtures/current-context.js";
 import { module02, module06 } from "../dist/src/fixtures/current-geometry.js";
-import { resolveItemPlacementTransform, resolveWorldTransforms } from "../dist/src/state/scene-state.js";
+import { module01 } from "../dist/src/fixtures/current-laundry.js";
+import { resolveEffectiveVisibility, resolveItemPlacementTransform, resolveWorldTransforms, setVisibilityIntent } from "../dist/src/state/scene-state.js";
 
 function assertVecAlmost(actual, expected, epsilon = 1e-9) {
   assert.ok(actual);
@@ -18,6 +19,7 @@ test("current scene includes full validated context without provisional 600mm de
   assert.deepEqual(validateScenePackage(currentSceneBase), []);
   const moduleIds = currentSceneBase.modules.map(module => module.id);
   assert.deepEqual(moduleIds, [
+    "scene/traditional/module/upper-laundry",
     "scene/traditional/module/lower-stove",
     "scene/traditional/module/lower-sink",
     "scene/traditional/module/fridge-side",
@@ -25,9 +27,16 @@ test("current scene includes full validated context without provisional 600mm de
     "scene/traditional/module/upper-sink-microwave",
     "scene/traditional/module/upper-fridge"
   ]);
+  assert.deepEqual(module01.dimensions.geometryMm, { width: 763.25, height: 700, depth: 350 });
   assert.deepEqual(module05.dimensions.geometryMm, { width: 800, height: 700, depth: 400 });
   assert.deepEqual(module07.dimensions.geometryMm, { width: 800, height: 484, depth: 350 });
   assert.equal(currentSceneBase.modules.find(module => module.id.endsWith("upper-sink-microwave"))?.dimensions.geometryMm.depth, 400);
+});
+
+test("module 01 preserves Promob nominal/property evidence and DXF geometry", () => {
+  assert.deepEqual(module01.dimensions.nominalMm, { width: 763.3, height: 700, depth: 350 });
+  assert.deepEqual(module01.transform.translationMm, { x: 1568.684, y: 8288.827, z: 1697.064 });
+  assert.equal(module01.geometry.filter(primitive => primitive.role === "front").length, 2);
 });
 
 test("glass divider is cross-source metric geometry", () => {
@@ -72,15 +81,28 @@ test("hood and cooktop slots remain explicit inferred geometry, never masqueradi
   assert.ok(cooktopSlot?.evidenceRefs?.some(ref => ref.startsWith("style-anchor:")));
 });
 
-test("standalone washer and fridge use Promob source placement and target envelopes", () => {
+test("standalone washer and fridge use confirmed Promob placement while tank/range remain explicit inferred placements", () => {
   const washer = currentSceneBase.items.find(item => item.definitionId === "AP-WASHER-01");
   const fridge = currentSceneBase.items.find(item => item.definitionId === "AP-FRIDGE-01");
+  const tank = currentSceneBase.items.find(item => item.definitionId === "AP-TANK-01");
+  const range = currentSceneBase.items.find(item => item.definitionId === "AP-RANGE-01");
   assert.deepEqual(washer?.transform.translationMm, { x: 1641.934, y: 7908.81, z: 0 });
   assert.deepEqual(fridge?.transform.translationMm, { x: 5097.427, y: 7900.44, z: 0 });
-  assert.deepEqual(washer?.targetEnvelopeMm, { width: 690, height: 990, depth: 730 });
-  assert.deepEqual(fridge?.targetEnvelopeMm, { width: 809, height: 1900, depth: 750 });
-  assert.equal(washer?.mountPolicy, "standalone");
-  assert.equal(fridge?.mountPolicy, "standalone");
+  assert.equal(washer?.placementStatus, "confirmed");
+  assert.equal(fridge?.placementStatus, "confirmed");
+  assert.equal(tank?.placementStatus, "inferred");
+  assert.equal(range?.placementStatus, "inferred");
+  assert.ok(tank?.evidenceRefs?.some(ref => ref.startsWith("inference:")));
+  assert.ok(range?.evidenceRefs?.some(ref => ref.startsWith("inference:")));
+});
+
+test("module02 and freestanding range form a reversible substitution group", () => {
+  const baseline = resolveEffectiveVisibility(currentSceneBase);
+  assert.equal(baseline.get(module02.id)?.effectiveVisible, true);
+  assert.equal(baseline.get("scene/traditional/appliance/freestanding-range")?.effectiveVisible, false);
+  const moduleHidden = setVisibilityIntent(currentSceneBase, module02.id, "off");
+  const replacement = resolveEffectiveVisibility(moduleHidden);
+  assert.equal(replacement.get("scene/traditional/appliance/freestanding-range")?.effectiveVisible, true);
 });
 
 test("hosted accessory geometry resolves to audited DXF world coordinates within floating tolerance", () => {
