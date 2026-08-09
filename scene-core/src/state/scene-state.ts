@@ -12,7 +12,13 @@ import { composeTransforms } from "../core/math.js";
 
 export type AnySceneEntity = EnvironmentGeometry | ModuleGeometry | SceneItem;
 
-export type VisibilityReason = "visible" | "intent-off" | "default-hidden" | "host-hidden" | "host-missing";
+export type VisibilityReason =
+  | "visible"
+  | "intent-off"
+  | "default-hidden"
+  | "host-hidden"
+  | "host-missing"
+  | "substitution-primary-visible";
 
 export interface EffectiveVisibility {
   readonly entityId: string;
@@ -85,6 +91,9 @@ export function resolveItemPlacementTransform(scene: ScenePackage, item: SceneIt
 
 export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<string, EffectiveVisibility> {
   const entities = new Map(allSceneEntities(scene).map(entity => [entity.id, entity] as const));
+  const substitutions = new Map(
+    (scene.substitutionGroups ?? []).map(group => [group.replacementEntityId, group] as const)
+  );
   const resolved = new Map<string, EffectiveVisibility>();
   const visiting = new Set<string>();
 
@@ -105,6 +114,18 @@ export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<str
       } else if (!resolveOne(host).effectiveVisible) {
         effectiveVisible = false;
         reason = "host-hidden";
+      }
+    }
+
+    const substitution = substitutions.get(entity.id);
+    if (effectiveVisible && substitution) {
+      const primary = entities.get(substitution.primaryEntityId);
+      if (!primary) {
+        effectiveVisible = false;
+        reason = "host-missing";
+      } else if (resolveOne(primary).effectiveVisible) {
+        effectiveVisible = false;
+        reason = "substitution-primary-visible";
       }
     }
 
