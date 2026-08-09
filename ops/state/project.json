@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "ProjectState 1.0",
+  "project": {
+    "id": "mobilipresenter",
+    "repository": "EAKerber/MobiliPresenter",
+    "productInvariants": {
+      "viewer": "fixed-camera",
+      "visualPriority": "contextual-fidelity-over-free-3d-navigation"
+    }
+  },
+  "git": {
+    "controlBranch": "main",
+    "activeDevelopmentBranch": "architecture/fixed-view-scene-core-v1",
+    "publishedBranch": "main"
+  },
+  "published": {
+    "release": "V7.0-I5",
+    "url": "https://mobilipresenter.netlify.app/",
+    "artifactManifest": "snapshot/mobile/manifest.json",
+    "artifactSha256": "38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae"
+  },
+  "development": {
+    "initiative": "Scene Core 0.1",
+    "phase": "architecture-bootstrap",
+    "checkpoint": "SC-00",
+    "nextTransition": "plan-scene-core-0.1",
+    "blockers": [],
+    "constraints": [
+      "fixed-camera-is-product-invariant",
+      "geometry-wins-for-assembly-preserve-nominal",
+      "runtime-rendering-must-be-deterministic",
+      "llm-is-authoring-or-enhancement-not-runtime-geometry-authority"
+    ]
+  },
+  "operations": {
+    "toolboxPhase": "phase-1-integrity",
+    "canonicalState": "ops/state/project.json",
+    "commands": [
+      "status",
+      "doctor",
+      "verify"
+    ]
+  }
+}

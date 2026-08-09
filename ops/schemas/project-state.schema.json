@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/project-state-1.0.json",
+  "title": "MobiliPresenter ProjectState 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "git", "published", "development", "operations"],
+  "properties": {
+    "schemaVersion": {"const": "ProjectState 1.0"},
+    "project": {
+      "type": "object",
+      "required": ["id", "repository", "productInvariants"],
+      "properties": {
+        "id": {"const": "mobilipresenter"},
+        "repository": {"const": "EAKerber/MobiliPresenter"},
+        "productInvariants": {"type": "object"}
+      }
+    },
+    "git": {
+      "type": "object",
+      "required": ["controlBranch", "activeDevelopmentBranch", "publishedBranch"],
+      "properties": {
+        "controlBranch": {"type": "string", "minLength": 1},
+        "activeDevelopmentBranch": {"type": "string", "minLength": 1},
+        "publishedBranch": {"type": "string", "minLength": 1}
+      }
+    },
+    "published": {
+      "type": "object",
+      "required": ["release", "url", "artifactManifest", "artifactSha256"],
+      "properties": {
+        "release": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "minLength": 1},
+        "artifactManifest": {"type": "string", "minLength": 1},
+        "artifactSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "development": {
+      "type": "object",
+      "required": ["initiative", "phase", "checkpoint", "nextTransition", "blockers", "constraints"],
+      "properties": {
+        "initiative": {"type": "string", "minLength": 1},
+        "phase": {"type": "string", "minLength": 1},
+        "checkpoint": {"type": "string", "minLength": 1},
+        "nextTransition": {"type": "string", "minLength": 1},
+        "blockers": {"type": "array", "items": {"type": "string"}},
+        "constraints": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "operations": {
+      "type": "object",
+      "required": ["toolboxPhase", "canonicalState", "commands"],
+      "properties": {
+        "toolboxPhase": {"type": "string", "minLength": 1},
+        "canonicalState": {"const": "ops/state/project.json"},
+        "commands": {"type": "array", "items": {"enum": ["status", "doctor", "verify"]}, "uniqueItems": true}
+      }
+    }
+  }
+}
