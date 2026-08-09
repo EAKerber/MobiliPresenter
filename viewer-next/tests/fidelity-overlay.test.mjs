@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFidelityOverlay } from "../dist/src/renderer/three/fidelity-overlay.js";
+import { buildFidelityOverlay } from "../dist-ts/src/renderer/three/fidelity-overlay.js";
 
 test("debug overlay batches lines by semantic fidelity role", () => {
   const overlay = buildFidelityOverlay([
