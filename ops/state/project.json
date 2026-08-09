@@ -22,8 +22,8 @@
   "development": {
     "initiative": "Scene Core 0.1",
     "phase": "implementation",
-    "checkpoint": "SC-01",
-    "nextTransition": "implement-sc-02-dxf-source-adapter",
+    "checkpoint": "SC-02",
+    "nextTransition": "implement-sc-03-current-scene-geometry",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
