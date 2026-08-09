@@ -10,6 +10,7 @@ export const LIGHTING_POLICY_SCHEMA_VERSION = "LightingPolicy 0.1.0" as const;
 export type ApplianceRole =
   | "laundry-washer"
   | "laundry-tank"
+  | "freestanding-range"
   | "built-in-oven"
   | "cooktop"
   | "hood"
