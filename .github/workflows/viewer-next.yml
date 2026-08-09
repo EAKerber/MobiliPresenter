@@ -72,16 +72,26 @@ jobs:
         working-directory: viewer-next
         run: python3 tests/browser_smoke.py
 
-      - name: Browser fidelity evidence
+      - name: Browser fidelity overlay
         working-directory: viewer-next
         run: python3 tests/fidelity_smoke.py
+
+      - name: Capture targeted 4x readability crops
+        working-directory: viewer-next
+        run: |
+          python3 tests/readability_capture.py \
+            /tmp/mobilipresenter-readability-spec.json \
+            /tmp/mobilipresenter-readability-crops \
+            /tmp/mobilipresenter-readability-crops.json
+          python -m json.tool /tmp/mobilipresenter-readability-crops.json > /dev/null
 
       - name: Measure semantic seam readability
         working-directory: viewer-next
         run: |
-          python3 tests/readability_probe.py \
-            /tmp/mobilipresenter-fidelity-clean-4x.png \
+          python3 tests/readability_analyze.py \
             /tmp/mobilipresenter-readability-spec.json \
+            /tmp/mobilipresenter-readability-crops.json \
+            /tmp/mobilipresenter-readability-crops \
             /tmp/mobilipresenter-readability-report.json
           python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
 
@@ -102,9 +112,6 @@ jobs:
             cp /tmp/mobilipresenter-viewer-next.log viewer-next/artifacts/preview.log
             cp /tmp/mobilipresenter-viewer-next.log viewer-next/fidelity-artifacts/preview.log
           fi
-          if [ -f /tmp/mobilipresenter-fidelity-clean-4x.png ]; then
-            cp /tmp/mobilipresenter-fidelity-clean-4x.png viewer-next/fidelity-artifacts/fidelity-clean-4x.png
-          fi
           if [ -f /tmp/mobilipresenter-fidelity-overlay-1x.png ]; then
             cp /tmp/mobilipresenter-fidelity-overlay-1x.png viewer-next/fidelity-artifacts/fidelity-overlay-1x.png
           fi
@@ -116,6 +123,12 @@ jobs:
           fi
           if [ -f /tmp/mobilipresenter-readability-spec.json ]; then
             cp /tmp/mobilipresenter-readability-spec.json viewer-next/fidelity-artifacts/readability-spec.json
+          fi
+          if [ -f /tmp/mobilipresenter-readability-crops.json ]; then
+            cp /tmp/mobilipresenter-readability-crops.json viewer-next/fidelity-artifacts/readability-crops.json
+          fi
+          if [ -d /tmp/mobilipresenter-readability-crops ]; then
+            cp -R /tmp/mobilipresenter-readability-crops viewer-next/fidelity-artifacts/readability-crops
           fi
           if [ -f /tmp/mobilipresenter-readability-report.json ]; then
             cp /tmp/mobilipresenter-readability-report.json viewer-next/fidelity-artifacts/readability-report.json
