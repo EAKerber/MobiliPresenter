@@ -1,0 +1,72 @@
+name: Agent Ops
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - 'ops/**'
+      - 'tools/agent.py'
+      - 'tools/tests/**'
+      - 'docs/plans/**'
+      - '.github/workflows/agent-ops.yml'
+  push:
+    branches:
+      - 'renderer/**'
+      - 'architecture/**'
+      - 'ops/**'
+    paths:
+      - 'AGENTS.md'
+      - 'ops/**'
+      - 'tools/agent.py'
+      - 'tools/tests/**'
+      - 'docs/plans/**'
+      - '.github/workflows/agent-ops.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Toolbox unit tests
+        run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
+
+      - name: Doctor
+        run: python tools/agent.py doctor --json
+
+      - name: Verify local coherence
+        run: python tools/agent.py verify --json
+
+      - name: Verify remote PR identity
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/agent.py verify --remote --json
+
+      - name: Generate handoff evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/agent.py handoff --json > /tmp/agent-handoff.json
+          python -m json.tool /tmp/agent-handoff.json > /dev/null
+
+      - name: Upload handoff evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-ops-handoff
+          path: /tmp/agent-handoff.json
+          if-no-files-found: error
