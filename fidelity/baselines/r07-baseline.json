@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "FidelityBaseline 1.0",
+  "id": "r07-first-webgl-baseline",
+  "status": "frozen-rejected-for-visual-fidelity",
+  "sceneId": "traditional-complete",
+  "cameraProfile": "fixed-perspective-calibrated",
+  "viewportPx": [1865, 967],
+  "source": {
+    "branch": "renderer/fixed-view-realistic-v1",
+    "headSha": "3f20e681c0fbfab540d1b3b0ec569d7467be2ed6",
+    "workflow": "Viewer Next",
+    "workflowRunId": 31335672034,
+    "workflowRunNumber": 36,
+    "artifactId": 9044250736,
+    "artifactName": "viewer-next-visual-baseline",
+    "artifactDigest": "sha256:c60cf1435b3a8fefd9e18231e73f224663ef9025d0f589a0b2d65e12c643f918",
+    "artifactBytes": 124180,
+    "screenshotName": "renderer-baseline.png",
+    "screenshotSha256": "035223c7434e360d9f23e56e18dad0dbe404954cc0dc5dea3917245c4c44d87c",
+    "screenshotBytes": 127104
+  },
+  "browserGate": {
+    "status": "PASS",
+    "requiredDomMarkers": [
+      "data-renderer-backend=three-webgl2",
+      "data-renderer-ready=true",
+      "data-frame-rendered=true",
+      "data-scene-id=traditional-complete"
+    ]
+  },
+  "knownFidelityFailures": {
+    "F0": [
+      "module-01-missing",
+      "laundry-tank-not-instantiated",
+      "module02-freestanding-range-substitution-missing"
+    ],
+    "F2": [
+      "module02-oven-mdf-surround-insufficiently-represented"
+    ],
+    "F5": [
+      "doors-and-drawers-low-readability",
+      "laundry-upper-low-readability",
+      "background-wall-low-spatial-readability"
+    ],
+    "F6": [
+      "hood-proxy-too-box-like",
+      "sink-faucet-stone-detail-insufficient",
+      "overall-render-reads-as-basic-3d-composition"
+    ]
+  },
+  "policy": {
+    "purpose": "regression-baseline-not-golden-target",
+    "visualCorrectionsAllowedBeforeF0F4Harness": false,
+    "styleAnchorIsNotGoldenTarget": true
+  }
+}
