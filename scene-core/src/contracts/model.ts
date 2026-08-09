@@ -45,12 +45,7 @@ export interface GeometryPrimitiveBase {
   readonly materialSlot?: string;
   readonly sourceBindingIds: readonly string[];
 }
-
-export interface BoxGeometry extends GeometryPrimitiveBase {
-  readonly primitive: "box";
-  readonly sizeMm: DimensionTripleMm;
-}
-
+export interface BoxGeometry extends GeometryPrimitiveBase { readonly primitive: "box"; readonly sizeMm: DimensionTripleMm; }
 export interface FaceGeometry extends GeometryPrimitiveBase {
   readonly primitive: "face";
   readonly uAxis: Vec3;
@@ -58,7 +53,6 @@ export interface FaceGeometry extends GeometryPrimitiveBase {
   readonly normal: Vec3;
   readonly sizeMm: readonly [number, number];
 }
-
 export type GeometryPrimitive = BoxGeometry | FaceGeometry;
 
 export interface ApplianceSlot {
@@ -75,7 +69,7 @@ export interface SceneEntityBase {
   readonly transform: RigidTransform;
   readonly visibilityIntent: VisibilityIntent;
   readonly defaultVisible: boolean;
-  readonly controllable: boolean;
+  readonly controllable?: boolean;
   readonly mountPolicy: MountPolicy;
   readonly hostId?: string;
 }
