@@ -10,6 +10,7 @@ export * from "./appearance/materials.js";
 export * from "./state/scene-state.js";
 export * from "./conditioning/conditioning.js";
 export * from "./source/dxf.js";
+export * from "./fidelity/projection.js";
 export * from "./fixtures/current-camera.js";
 export * from "./fixtures/current-geometry.js";
 export * from "./fixtures/current-context.js";
