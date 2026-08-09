@@ -40,6 +40,7 @@ function minimalScene() {
       structuralEnvelope: { min: vec3(0, 0, 0), max: vec3(3000, 100, 2600) },
       geometry: []
     }],
+    items: [],
     modules: [{
       id: "scene/test/module/box",
       kind: "module",
