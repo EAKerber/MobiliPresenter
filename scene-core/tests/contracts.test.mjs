@@ -19,7 +19,7 @@ function minimalScene() {
       id: "camera/main",
       mode: "fixed",
       projection: "perspective",
-      transform: identityTransform(),
+      positionMm: vec3(0, 0, 0),
       targetMm: vec3(0, 1000, 0),
       up: vec3(0, 0, 1),
       fovYDeg: 43.28,
