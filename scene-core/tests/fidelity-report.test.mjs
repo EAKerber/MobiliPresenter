@@ -5,7 +5,7 @@ import {
   compareFidelityReports
 } from "../dist/src/fidelity/report.js";
 
-test("current baseline report records known hard-gate failures deterministically", () => {
+test("current candidate report records fixed completeness and remaining hard-gate work deterministically", () => {
   const first = buildCurrentFidelityReport();
   const second = buildCurrentFidelityReport();
   assert.deepEqual(second, first);
@@ -13,9 +13,9 @@ test("current baseline report records known hard-gate failures deterministically
   assert.equal(first.hardGatesPass, false);
 
   const byId = new Map(first.checks.map(item => [item.id, item]));
-  assert.equal(byId.get("required-entity:scene/traditional/module/upper-laundry")?.status, "fail");
-  assert.equal(byId.get("required-entity:scene/traditional/fixture/laundry-tank")?.status, "fail");
-  assert.equal(byId.get("required-entity:scene/traditional/appliance/freestanding-range")?.status, "fail");
+  assert.equal(byId.get("required-entity:scene/traditional/module/upper-laundry")?.status, "pass");
+  assert.equal(byId.get("required-entity:scene/traditional/fixture/laundry-tank")?.status, "pass");
+  assert.equal(byId.get("required-entity:scene/traditional/appliance/freestanding-range")?.status, "pass");
   assert.equal(byId.get("topology:module02-oven-surround-front-geometry")?.status, "fail");
   assert.equal(byId.get("metric:module02-plus-module03-span")?.status, "pass");
   assert.equal(byId.get("projection:module02-plus-module03-span")?.status, "pass");
@@ -23,16 +23,24 @@ test("current baseline report records known hard-gate failures deterministically
 });
 
 test("hard-gate comparison reports pass-to-fail regressions only", () => {
-  const baseline = buildCurrentFidelityReport();
+  const candidate = buildCurrentFidelityReport();
   const baselineWithPass = {
-    ...baseline,
-    checks: baseline.checks.map(item =>
-      item.id === "required-entity:scene/traditional/module/upper-laundry"
+    ...candidate,
+    checks: candidate.checks.map(item =>
+      item.id === "metric:module02-plus-module03-span"
         ? { ...item, status: "pass" }
         : item
     )
   };
-  const regressions = compareFidelityReports(baselineWithPass, baseline);
+  const regressed = {
+    ...candidate,
+    checks: candidate.checks.map(item =>
+      item.id === "metric:module02-plus-module03-span"
+        ? { ...item, status: "fail" }
+        : item
+    )
+  };
+  const regressions = compareFidelityReports(baselineWithPass, regressed);
   assert.equal(regressions.length, 1);
-  assert.equal(regressions[0].id, "required-entity:scene/traditional/module/upper-laundry");
+  assert.equal(regressions[0].id, "metric:module02-plus-module03-span");
 });
