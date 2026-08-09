@@ -21,21 +21,27 @@
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "planning",
-    "checkpoint": "R-00",
-    "nextTransition": "plan-renderer-0.1",
+    "phase": "visual-correction-loop",
+    "checkpoint": "FH-06",
+    "nextTransition": "correct-highest-priority-f5-f6-failures-without-f0-f4-regression",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
       "scene-core-0.1-is-integrated-foundation",
       "geometry-wins-for-assembly-preserve-nominal",
       "runtime-rendering-must-be-deterministic",
-      "llm-is-authoring-or-enhancement-not-runtime-geometry-authority"
-    ]
+      "llm-is-authoring-or-enhancement-not-runtime-geometry-authority",
+      "mm-is-physical-authority-pixels-are-projection-evidence",
+      "supersampling-4x-is-targeted-crop-fidelity-profile",
+      "f0-through-f4-must-not-regress-during-visual-tuning",
+      "fh05-readability-baseline-is-regression-reference"
+    ],
+    "plan": "docs/plans/fidelity-harness-v1.md",
+    "prNumber": 6
   },
   "operations": {
-    "toolboxPhase": "phase-1-integrity",
+    "toolboxPhase": "phase-1.1-coherence",
     "canonicalState": "ops/state/project.json",
-    "commands": ["status", "doctor", "verify"]
+    "commands": ["status", "doctor", "verify", "checkpoint", "handoff"]
   }
 }
