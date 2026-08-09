@@ -6,9 +6,12 @@ import struct
 import subprocess
 from pathlib import Path
 
-URL = "http://127.0.0.1:4173/?fidelity=1"
+BASE = "http://127.0.0.1:4173/"
+CLEAN_URL = f"{BASE}?fidelity=1"
+OVERLAY_URL = f"{BASE}?fidelity=1&overlay=1"
 DOM = Path("/tmp/mobilipresenter-fidelity-dom.html")
-SCREENSHOT = Path("/tmp/mobilipresenter-fidelity-4x.png")
+CLEAN_SCREENSHOT = Path("/tmp/mobilipresenter-fidelity-clean-4x.png")
+OVERLAY_SCREENSHOT = Path("/tmp/mobilipresenter-fidelity-overlay-4x.png")
 EVIDENCE = Path("/tmp/mobilipresenter-fidelity-evidence.json")
 CANONICAL = (1865, 967)
 SUPERSAMPLE = 4
@@ -46,13 +49,25 @@ def run(args: list[str]) -> subprocess.CompletedProcess[str]:
 def png_size(path: Path) -> tuple[int, int]:
     data = path.read_bytes()
     if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
-        raise SystemExit("FIDELITY_SCREENSHOT_NOT_PNG")
+        raise SystemExit(f"FIDELITY_SCREENSHOT_NOT_PNG:{path}")
     return struct.unpack(">II", data[16:24])
+
+
+def capture(chrome: str, url: str, output: Path) -> tuple[int, int]:
+    result = run(chrome_args(chrome) + [f"--screenshot={output}", url])
+    if result.returncode != 0 or not output.is_file():
+        raise SystemExit(f"FIDELITY_CHROME_SCREENSHOT_FAILED:{url}:{result.stderr[-2000:]}")
+    size = png_size(output)
+    if size != EXPECTED:
+        raise SystemExit(f"FIDELITY_SCREENSHOT_SIZE_MISMATCH:{output}:{size[0]}x{size[1]}:expected={EXPECTED[0]}x{EXPECTED[1]}")
+    if output.stat().st_size < 25_000:
+        raise SystemExit(f"FIDELITY_SCREENSHOT_SUSPICIOUSLY_SMALL:{output}:{output.stat().st_size}")
+    return size
 
 
 def main() -> None:
     chrome = find_chrome()
-    dom_result = run(chrome_args(chrome) + ["--dump-dom", URL])
+    dom_result = run(chrome_args(chrome) + ["--dump-dom", OVERLAY_URL])
     if dom_result.returncode != 0:
         raise SystemExit(f"FIDELITY_CHROME_DOM_FAILED:{dom_result.stderr[-2000:]}")
     DOM.write_text(dom_result.stdout, encoding="utf-8")
@@ -61,6 +76,7 @@ def main() -> None:
         'data-renderer-ready="true"',
         'data-frame-rendered="true"',
         'data-scene-id="traditional-complete"',
+        'data-fidelity-mode="true"',
         'data-fidelity-overlay="true"',
         'data-fidelity-line-count=',
     )
@@ -68,23 +84,16 @@ def main() -> None:
     if missing:
         raise SystemExit(f"FIDELITY_DOM_GATE_FAILED:{missing}\n{dom_result.stderr[-2000:]}")
 
-    shot_result = run(chrome_args(chrome) + [f"--screenshot={SCREENSHOT}", URL])
-    if shot_result.returncode != 0 or not SCREENSHOT.is_file():
-        raise SystemExit(f"FIDELITY_CHROME_SCREENSHOT_FAILED:{shot_result.stderr[-2000:]}")
-    width, height = png_size(SCREENSHOT)
-    if (width, height) != EXPECTED:
-        raise SystemExit(f"FIDELITY_SCREENSHOT_SIZE_MISMATCH:{width}x{height}:expected={EXPECTED[0]}x{EXPECTED[1]}")
-    if SCREENSHOT.stat().st_size < 25_000:
-        raise SystemExit(f"FIDELITY_SCREENSHOT_SUSPICIOUSLY_SMALL:{SCREENSHOT.stat().st_size}")
-
+    clean_size = capture(chrome, CLEAN_URL, CLEAN_SCREENSHOT)
+    overlay_size = capture(chrome, OVERLAY_URL, OVERLAY_SCREENSHOT)
     evidence = {
         "status": "PASS",
         "browser": chrome,
-        "url": URL,
         "canonicalViewportPx": list(CANONICAL),
         "supersampleFactor": SUPERSAMPLE,
-        "renderedScreenshotPx": [width, height],
-        "screenshotBytes": SCREENSHOT.stat().st_size,
+        "renderedScreenshotPx": list(clean_size),
+        "cleanScreenshot": {"path": str(CLEAN_SCREENSHOT), "bytes": CLEAN_SCREENSHOT.stat().st_size},
+        "overlayScreenshot": {"path": str(OVERLAY_SCREENSHOT), "bytes": OVERLAY_SCREENSHOT.stat().st_size, "size": list(overlay_size)},
         "requiredDomMarkers": list(required),
     }
     EVIDENCE.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
