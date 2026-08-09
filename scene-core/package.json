@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "verify": "npm run test"
+    "test:dxf": "python3 -m unittest discover -s tests_py",
+    "verify": "npm run test && npm run test:dxf"
   }
 }
