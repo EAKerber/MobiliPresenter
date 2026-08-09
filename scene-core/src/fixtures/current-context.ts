@@ -24,7 +24,7 @@ const box = (
   localTransform: transform,
   sizeMm: { width, height, depth },
   sourceBindingIds: [`placement:${layer}`],
-  ...(materialSlot ? { materialSlot } : {})
+  materialSlot: materialSlot ?? (role === "front" ? "front" : "carcass")
 });
 
 export const glassDivider: EnvironmentGeometry = {
@@ -36,12 +36,9 @@ export const glassDivider: EnvironmentGeometry = {
   defaultVisible: true,
   controllable: false,
   mountPolicy: "standalone",
-  structuralEnvelope: {
-    min: { x: 0, y: 0, z: 0 },
-    max: { x: 8, y: 400, z: 2601.63 }
-  },
+  structuralEnvelope: { min: { x: 0, y: 0, z: 0 }, max: { x: 8, y: 400, z: 2601.63 } },
   geometry: [
-    box("scene/traditional/environment/glass-divider/panel", "glass", t(0,0,0), 8, 2601.63, 400, "LAYER59", "glass-clear")
+    box("scene/traditional/environment/glass-divider/panel", "glass", t(0,0,0), 8, 2601.63, 400, "LAYER59", "glass")
   ]
 };
 
@@ -66,7 +63,7 @@ export const module04: ModuleGeometry = {
   structuralEnvelope: { min: {x:0,y:0,z:0}, max: {x:18,y:610,z:2400} },
   renderEnvelope: { min: {x:0,y:0,z:0}, max: {x:18,y:610,z:2400} },
   geometry: [
-    box("scene/traditional/module/fridge-side/panel", "side", t(0,0,0), 18, 2400, 610, "LAYER114", "front-primary")
+    box("scene/traditional/module/fridge-side/panel", "side", t(0,0,0), 18, 2400, 610, "LAYER114", "front")
   ],
   applianceSlots: []
 };
@@ -90,18 +87,28 @@ export const module05: ModuleGeometry = {
     ]
   },
   structuralEnvelope: { min:{x:0,y:0,z:0}, max:{x:800,y:400,z:700} },
-  renderEnvelope: { min:{x:0,y:-18,z:0}, max:{x:800,y:400,z:700} },
+  renderEnvelope: { min:{x:0,y:-18,z:-215}, max:{x:800,y:400,z:700} },
   geometry: [
-    box("scene/traditional/module/upper-stove/back", "back", t(8,394,8), 784,684,6,"LAYER60","carcass-white"),
-    box("scene/traditional/module/upper-stove/bottom", "bottom", t(18,0,0),764,18,400,"LAYER61","carcass-white"),
-    box("scene/traditional/module/upper-stove/top", "top", t(18,0,682),764,18,400,"LAYER62","carcass-white"),
-    box("scene/traditional/module/upper-stove/left-side", "side", t(0,0,0),18,700,400,"LAYER63","carcass-white"),
-    box("scene/traditional/module/upper-stove/right-side", "side", t(782,0,0),18,700,400,"LAYER64","carcass-white"),
-    box("scene/traditional/module/upper-stove/shelf", "shelf", t(18,20,341),764,18,374,"LAYER65","carcass-white"),
-    box("scene/traditional/module/upper-stove/front/door-left", "front", t(3,-18,4),395.5,693,18,"LAYER71","front-primary"),
-    box("scene/traditional/module/upper-stove/front/door-right", "front", t(401.5,-18,4),395.5,693,18,"LAYER66","front-primary")
+    box("scene/traditional/module/upper-stove/back", "back", t(8,394,8), 784,684,6,"LAYER60"),
+    box("scene/traditional/module/upper-stove/bottom", "bottom", t(18,0,0),764,18,400,"LAYER61"),
+    box("scene/traditional/module/upper-stove/top", "top", t(18,0,682),764,18,400,"LAYER62"),
+    box("scene/traditional/module/upper-stove/left-side", "side", t(0,0,0),18,700,400,"LAYER63"),
+    box("scene/traditional/module/upper-stove/right-side", "side", t(782,0,0),18,700,400,"LAYER64"),
+    box("scene/traditional/module/upper-stove/shelf", "shelf", t(18,20,341),764,18,374,"LAYER65"),
+    box("scene/traditional/module/upper-stove/front/door-left", "front", t(3,-18,4),395.5,693,18,"LAYER71"),
+    box("scene/traditional/module/upper-stove/front/door-right", "front", t(401.5,-18,4),395.5,693,18,"LAYER66")
   ],
-  applianceSlots: []
+  applianceSlots: [
+    {
+      id: "scene/traditional/module/upper-stove/slot/hood",
+      role: "hood",
+      localTransform: t(100, 0, -215),
+      clearSizeMm: { width: 600, height: 215, depth: 298 },
+      defaultApplianceId: "AP-HOOD-01",
+      status: "inferred",
+      evidenceRefs: ["style-anchor:target-render", "appearance:AP-HOOD-01"]
+    }
+  ]
 };
 
 export const module07: ModuleGeometry = {
@@ -126,13 +133,13 @@ export const module07: ModuleGeometry = {
   structuralEnvelope: { min:{x:0,y:0,z:0}, max:{x:800,y:350,z:484} },
   renderEnvelope: { min:{x:0,y:-18,z:0}, max:{x:800,y:350,z:484} },
   geometry: [
-    box("scene/traditional/module/upper-fridge/back", "back", t(8,344,8),784,468,6,"LAYER99","carcass-white"),
-    box("scene/traditional/module/upper-fridge/bottom", "bottom", t(18,0,0),764,18,350,"LAYER100","carcass-white"),
-    box("scene/traditional/module/upper-fridge/top", "top", t(18,0,466),764,18,350,"LAYER101","carcass-white"),
-    box("scene/traditional/module/upper-fridge/left-side", "side", t(0,0,0),18,484,350,"LAYER102","carcass-white"),
-    box("scene/traditional/module/upper-fridge/right-side", "side", t(782,0,0),18,484,350,"LAYER103","carcass-white"),
-    box("scene/traditional/module/upper-fridge/front/door-left", "front", t(3,-18,4),395.5,477,18,"LAYER109","front-primary"),
-    box("scene/traditional/module/upper-fridge/front/door-right", "front", t(401.5,-18,4),395.5,477,18,"LAYER104","front-primary")
+    box("scene/traditional/module/upper-fridge/back", "back", t(8,344,8),784,468,6,"LAYER99"),
+    box("scene/traditional/module/upper-fridge/bottom", "bottom", t(18,0,0),764,18,350,"LAYER100"),
+    box("scene/traditional/module/upper-fridge/top", "top", t(18,0,466),764,18,350,"LAYER101"),
+    box("scene/traditional/module/upper-fridge/left-side", "side", t(0,0,0),18,484,350,"LAYER102"),
+    box("scene/traditional/module/upper-fridge/right-side", "side", t(782,0,0),18,484,350,"LAYER103"),
+    box("scene/traditional/module/upper-fridge/front/door-left", "front", t(3,-18,4),395.5,477,18,"LAYER109"),
+    box("scene/traditional/module/upper-fridge/front/door-right", "front", t(401.5,-18,4),395.5,477,18,"LAYER104")
   ],
   applianceSlots: []
 };
@@ -146,7 +153,9 @@ export const module03WithSink: ModuleGeometry = {
       role: "kitchen-sink",
       localTransform: t(417.295, 63.956, 580.8759),
       clearSizeMm: { width: 382.087, height: 178.1241, depth: 382.085 },
-      defaultApplianceId: "FX-SINK-01"
+      defaultApplianceId: "FX-SINK-01",
+      status: "confirmed",
+      evidenceRefs: ["promob-dxf:LAYER41", "style-anchor:kitchen-sink"]
     }
   ]
 };
