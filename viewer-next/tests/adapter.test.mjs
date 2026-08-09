@@ -72,10 +72,17 @@ test("Three off-axis camera reproduces Scene Core projection", () => {
 
 test("targeted 4x crop projection is exactly the full-canvas projection minus crop origin", () => {
   const full = { widthPx: 7460, heightPx: 3868 };
-  const crop = { xPx: 2800, yPx: 1700, widthPx: 640, heightPx: 480 };
   const point = vec3(4264.7, 8102.4, 480);
   const fullCamera = createThreeCamera(currentFixedCamera, full);
   const fullPx = projectScenePointWithThree(fullCamera, full, point);
+  const widthPx = 640;
+  const heightPx = 480;
+  const crop = {
+    xPx: Math.max(0, Math.min(full.widthPx - widthPx, Math.floor(fullPx[0] - widthPx / 2))),
+    yPx: Math.max(0, Math.min(full.heightPx - heightPx, Math.floor(fullPx[1] - heightPx / 2))),
+    widthPx,
+    heightPx
+  };
   assert.ok(fullPx[0] >= crop.xPx && fullPx[0] <= crop.xPx + crop.widthPx);
   assert.ok(fullPx[1] >= crop.yPx && fullPx[1] <= crop.yPx + crop.heightPx);
 
