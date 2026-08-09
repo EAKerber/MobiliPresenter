@@ -14,6 +14,7 @@ import {
   module05,
   module07
 } from "./current-context.js";
+import { module01 } from "./current-laundry.js";
 
 const t = (x: number, y: number, z: number): RigidTransform => ({
   translationMm: { x, y, z },
@@ -48,7 +49,35 @@ export const currentItems: readonly SceneItem[] = [
     visibilityIntent: "auto",
     defaultVisible: true,
     controllable: true,
-    mountPolicy: "standalone"
+    mountPolicy: "standalone",
+    placementStatus: "confirmed",
+    evidenceRefs: ["promob-dxf:LAYER58", "promob-property:washer-envelope"]
+  },
+  {
+    id: "scene/traditional/fixture/laundry-tank",
+    kind: "fixture",
+    definitionId: "AP-TANK-01",
+    transform: t(2451.8365, 7944.14, 0),
+    targetEnvelopeMm: { width: 500, height: 820, depth: 500 },
+    visibilityIntent: "auto",
+    defaultVisible: true,
+    controllable: true,
+    mountPolicy: "standalone",
+    placementStatus: "inferred",
+    evidenceRefs: ["style-anchor:laundry-tank", "inference:centered-on-column-envelope-and-backed-to-column-front"]
+  },
+  {
+    id: "scene/traditional/appliance/freestanding-range",
+    kind: "appliance",
+    definitionId: "AP-RANGE-01",
+    transform: t(3087.244, 8000.44, 0),
+    targetEnvelopeMm: { width: 760, height: 970, depth: 650 },
+    visibilityIntent: "auto",
+    defaultVisible: true,
+    controllable: true,
+    mountPolicy: "standalone",
+    placementStatus: "inferred",
+    evidenceRefs: ["user-rule:module02-absent-means-freestanding-stove", "inference:centered-in-module02-zone-and-backed-to-main-wall", "appearance:AP-RANGE-01"]
   },
   {
     id: "scene/traditional/appliance/oven",
@@ -189,7 +218,9 @@ export const currentItems: readonly SceneItem[] = [
     visibilityIntent: "auto",
     defaultVisible: true,
     controllable: true,
-    mountPolicy: "standalone"
+    mountPolicy: "standalone",
+    placementStatus: "confirmed",
+    evidenceRefs: ["promob-dxf:LAYER116", "promob-property:fridge-envelope"]
   }
 ];
 
@@ -201,6 +232,14 @@ export const currentSceneBase: ScenePackage = {
   presentationFrame: currentPresentationFrame,
   environment: [currentEnvironment, glassDivider],
   items: currentItems,
-  modules: [module02, module03WithSink, module04, module05, module06, module07],
-  sourceBindings: []
+  modules: [module01, module02, module03WithSink, module04, module05, module06, module07],
+  sourceBindings: [],
+  substitutionGroups: [
+    {
+      id: "scene/traditional/substitution/stove-zone",
+      primaryEntityId: module02.id,
+      replacementEntityId: "scene/traditional/appliance/freestanding-range",
+      policy: "replacement-when-primary-hidden"
+    }
+  ]
 };
