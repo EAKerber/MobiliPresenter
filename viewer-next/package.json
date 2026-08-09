@@ -1,0 +1,21 @@
+{
+  "name": "@mobilipresenter/viewer-next",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:core": "npm --prefix ../scene-core run build",
+    "build": "npm run build:core && tsc -p tsconfig.json && vite build",
+    "test": "npm run build:core && tsc -p tsconfig.json && node --test tests/*.test.mjs",
+    "verify": "npm run test && vite build"
+  },
+  "dependencies": {
+    "@mobilipresenter/scene-core": "file:../scene-core",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.183.1",
+    "typescript": "5.8.3",
+    "vite": "8.1.5"
+  }
+}
