@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  buildCurrentFidelityReport,
+  compareFidelityReports
+} from "../dist/src/fidelity/report.js";
+
+test("current baseline report records known hard-gate failures deterministically", () => {
+  const first = buildCurrentFidelityReport();
+  const second = buildCurrentFidelityReport();
+  assert.deepEqual(second, first);
+  assert.equal(first.schemaVersion, "FidelityReport 1.0");
+  assert.equal(first.hardGatesPass, false);
+
+  const byId = new Map(first.checks.map(item => [item.id, item]));
+  assert.equal(byId.get("required-entity:scene/traditional/module/upper-laundry")?.status, "fail");
+  assert.equal(byId.get("required-entity:scene/traditional/fixture/laundry-tank")?.status, "fail");
+  assert.equal(byId.get("required-entity:scene/traditional/appliance/freestanding-range")?.status, "fail");
+  assert.equal(byId.get("topology:module02-oven-surround-front-geometry")?.status, "fail");
+  assert.equal(byId.get("metric:module02-plus-module03-span")?.status, "pass");
+  assert.equal(byId.get("projection:module02-plus-module03-span")?.status, "pass");
+  assert.equal(byId.get("hardware:anchors-defined")?.status, "pending");
+});
+
+test("hard-gate comparison reports pass-to-fail regressions only", () => {
+  const baseline = buildCurrentFidelityReport();
+  const baselineWithPass = {
+    ...baseline,
+    checks: baseline.checks.map(item =>
+      item.id === "required-entity:scene/traditional/module/upper-laundry"
+        ? { ...item, status: "pass" }
+        : item
+    )
+  };
+  const regressions = compareFidelityReports(baselineWithPass, baseline);
+  assert.equal(regressions.length, 1);
+  assert.equal(regressions[0].id, "required-entity:scene/traditional/module/upper-laundry");
+});
