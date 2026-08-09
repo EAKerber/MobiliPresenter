@@ -38,7 +38,7 @@ function minimalScene() {
       defaultVisible: true,
       mountPolicy: "standalone",
       structuralEnvelope: { min: vec3(0, 0, 0), max: vec3(3000, 100, 2600) },
-      surfaces: []
+      geometry: []
     }],
     modules: [{
       id: "scene/test/module/box",
@@ -56,7 +56,7 @@ function minimalScene() {
       },
       structuralEnvelope: { min: vec3(0, 0, 0), max: vec3(1200, 400, 800) },
       renderEnvelope: { min: vec3(0, -18, 0), max: vec3(1200, 400, 800) },
-      surfaces: [],
+      geometry: [],
       applianceSlots: []
     }],
     sourceBindings: []
@@ -70,19 +70,13 @@ test("minimal second-scene fixture validates without project-specific ids", () =
 test("hosted entity must reference a host", () => {
   const scene = minimalScene();
   const module = scene.modules[0];
-  const broken = {
-    ...scene,
-    modules: [{ ...module, mountPolicy: "hosted", hostId: "scene/test/module/missing" }]
-  };
+  const broken = { ...scene, modules: [{ ...module, mountPolicy: "hosted", hostId: "scene/test/module/missing" }] };
   assert.equal(validateScenePackage(broken).some(issue => issue.code === "HOST_NOT_FOUND"), true);
 });
 
 test("duplicate entity ids are rejected", () => {
   const scene = minimalScene();
   const environment = scene.environment[0];
-  const duplicate = {
-    ...scene,
-    modules: [{ ...scene.modules[0], id: environment.id }]
-  };
+  const duplicate = { ...scene, modules: [{ ...scene.modules[0], id: environment.id }] };
   assert.equal(validateScenePackage(duplicate).some(issue => issue.code === "ENTITY_ID_DUPLICATE"), true);
 });
