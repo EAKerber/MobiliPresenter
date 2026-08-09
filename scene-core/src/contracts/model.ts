@@ -23,7 +23,7 @@ export type EntityKind = "environment" | "module" | "appliance" | "fixture" | "a
 export type VisibilityIntent = "auto" | "on" | "off";
 export type MountPolicy = "standalone" | "hosted";
 export type SemanticLayer = 0 | 1 | 2;
-export type GeometryRole = "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "wall" | "column" | "other";
+export type GeometryRole = "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "wall" | "column" | "stone" | "plinth" | "light-profile" | "other";
 
 export interface DimensionTripleMm { readonly width: number; readonly height: number; readonly depth: number; }
 export interface DimensionEvidence {
@@ -61,6 +61,8 @@ export interface ApplianceSlot {
   readonly localTransform: RigidTransform;
   readonly clearSizeMm: DimensionTripleMm;
   readonly defaultApplianceId?: string;
+  readonly status?: "confirmed" | "inferred";
+  readonly evidenceRefs?: readonly string[];
 }
 
 export interface SceneEntityBase {
@@ -78,6 +80,8 @@ export interface SceneItem extends SceneEntityBase {
   readonly kind: "appliance" | "fixture" | "accessory";
   readonly definitionId: string;
   readonly slotId?: string;
+  readonly targetEnvelopeMm?: DimensionTripleMm;
+  readonly geometry?: readonly GeometryPrimitive[];
 }
 
 export interface ModuleGeometry extends SceneEntityBase {
