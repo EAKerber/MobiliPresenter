@@ -21,12 +21,10 @@
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "fidelity-harness",
-    "checkpoint": "FH-05",
-    "nextTransition": "measure-f5-readability-baseline-and-enter-fh-06",
-    "blockers": [
-      "viewer-fidelity-4x-and-readability-artifact-pending-ci"
-    ],
+    "phase": "visual-correction-loop",
+    "checkpoint": "FH-06",
+    "nextTransition": "correct-highest-priority-f5-f6-failures-without-f0-f4-regression",
+    "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
       "scene-core-0.1-is-integrated-foundation",
@@ -34,8 +32,9 @@
       "runtime-rendering-must-be-deterministic",
       "llm-is-authoring-or-enhancement-not-runtime-geometry-authority",
       "mm-is-physical-authority-pixels-are-projection-evidence",
-      "supersampling-4x-is-default-fidelity-profile",
-      "f0-through-f4-must-not-regress-during-visual-tuning"
+      "supersampling-4x-is-targeted-crop-fidelity-profile",
+      "f0-through-f4-must-not-regress-during-visual-tuning",
+      "fh05-readability-baseline-is-regression-reference"
     ],
     "plan": "docs/plans/fidelity-harness-v1.md",
     "prNumber": 6
