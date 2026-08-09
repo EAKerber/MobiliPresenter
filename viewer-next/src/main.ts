@@ -1,5 +1,7 @@
 import {
   createCurrentFidelityOverlayLines,
+  CURRENT_FIDELITY_SUPERSAMPLE,
+  CURRENT_FIDELITY_VIEWPORT,
   currentFixedCamera,
   currentSceneBase
 } from "@mobilipresenter/scene-core";
@@ -11,7 +13,12 @@ import {
 } from "three";
 import { styleAnchorAppearance } from "./fixtures/style-anchor.js";
 import { attachParametricAppliances } from "./renderer/three/appliances.js";
-import { createThreeCamera, updateThreeCameraViewport } from "./renderer/three/camera.js";
+import {
+  createThreeCamera,
+  updateThreeCameraCrop,
+  updateThreeCameraViewport,
+  type PixelCrop
+} from "./renderer/three/camera.js";
 import { buildFidelityOverlay } from "./renderer/three/fidelity-overlay.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "./renderer/three/lighting.js";
 import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
@@ -26,12 +33,28 @@ const query = new URLSearchParams(window.location.search);
 const fidelityMode = query.get("fidelity") === "1";
 const fidelityOverlayMode = fidelityMode && query.get("overlay") === "1";
 
+function parseCrop(raw: string | null): PixelCrop | null {
+  if (!raw) return null;
+  const values = raw.split(",").map(value => Number.parseInt(value, 10));
+  if (values.length !== 4 || values.some(value => !Number.isFinite(value))) throw new Error("FIDELITY_CROP_INVALID");
+  const [xPx, yPx, widthPx, heightPx] = values as [number, number, number, number];
+  if (widthPx <= 0 || heightPx <= 0 || xPx < 0 || yPx < 0) throw new Error("FIDELITY_CROP_INVALID");
+  return { xPx, yPx, widthPx, heightPx };
+}
+
+const fidelityCrop = fidelityMode ? parseCrop(query.get("crop")) : null;
+const fidelityFullViewport = {
+  widthPx: CURRENT_FIDELITY_VIEWPORT.widthPx * CURRENT_FIDELITY_SUPERSAMPLE,
+  heightPx: CURRENT_FIDELITY_VIEWPORT.heightPx * CURRENT_FIDELITY_SUPERSAMPLE
+};
+
 app.dataset.rendererBackend = "three-webgl2";
 app.dataset.rendererReady = "false";
 app.dataset.frameRendered = "false";
 app.dataset.sceneId = currentSceneBase.sceneId;
 app.dataset.fidelityMode = fidelityMode ? "true" : "false";
 app.dataset.fidelityOverlay = fidelityOverlayMode ? "true" : "false";
+app.dataset.fidelityCrop = fidelityCrop ? `${fidelityCrop.xPx},${fidelityCrop.yPx},${fidelityCrop.widthPx},${fidelityCrop.heightPx}` : "none";
 
 const renderer = new WebGLRenderer({
   antialias: true,
@@ -42,7 +65,7 @@ renderer.outputColorSpace = SRGBColorSpace;
 renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, fidelityMode ? 4 : 2));
+renderer.setPixelRatio(fidelityCrop ? 1 : Math.min(window.devicePixelRatio || 1, fidelityMode ? CURRENT_FIDELITY_SUPERSAMPLE : 2));
 app.appendChild(renderer.domElement);
 
 const materials = new ThreeMaterialRegistry(styleAnchorAppearance);
@@ -53,7 +76,7 @@ const adapter = buildThreeScene(
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
 adapter.scene.background = new Color(0xf3f2ee);
 
-if (fidelityOverlayMode) {
+if (fidelityOverlayMode && !fidelityCrop) {
   const fidelityLines = createCurrentFidelityOverlayLines();
   const fidelityOverlay = buildFidelityOverlay(fidelityLines, { xray: true, opacity: 0.72 });
   fidelityOverlay.renderOrder = 10_000;
@@ -70,7 +93,7 @@ const environment = installNeutralRoomEnvironment(
 );
 
 let viewport = { widthPx: 1, heightPx: 1 };
-const camera = createThreeCamera(currentFixedCamera, viewport);
+const camera = createThreeCamera(currentFixedCamera, fidelityCrop ? fidelityFullViewport : viewport);
 const post = createSelectiveBloomPipeline(
   renderer,
   adapter.scene,
@@ -90,7 +113,11 @@ function resize(): void {
   const heightPx = Math.max(1, Math.round(app.clientHeight));
   viewport = { widthPx, heightPx };
   renderer.setSize(widthPx, heightPx, false);
-  updateThreeCameraViewport(camera, currentFixedCamera, viewport);
+  if (fidelityCrop) {
+    updateThreeCameraCrop(camera, currentFixedCamera, fidelityFullViewport, fidelityCrop);
+  } else {
+    updateThreeCameraViewport(camera, currentFixedCamera, viewport);
+  }
   post.setSize(widthPx, heightPx);
   render();
 }
