@@ -2,11 +2,13 @@ import type { ScenePackage } from "../contracts/model.js";
 import { currentFixedCamera } from "../fixtures/current-camera.js";
 import { module02, module06 } from "../fixtures/current-geometry.js";
 import { module03WithSink } from "../fixtures/current-context.js";
+import { currentHardwareAnchors } from "../fixtures/current-hardware.js";
 import { currentSceneBase } from "../fixtures/current-scene.js";
 import {
   CURRENT_FIDELITY_SUPERSAMPLE,
   CURRENT_FIDELITY_VIEWPORT
 } from "../fixtures/current-fidelity.js";
+import { resolveHardwareAnchors } from "../hardware/anchors.js";
 import { createScreenMetricProfile, projectMetricSegment } from "./projection.js";
 
 export type FidelityTier = "F0" | "F1" | "F2" | "F3" | "F4" | "F5" | "F6";
@@ -105,8 +107,25 @@ export function buildCurrentFidelityReport(scene: ScenePackage = currentSceneBas
     { expected: expectedSpanPx, observed: projectedSpan.canonicalLengthPx, tolerance: 0.01, unit: "px" }
   ));
 
-  checks.push(check("hardware:anchors-defined", "F4", "hard", "pending", { expected: true, observed: false, unit: "boolean", note: "HardwareAnchor contract is scheduled for FH-05." }));
-  checks.push(check("readability:semantic-edge-baseline", "F5", "soft", "pending", { note: "Quantitative edge readability is scheduled after the 4x overlay baseline is available." }));
+  try {
+    const anchors = resolveHardwareAnchors(scene, currentHardwareAnchors);
+    checks.push(check(
+      "hardware:anchors-defined",
+      "F4",
+      "hard",
+      anchors.length === currentHardwareAnchors.length ? "pass" : "fail",
+      {
+        expected: currentHardwareAnchors.length,
+        observed: anchors.length,
+        unit: "count",
+        note: "V7 handle semantics were ported as centered/edge-offset rules; current values remain evidence-status inferred until visually/physically confirmed."
+      }
+    ));
+  } catch (error) {
+    checks.push(check("hardware:anchors-defined", "F4", "hard", "fail", { expected: currentHardwareAnchors.length, observed: 0, unit: "count", note: error instanceof Error ? error.message : String(error) }));
+  }
+
+  checks.push(check("readability:semantic-edge-baseline", "F5", "soft", "pending", { note: "Quantitative edge readability follows the 4x overlay artifact." }));
   checks.push(check("appearance:human-gate", "F6", "human", "info", { note: "R-07 was rejected as visually sufficient; style anchor remains non-golden." }));
 
   checks.sort((a, b) => `${a.tier}:${a.id}`.localeCompare(`${b.tier}:${b.id}`));
