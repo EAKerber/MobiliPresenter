@@ -20,7 +20,7 @@ test("fantasy appliance and accessory catalogs are stable", () => {
   const applianceIds = currentAppearance.applianceDefinitions.map(definition => definition.id).sort();
   assert.deepEqual(applianceIds, [
     "AP-COOKTOP-01", "AP-FRIDGE-01", "AP-HOOD-01", "AP-MICRO-01",
-    "AP-OVEN-01", "AP-TANK-01", "AP-WASHER-01", "FX-SINK-01"
+    "AP-OVEN-01", "AP-RANGE-01", "AP-TANK-01", "AP-WASHER-01", "FX-SINK-01"
   ]);
   const accessoryIds = currentAppearance.accessoryDefinitions.map(definition => definition.id).sort();
   assert.deepEqual(accessoryIds, ["ACC-PLINTH-LOWER", "ACC-STONE-COUNTERTOP", "ACC-UNDERCAB-LED-01"]);
@@ -62,9 +62,13 @@ test("visibility changes do not mutate geometry digest", () => {
   assert.equal(sceneGeometryDigest(hidden), before);
 });
 
-test("standalone appliances carry source target envelopes required by their fit policies", () => {
+test("standalone appliances carry target envelopes required by their fit policies", () => {
   const washer = currentSceneBase.items.find(item => item.definitionId === "AP-WASHER-01");
   const fridge = currentSceneBase.items.find(item => item.definitionId === "AP-FRIDGE-01");
+  const range = currentSceneBase.items.find(item => item.definitionId === "AP-RANGE-01");
+  const tank = currentSceneBase.items.find(item => item.definitionId === "AP-TANK-01");
   assert.deepEqual(washer?.targetEnvelopeMm, { width: 690, height: 990, depth: 730 });
   assert.deepEqual(fridge?.targetEnvelopeMm, { width: 809, height: 1900, depth: 750 });
+  assert.deepEqual(range?.targetEnvelopeMm, { width: 760, height: 970, depth: 650 });
+  assert.deepEqual(tank?.targetEnvelopeMm, { width: 500, height: 820, depth: 500 });
 });
