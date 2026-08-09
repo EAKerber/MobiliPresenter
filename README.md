@@ -1,20 +1,36 @@
 # MobiliPresenter
 
-Apresentador modular de mobiliário baseado em sequências de imagens pré-renderizadas, composição multimódulo e metadados físicos em milímetros.
+Apresentador modular de mobiliário com composição métrica, câmera fixa e foco em contextualização visual fiel.
+
+## Entrada para desenvolvimento por agentes
+
+O estado operacional canônico não deve ser inferido deste README. Após confirmar o repositório ativo, use:
+
+```bash
+python3 tools/agent.py status
+python3 tools/agent.py doctor
+python3 tools/agent.py verify
+```
+
+A autoridade de estado é `ops/state/project.json`. As decisões operacionais adotadas estão registradas em `docs/adr/0001-deterministic-agent-operations.md`.
 
 ## Estado publicado
 
-- versão: **V7.0-I5**
+A publicação em `main` permanece a **V7.0-I5** enquanto a nova fundação Scene Core é desenvolvida isoladamente.
+
+- versão publicada: **V7.0-I5**
 - URL canônica: **https://mobilipresenter.netlify.app/**
-- finalidade atual: validação mobile pelo Netlify
+- finalidade da publicação atual: validação mobile do snapshot V7
 - composição de referência: gaveteiro de 399 mm à esquerda + balcão de 780 mm à direita
-- amplitude angular: yaw de -95° a +95°, passo de 5°, 39 poses
+- amplitude angular do snapshot publicado: yaw de -95° a +95°, passo de 5°, 39 poses
 - controles publicados: rotação, presets angulares e visibilidade independente das instâncias
 - camada fabril: resumo parcial; dados desconhecidos permanecem explícitos e não são inventados
 
+O requisito de produto atual para a próxima fundação é **viewer em câmera fixa**, priorizando fidelidade contextual sobre liberdade de navegação 3D.
+
 ## Páginas publicadas
 
-- `https://mobilipresenter.netlify.app/` — viewer mobile da composição
+- `https://mobilipresenter.netlify.app/` — viewer mobile da composição V7
 - `https://mobilipresenter.netlify.app/manufacturing.html` — estado semântico e fabril da V7.0-I5
 
 O preview hospedado é um artefato leve para validação pelo celular. Ele usa dois spritesheets WebP alinhados e não substitui o snapshot técnico completo da iteração.
