@@ -20,6 +20,7 @@ import {
 import {
   createThreeCamera,
   projectScenePointWithThree,
+  updateThreeCameraCrop,
   updateThreeCameraViewport
 } from "../dist-ts/src/renderer/three/camera.js";
 import {
@@ -67,6 +68,22 @@ test("Three off-axis camera reproduces Scene Core projection", () => {
     almost(three[0], core.xPx, 1e-6);
     almost(three[1], core.yPx, 1e-6);
   }
+});
+
+test("targeted 4x crop projection is exactly the full-canvas projection minus crop origin", () => {
+  const full = { widthPx: 7460, heightPx: 3868 };
+  const crop = { xPx: 2800, yPx: 1700, widthPx: 640, heightPx: 480 };
+  const point = vec3(4264.7, 8102.4, 480);
+  const fullCamera = createThreeCamera(currentFixedCamera, full);
+  const fullPx = projectScenePointWithThree(fullCamera, full, point);
+  assert.ok(fullPx[0] >= crop.xPx && fullPx[0] <= crop.xPx + crop.widthPx);
+  assert.ok(fullPx[1] >= crop.yPx && fullPx[1] <= crop.yPx + crop.heightPx);
+
+  const cropCamera = createThreeCamera(currentFixedCamera, full);
+  updateThreeCameraCrop(cropCamera, currentFixedCamera, full, crop);
+  const localPx = projectScenePointWithThree(cropCamera, { widthPx: crop.widthPx, heightPx: crop.heightPx }, point);
+  almost(localPx[0], fullPx[0] - crop.xPx, 1e-6);
+  almost(localPx[1], fullPx[1] - crop.yPx, 1e-6);
 });
 
 test("viewport resize changes only projection sampling, not physical camera transform", () => {
