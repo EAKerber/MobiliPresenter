@@ -21,9 +21,9 @@
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "planning",
-    "checkpoint": "R-00",
-    "nextTransition": "plan-renderer-0.1",
+    "phase": "implementation",
+    "checkpoint": "R-01",
+    "nextTransition": "implement-r-02-three-scene-adapter",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
