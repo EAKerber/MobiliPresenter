@@ -21,16 +21,21 @@
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "implementation",
-    "checkpoint": "R-01",
-    "nextTransition": "implement-r-02-three-scene-adapter",
-    "blockers": [],
+    "phase": "fidelity-harness",
+    "checkpoint": "FH-00",
+    "nextTransition": "freeze-baseline-and-implement-metric-projection",
+    "blockers": [
+      "visual-corrections-paused-until-fidelity-harness-hard-gates-exist"
+    ],
     "constraints": [
       "fixed-camera-is-product-invariant",
       "scene-core-0.1-is-integrated-foundation",
       "geometry-wins-for-assembly-preserve-nominal",
       "runtime-rendering-must-be-deterministic",
-      "llm-is-authoring-or-enhancement-not-runtime-geometry-authority"
+      "llm-is-authoring-or-enhancement-not-runtime-geometry-authority",
+      "mm-is-physical-authority-pixels-are-projection-evidence",
+      "supersampling-4x-is-default-fidelity-profile",
+      "f0-through-f4-must-not-regress-during-visual-tuning"
     ]
   },
   "operations": {
