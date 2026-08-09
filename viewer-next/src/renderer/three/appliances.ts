@@ -14,8 +14,7 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   Object3D,
-  TorusGeometry,
-  Vector3
+  TorusGeometry
 } from "three";
 import type { ThreeSceneAdapter } from "./scene-adapter.js";
 import type { ThreeMaterialRegistry } from "./materials.js";
@@ -200,6 +199,27 @@ function buildOven(size: DimensionTripleMm, registry: ThreeMaterialRegistry): Ob
   return group;
 }
 
+function buildRange(size: DimensionTripleMm, registry: ThreeMaterialRegistry): Object3D {
+  const group = new Group();
+  const inox = material(registry, "inox-brushed");
+  const glass = material(registry, "black-glass");
+  const dark = material(registry, "dark-metal");
+  group.add(boxPart(size.width, size.height * 0.84, size.depth, inox, 0, 0, 0));
+  group.add(boxPart(size.width, size.height * 0.16, size.depth * 0.92, inox, 0, size.depth * 0.04, size.height * 0.84));
+  group.add(boxPart(size.width * 0.78, size.height * 0.48, 18, glass, size.width * 0.11, -20, size.height * 0.15));
+  group.add(boxPart(size.width * 0.76, size.height * 0.09, 16, dark, size.width * 0.12, -18, size.height * 0.70));
+  group.add(boxPart(size.width * 0.72, 18, 22, inox, size.width * 0.14, -26, size.height * 0.66));
+  const positions = [[0.2, 0.26], [0.5, 0.22], [0.8, 0.26], [0.32, 0.67], [0.7, 0.67]] as const;
+  for (const [px, py] of positions) {
+    const radius = Math.min(size.width, size.depth) * (px === 0.5 ? 0.085 : 0.075);
+    const burner = frontRing(radius, Math.max(4, radius * 0.13), dark, size.width * px, size.height + 5, -(size.depth * py));
+    burner.rotation.x = Math.PI / 2;
+    burner.rotation.z = Math.PI / 2;
+    group.add(burner);
+  }
+  return group;
+}
+
 function buildMicrowave(size: DimensionTripleMm, registry: ThreeMaterialRegistry): Object3D {
   const group = new Group();
   const inox = material(registry, "inox-brushed");
@@ -267,6 +287,7 @@ function buildDefinition(
   switch (definition.role) {
     case "laundry-washer": return buildWasher(size, registry);
     case "refrigerator": return buildFridge(size, registry);
+    case "freestanding-range": return buildRange(size, registry);
     case "built-in-oven": return buildOven(size, registry);
     case "built-in-microwave": return buildMicrowave(size, registry);
     case "hood": return buildHood(size, registry);
