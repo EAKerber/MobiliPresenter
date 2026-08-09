@@ -1,5 +1,5 @@
 import type { RigidTransform, Vec3 } from "@mobilipresenter/scene-core";
-import { Matrix4, Object3D, Vector3 } from "three";
+import { Matrix4, Object3D, Quaternion, Vector3 } from "three";
 
 const SCENE_TO_THREE = new Matrix4().makeRotationX(-Math.PI / 2);
 const THREE_TO_SCENE = SCENE_TO_THREE.clone().invert();
@@ -15,7 +15,7 @@ export function threeVectorToScene(value: Vector3): Vec3 {
 export function sceneTransformToThreeMatrix(transform: RigidTransform): Matrix4 {
   const sceneMatrix = new Matrix4().compose(
     new Vector3(transform.translationMm.x, transform.translationMm.y, transform.translationMm.z),
-    { x: transform.rotation.x, y: transform.rotation.y, z: transform.rotation.z, w: transform.rotation.w } as never,
+    new Quaternion(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w),
     new Vector3(1, 1, 1)
   );
   return SCENE_TO_THREE.clone().multiply(sceneMatrix).multiply(THREE_TO_SCENE);
