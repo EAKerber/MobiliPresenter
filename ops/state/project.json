@@ -36,11 +36,13 @@
       "mm-is-physical-authority-pixels-are-projection-evidence",
       "supersampling-4x-is-default-fidelity-profile",
       "f0-through-f4-must-not-regress-during-visual-tuning"
-    ]
+    ],
+    "plan": "docs/plans/fidelity-harness-v1.md",
+    "prNumber": 6
   },
   "operations": {
-    "toolboxPhase": "phase-1-integrity",
+    "toolboxPhase": "phase-1.1-coherence",
     "canonicalState": "ops/state/project.json",
-    "commands": ["status", "doctor", "verify"]
+    "commands": ["status", "doctor", "verify", "checkpoint", "handoff"]
   }
 }
