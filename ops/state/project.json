@@ -22,10 +22,10 @@
   "development": {
     "initiative": "Fixed View Renderer 0.1",
     "phase": "fidelity-harness",
-    "checkpoint": "FH-00",
-    "nextTransition": "freeze-baseline-and-implement-metric-projection",
+    "checkpoint": "FH-05",
+    "nextTransition": "measure-f5-readability-baseline-and-enter-fh-06",
     "blockers": [
-      "visual-corrections-paused-until-fidelity-harness-hard-gates-exist"
+      "viewer-fidelity-4x-and-readability-artifact-pending-ci"
     ],
     "constraints": [
       "fixed-camera-is-product-invariant",
