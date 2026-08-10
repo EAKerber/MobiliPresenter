@@ -1,9 +1,9 @@
 {
   "schemaVersion": "MobiliPresenterCiStatus 1.0",
   "workflow": "Viewer Next",
-  "sourceCommit": "3746d54f991e6a1989d2113f3c85598c31096a44",
+  "sourceCommit": "da2012afed848d6f93ad9fa6df2ff755dc3f60dd",
   "sourceBranch": "renderer/fixed-view-realistic-v1",
-  "workflowRunId": 31351839021,
+  "workflowRunId": 31352286188,
   "workflowRunAttempt": 1,
   "verifyResult": "success"
 }
