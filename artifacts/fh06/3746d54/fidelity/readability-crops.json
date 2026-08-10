@@ -1,0 +1,169 @@
+{
+  "schemaVersion": "ReadabilityCropManifest 1.0",
+  "virtualViewportPx": [
+    7460,
+    3868
+  ],
+  "supersampleFactor": 4,
+  "policy": "grouped-targeted-off-axis-crops-from-fixed-camera",
+  "captureCount": 4,
+  "probeCount": 10,
+  "captures": [
+    {
+      "groupId": "module01",
+      "crop4x": {
+        "xPx": 766,
+        "yPx": 447,
+        "widthPx": 256,
+        "heightPx": 773
+      },
+      "png": "module01.png",
+      "bytes": 4305
+    },
+    {
+      "groupId": "module02",
+      "crop4x": {
+        "xPx": 2184,
+        "yPx": 2250,
+        "widthPx": 809,
+        "heightPx": 809
+      },
+      "png": "module02.png",
+      "bytes": 141450
+    },
+    {
+      "groupId": "module03",
+      "crop4x": {
+        "xPx": 3016,
+        "yPx": 2280,
+        "widthPx": 1046,
+        "heightPx": 746
+      },
+      "png": "module03.png",
+      "bytes": 9848
+    },
+    {
+      "groupId": "module06",
+      "crop4x": {
+        "xPx": 3321,
+        "yPx": 434,
+        "widthPx": 256,
+        "heightPx": 894
+      },
+      "png": "module06.png",
+      "bytes": 4122
+    }
+  ],
+  "entries": [
+    {
+      "probeId": "module03/drawer-seam/1-2",
+      "groupId": "module03",
+      "crop4x": {
+        "xPx": 3016,
+        "yPx": 2280,
+        "widthPx": 1046,
+        "heightPx": 746
+      },
+      "png": "module03.png"
+    },
+    {
+      "probeId": "module03/drawer-seam/2-3",
+      "groupId": "module03",
+      "crop4x": {
+        "xPx": 3016,
+        "yPx": 2280,
+        "widthPx": 1046,
+        "heightPx": 746
+      },
+      "png": "module03.png"
+    },
+    {
+      "probeId": "module03/drawer-seam/3-4",
+      "groupId": "module03",
+      "crop4x": {
+        "xPx": 3016,
+        "yPx": 2280,
+        "widthPx": 1046,
+        "heightPx": 746
+      },
+      "png": "module03.png"
+    },
+    {
+      "probeId": "module03/door-seam",
+      "groupId": "module03",
+      "crop4x": {
+        "xPx": 3016,
+        "yPx": 2280,
+        "widthPx": 1046,
+        "heightPx": 746
+      },
+      "png": "module03.png"
+    },
+    {
+      "probeId": "module01/door-seam",
+      "groupId": "module01",
+      "crop4x": {
+        "xPx": 766,
+        "yPx": 447,
+        "widthPx": 256,
+        "heightPx": 773
+      },
+      "png": "module01.png"
+    },
+    {
+      "probeId": "module06/door-left-center-seam",
+      "groupId": "module06",
+      "crop4x": {
+        "xPx": 3321,
+        "yPx": 434,
+        "widthPx": 256,
+        "heightPx": 894
+      },
+      "png": "module06.png"
+    },
+    {
+      "probeId": "module02/oven-opening-left",
+      "groupId": "module02",
+      "crop4x": {
+        "xPx": 2184,
+        "yPx": 2250,
+        "widthPx": 809,
+        "heightPx": 809
+      },
+      "png": "module02.png"
+    },
+    {
+      "probeId": "module02/oven-opening-right",
+      "groupId": "module02",
+      "crop4x": {
+        "xPx": 2184,
+        "yPx": 2250,
+        "widthPx": 809,
+        "heightPx": 809
+      },
+      "png": "module02.png"
+    },
+    {
+      "probeId": "module02/oven-opening-bottom",
+      "groupId": "module02",
+      "crop4x": {
+        "xPx": 2184,
+        "yPx": 2250,
+        "widthPx": 809,
+        "heightPx": 809
+      },
+      "png": "module02.png"
+    },
+    {
+      "probeId": "module02/oven-opening-top",
+      "groupId": "module02",
+      "crop4x": {
+        "xPx": 2184,
+        "yPx": 2250,
+        "widthPx": 809,
+        "heightPx": 809
+      },
+      "png": "module02.png"
+    }
+  ]
+}

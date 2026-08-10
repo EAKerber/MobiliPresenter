@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "ReadabilityReport 1.0",
+  "status": "MEASURED",
+  "supersampleFactor": 4,
+  "capturePolicy": "targeted-off-axis-4x-crops",
+  "summary": {
+    "meanEdgeRecall": 0.7,
+    "medianProbeContrast": 0.10499578431372547,
+    "medianProbeEdgeOffsetCanonicalPx": 0.5
+  },
+  "probes": [
+    {
+      "id": "module03/drawer-seam/1-2",
+      "role": "front-seam",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.00962764705882349,
+      "p10PeakContrast": 0.009556862745097983,
+      "medianEdgeOffsetCanonicalPx": 0.5,
+      "p95EdgeOffsetCanonicalPx": 0.5
+    },
+    {
+      "id": "module03/drawer-seam/2-3",
+      "role": "front-seam",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.0116513725490196,
+      "p10PeakContrast": 0.01024901960784319,
+      "medianEdgeOffsetCanonicalPx": 0.5,
+      "p95EdgeOffsetCanonicalPx": 0.5
+    },
+    {
+      "id": "module03/drawer-seam/3-4",
+      "role": "front-seam",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.014304313725490236,
+      "p10PeakContrast": 0.012760392156862754,
+      "medianEdgeOffsetCanonicalPx": 0.5,
+      "p95EdgeOffsetCanonicalPx": 0.5
+    },
+    {
+      "id": "module03/door-seam",
+      "role": "front-seam",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.12265882352941174,
+      "p10PeakContrast": 0.1221082352941176,
+      "medianEdgeOffsetCanonicalPx": 0.5,
+      "p95EdgeOffsetCanonicalPx": 0.5
+    },
+    {
+      "id": "module01/door-seam",
+      "role": "front-seam",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.13529411764705887,
+      "p10PeakContrast": 0.13515254901960785,
+      "medianEdgeOffsetCanonicalPx": 0.5,
+      "p95EdgeOffsetCanonicalPx": 0.5
+    },
+    {
+      "id": "module06/door-left-center-seam",
+      "role": "front-seam",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.05982078431372548,
+      "p10PeakContrast": 0.05758078431372554,
+      "medianEdgeOffsetCanonicalPx": 0.75,
+      "p95EdgeOffsetCanonicalPx": 0.75
+    },
+    {
+      "id": "module02/oven-opening-left",
+      "role": "oven-surround",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.11438176470588235,
+      "p10PeakContrast": 0.11095686274509808,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "p95EdgeOffsetCanonicalPx": 0.25
+    },
+    {
+      "id": "module02/oven-opening-right",
+      "role": "oven-surround",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.2136917647058824,
+      "p10PeakContrast": 0.20968760784313728,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "p95EdgeOffsetCanonicalPx": 0.25
+    },
+    {
+      "id": "module02/oven-opening-bottom",
+      "role": "oven-surround",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.09560980392156859,
+      "p10PeakContrast": 0.0894096862745098,
+      "medianEdgeOffsetCanonicalPx": 0.75,
+      "p95EdgeOffsetCanonicalPx": 0.75
+    },
+    {
+      "id": "module02/oven-opening-top",
+      "role": "oven-surround",
+      "samples": 48,
+      "contrastThreshold": 0.02,
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.14801843137254897,
+      "p10PeakContrast": 0.1441133725490196,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "p95EdgeOffsetCanonicalPx": 0.25
+    }
+  ],
+  "policy": {
+    "softGate": true,
+    "measurement": "peak local sRGB-luma gradient inside the metric seam corridor",
+    "textureAwayFromExpectedSeamDoesNotScore": true,
+    "full4xFramebufferRequired": false
+  }
+}
