@@ -11,21 +11,48 @@ test("Layer 0 white wall and column are explicit semantic wall geometry", () => 
   assert.deepEqual(columnReturn?.sizeMm, [206.3, 2601.63]);
 });
 
-test("module 02 preserves nominal/geometric width and explicit oven/cooktop slots", () => {
+test("module 02 separates confirmed oven cavity from stable 600x600 front opening", () => {
   assert.equal(module02.dimensions.nominalMm?.width, 790);
   assert.equal(module02.dimensions.geometryMm.width, 791.01);
-  assert.deepEqual(module02.applianceSlots[0]?.clearSizeMm, {
+  const ovenSlot = module02.applianceSlots[0];
+  assert.ok(ovenSlot);
+  assert.deepEqual(ovenSlot.clearSizeMm, {
+    width: 600,
+    height: 600,
+    depth: 525
+  });
+  assert.deepEqual(ovenSlot.cavitySizeMm, {
     width: 755.01,
     height: 724,
     depth: 525
   });
-  assert.equal(module02.applianceSlots[0]?.status, "confirmed");
+  assert.deepEqual(ovenSlot.frontOpening?.sizeMm, { width: 600, height: 600 });
+  assert.equal(ovenSlot.frontOpening?.localTransform.translationMm.z, 80);
+  assert.equal(ovenSlot.localTransform.translationMm.z, 82);
+  assert.equal(ovenSlot.status, "inferred");
   assert.deepEqual(module02.applianceSlots[1]?.clearSizeMm, {
     width: 600,
     height: 60,
     depth: 520
   });
   assert.equal(module02.applianceSlots[1]?.status, "inferred");
+});
+
+test("module 02 front MDF surround is explicit and preserves 95/95/80/80 fields", () => {
+  const fronts = new Map(module02.geometry.filter(item => item.role === "front").map(item => [item.id, item]));
+  const left = fronts.get("scene/traditional/module/lower-stove/front/oven-left-stile");
+  const right = fronts.get("scene/traditional/module/lower-stove/front/oven-right-stile");
+  const bottom = fronts.get("scene/traditional/module/lower-stove/front/oven-bottom-rail");
+  const top = fronts.get("scene/traditional/module/lower-stove/front/oven-top-rail");
+  assert.ok(left && right && bottom && top);
+  assert.deepEqual(left.sizeMm, { width: 95, height: 760, depth: 18 });
+  assert.deepEqual(right.sizeMm, { width: 95, height: 760, depth: 18 });
+  assert.deepEqual(bottom.sizeMm, { width: 600, height: 80, depth: 18 });
+  assert.deepEqual(top.sizeMm, { width: 600, height: 80, depth: 18 });
+  assert.equal(left.materialSlot, "front");
+  assert.equal(right.materialSlot, "front");
+  assert.equal(bottom.materialSlot, "front");
+  assert.equal(top.materialSlot, "front");
 });
 
 test("module 03 preserves 1200 nominal and 1216.678 geometric width", () => {
