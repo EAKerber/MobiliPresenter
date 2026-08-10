@@ -50,11 +50,14 @@ export function createModuleSelectionOverlay(
   let selectedModuleId: string | null = null;
   let helper: Box3Helper | null = null;
 
+  const helperMaterials = (target: Box3Helper) =>
+    Array.isArray(target.material) ? target.material : [target.material];
+
   const clear = (): void => {
     if (!helper) return;
     root.remove(helper);
     helper.geometry.dispose();
-    helper.material.dispose();
+    for (const material of helperMaterials(helper)) material.dispose();
     helper = null;
   };
 
@@ -78,10 +81,12 @@ export function createModuleSelectionOverlay(
       if (bounds.isEmpty()) return;
       helper = new Box3Helper(bounds, SELECTION_GOLD);
       helper.name = `selection:${moduleId}`;
-      helper.material.transparent = true;
-      helper.material.opacity = 0.34;
-      helper.material.depthTest = true;
-      helper.material.depthWrite = false;
+      for (const material of helperMaterials(helper)) {
+        material.transparent = true;
+        material.opacity = 0.34;
+        material.depthTest = true;
+        material.depthWrite = false;
+      }
       helper.userData.moduleId = moduleId;
       helper.userData.interactionOnly = true;
       root.add(helper);
