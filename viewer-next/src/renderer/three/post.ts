@@ -160,3 +160,5 @@ export function createSelectiveBloomPipeline(
     }
   };
 }
+
+// CI checkpoint: typed GTAO configuration for S10.
