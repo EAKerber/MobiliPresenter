@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "SinkStationReadabilityGate 1.0",
+  "sourceReport": "/tmp/mobilipresenter-readability-report.json",
+  "thresholds": {
+    "minEdgeRecall": 0.9,
+    "minMedianPeakContrast": 0.04,
+    "minP10PeakContrast": 0.03,
+    "maxMedianEdgeOffsetCanonicalPx": 1.0
+  },
+  "pass": true,
+  "failures": [],
+  "probes": [
+    {
+      "id": "sink/opening/front",
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.051367450980392165,
+      "p10PeakContrast": 0.04772509803921576,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "failureReasons": []
+    },
+    {
+      "id": "sink/opening/back",
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.05136352941176475,
+      "p10PeakContrast": 0.04996117647058823,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "failureReasons": []
+    },
+    {
+      "id": "sink/opening/left",
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.13316588235294113,
+      "p10PeakContrast": 0.09997411764705885,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "failureReasons": []
+    },
+    {
+      "id": "sink/opening/right",
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.1726080392156862,
+      "p10PeakContrast": 0.1708556862745098,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "failureReasons": []
+    }
+  ]
+}
