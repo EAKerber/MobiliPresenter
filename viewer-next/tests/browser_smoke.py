@@ -66,6 +66,8 @@ def main() -> None:
         'data-cooktop-gap-mm="1.000"',
         'data-front-readability="module03-drawer-bevel-recess-v1"',
         'data-front-physical-gap-mm="2,2,2"',
+        'data-oven-readability="fh06-s10-oven-physical-reveal-v1"',
+        'data-oven-physical-clearance-mm="2,2,2,2"',
         'data-wall-tile-coverage="full-wall"',
         'data-wall-tile-surface-count="4"',
         'data-sink-refinement="SINK-UNDERMOUNT-40X34-01"',
@@ -105,5 +107,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-# CI checkpoint: S10 color/contact/GTAO candidate.
