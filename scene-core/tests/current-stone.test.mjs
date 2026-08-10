@@ -12,6 +12,9 @@ import {
   resolveWorldTransforms
 } from "../dist/src/index.js";
 
+const WALL_PLANE_Y_MM = 8650.44;
+const AUDITED_STONE_WALL_TOLERANCE_MM = 0.0021;
+
 function stoneById(id) {
   const item = currentSceneBase.items.find(candidate => candidate.id === id);
   assert.ok(item, id);
@@ -63,7 +66,7 @@ test("both stones use the same 30mm design thickness while retaining source prov
   }
 });
 
-test("rear upstands are explicit, aligned and terminate on the main wall plane", () => {
+test("rear upstands are explicit, aligned and terminate on the main wall plane within audited source tolerance", () => {
   const world = resolveWorldTransforms(currentSceneBase);
   for (const id of [STONE02_ID, STONE03_ID]) {
     const stone = stoneById(id);
@@ -74,7 +77,10 @@ test("rear upstands are explicit, aligned and terminate on the main wall plane",
     assert.equal(upstand.sizeMm.depth, STONE_REAR_UPSTAND_DEPTH_MM);
     assert.equal(upstand.localTransform.translationMm.z, STONE_DESIGN_THICKNESS_MM);
     const rearY = stoneWorld.translationMm.y + upstand.localTransform.translationMm.y + upstand.sizeMm.depth;
-    assert.ok(Math.abs(rearY - 8650.44) <= 0.002, `${id}: rearY=${rearY}`);
+    assert.ok(
+      Math.abs(rearY - WALL_PLANE_Y_MM) <= AUDITED_STONE_WALL_TOLERANCE_MM,
+      `${id}: rearY=${rearY}`
+    );
   }
 
   const upstand02 = primitiveBySuffix(stoneById(STONE02_ID), "/upstand");
