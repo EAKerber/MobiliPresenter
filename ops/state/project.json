@@ -44,6 +44,7 @@
       "module02-and-module03-fronts-share-the-same-tuned-front-wood-material",
       "module02-oven-physical-clearance-remains-2mm-on-all-four-sides",
       "cooktop-render-contact-is-1mm-above-stone02-without-mutating-core-slot",
+      "contact-fidelity-hard-gate-measures-cooktop-stone-gap-as-1mm-plusminus-0.01mm",
       "gtao-occlusion-profile-is-mm-scaled-radius72-blend0.38",
       "module03-drawer-physical-gaps-remain-2mm",
       "stone-is-two-independent-30mm-design-pieces-with-100x20-rear-upstands",
@@ -51,7 +52,7 @@
       "faucet-is-core-anchored-high-arc-340mm-255mm-reach",
       "full-wall-tile-covers-main-column-return-and-inferred-laundry-wall",
       "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
-      "verified-user-artifact-source-is-c11ed0e7ffa015e543031caccba06506a3784db3",
+      "verified-user-artifact-source-is-77cd8adb7bdc1f15a58a2f5e55269a0b302b99ac",
       "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
     "plan": "docs/plans/fh06-1-implementation-methodology.md",
