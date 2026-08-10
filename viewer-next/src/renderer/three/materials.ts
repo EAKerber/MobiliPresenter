@@ -118,12 +118,29 @@ function createThreeMaterial(definition: MaterialDefinition): PbrMaterial {
   return material;
 }
 
+function materialDefinitionById(appearance: AppearancePackage, id: string): MaterialDefinition {
+  const definition = appearance.materials.find(material => material.id === id);
+  if (!definition) throw new Error(`MATERIAL_NOT_FOUND:${id}`);
+  return definition;
+}
+
 export class ThreeMaterialRegistry {
-  readonly #appearance: AppearancePackage;
+  #appearance: AppearancePackage;
   readonly #cache = new Map<string, PbrMaterial>();
 
   constructor(appearance: AppearancePackage) {
     this.#appearance = appearance;
+  }
+
+  updateAppearance(next: AppearancePackage): void {
+    for (const id of this.#cache.keys()) {
+      const before = materialDefinitionById(this.#appearance, id);
+      const after = materialDefinitionById(next, id);
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        throw new Error(`MATERIAL_DEFINITION_MUTATION_REQUIRES_REBUILD:${id}`);
+      }
+    }
+    this.#appearance = next;
   }
 
   resolve(entityId: string, materialSlot: string): PbrMaterial {
@@ -139,8 +156,7 @@ export class ThreeMaterialRegistry {
   materialByDefinitionId(id: string): PbrMaterial {
     const cached = this.#cache.get(id);
     if (cached) return cached;
-    const definition = this.#appearance.materials.find(material => material.id === id);
-    if (!definition) throw new Error(`MATERIAL_NOT_FOUND:${id}`);
+    const definition = materialDefinitionById(this.#appearance, id);
     const material = createThreeMaterial(definition);
     this.#cache.set(id, material);
     return material;
@@ -157,6 +173,7 @@ export function syncThreeMaterials(
   appearance: AppearancePackage,
   registry = new ThreeMaterialRegistry(appearance)
 ): ThreeMaterialRegistry {
+  registry.updateAppearance(appearance);
   for (const [entityId, group] of adapter.entityGroups) {
     group.traverse(object => {
       if (!(object instanceof Mesh)) return;
