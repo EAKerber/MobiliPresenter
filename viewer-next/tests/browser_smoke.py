@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 from runtime_controls_smoke import main as runtime_controls_smoke
+from runtime_ui_smoke import main as runtime_ui_smoke
 
 URL = "http://127.0.0.1:4173/"
 DOM = Path("/tmp/mobilipresenter-viewer-dom.html")
@@ -59,6 +60,7 @@ def main() -> None:
         'data-renderer-backend="three-webgl2"',
         'data-renderer-ready="true"',
         'data-frame-rendered="true"',
+        'data-viewer-controls="false"',
         'data-scene-id="traditional-complete"',
         'data-color-treatment="fh06-s10-neutral-warm-v1"',
         'data-occlusion="gtao-mm-v1"',
@@ -108,6 +110,7 @@ def main() -> None:
     print(json.dumps(evidence, indent=2))
 
     runtime_controls_smoke()
+    runtime_ui_smoke()
 
 
 if __name__ == "__main__":
