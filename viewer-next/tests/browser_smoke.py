@@ -105,3 +105,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# CI checkpoint: S10 color/contact/GTAO candidate.
