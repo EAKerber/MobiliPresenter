@@ -86,7 +86,8 @@ export function resolveItemPlacementTransform(scene: ScenePackage, item: SceneIt
   if (host.kind !== "module") throw new Error(`SLOT_HOST_MUST_BE_MODULE:${item.hostId}`);
   const slot = host.applianceSlots.find(candidate => candidate.id === item.slotId);
   if (!slot) throw new Error(`SLOT_NOT_FOUND:${item.slotId}`);
-  return composeTransforms(composeTransforms(hostWorld, slot.localTransform), item.transform);
+  const mountTransform = slot.frontOpening?.localTransform ?? slot.localTransform;
+  return composeTransforms(composeTransforms(hostWorld, mountTransform), item.transform);
 }
 
 export function resolveEffectiveVisibility(scene: ScenePackage): ReadonlyMap<string, EffectiveVisibility> {
