@@ -56,11 +56,19 @@ export interface FaceGeometry extends GeometryPrimitiveBase {
 }
 export type GeometryPrimitive = BoxGeometry | FaceGeometry;
 
+export interface ApplianceFrontOpening {
+  readonly localTransform: RigidTransform;
+  readonly sizeMm: { readonly width: number; readonly height: number };
+  readonly status?: "confirmed" | "inferred";
+  readonly evidenceRefs?: readonly string[];
+}
+
 export interface ApplianceSlot {
   readonly id: string;
   readonly role: string;
   readonly localTransform: RigidTransform;
   readonly clearSizeMm: DimensionTripleMm;
+  readonly frontOpening?: ApplianceFrontOpening;
   readonly defaultApplianceId?: string;
   readonly status?: "confirmed" | "inferred";
   readonly evidenceRefs?: readonly string[];
