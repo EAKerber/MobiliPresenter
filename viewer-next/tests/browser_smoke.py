@@ -58,6 +58,9 @@ def main() -> None:
         'data-renderer-ready="true"',
         'data-frame-rendered="true"',
         'data-scene-id="traditional-complete"',
+        'data-sink-refinement="SINK-UNDERMOUNT-40X34-01"',
+        'data-sink-stone-hole="extruded-shape-with-rounded-hole"',
+        'data-sink-continuous-bowl="true"',
     )
     missing = [needle for needle in required if needle not in dom_result.stdout]
     if missing:

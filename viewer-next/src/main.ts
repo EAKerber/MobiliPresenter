@@ -24,6 +24,7 @@ import { buildThreeLighting, installNeutralRoomEnvironment } from "./renderer/th
 import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
 import { createSelectiveBloomPipeline } from "./renderer/three/post.js";
 import { buildThreeScene } from "./renderer/three/scene-adapter.js";
+import { applyFh06SinkRefinement } from "./renderer/three/sink-refinement.js";
 import { applyFh06VisualRefinements } from "./renderer/three/visual-refinements.js";
 
 const appElement = document.querySelector<HTMLElement>("#app");
@@ -76,6 +77,10 @@ const adapter = buildThreeScene(
 );
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
 applyFh06VisualRefinements(adapter, materials);
+const sinkRefinement = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
+app.dataset.sinkRefinement = sinkRefinement.sinkFamilyId;
+app.dataset.sinkStoneHole = sinkRefinement.stoneHoleGeometry;
+app.dataset.sinkContinuousBowl = sinkRefinement.continuousBowl ? "true" : "false";
 adapter.scene.background = new Color(0xf3f2ee);
 
 if (fidelityOverlayMode && !fidelityCrop) {

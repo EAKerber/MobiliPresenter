@@ -1,47 +1,49 @@
 import { STONE03_ID, type SceneItem, type ScenePackage } from "@mobilipresenter/scene-core";
 import {
   Box3,
-  BoxGeometry,
-  CatmullRomCurve3,
+  BufferGeometry,
+  CylinderGeometry,
+  DoubleSide,
+  ExtrudeGeometry,
+  Float32BufferAttribute,
   Group,
   Mesh,
   MeshStandardMaterial,
-  TubeGeometry,
-  Vector3,
+  Path,
+  Shape,
+  ShapeGeometry,
   type Material
 } from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { ThreeSceneAdapter } from "./scene-adapter.js";
 import type { ThreeMaterialRegistry } from "./materials.js";
 
 const SINK_ITEM_ID = "scene/traditional/fixture/kitchen-sink";
 const SINK_STONE_ID = STONE03_ID;
 const SINK_STONE_PRIMITIVE_ID = `${STONE03_ID}/slab`;
+const SINK_FAMILY_ID = "SINK-UNDERMOUNT-40X34-01";
+const ARCHETYPE_WIDTH_MM = 400;
+const ARCHETYPE_DEPTH_MM = 340;
+const ARCHETYPE_BOWL_DEPTH_MM = 170;
+const ARCHETYPE_FLANGE_MM = 15;
+const ARCHETYPE_OUTER_RADIUS_MM = 38;
 const RENDER_AABB_TOLERANCE_MM = 0.001;
+const RIM_THICKNESS_MM = 3;
+const LOOP_SEGMENTS_PER_CORNER = 8;
 
 interface FitData {
+  readonly envelopeMm: { readonly width: number; readonly height: number; readonly depth: number };
   readonly fittedMm: { readonly width: number; readonly height: number; readonly depth: number };
   readonly offsetMm: readonly [number, number, number];
 }
 
-function part(
-  width: number,
-  height: number,
-  depth: number,
-  material: Material,
-  x: number,
-  y: number,
-  z: number,
-  rounded = 0
-): Mesh {
-  const geometry = rounded > 0
-    ? new RoundedBoxGeometry(width, height, depth, 3, Math.min(rounded, width / 4, height / 4, depth / 4))
-    : new BoxGeometry(width, height, depth);
-  const mesh = new Mesh(geometry, material);
-  mesh.position.set(x + width / 2, z + height / 2, -(y + depth / 2));
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
+interface SinkGeometryContract {
+  readonly fit: FitData;
+  readonly openingMm: readonly [number, number, number, number];
+  readonly flangeMm: number;
+  readonly outerRadiusMm: number;
+  readonly openingRadiusMm: number;
+  readonly bowlDepthMm: number;
+  readonly topAlignedOffsetZMm: number;
 }
 
 function itemById(scene: ScenePackage, id: string): SceneItem {
@@ -50,20 +52,145 @@ function itemById(scene: ScenePackage, id: string): SceneItem {
   return item;
 }
 
-function splitCountertopAroundSink(
-  adapter: ThreeSceneAdapter,
-  scene: ScenePackage
-): { outerBefore: Box3; outerAfter: Box3; openingMm: readonly [number, number, number, number] } {
+function sinkProxy(adapter: ThreeSceneAdapter): Group {
+  const entity = adapter.entityGroups.get(SINK_ITEM_ID);
+  if (!entity) throw new Error("SINK_ENTITY_GROUP_MISSING");
+  const proxy = entity.getObjectByName(`${SINK_ITEM_ID}/parametric`);
+  if (!(proxy instanceof Group)) throw new Error("SINK_PROXY_MISSING");
+  return proxy;
+}
+
+function roundedRectPath(
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+  radius: number,
+  clockwise = false
+): Path {
+  const r = Math.max(0, Math.min(radius, width / 2, depth / 2));
+  const path = new Path();
+  if (!clockwise) {
+    path.moveTo(x + r, y);
+    path.lineTo(x + width - r, y);
+    path.quadraticCurveTo(x + width, y, x + width, y + r);
+    path.lineTo(x + width, y + depth - r);
+    path.quadraticCurveTo(x + width, y + depth, x + width - r, y + depth);
+    path.lineTo(x + r, y + depth);
+    path.quadraticCurveTo(x, y + depth, x, y + depth - r);
+    path.lineTo(x, y + r);
+    path.quadraticCurveTo(x, y, x + r, y);
+  } else {
+    path.moveTo(x + r, y);
+    path.quadraticCurveTo(x, y, x, y + r);
+    path.lineTo(x, y + depth - r);
+    path.quadraticCurveTo(x, y + depth, x + r, y + depth);
+    path.lineTo(x + width - r, y + depth);
+    path.quadraticCurveTo(x + width, y + depth, x + width, y + depth - r);
+    path.lineTo(x + width, y + r);
+    path.quadraticCurveTo(x + width, y, x + width - r, y);
+    path.lineTo(x + r, y);
+  }
+  path.closePath();
+  return path;
+}
+
+function roundedRectShape(
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+  radius: number
+): Shape {
+  const source = roundedRectPath(x, y, width, depth, radius, false);
+  const shape = new Shape();
+  shape.curves = [...source.curves];
+  shape.currentPoint.copy(source.currentPoint);
+  return shape;
+}
+
+function slabShapeWithHole(
+  width: number,
+  depth: number,
+  opening: readonly [number, number, number, number],
+  radius: number
+): Shape {
+  const shape = new Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(width, 0);
+  shape.lineTo(width, depth);
+  shape.lineTo(0, depth);
+  shape.lineTo(0, 0);
+  shape.closePath();
+  shape.holes.push(roundedRectPath(opening[0], opening[1], opening[2], opening[3], radius, true));
+  return shape;
+}
+
+function extrudedScenePlane(shape: Shape, heightMm: number): ExtrudeGeometry {
+  const geometry = new ExtrudeGeometry(shape, {
+    depth: heightMm,
+    bevelEnabled: false,
+    curveSegments: 8,
+    steps: 1
+  });
+  geometry.rotateX(-Math.PI / 2);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function scenePlane(shape: Shape): ShapeGeometry {
+  const geometry = new ShapeGeometry(shape, 8);
+  geometry.rotateX(-Math.PI / 2);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function sinkContract(adapter: ThreeSceneAdapter, scene: ScenePackage): SinkGeometryContract {
   const stoneItem = itemById(scene, SINK_STONE_ID);
   const sinkItem = itemById(scene, SINK_ITEM_ID);
-  if (!stoneItem.geometry?.length) throw new Error("SINK_COUNTERTOP_GEOMETRY_MISSING");
   if (!sinkItem.hostId || !sinkItem.slotId) throw new Error("SINK_SLOT_REFERENCE_MISSING");
+  if (sinkItem.hostId !== stoneItem.hostId) throw new Error("SINK_STONE_HOST_MISMATCH");
   const host = scene.modules.find(module => module.id === sinkItem.hostId);
   if (!host) throw new Error("SINK_HOST_MODULE_MISSING");
   const slot = host.applianceSlots.find(candidate => candidate.id === sinkItem.slotId);
   if (!slot) throw new Error("SINK_SLOT_MISSING");
 
-  const primitive = stoneItem.geometry.find(candidate => candidate.id === SINK_STONE_PRIMITIVE_ID);
+  const proxy = sinkProxy(adapter);
+  const fit = proxy.userData.fit as FitData | undefined;
+  if (!fit) throw new Error("SINK_FIT_MISSING");
+  const scale = fit.fittedMm.width / ARCHETYPE_WIDTH_MM;
+  const flangeMm = ARCHETYPE_FLANGE_MM * scale;
+  const outerRadiusMm = ARCHETYPE_OUTER_RADIUS_MM * scale;
+  const openingRadiusMm = Math.max(10, outerRadiusMm - flangeMm);
+  const openingWidth = fit.fittedMm.width - 2 * flangeMm;
+  const openingDepth = fit.fittedMm.depth - 2 * flangeMm;
+  const slotInStoneX = slot.localTransform.translationMm.x - stoneItem.transform.translationMm.x;
+  const slotInStoneY = slot.localTransform.translationMm.y - stoneItem.transform.translationMm.y;
+  const openingX = slotInStoneX + fit.offsetMm[0] + flangeMm;
+  const openingY = slotInStoneY + fit.offsetMm[1] + flangeMm;
+  const topAlignedOffsetZMm = fit.envelopeMm.height - fit.fittedMm.height;
+  const bowlDepthMm = ARCHETYPE_BOWL_DEPTH_MM * scale;
+
+  return {
+    fit,
+    openingMm: [openingX, openingY, openingWidth, openingDepth],
+    flangeMm,
+    outerRadiusMm,
+    openingRadiusMm,
+    bowlDepthMm,
+    topAlignedOffsetZMm
+  };
+}
+
+function replaceStoneSlabWithHole(
+  adapter: ThreeSceneAdapter,
+  scene: ScenePackage,
+  contract: SinkGeometryContract
+): { readonly before: Box3; readonly after: Box3 } {
+  const stoneItem = itemById(scene, SINK_STONE_ID);
+  const primitive = stoneItem.geometry?.find(candidate => candidate.id === SINK_STONE_PRIMITIVE_ID);
   if (!primitive || primitive.primitive !== "box") throw new Error("SINK_COUNTERTOP_BOX_MISSING");
   const group = adapter.entityGroups.get(stoneItem.id);
   if (!group) throw new Error("SINK_COUNTERTOP_GROUP_MISSING");
@@ -71,93 +198,205 @@ function splitCountertopAroundSink(
   if (!(primitiveGroup instanceof Group)) throw new Error("SINK_COUNTERTOP_PRIMITIVE_GROUP_MISSING");
   const original = primitiveGroup.getObjectByName(`${primitive.id}/mesh`);
   if (!(original instanceof Mesh)) throw new Error("SINK_COUNTERTOP_MESH_MISSING");
+
+  const [openingX, openingY, openingWidth, openingDepth] = contract.openingMm;
+  if (
+    openingX < 0 || openingY < 0 ||
+    openingX + openingWidth > primitive.sizeMm.width ||
+    openingY + openingDepth > primitive.sizeMm.depth
+  ) throw new Error("SINK_CUTOUT_OUTSIDE_COUNTERTOP");
+
   primitiveGroup.updateWorldMatrix(true, true);
-  const outerBefore = new Box3().setFromObject(primitiveGroup);
-  const stoneMaterial = original.material as Material;
+  const before = new Box3().setFromObject(primitiveGroup);
+  const material = original.material as Material;
+  const shape = slabShapeWithHole(
+    primitive.sizeMm.width,
+    primitive.sizeMm.depth,
+    contract.openingMm,
+    contract.openingRadiusMm
+  );
+  const geometry = extrudedScenePlane(shape, primitive.sizeMm.height);
+  geometry.userData.visualRefinement = "fh06-1-s4-stone-hole-v1";
+  geometry.userData.holeCount = 1;
+  geometry.userData.openingMm = [...contract.openingMm];
+  geometry.userData.openingRadiusMm = contract.openingRadiusMm;
 
-  const openingX = slot.localTransform.translationMm.x - stoneItem.transform.translationMm.x;
-  const openingY = slot.localTransform.translationMm.y - stoneItem.transform.translationMm.y;
-  const openingWidth = slot.clearSizeMm.width;
-  const openingDepth = slot.clearSizeMm.depth;
-  const slabWidth = primitive.sizeMm.width;
-  const slabDepth = primitive.sizeMm.depth;
-  const slabHeight = primitive.sizeMm.height;
-  const rightStart = openingX + openingWidth;
-  const backStart = openingY + openingDepth;
-  if (openingX < 0 || openingY < 0 || rightStart > slabWidth || backStart > slabDepth) {
-    throw new Error("SINK_CUTOUT_OUTSIDE_COUNTERTOP");
-  }
+  const replacement = new Mesh(geometry, material);
+  replacement.name = `${primitive.id}/mesh`;
+  replacement.castShadow = true;
+  replacement.receiveShadow = true;
+  replacement.userData.geometryId = primitive.id;
+  replacement.userData.materialSlot = primitive.materialSlot ?? "stone";
+  replacement.userData.visualRefinement = "fh06-1-s4-stone-hole-v1";
 
-  group.remove(primitiveGroup);
+  primitiveGroup.remove(original);
   original.geometry.dispose();
-
-  const cutout = new Group();
-  cutout.name = `${stoneItem.id}/visual-cutout`;
-  cutout.userData.visualRefinement = "fh06-stone-cutout-v1";
-  cutout.userData.openingMm = [openingX, openingY, openingWidth, openingDepth];
-  if (openingX > 0) cutout.add(part(openingX, slabHeight, slabDepth, stoneMaterial, 0, 0, 0));
-  if (slabWidth - rightStart > 0) cutout.add(part(slabWidth - rightStart, slabHeight, slabDepth, stoneMaterial, rightStart, 0, 0));
-  if (openingY > 0) cutout.add(part(openingWidth, slabHeight, openingY, stoneMaterial, openingX, 0, 0));
-  if (slabDepth - backStart > 0) cutout.add(part(openingWidth, slabHeight, slabDepth - backStart, stoneMaterial, openingX, backStart, 0));
-  group.add(cutout);
-  group.updateWorldMatrix(true, true);
-  const outerAfter = new Box3().setFromObject(cutout);
-  return { outerBefore, outerAfter, openingMm: [openingX, openingY, openingWidth, openingDepth] };
+  primitiveGroup.add(replacement);
+  primitiveGroup.updateWorldMatrix(true, true);
+  const after = new Box3().setFromObject(primitiveGroup);
+  return { before, after };
 }
 
-function rebuildSink(
-  adapter: ThreeSceneAdapter,
-  registry: ThreeMaterialRegistry
-): { proxy: Group; faucetHeightMm: number } {
-  const entity = adapter.entityGroups.get(SINK_ITEM_ID);
-  if (!entity) throw new Error("SINK_ENTITY_GROUP_MISSING");
-  const proxy = entity.getObjectByName(`${SINK_ITEM_ID}/parametric`) as Group | undefined;
-  if (!proxy) throw new Error("SINK_PROXY_MISSING");
-  const fit = proxy.userData.fit as FitData | undefined;
-  if (!fit) throw new Error("SINK_FIT_MISSING");
+interface PlanePoint {
+  readonly x: number;
+  readonly depth: number;
+}
 
-  const { width, height, depth } = fit.fittedMm;
-  const inox = registry.materialByDefinitionId("inox-brushed") as MeshStandardMaterial;
-  const chrome = registry.materialByDefinitionId("chrome") as MeshStandardMaterial;
+function roundedRectLoop(
+  x: number,
+  depthOrigin: number,
+  width: number,
+  depth: number,
+  radius: number,
+  segmentsPerCorner = LOOP_SEGMENTS_PER_CORNER
+): readonly PlanePoint[] {
+  const r = Math.max(0, Math.min(radius, width / 2, depth / 2));
+  const corners = [
+    { cx: x + width - r, cy: depthOrigin + r, a0: -Math.PI / 2 },
+    { cx: x + width - r, cy: depthOrigin + depth - r, a0: 0 },
+    { cx: x + r, cy: depthOrigin + depth - r, a0: Math.PI / 2 },
+    { cx: x + r, cy: depthOrigin + r, a0: Math.PI }
+  ] as const;
+  const points: PlanePoint[] = [];
+  for (const corner of corners) {
+    for (let i = 0; i < segmentsPerCorner; i++) {
+      const angle = corner.a0 + (Math.PI / 2) * (i / segmentsPerCorner);
+      points.push({
+        x: corner.cx + Math.cos(angle) * r,
+        depth: corner.cy + Math.sin(angle) * r
+      });
+    }
+  }
+  return points;
+}
+
+function bowlSideGeometry(
+  topLoop: readonly PlanePoint[],
+  bottomLoop: readonly PlanePoint[],
+  topZ: number,
+  bottomZ: number
+): BufferGeometry {
+  if (topLoop.length !== bottomLoop.length || topLoop.length < 8) throw new Error("SINK_BOWL_LOOP_MISMATCH");
+  const positions: number[] = [];
+  for (const point of topLoop) positions.push(point.x, topZ, -point.depth);
+  for (const point of bottomLoop) positions.push(point.x, bottomZ, -point.depth);
+  const count = topLoop.length;
+  const indices: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const next = (i + 1) % count;
+    const top = i;
+    const topNext = next;
+    const bottom = count + i;
+    const bottomNext = count + next;
+    indices.push(top, bottom, bottomNext, top, bottomNext, topNext);
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  geometry.userData.continuousLoft = true;
+  geometry.userData.loopSamples = count;
+  return geometry;
+}
+
+function rebuildSinkBowl(
+  adapter: ThreeSceneAdapter,
+  registry: ThreeMaterialRegistry,
+  contract: SinkGeometryContract
+): Group {
+  const proxy = sinkProxy(adapter);
   proxy.clear();
+  const inox = registry.materialByDefinitionId("inox-brushed") as MeshStandardMaterial;
+  const sideMaterial = inox.clone();
+  sideMaterial.side = DoubleSide;
+  sideMaterial.name = `${inox.name}/sink-bowl`;
+  sideMaterial.userData.transientVisualMaterial = true;
 
   const visual = new Group();
   visual.name = `${SINK_ITEM_ID}/visual`;
-  visual.position.set(fit.offsetMm[0], fit.offsetMm[2], -fit.offsetMm[1]);
-  const rim = 9;
-  const bowlInset = 18;
-  const topZ = height - rim;
-  visual.add(part(width, rim, rim, inox, 0, 0, topZ, 3));
-  visual.add(part(width, rim, rim, inox, 0, depth - rim, topZ, 3));
-  visual.add(part(rim, rim, depth - 2 * rim, inox, 0, rim, topZ, 3));
-  visual.add(part(rim, rim, depth - 2 * rim, inox, width - rim, rim, topZ, 3));
+  visual.position.set(
+    contract.fit.offsetMm[0],
+    contract.topAlignedOffsetZMm,
+    -contract.fit.offsetMm[1]
+  );
 
-  const wallHeight = Math.max(40, height * 0.68);
-  visual.add(part(7, wallHeight, depth - 2 * bowlInset, inox, bowlInset, bowlInset, topZ - wallHeight, 2));
-  visual.add(part(7, wallHeight, depth - 2 * bowlInset, inox, width - bowlInset - 7, bowlInset, topZ - wallHeight, 2));
-  visual.add(part(width - 2 * bowlInset, wallHeight, 7, inox, bowlInset, depth - bowlInset - 7, topZ - wallHeight, 2));
-  visual.add(part(width - 2 * bowlInset, 8, depth - 2 * bowlInset, inox, bowlInset, bowlInset, Math.max(4, topZ - wallHeight), 10));
+  const width = contract.fit.fittedMm.width;
+  const height = contract.fit.fittedMm.height;
+  const depth = contract.fit.fittedMm.depth;
+  const flange = contract.flangeMm;
+  const openingWidth = width - 2 * flange;
+  const openingDepth = depth - 2 * flange;
+  const topZ = height - RIM_THICKNESS_MM;
+  const bottomZ = Math.max(5, height - contract.bowlDepthMm);
+  const bottomInset = Math.min(32 * (width / ARCHETYPE_WIDTH_MM), openingWidth * 0.16, openingDepth * 0.16);
+  const bottomWidth = openingWidth - 2 * bottomInset;
+  const bottomDepth = openingDepth - 2 * bottomInset;
+  const bottomRadius = Math.max(10, contract.openingRadiusMm * 0.62);
 
-  const faucetX = width * 0.78;
-  const faucetBack = -depth * 0.91;
-  const baseY = height + 2;
-  const faucetRise = 220;
-  const curve = new CatmullRomCurve3([
-    new Vector3(faucetX, baseY, faucetBack),
-    new Vector3(faucetX, baseY + 90, faucetBack),
-    new Vector3(faucetX, baseY + 180, faucetBack + 18),
-    new Vector3(faucetX, baseY + faucetRise, faucetBack + 92),
-    new Vector3(faucetX, baseY + 185, faucetBack + 165)
-  ]);
-  const faucet = new Mesh(new TubeGeometry(curve, 32, 6, 12, false), chrome);
-  faucet.castShadow = true;
-  visual.add(faucet);
-  visual.add(part(26, 18, 22, chrome, faucetX - 13, depth * 0.77, height - 6, 5));
+  const rimShape = roundedRectShape(0, 0, width, depth, contract.outerRadiusMm);
+  rimShape.holes.push(roundedRectPath(
+    flange,
+    flange,
+    openingWidth,
+    openingDepth,
+    contract.openingRadiusMm,
+    true
+  ));
+  const rim = new Mesh(extrudedScenePlane(rimShape, RIM_THICKNESS_MM), inox);
+  rim.name = `${SINK_ITEM_ID}/rim`;
+  rim.position.y = topZ;
+  rim.castShadow = true;
+  rim.receiveShadow = true;
+  visual.add(rim);
+
+  const topLoop = roundedRectLoop(
+    flange,
+    flange,
+    openingWidth,
+    openingDepth,
+    contract.openingRadiusMm
+  );
+  const bottomLoop = roundedRectLoop(
+    flange + bottomInset,
+    flange + bottomInset,
+    bottomWidth,
+    bottomDepth,
+    bottomRadius
+  );
+  const bowlSide = new Mesh(bowlSideGeometry(topLoop, bottomLoop, topZ, bottomZ), sideMaterial);
+  bowlSide.name = `${SINK_ITEM_ID}/bowl-side`;
+  bowlSide.castShadow = true;
+  bowlSide.receiveShadow = true;
+  visual.add(bowlSide);
+
+  const bottomShape = roundedRectShape(
+    flange + bottomInset,
+    flange + bottomInset,
+    bottomWidth,
+    bottomDepth,
+    bottomRadius
+  );
+  const bottom = new Mesh(scenePlane(bottomShape), sideMaterial);
+  bottom.name = `${SINK_ITEM_ID}/bowl-bottom`;
+  bottom.position.y = bottomZ;
+  bottom.receiveShadow = true;
+  visual.add(bottom);
+
+  const drain = new Mesh(new CylinderGeometry(20, 20, 3, 48), inox);
+  drain.name = `${SINK_ITEM_ID}/drain`;
+  drain.position.set(width / 2, bottomZ + 1.6, -depth / 2);
+  drain.receiveShadow = true;
+  visual.add(drain);
 
   proxy.add(visual);
-  proxy.userData.visualRefinement = "fh06-sink-and-faucet-v1";
-  proxy.userData.faucetRiseMm = faucetRise;
-  return { proxy, faucetHeightMm: faucetRise };
+  proxy.userData.visualRefinement = "fh06-1-s4-undermount-sink-v1";
+  proxy.userData.sinkFamilyId = SINK_FAMILY_ID;
+  proxy.userData.topAlignedOffsetZMm = contract.topAlignedOffsetZMm;
+  proxy.userData.bowlDepthMm = contract.bowlDepthMm;
+  proxy.userData.faucetSeparatedToS5 = true;
+  return proxy;
 }
 
 function maxAabbDriftMm(before: Box3, after: Box3): number {
@@ -172,11 +411,19 @@ function maxAabbDriftMm(before: Box3, after: Box3): number {
 }
 
 export interface SinkRefinementResult {
+  readonly sinkFamilyId: typeof SINK_FAMILY_ID;
   readonly openingMm: readonly [number, number, number, number];
+  readonly openingRadiusMm: number;
+  readonly flangeMm: number;
+  readonly fittedOuterMm: { readonly width: number; readonly height: number; readonly depth: number };
+  readonly bowlDepthMm: number;
+  readonly topAlignedOffsetZMm: number;
   readonly countertopOuterEnvelopePreserved: boolean;
   readonly countertopOuterEnvelopeDriftMm: number;
   readonly countertopOuterEnvelopeToleranceMm: number;
-  readonly faucetHeightMm: number;
+  readonly stoneHoleGeometry: "extruded-shape-with-rounded-hole";
+  readonly continuousBowl: true;
+  readonly faucetSeparatedToS5: true;
 }
 
 export function applyFh06SinkRefinement(
@@ -184,14 +431,23 @@ export function applyFh06SinkRefinement(
   registry: ThreeMaterialRegistry,
   scene: ScenePackage
 ): SinkRefinementResult {
-  const stone = splitCountertopAroundSink(adapter, scene);
-  const sink = rebuildSink(adapter, registry);
-  const driftMm = maxAabbDriftMm(stone.outerBefore, stone.outerAfter);
+  const contract = sinkContract(adapter, scene);
+  const stone = replaceStoneSlabWithHole(adapter, scene, contract);
+  rebuildSinkBowl(adapter, registry, contract);
+  const driftMm = maxAabbDriftMm(stone.before, stone.after);
   return {
-    openingMm: stone.openingMm,
+    sinkFamilyId: SINK_FAMILY_ID,
+    openingMm: contract.openingMm,
+    openingRadiusMm: contract.openingRadiusMm,
+    flangeMm: contract.flangeMm,
+    fittedOuterMm: contract.fit.fittedMm,
+    bowlDepthMm: contract.bowlDepthMm,
+    topAlignedOffsetZMm: contract.topAlignedOffsetZMm,
     countertopOuterEnvelopePreserved: driftMm <= RENDER_AABB_TOLERANCE_MM,
     countertopOuterEnvelopeDriftMm: driftMm,
     countertopOuterEnvelopeToleranceMm: RENDER_AABB_TOLERANCE_MM,
-    faucetHeightMm: sink.faucetHeightMm
+    stoneHoleGeometry: "extruded-shape-with-rounded-hole",
+    continuousBowl: true,
+    faucetSeparatedToS5: true
   };
 }
