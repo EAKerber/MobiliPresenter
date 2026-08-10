@@ -54,6 +54,7 @@ export interface SelectiveBloomPipeline {
   readonly finalComposer: EffectComposer;
   render(): void;
   setSize(widthPx: number, heightPx: number): void;
+  setAppearance(appearance: AppearancePackage): void;
   dispose(): void;
 }
 
@@ -135,6 +136,12 @@ export function createSelectiveBloomPipeline(
   finalComposer.addPass(mixPass);
   finalComposer.addPass(new OutputPass());
 
+  const applyAppearance = (next: AppearancePackage): void => {
+    bloomPass.strength = next.lighting.post.bloomEnabled ? next.lighting.post.bloomStrength : 0;
+    bloomPass.radius = next.lighting.post.bloomRadius;
+  };
+  applyAppearance(appearance);
+
   return {
     bloomCamera,
     bloomComposer,
@@ -151,6 +158,9 @@ export function createSelectiveBloomPipeline(
     setSize(nextWidthPx: number, nextHeightPx: number): void {
       bloomComposer.setSize(nextWidthPx, nextHeightPx);
       finalComposer.setSize(nextWidthPx, nextHeightPx);
+    },
+    setAppearance(next: AppearancePackage): void {
+      applyAppearance(next);
     },
     dispose(): void {
       bloomComposer.dispose();
