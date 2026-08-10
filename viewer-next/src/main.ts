@@ -21,12 +21,13 @@ import {
   updateThreeCameraViewport,
   type PixelCrop
 } from "./renderer/three/camera.js";
+import { applyFh06CooktopContact } from "./renderer/three/cooktop-contact.js";
 import { applyFh06FaucetRefinement } from "./renderer/three/faucet-refinement.js";
 import { buildFidelityOverlay } from "./renderer/three/fidelity-overlay.js";
 import { applyFh06FrontReadability } from "./renderer/three/front-readability.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "./renderer/three/lighting.js";
 import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
-import { createSelectiveBloomPipeline } from "./renderer/three/post.js";
+import { FH06_GTAO_PROFILE, createSelectiveBloomPipeline } from "./renderer/three/post.js";
 import { buildThreeScene } from "./renderer/three/scene-adapter.js";
 import { applyFh06SinkRefinement } from "./renderer/three/sink-refinement.js";
 import { applyFh06UnderCabProfile } from "./renderer/three/under-cab-profile.js";
@@ -63,11 +64,15 @@ app.dataset.sceneId = currentSceneBase.sceneId;
 app.dataset.fidelityMode = fidelityMode ? "true" : "false";
 app.dataset.fidelityOverlay = fidelityOverlayMode ? "true" : "false";
 app.dataset.fidelityCrop = fidelityCrop ? `${fidelityCrop.xPx},${fidelityCrop.yPx},${fidelityCrop.widthPx},${fidelityCrop.heightPx}` : "none";
+app.dataset.colorTreatment = "fh06-s10-neutral-warm-v1";
+app.dataset.occlusion = "gtao-mm-v1";
+app.dataset.occlusionRadiusMm = String(FH06_GTAO_PROFILE.radiusMm);
+app.dataset.occlusionBlend = String(FH06_GTAO_PROFILE.blendIntensity);
 
 const renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
 renderer.outputColorSpace = SRGBColorSpace;
 renderer.toneMapping = ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.setPixelRatio(fidelityCrop ? 1 : Math.min(window.devicePixelRatio || 1, fidelityMode ? CURRENT_FIDELITY_SUPERSAMPLE : 2));
 app.appendChild(renderer.domElement);
@@ -75,12 +80,15 @@ app.appendChild(renderer.domElement);
 const materials = new ThreeMaterialRegistry(styleAnchorAppearance);
 const adapter = buildThreeScene(currentSceneBase, (entityId, slot) => materials.resolve(entityId, slot));
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
+const cooktopContact = applyFh06CooktopContact(adapter, currentSceneBase);
 applyFh06VisualRefinements(adapter, materials);
 const frontReadability = applyFh06FrontReadability(adapter, materials, currentSceneBase);
 const tileRefinement = applyFh06FullWallTiles(adapter, currentSceneBase);
 const sinkRefinement = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
 const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
 const underCabRefinement = applyFh06UnderCabProfile(adapter, materials, currentSceneBase, currentUnderCabLightContract);
+app.dataset.cooktopContact = cooktopContact.refinementId;
+app.dataset.cooktopGapMm = cooktopContact.afterGapMm.toFixed(3);
 app.dataset.frontReadability = frontReadability.refinementId;
 app.dataset.frontPhysicalGapMm = frontReadability.physicalGapMm.join(",");
 app.dataset.wallTileCoverage = "full-wall";
@@ -94,7 +102,7 @@ app.dataset.underCabProfile = "rear-corner-18mm-45deg";
 app.dataset.underCabKelvin = String(underCabRefinement.colorTemperatureK);
 app.dataset.underCabHost = underCabRefinement.hostModuleId;
 app.dataset.underCabAreaLight = underCabRefinement.hasActualAreaLight ? "true" : "false";
-adapter.scene.background = new Color(0xf3f2ee);
+adapter.scene.background = new Color(0xf0ede7);
 
 if (fidelityOverlayMode && !fidelityCrop) {
   const fidelityLines = createCurrentFidelityOverlayLines();
