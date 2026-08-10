@@ -20,10 +20,13 @@ function setup() {
   return { materials, adapter };
 }
 
-test("sink countertop cutout preserves the authoritative outer envelope", () => {
+test("sink countertop cutout preserves authoritative envelope within explicit render precision", () => {
   const before = sceneGeometryDigest(currentSceneBase);
   const { materials, adapter } = setup();
   const result = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
+  assert.equal(result.countertopOuterEnvelopeToleranceMm, 0.001);
+  assert.ok(result.countertopOuterEnvelopeDriftMm <= result.countertopOuterEnvelopeToleranceMm,
+    `countertop render AABB drift ${result.countertopOuterEnvelopeDriftMm}mm exceeds ${result.countertopOuterEnvelopeToleranceMm}mm`);
   assert.equal(result.countertopOuterEnvelopePreserved, true);
   assert.deepEqual(result.openingMm.map(value => Math.round(value * 1000) / 1000), [417.295, 83.958, 382.087, 382.085]);
   assert.equal(sceneGeometryDigest(currentSceneBase), before);
