@@ -31,3 +31,5 @@ test("Contact Fidelity fails deterministically when expected gap does not match 
   assert.ok(Math.abs(measurement.measuredGapMm - 1) <= 0.01);
   registry.dispose();
 });
+
+// CI checkpoint: first reusable Contact Fidelity hard gate.
