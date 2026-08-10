@@ -22,8 +22,8 @@
   "development": {
     "initiative": "Fixed View Renderer 0.1",
     "phase": "visual-correction-loop",
-    "checkpoint": "FH-06",
-    "nextTransition": "correct-highest-priority-f5-f6-failures-without-f0-f4-regression",
+    "checkpoint": "FH-06.1",
+    "nextTransition": "implement-oven-surround-and-sink-station-contract-before-further-appearance-tuning",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
@@ -34,7 +34,9 @@
       "mm-is-physical-authority-pixels-are-projection-evidence",
       "supersampling-4x-is-targeted-crop-fidelity-profile",
       "f0-through-f4-must-not-regress-during-visual-tuning",
-      "fh05-readability-baseline-is-regression-reference"
+      "fh05-readability-baseline-is-regression-reference",
+      "oven-surround-and-sink-station-must-pass-fh06-1-spec",
+      "full-wall-tile-is-scene-material-policy"
     ],
     "plan": "docs/plans/fidelity-harness-v1.md",
     "prNumber": 6
