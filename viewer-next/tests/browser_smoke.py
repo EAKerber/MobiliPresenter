@@ -61,6 +61,8 @@ def main() -> None:
         'data-sink-refinement="SINK-UNDERMOUNT-40X34-01"',
         'data-sink-stone-hole="extruded-shape-with-rounded-hole"',
         'data-sink-continuous-bowl="true"',
+        'data-faucet-refinement="FAUCET-HIGH-ARC-01"',
+        'data-faucet-host="scene/traditional/accessory/stone-03"',
     )
     missing = [needle for needle in required if needle not in dom_result.stdout]
     if missing:

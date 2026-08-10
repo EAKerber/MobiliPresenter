@@ -23,4 +23,5 @@ export * from "./fixtures/current-laundry.js";
 export * from "./fixtures/current-hardware.js";
 export * from "./fixtures/current-appearance.js";
 export * from "./fixtures/current-scene.js";
+export * from "./fixtures/current-faucet.js";
 export * from "./fixtures/current-fidelity.js";

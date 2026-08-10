@@ -2,6 +2,7 @@ import {
   createCurrentFidelityOverlayLines,
   CURRENT_FIDELITY_SUPERSAMPLE,
   CURRENT_FIDELITY_VIEWPORT,
+  currentFaucetAnchor,
   currentFixedCamera,
   currentSceneBase
 } from "@mobilipresenter/scene-core";
@@ -19,6 +20,7 @@ import {
   updateThreeCameraViewport,
   type PixelCrop
 } from "./renderer/three/camera.js";
+import { applyFh06FaucetRefinement } from "./renderer/three/faucet-refinement.js";
 import { buildFidelityOverlay } from "./renderer/three/fidelity-overlay.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "./renderer/three/lighting.js";
 import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
@@ -78,9 +80,12 @@ const adapter = buildThreeScene(
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
 applyFh06VisualRefinements(adapter, materials);
 const sinkRefinement = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
+const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
 app.dataset.sinkRefinement = sinkRefinement.sinkFamilyId;
 app.dataset.sinkStoneHole = sinkRefinement.stoneHoleGeometry;
 app.dataset.sinkContinuousBowl = sinkRefinement.continuousBowl ? "true" : "false";
+app.dataset.faucetRefinement = faucetRefinement.presetId;
+app.dataset.faucetHost = faucetRefinement.hostEntityId;
 adapter.scene.background = new Color(0xf3f2ee);
 
 if (fidelityOverlayMode && !fidelityCrop) {
