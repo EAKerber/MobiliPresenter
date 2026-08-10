@@ -1,4 +1,5 @@
 import type {
+  ApplianceFrontOpening,
   ApplianceSlot,
   BoxGeometry,
   EnvironmentGeometry,
@@ -69,7 +70,8 @@ const slot = (
   depth: number,
   defaultApplianceId: string,
   status: "confirmed" | "inferred",
-  evidenceRefs: readonly string[]
+  evidenceRefs: readonly string[],
+  frontOpening?: ApplianceFrontOpening
 ): ApplianceSlot => ({
   id,
   role,
@@ -77,7 +79,8 @@ const slot = (
   clearSizeMm: { width, height, depth },
   defaultApplianceId,
   status,
-  evidenceRefs
+  evidenceRefs,
+  ...(frontOpening ? { frontOpening } : {})
 });
 
 export const currentEnvironment: EnvironmentGeometry = {
@@ -98,6 +101,11 @@ export const currentEnvironment: EnvironmentGeometry = {
     face("scene/traditional/environment/base/column-return", "column", t(3071.739, 8444.14, 0), { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 1, y: 0, z: 0 }, 206.3, 2601.63, "placement:LAYER-column-return", "wall")
   ]
 };
+
+const MODULE02_NOMINAL_FRONT_OFFSET_X = (791.01 - 790) / 2;
+const MODULE02_OVEN_OPENING_X = MODULE02_NOMINAL_FRONT_OFFSET_X + 95;
+const MODULE02_OVEN_OPENING_Z = 80;
+const MODULE02_FRONT_SOURCE = "design-default:fh06-1:module02-front-opening";
 
 export const module02: ModuleGeometry = {
   id: "scene/traditional/module/lower-stove",
@@ -124,10 +132,30 @@ export const module02: ModuleGeometry = {
     box("scene/traditional/module/lower-stove/bottom", "bottom", t(0, 0, 0), 791.01, 18, 530, "placement:LAYER136"),
     box("scene/traditional/module/lower-stove/rear-brace", "back", t(8, 525, 8), 775.01, 751, 5, "placement:LAYER137"),
     box("scene/traditional/module/lower-stove/top-front-rail", "top", t(18, 0, 742), 755.01, 18, 70, "placement:LAYER138"),
-    box("scene/traditional/module/lower-stove/top-rear-rail", "top", t(18, 455, 742), 755.01, 18, 70, "placement:LAYER139")
+    box("scene/traditional/module/lower-stove/top-rear-rail", "top", t(18, 455, 742), 755.01, 18, 70, "placement:LAYER139"),
+    box("scene/traditional/module/lower-stove/front/oven-left-stile", "front", t(MODULE02_NOMINAL_FRONT_OFFSET_X, -18, 0), 95, 760, 18, MODULE02_FRONT_SOURCE),
+    box("scene/traditional/module/lower-stove/front/oven-right-stile", "front", t(MODULE02_OVEN_OPENING_X + 600, -18, 0), 95, 760, 18, MODULE02_FRONT_SOURCE),
+    box("scene/traditional/module/lower-stove/front/oven-bottom-rail", "front", t(MODULE02_OVEN_OPENING_X, -18, 0), 600, 80, 18, MODULE02_FRONT_SOURCE),
+    box("scene/traditional/module/lower-stove/front/oven-top-rail", "front", t(MODULE02_OVEN_OPENING_X, -18, 680), 600, 80, 18, MODULE02_FRONT_SOURCE)
   ],
   applianceSlots: [
-    slot("scene/traditional/module/lower-stove/slot/oven", "built-in-oven", t(18, 5, 18), 755.01, 724, 525, "AP-OVEN-01", "confirmed", ["technical-sheet:module-02", "promob-dxf:LAYER134-139"]),
+    slot(
+      "scene/traditional/module/lower-stove/slot/oven",
+      "built-in-oven",
+      t(18, 5, 18),
+      755.01,
+      724,
+      525,
+      "AP-OVEN-01",
+      "confirmed",
+      ["technical-sheet:module-02", "promob-dxf:LAYER134-139"],
+      {
+        localTransform: t(MODULE02_OVEN_OPENING_X, -18, MODULE02_OVEN_OPENING_Z),
+        sizeMm: { width: 600, height: 600 },
+        status: "inferred",
+        evidenceRefs: ["user-reference:module02-oven-surround", "design-default:fh06-1:60cm-built-in-oven-opening"]
+      }
+    ),
     slot("scene/traditional/module/lower-stove/slot/cooktop", "cooktop", t(95.505, -5, 796), 600, 60, 520, "AP-COOKTOP-01", "inferred", ["style-anchor:target-render", "promob-dxf:LAYER148-countertop"])
   ]
 };
