@@ -103,27 +103,21 @@ export function createSelectiveBloomPipeline(
   const basePass = new RenderPass(scene, camera);
   finalComposer.addPass(basePass);
 
-  const gtaoPass = new GTAOPass(
-    scene,
-    camera,
-    widthPx,
-    heightPx,
-    undefined,
-    {
-      radius: FH06_GTAO_PROFILE.radiusMm,
-      distanceExponent: FH06_GTAO_PROFILE.distanceExponent,
-      thickness: FH06_GTAO_PROFILE.thicknessMm,
-      distanceFallOff: FH06_GTAO_PROFILE.distanceFallOff,
-      scale: FH06_GTAO_PROFILE.scale,
-      samples: FH06_GTAO_PROFILE.samples,
-      screenSpaceRadius: false
-    },
-    {
-      radius: FH06_GTAO_PROFILE.denoiseRadiusPx,
-      rings: FH06_GTAO_PROFILE.denoiseRings,
-      samples: FH06_GTAO_PROFILE.denoiseSamples
-    }
-  );
+  const gtaoPass = new GTAOPass(scene, camera, widthPx, heightPx);
+  gtaoPass.updateGtaoMaterial({
+    radius: FH06_GTAO_PROFILE.radiusMm,
+    distanceExponent: FH06_GTAO_PROFILE.distanceExponent,
+    thickness: FH06_GTAO_PROFILE.thicknessMm,
+    distanceFallOff: FH06_GTAO_PROFILE.distanceFallOff,
+    scale: FH06_GTAO_PROFILE.scale,
+    samples: FH06_GTAO_PROFILE.samples,
+    screenSpaceRadius: false
+  });
+  gtaoPass.updatePdMaterial({
+    radius: FH06_GTAO_PROFILE.denoiseRadiusPx,
+    rings: FH06_GTAO_PROFILE.denoiseRings,
+    samples: FH06_GTAO_PROFILE.denoiseSamples
+  });
   gtaoPass.blendIntensity = FH06_GTAO_PROFILE.blendIntensity;
   finalComposer.addPass(gtaoPass);
 
