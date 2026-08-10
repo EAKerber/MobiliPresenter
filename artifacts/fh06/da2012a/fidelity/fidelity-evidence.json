@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "browser": "/usr/bin/google-chrome",
+  "canonicalViewportPx": [
+    1865,
+    967
+  ],
+  "overlayScreenshot": {
+    "path": "/tmp/mobilipresenter-fidelity-overlay-1x.png",
+    "bytes": 214661,
+    "size": [
+      1865,
+      967
+    ]
+  },
+  "measurementPolicy": "4x precision is provided by targeted off-axis crops; no monolithic 7460x3868 framebuffer is required",
+  "requiredDomMarkers": [
+    "data-renderer-backend=\"three-webgl2\"",
+    "data-renderer-ready=\"true\"",
+    "data-frame-rendered=\"true\"",
+    "data-scene-id=\"traditional-complete\"",
+    "data-fidelity-mode=\"true\"",
+    "data-fidelity-overlay=\"true\"",
+    "data-fidelity-line-count="
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "schemaVersion": "ReadabilityComparison 1.2",
+  "baseline": "../fidelity/baselines/fh06-1-readability.json",
+  "candidate": "/tmp/mobilipresenter-readability-report.json",
+  "migration": null,
+  "policy": {
+    "maxRecallDrop": 0.05,
+    "maxMedianContrastDrop": 0.015,
+    "maxP10ContrastDrop": 0.01,
+    "maxMedianOffsetIncreaseCanonicalPx": 0.5,
+    "recallRequiresBaselineMargin": {
+      "medianContrastMargin": 0.015,
+      "p10ContrastMargin": 0.01
+    },
+    "legacyBaselineThresholdMayComeFromSameCandidateProbe": true,
+    "nearThresholdRecallIsDiagnosticOnly": true,
+    "probeSetChangeRequiresExplicitMigration": true
+  },
+  "pass": true,
+  "regressions": [],
+  "deltas": [
+    {
+      "id": "module01/door-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.0,
+      "p10PeakContrast": -5.551115123125783e-17,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module02/oven-opening-bottom",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.004055294117647046,
+      "p10PeakContrast": 0.0037375294117646535,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module02/oven-opening-left",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": -0.005660980392156872,
+      "p10PeakContrast": -0.006429098039215653,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module02/oven-opening-right",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": -0.0018192156862744946,
+      "p10PeakContrast": -0.0019183137254900895,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module02/oven-opening-top",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": -0.0011180392156862617,
+      "p10PeakContrast": -0.0019442745098038894,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/door-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": -0.001109019607843209,
+      "p10PeakContrast": -0.000550588235294136,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/drawer-seam/1-2",
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.15842588235294125,
+      "p10PeakContrast": 0.1585674509803922,
+      "medianEdgeOffsetCanonicalPx": -0.5,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": false,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/drawer-seam/2-3",
+      "edgeRecall": 1.0,
+      "medianPeakContrast": 0.15296823529411763,
+      "p10PeakContrast": 0.15478745098039215,
+      "medianEdgeOffsetCanonicalPx": -0.5,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": false,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/drawer-seam/3-4",
+      "edgeRecall": 0.9791666666666666,
+      "medianPeakContrast": 0.15144235294117642,
+      "p10PeakContrast": 0.1529862745098039,
+      "medianEdgeOffsetCanonicalPx": -0.25,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": false,
+      "regressionReasons": []
+    },
+    {
+      "id": "module06/door-left-center-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": -0.004209803921568611,
+      "p10PeakContrast": -0.003646274509803926,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    }
+  ],
+  "comparableProbeIds": [
+    "module01/door-seam",
+    "module02/oven-opening-bottom",
+    "module02/oven-opening-left",
+    "module02/oven-opening-right",
+    "module02/oven-opening-top",
+    "module03/door-seam",
+    "module03/drawer-seam/1-2",
+    "module03/drawer-seam/2-3",
+    "module03/drawer-seam/3-4",
+    "module06/door-left-center-seam"
+  ],
+  "newProbeIds": [],
+  "supersededProbeIds": []
+}
