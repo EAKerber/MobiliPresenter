@@ -29,6 +29,9 @@ const ARCHETYPE_OUTER_RADIUS_MM = 38;
 const RENDER_AABB_TOLERANCE_MM = 0.001;
 const RIM_THICKNESS_MM = 3;
 const LOOP_SEGMENTS_PER_CORNER = 8;
+const STONE_CUTOUT_SIDE_DARKENING = 0.62;
+const BOWL_SIDE_DARKENING = 0.58;
+const BOWL_BOTTOM_DARKENING = 0.46;
 
 interface FitData {
   readonly envelopeMm: { readonly width: number; readonly height: number; readonly depth: number };
@@ -184,11 +187,35 @@ function sinkContract(adapter: ThreeSceneAdapter, scene: ScenePackage): SinkGeom
   };
 }
 
+function standardMaterial(material: Material | readonly Material[], role: string): MeshStandardMaterial {
+  const first = Array.isArray(material) ? material[0] : material;
+  if (!(first instanceof MeshStandardMaterial)) throw new Error(`SINK_STANDARD_MATERIAL_REQUIRED:${role}`);
+  return first;
+}
+
+function darkerClone(
+  source: MeshStandardMaterial,
+  name: string,
+  multiplier: number,
+  roughness: number,
+  metalness = source.metalness
+): MeshStandardMaterial {
+  const clone = source.clone();
+  clone.name = name;
+  clone.color.multiplyScalar(multiplier);
+  clone.roughness = roughness;
+  clone.metalness = metalness;
+  clone.side = DoubleSide;
+  clone.userData.transientVisualMaterial = true;
+  clone.userData.luminanceMultiplier = multiplier;
+  return clone;
+}
+
 function replaceStoneSlabWithHole(
   adapter: ThreeSceneAdapter,
   scene: ScenePackage,
   contract: SinkGeometryContract
-): { readonly before: Box3; readonly after: Box3 } {
+): { readonly before: Box3; readonly after: Box3; readonly cutoutSideMaterial: MeshStandardMaterial } {
   const stoneItem = itemById(scene, SINK_STONE_ID);
   const primitive = stoneItem.geometry?.find(candidate => candidate.id === SINK_STONE_PRIMITIVE_ID);
   if (!primitive || primitive.primitive !== "box") throw new Error("SINK_COUNTERTOP_BOX_MISSING");
@@ -208,7 +235,16 @@ function replaceStoneSlabWithHole(
 
   primitiveGroup.updateWorldMatrix(true, true);
   const before = new Box3().setFromObject(primitiveGroup);
-  const material = original.material as Material;
+  const capMaterial = standardMaterial(original.material, "stone-cap");
+  const cutoutSideMaterial = darkerClone(
+    capMaterial,
+    `${capMaterial.name}/sink-cutout-side`,
+    STONE_CUTOUT_SIDE_DARKENING,
+    Math.min(1, capMaterial.roughness + 0.14),
+    0
+  );
+  cutoutSideMaterial.userData.sinkCutoutSide = true;
+
   const shape = slabShapeWithHole(
     primitive.sizeMm.width,
     primitive.sizeMm.depth,
@@ -216,25 +252,27 @@ function replaceStoneSlabWithHole(
     contract.openingRadiusMm
   );
   const geometry = extrudedScenePlane(shape, primitive.sizeMm.height);
-  geometry.userData.visualRefinement = "fh06-1-s4-stone-hole-v1";
+  geometry.userData.visualRefinement = "fh06-1-s9-stone-hole-readability-v1";
   geometry.userData.holeCount = 1;
   geometry.userData.openingMm = [...contract.openingMm];
   geometry.userData.openingRadiusMm = contract.openingRadiusMm;
+  geometry.userData.capMaterialIndex = 0;
+  geometry.userData.sideMaterialIndex = 1;
 
-  const replacement = new Mesh(geometry, material);
+  const replacement = new Mesh(geometry, [capMaterial, cutoutSideMaterial]);
   replacement.name = `${primitive.id}/mesh`;
   replacement.castShadow = true;
   replacement.receiveShadow = true;
   replacement.userData.geometryId = primitive.id;
   replacement.userData.materialSlot = primitive.materialSlot ?? "stone";
-  replacement.userData.visualRefinement = "fh06-1-s4-stone-hole-v1";
+  replacement.userData.visualRefinement = "fh06-1-s9-stone-hole-readability-v1";
 
   primitiveGroup.remove(original);
   original.geometry.dispose();
   primitiveGroup.add(replacement);
   primitiveGroup.updateWorldMatrix(true, true);
   const after = new Box3().setFromObject(primitiveGroup);
-  return { before, after };
+  return { before, after, cutoutSideMaterial };
 }
 
 interface PlanePoint {
@@ -305,14 +343,14 @@ function rebuildSinkBowl(
   adapter: ThreeSceneAdapter,
   registry: ThreeMaterialRegistry,
   contract: SinkGeometryContract
-): Group {
+): { readonly proxy: Group; readonly sideMaterial: MeshStandardMaterial; readonly bottomMaterial: MeshStandardMaterial } {
   const proxy = sinkProxy(adapter);
   proxy.clear();
   const inox = registry.materialByDefinitionId("inox-brushed") as MeshStandardMaterial;
-  const sideMaterial = inox.clone();
-  sideMaterial.side = DoubleSide;
-  sideMaterial.name = `${inox.name}/sink-bowl`;
-  sideMaterial.userData.transientVisualMaterial = true;
+  const sideMaterial = darkerClone(inox, `${inox.name}/sink-bowl-side`, BOWL_SIDE_DARKENING, 0.46, 0.72);
+  sideMaterial.userData.sinkBowlSide = true;
+  const bottomMaterial = darkerClone(inox, `${inox.name}/sink-bowl-bottom`, BOWL_BOTTOM_DARKENING, 0.54, 0.62);
+  bottomMaterial.userData.sinkBowlBottom = true;
 
   const visual = new Group();
   visual.name = `${SINK_ITEM_ID}/visual`;
@@ -349,15 +387,10 @@ function rebuildSinkBowl(
   rim.position.y = topZ;
   rim.castShadow = true;
   rim.receiveShadow = true;
+  rim.userData.visualRole = "bright-undermount-rim";
   visual.add(rim);
 
-  const topLoop = roundedRectLoop(
-    flange,
-    flange,
-    openingWidth,
-    openingDepth,
-    contract.openingRadiusMm
-  );
+  const topLoop = roundedRectLoop(flange, flange, openingWidth, openingDepth, contract.openingRadiusMm);
   const bottomLoop = roundedRectLoop(
     flange + bottomInset,
     flange + bottomInset,
@@ -369,6 +402,7 @@ function rebuildSinkBowl(
   bowlSide.name = `${SINK_ITEM_ID}/bowl-side`;
   bowlSide.castShadow = true;
   bowlSide.receiveShadow = true;
+  bowlSide.userData.visualRole = "occluded-brushed-inox-side";
   visual.add(bowlSide);
 
   const bottomShape = roundedRectShape(
@@ -378,25 +412,27 @@ function rebuildSinkBowl(
     bottomDepth,
     bottomRadius
   );
-  const bottom = new Mesh(scenePlane(bottomShape), sideMaterial);
+  const bottom = new Mesh(scenePlane(bottomShape), bottomMaterial);
   bottom.name = `${SINK_ITEM_ID}/bowl-bottom`;
   bottom.position.y = bottomZ;
   bottom.receiveShadow = true;
+  bottom.userData.visualRole = "occluded-brushed-inox-bottom";
   visual.add(bottom);
 
-  const drain = new Mesh(new CylinderGeometry(20, 20, 3, 48), inox);
+  const drain = new Mesh(new CylinderGeometry(20, 20, 3, 48), sideMaterial);
   drain.name = `${SINK_ITEM_ID}/drain`;
   drain.position.set(width / 2, bottomZ + 1.6, -depth / 2);
   drain.receiveShadow = true;
   visual.add(drain);
 
   proxy.add(visual);
-  proxy.userData.visualRefinement = "fh06-1-s4-undermount-sink-v1";
+  proxy.userData.visualRefinement = "fh06-1-s9-undermount-sink-readability-v1";
   proxy.userData.sinkFamilyId = SINK_FAMILY_ID;
   proxy.userData.topAlignedOffsetZMm = contract.topAlignedOffsetZMm;
   proxy.userData.bowlDepthMm = contract.bowlDepthMm;
   proxy.userData.faucetSeparatedToS5 = true;
-  return proxy;
+  proxy.userData.readabilityPolicy = "physical-surface-response-no-screen-outline";
+  return { proxy, sideMaterial, bottomMaterial };
 }
 
 function maxAabbDriftMm(before: Box3, after: Box3): number {
@@ -424,6 +460,10 @@ export interface SinkRefinementResult {
   readonly stoneHoleGeometry: "extruded-shape-with-rounded-hole";
   readonly continuousBowl: true;
   readonly faucetSeparatedToS5: true;
+  readonly readabilityPolicy: "physical-surface-response-no-screen-outline";
+  readonly stoneCutoutSideDarkening: number;
+  readonly bowlSideDarkening: number;
+  readonly bowlBottomDarkening: number;
 }
 
 export function applyFh06SinkRefinement(
@@ -448,6 +488,10 @@ export function applyFh06SinkRefinement(
     countertopOuterEnvelopeToleranceMm: RENDER_AABB_TOLERANCE_MM,
     stoneHoleGeometry: "extruded-shape-with-rounded-hole",
     continuousBowl: true,
-    faucetSeparatedToS5: true
+    faucetSeparatedToS5: true,
+    readabilityPolicy: "physical-surface-response-no-screen-outline",
+    stoneCutoutSideDarkening: STONE_CUTOUT_SIDE_DARKENING,
+    bowlSideDarkening: BOWL_SIDE_DARKENING,
+    bowlBottomDarkening: BOWL_BOTTOM_DARKENING
   };
 }

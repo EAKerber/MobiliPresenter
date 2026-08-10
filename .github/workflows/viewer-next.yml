@@ -19,6 +19,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: viewer-next-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -97,14 +101,23 @@ jobs:
             /tmp/mobilipresenter-readability-report.json
           python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
 
-      - name: Compare readability against FH-06.1 S1 baseline
+      - name: Compare unchanged readability probes against S8
         working-directory: viewer-next
         run: |
           python3 tests/readability_compare.py \
-            ../fidelity/baselines/fh06-1-readability.json \
+            ../fidelity/baselines/fh06-1-s8-readability.json \
             /tmp/mobilipresenter-readability-report.json \
-            /tmp/mobilipresenter-readability-comparison.json
+            /tmp/mobilipresenter-readability-comparison.json \
+            ../fidelity/migrations/fh06-1-s9-readability-probes.json
           python -m json.tool /tmp/mobilipresenter-readability-comparison.json > /dev/null
+
+      - name: Gate sink station readability
+        working-directory: viewer-next
+        run: |
+          python3 tests/sink_readability_gate.py \
+            /tmp/mobilipresenter-readability-report.json \
+            /tmp/mobilipresenter-sink-readability-gate.json
+          python -m json.tool /tmp/mobilipresenter-sink-readability-gate.json > /dev/null
 
       - name: Stage visual evidence
         if: always()
@@ -146,6 +159,9 @@ jobs:
           fi
           if [ -f /tmp/mobilipresenter-readability-comparison.json ]; then
             cp /tmp/mobilipresenter-readability-comparison.json viewer-next/fidelity-artifacts/readability-comparison.json
+          fi
+          if [ -f /tmp/mobilipresenter-sink-readability-gate.json ]; then
+            cp /tmp/mobilipresenter-sink-readability-gate.json viewer-next/fidelity-artifacts/sink-readability-gate.json
           fi
 
       - name: Persist user-facing artifacts to temporary branch

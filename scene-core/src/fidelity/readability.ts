@@ -5,7 +5,7 @@ import { createScreenMetricProfile, projectMetricSegment } from "./projection.js
 
 export interface ReadabilityProbe {
   readonly id: string;
-  readonly role: "front-seam" | "oven-surround" | "module-boundary";
+  readonly role: "front-seam" | "oven-surround" | "module-boundary" | "sink-opening";
   readonly aMm: Vec3;
   readonly bMm: Vec3;
   readonly searchBandCanonicalPx: number;
@@ -29,6 +29,17 @@ const OVEN_OPENING_TOP_Z = 779;
 const OVEN_OPENING_EVIDENCE = [
   "scene-core:module02-front-opening",
   "design-default:fh06-1:600x600-opening"
+] as const;
+
+const SINK_OPENING_X0 = 4294.3722625;
+const SINK_OPENING_X1 = 4647.8027375;
+const SINK_OPENING_Y0 = 8227.3797875;
+const SINK_OPENING_Y1 = 8523.4972125;
+const SINK_OPENING_Z = 889;
+const SINK_OPENING_EVIDENCE = [
+  "scene-core:module03-confirmed-sink-slot",
+  "viewer-contract:SINK-UNDERMOUNT-40X34-01",
+  "fh06-1-s4:true-rounded-stone-hole"
 ] as const;
 
 export const currentReadabilityProbes: readonly ReadabilityProbe[] = [
@@ -95,6 +106,34 @@ export const currentReadabilityProbes: readonly ReadabilityProbe[] = [
     bMm: { x: OVEN_OPENING_RIGHT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_TOP_Z },
     searchBandCanonicalPx: 4, contrastThreshold: 0.02,
     evidenceRefs: OVEN_OPENING_EVIDENCE
+  },
+  {
+    id: "sink/opening/front", role: "sink-opening",
+    aMm: { x: SINK_OPENING_X0, y: SINK_OPENING_Y0, z: SINK_OPENING_Z },
+    bMm: { x: SINK_OPENING_X1, y: SINK_OPENING_Y0, z: SINK_OPENING_Z },
+    searchBandCanonicalPx: 4, contrastThreshold: 0.02,
+    evidenceRefs: SINK_OPENING_EVIDENCE
+  },
+  {
+    id: "sink/opening/back", role: "sink-opening",
+    aMm: { x: SINK_OPENING_X0, y: SINK_OPENING_Y1, z: SINK_OPENING_Z },
+    bMm: { x: SINK_OPENING_X1, y: SINK_OPENING_Y1, z: SINK_OPENING_Z },
+    searchBandCanonicalPx: 4, contrastThreshold: 0.02,
+    evidenceRefs: SINK_OPENING_EVIDENCE
+  },
+  {
+    id: "sink/opening/left", role: "sink-opening",
+    aMm: { x: SINK_OPENING_X0, y: SINK_OPENING_Y0, z: SINK_OPENING_Z },
+    bMm: { x: SINK_OPENING_X0, y: SINK_OPENING_Y1, z: SINK_OPENING_Z },
+    searchBandCanonicalPx: 4, contrastThreshold: 0.02,
+    evidenceRefs: SINK_OPENING_EVIDENCE
+  },
+  {
+    id: "sink/opening/right", role: "sink-opening",
+    aMm: { x: SINK_OPENING_X1, y: SINK_OPENING_Y0, z: SINK_OPENING_Z },
+    bMm: { x: SINK_OPENING_X1, y: SINK_OPENING_Y1, z: SINK_OPENING_Z },
+    searchBandCanonicalPx: 4, contrastThreshold: 0.02,
+    evidenceRefs: SINK_OPENING_EVIDENCE
   }
 ];
 

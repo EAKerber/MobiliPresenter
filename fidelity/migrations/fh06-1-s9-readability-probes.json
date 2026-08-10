@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ReadabilityProbeMigration 1.0",
+  "fromBaseline": "fh06-1-s8-readability",
+  "toCheckpoint": "fh06-1-s9-sink-station-readability",
+  "unchangedProbeIds": [
+    "module03/drawer-seam/1-2",
+    "module03/drawer-seam/2-3",
+    "module03/drawer-seam/3-4",
+    "module03/door-seam",
+    "module01/door-seam",
+    "module06/door-left-center-seam",
+    "module02/oven-opening-left",
+    "module02/oven-opening-right",
+    "module02/oven-opening-bottom",
+    "module02/oven-opening-top"
+  ],
+  "supersededProbeIds": [],
+  "addedProbeIds": [
+    "sink/opening/front",
+    "sink/opening/back",
+    "sink/opening/left",
+    "sink/opening/right"
+  ],
+  "reason": "Add metric visibility gates for the true sink opening without changing or reinterpreting the existing ten probes."
+}

@@ -9,7 +9,7 @@ test("current readability probe set is deterministic and semantic", () => {
   const a = currentProjectedReadabilityProbes();
   const b = currentProjectedReadabilityProbes();
   assert.deepEqual(a, b);
-  assert.equal(a.length, 10);
+  assert.equal(a.length, 14);
   assert.equal(new Set(a.map(probe => probe.id)).size, a.length);
   const oven = a.filter(probe => probe.role === "oven-surround");
   assert.equal(oven.length, 4);
@@ -18,6 +18,14 @@ test("current readability probe set is deterministic and semantic", () => {
     "module02/oven-opening-right",
     "module02/oven-opening-bottom",
     "module02/oven-opening-top"
+  ]));
+  const sink = a.filter(probe => probe.role === "sink-opening");
+  assert.equal(sink.length, 4);
+  assert.deepEqual(new Set(sink.map(probe => probe.id)), new Set([
+    "sink/opening/front",
+    "sink/opening/back",
+    "sink/opening/left",
+    "sink/opening/right"
   ]));
   assert.ok(a.some(probe => probe.id.startsWith("module01/")));
 });
@@ -46,4 +54,23 @@ test("module02 probes follow the real 600x600 front opening rather than the old 
   assert.deepEqual(byId.get("module02/oven-opening-right")?.aMm, { x: 3767.244, y: 8102.44, z: 179 });
   assert.deepEqual(byId.get("module02/oven-opening-bottom")?.bMm, { x: 3767.244, y: 8102.44, z: 179 });
   assert.deepEqual(byId.get("module02/oven-opening-top")?.bMm, { x: 3767.244, y: 8102.44, z: 779 });
+});
+
+test("sink probes follow the true rounded stone opening at the 30mm stone top", () => {
+  const byId = new Map(currentReadabilityProbes.map(probe => [probe.id, probe]));
+  const x0 = 4294.3722625;
+  const x1 = 4647.8027375;
+  const y0 = 8227.3797875;
+  const y1 = 8523.4972125;
+  const z = 889;
+  assert.deepEqual(byId.get("sink/opening/front")?.aMm, { x: x0, y: y0, z });
+  assert.deepEqual(byId.get("sink/opening/front")?.bMm, { x: x1, y: y0, z });
+  assert.deepEqual(byId.get("sink/opening/back")?.aMm, { x: x0, y: y1, z });
+  assert.deepEqual(byId.get("sink/opening/back")?.bMm, { x: x1, y: y1, z });
+  assert.deepEqual(byId.get("sink/opening/left")?.bMm, { x: x0, y: y1, z });
+  assert.deepEqual(byId.get("sink/opening/right")?.bMm, { x: x1, y: y1, z });
+  for (const id of ["sink/opening/front", "sink/opening/back", "sink/opening/left", "sink/opening/right"]) {
+    assert.equal(byId.get(id)?.contrastThreshold, 0.02);
+    assert.equal(byId.get(id)?.searchBandCanonicalPx, 4);
+  }
 });
