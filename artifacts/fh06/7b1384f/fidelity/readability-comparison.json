@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "ReadabilityComparison 1.2",
+  "baseline": "../fidelity/baselines/fh05-readability.json",
+  "candidate": "/tmp/mobilipresenter-readability-report.json",
+  "migration": "../fidelity/migrations/fh06-1-readability-probes.json",
+  "policy": {
+    "maxRecallDrop": 0.05,
+    "maxMedianContrastDrop": 0.015,
+    "maxP10ContrastDrop": 0.01,
+    "maxMedianOffsetIncreaseCanonicalPx": 0.5,
+    "recallRequiresBaselineMargin": {
+      "medianContrastMargin": 0.015,
+      "p10ContrastMargin": 0.01
+    },
+    "legacyBaselineThresholdMayComeFromSameCandidateProbe": true,
+    "nearThresholdRecallIsDiagnosticOnly": true,
+    "probeSetChangeRequiresExplicitMigration": true
+  },
+  "pass": true,
+  "regressions": [],
+  "deltas": [
+    {
+      "id": "module01/door-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.05529411764705887,
+      "p10PeakContrast": 0.08511176470588243,
+      "medianEdgeOffsetCanonicalPx": -2.5,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "candidate-legacy-baseline-fallback",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/door-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.004348627450980427,
+      "p10PeakContrast": 0.016776470588235254,
+      "medianEdgeOffsetCanonicalPx": 0.25,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "candidate-legacy-baseline-fallback",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/drawer-seam/1-2",
+      "edgeRecall": -1.0,
+      "medianPeakContrast": -0.005437254901960804,
+      "p10PeakContrast": -0.007398039215686287,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "candidate-legacy-baseline-fallback",
+      "recallRegressionEnforced": false,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/drawer-seam/2-3",
+      "edgeRecall": -1.0,
+      "medianPeakContrast": -0.004886666666666668,
+      "p10PeakContrast": -0.00670588235294119,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "candidate-legacy-baseline-fallback",
+      "recallRegressionEnforced": false,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/drawer-seam/3-4",
+      "edgeRecall": -0.9791666666666666,
+      "medianPeakContrast": -0.002650588235294033,
+      "p10PeakContrast": -0.004194509803921515,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "candidate-legacy-baseline-fallback",
+      "recallRegressionEnforced": false,
+      "regressionReasons": []
+    },
+    {
+      "id": "module06/door-left-center-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.0028541176470587987,
+      "p10PeakContrast": 0.020212156862745162,
+      "medianEdgeOffsetCanonicalPx": -1.75,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "candidate-legacy-baseline-fallback",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    }
+  ],
+  "comparableProbeIds": [
+    "module01/door-seam",
+    "module03/door-seam",
+    "module03/drawer-seam/1-2",
+    "module03/drawer-seam/2-3",
+    "module03/drawer-seam/3-4",
+    "module06/door-left-center-seam"
+  ],
+  "newProbeIds": [
+    "module02/oven-opening-bottom",
+    "module02/oven-opening-left",
+    "module02/oven-opening-right",
+    "module02/oven-opening-top"
+  ],
+  "supersededProbeIds": [
+    "module02/oven-surround-left",
+    "module02/oven-surround-right"
+  ]
+}

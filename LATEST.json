@@ -1,21 +1,10 @@
 {
   "schemaVersion": "MobiliPresenterArtifactPointer 1.0",
-  "status": "verified-source-pending-durable-binary-materialization",
-  "sourceCommit": "e2864a0b2e0ce89aeb27c8216699bf68f0b868a8",
-  "sourceShortSha": "e2864a0",
-  "sourceBranch": "renderer/fixed-view-realistic-v1",
-  "workflowRunId": 31341138087,
-  "workflowArtifacts": {
-    "visual": {
-      "artifactId": 9045878504,
-      "digest": "sha256:fbd11102a045259664a023ff9a8e39fc8b71dfa0a7f872cbe5237d37e2131c06"
-    },
-    "fidelity": {
-      "artifactId": 9045878725,
-      "digest": "sha256:643441ca5d568baabfad4b7b4a595f1a7465de7f7bde36cce5c4e58d27a7bc37"
-    }
-  },
-  "durableBranch": "tmp/fh06-user-artifacts",
-  "expectedPathAfterPublisher": "artifacts/fh06/e2864a0",
-  "note": "Do not use sandbox or /mnt/data as delivery authority. The old round-20-fh06-candidate.zip was invalid at 22 bytes."
+  "sourceCommit": "7b1384f52e6405783f88605db864bcc7546b77e0",
+  "sourceShortSha": "7b1384f",
+  "workflowRunId": 31347759004,
+  "path": "artifacts/fh06/7b1384f",
+  "manifest": "artifacts/fh06/7b1384f/ARTIFACTS.json",
+  "bundle": "artifacts/fh06/7b1384f/fh06-7b1384f-verified-bundle.zip",
+  "preview": "artifacts/fh06/7b1384f/visual/renderer-baseline.png"
 }
