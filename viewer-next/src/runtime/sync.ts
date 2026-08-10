@@ -89,6 +89,17 @@ export function syncRuntimeMaterials(
   syncRevealMaterial(adapter, registry, module02.id, MODULE02_REVEALS, 0.22);
 }
 
+function syncSemanticLightingVisibility(
+  lighting: ThreeLightingAdapter,
+  scenePackage: ScenePackage,
+  appearance: AppearancePackage
+): void {
+  const activeEmitters = new Set(resolveLighting(scenePackage, appearance).semanticEmitters.map(emitter => emitter.instanceId));
+  for (const [instanceId, group] of lighting.semanticGroups) {
+    group.visible = activeEmitters.has(instanceId);
+  }
+}
+
 export function syncRuntimeVisibility(
   adapter: ThreeSceneAdapter,
   lighting: ThreeLightingAdapter,
@@ -96,10 +107,7 @@ export function syncRuntimeVisibility(
   appearance: AppearancePackage
 ): void {
   syncThreeVisibility(adapter, scenePackage);
-  const activeEmitters = new Set(resolveLighting(scenePackage, appearance).semanticEmitters.map(emitter => emitter.instanceId));
-  for (const [instanceId, group] of lighting.semanticGroups) {
-    group.visible = activeEmitters.has(instanceId);
-  }
+  syncSemanticLightingVisibility(lighting, scenePackage, appearance);
 }
 
 export function syncRuntimeLighting(
@@ -120,5 +128,5 @@ export function syncRuntimeLighting(
   }
   scene.environmentIntensity = appearance.lighting.environment.relativeIntensity;
   post.setAppearance(appearance);
-  syncRuntimeVisibility({ scene, entityGroups: new Map() }, lighting, scenePackage, appearance);
+  syncSemanticLightingVisibility(lighting, scenePackage, appearance);
 }
