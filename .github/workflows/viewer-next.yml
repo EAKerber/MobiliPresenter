@@ -101,15 +101,23 @@ jobs:
             /tmp/mobilipresenter-readability-report.json
           python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
 
-      - name: Compare unchanged readability probes against S8
+      - name: Compare unaffected readability probes against S8
         working-directory: viewer-next
         run: |
           python3 tests/readability_compare.py \
             ../fidelity/baselines/fh06-1-s8-readability.json \
             /tmp/mobilipresenter-readability-report.json \
             /tmp/mobilipresenter-readability-comparison.json \
-            ../fidelity/migrations/fh06-1-s9-readability-probes.json
+            ../fidelity/migrations/fh06-1-s10-appearance-probes.json
           python -m json.tool /tmp/mobilipresenter-readability-comparison.json > /dev/null
+
+      - name: Gate S10 oven and drawer readability
+        working-directory: viewer-next
+        run: |
+          python3 tests/s10_readability_gate.py \
+            /tmp/mobilipresenter-readability-report.json \
+            /tmp/mobilipresenter-s10-readability-gate.json
+          python -m json.tool /tmp/mobilipresenter-s10-readability-gate.json > /dev/null
 
       - name: Gate sink station readability
         working-directory: viewer-next
@@ -159,6 +167,9 @@ jobs:
           fi
           if [ -f /tmp/mobilipresenter-readability-comparison.json ]; then
             cp /tmp/mobilipresenter-readability-comparison.json viewer-next/fidelity-artifacts/readability-comparison.json
+          fi
+          if [ -f /tmp/mobilipresenter-s10-readability-gate.json ]; then
+            cp /tmp/mobilipresenter-s10-readability-gate.json viewer-next/fidelity-artifacts/s10-readability-gate.json
           fi
           if [ -f /tmp/mobilipresenter-sink-readability-gate.json ]; then
             cp /tmp/mobilipresenter-sink-readability-gate.json viewer-next/fidelity-artifacts/sink-readability-gate.json
