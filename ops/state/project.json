@@ -36,6 +36,7 @@
       "f0-through-f4-must-not-regress-during-visual-tuning",
       "fh05-readability-baseline-is-regression-reference",
       "oven-surround-and-sink-station-must-pass-fh06-1-spec",
+      "under-cab-lighting-must-pass-fh06-2-spec",
       "full-wall-tile-is-scene-material-policy"
     ],
     "plan": "docs/plans/fidelity-harness-v1.md",
