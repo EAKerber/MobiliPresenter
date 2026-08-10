@@ -7,11 +7,13 @@ on:
     paths:
       - "viewer-next/**"
       - "scene-core/**"
+      - "fidelity/**"
       - ".github/workflows/viewer-next.yml"
   pull_request:
     paths:
       - "viewer-next/**"
       - "scene-core/**"
+      - "fidelity/**"
       - ".github/workflows/viewer-next.yml"
 
 permissions:
@@ -95,6 +97,16 @@ jobs:
             /tmp/mobilipresenter-readability-report.json
           python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
 
+      - name: Compare unchanged readability probes against FH-05
+        working-directory: viewer-next
+        run: |
+          python3 tests/readability_compare.py \
+            ../fidelity/baselines/fh05-readability.json \
+            /tmp/mobilipresenter-readability-report.json \
+            /tmp/mobilipresenter-readability-comparison.json \
+            ../fidelity/migrations/fh06-1-readability-probes.json
+          python -m json.tool /tmp/mobilipresenter-readability-comparison.json > /dev/null
+
       - name: Stage visual evidence
         if: always()
         run: |
@@ -132,6 +144,9 @@ jobs:
           fi
           if [ -f /tmp/mobilipresenter-readability-report.json ]; then
             cp /tmp/mobilipresenter-readability-report.json viewer-next/fidelity-artifacts/readability-report.json
+          fi
+          if [ -f /tmp/mobilipresenter-readability-comparison.json ]; then
+            cp /tmp/mobilipresenter-readability-comparison.json viewer-next/fidelity-artifacts/readability-comparison.json
           fi
 
       - name: Persist user-facing artifacts to temporary branch
