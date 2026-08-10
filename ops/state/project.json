@@ -23,7 +23,7 @@
     "initiative": "Fixed View Renderer 0.1",
     "phase": "visual-correction-loop",
     "checkpoint": "FH-06.1",
-    "nextTransition": "implement-oven-surround-and-sink-station-contract-before-further-appearance-tuning",
+    "nextTransition": "execute-fh06-1-s1-module02-front-opening",
     "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
@@ -37,9 +37,10 @@
       "fh05-readability-baseline-is-regression-reference",
       "oven-surround-and-sink-station-must-pass-fh06-1-spec",
       "under-cab-lighting-must-pass-fh06-2-spec",
-      "full-wall-tile-is-scene-material-policy"
+      "full-wall-tile-is-scene-material-policy",
+      "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
-    "plan": "docs/plans/fidelity-harness-v1.md",
+    "plan": "docs/plans/fh06-1-implementation-methodology.md",
     "prNumber": 6
   },
   "operations": {
