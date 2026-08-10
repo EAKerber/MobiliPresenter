@@ -21,6 +21,16 @@ export interface ProjectedReadabilityProbe extends ReadabilityProbe {
   readonly searchBandPx4x: number;
 }
 
+const OVEN_OPENING_LEFT_X = 3167.244;
+const OVEN_OPENING_RIGHT_X = 3767.244;
+const OVEN_OPENING_FRONT_Y = 8102.44;
+const OVEN_OPENING_BOTTOM_Z = 179;
+const OVEN_OPENING_TOP_Z = 779;
+const OVEN_OPENING_EVIDENCE = [
+  "scene-core:module02-front-opening",
+  "design-default:fh06-1:600x600-opening"
+] as const;
+
 export const currentReadabilityProbes: readonly ReadabilityProbe[] = [
   {
     id: "module03/drawer-seam/1-2", role: "front-seam",
@@ -59,16 +69,32 @@ export const currentReadabilityProbes: readonly ReadabilityProbe[] = [
     evidenceRefs: ["scene-core:module06-fronts"]
   },
   {
-    id: "module02/oven-surround-left", role: "oven-surround",
-    aMm: { x: 3089.739, y: 8120.44, z: 117 }, bMm: { x: 3089.739, y: 8120.44, z: 841 },
+    id: "module02/oven-opening-left", role: "oven-surround",
+    aMm: { x: OVEN_OPENING_LEFT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_BOTTOM_Z },
+    bMm: { x: OVEN_OPENING_LEFT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_TOP_Z },
     searchBandCanonicalPx: 4, contrastThreshold: 0.02,
-    evidenceRefs: ["scene-core:module02-oven-slot"]
+    evidenceRefs: OVEN_OPENING_EVIDENCE
   },
   {
-    id: "module02/oven-surround-right", role: "oven-surround",
-    aMm: { x: 3844.749, y: 8120.44, z: 117 }, bMm: { x: 3844.749, y: 8120.44, z: 841 },
+    id: "module02/oven-opening-right", role: "oven-surround",
+    aMm: { x: OVEN_OPENING_RIGHT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_BOTTOM_Z },
+    bMm: { x: OVEN_OPENING_RIGHT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_TOP_Z },
     searchBandCanonicalPx: 4, contrastThreshold: 0.02,
-    evidenceRefs: ["scene-core:module02-oven-slot"]
+    evidenceRefs: OVEN_OPENING_EVIDENCE
+  },
+  {
+    id: "module02/oven-opening-bottom", role: "oven-surround",
+    aMm: { x: OVEN_OPENING_LEFT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_BOTTOM_Z },
+    bMm: { x: OVEN_OPENING_RIGHT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_BOTTOM_Z },
+    searchBandCanonicalPx: 4, contrastThreshold: 0.02,
+    evidenceRefs: OVEN_OPENING_EVIDENCE
+  },
+  {
+    id: "module02/oven-opening-top", role: "oven-surround",
+    aMm: { x: OVEN_OPENING_LEFT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_TOP_Z },
+    bMm: { x: OVEN_OPENING_RIGHT_X, y: OVEN_OPENING_FRONT_Y, z: OVEN_OPENING_TOP_Z },
+    searchBandCanonicalPx: 4, contrastThreshold: 0.02,
+    evidenceRefs: OVEN_OPENING_EVIDENCE
   }
 ];
 
