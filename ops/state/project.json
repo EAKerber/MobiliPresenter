@@ -21,11 +21,11 @@
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "visual-correction-loop",
+    "phase": "human-visual-gate",
     "checkpoint": "FH-06.1-S9",
-    "nextTransition": "implement-and-gate-sink-station-readability",
+    "nextTransition": "review-verified-s9-sink-station-and-overall-f6-appearance",
     "blockers": [
-      "sink-bowl-not-yet-recognizable-in-fixed-camera"
+      "human-f6-appearance-review-required-before-renderer-merge"
     ],
     "constraints": [
       "fixed-camera-is-product-invariant",
@@ -37,9 +37,9 @@
       "supersampling-4x-is-targeted-crop-fidelity-profile",
       "f0-through-f4-must-not-regress-during-visual-tuning",
       "fh06-1-s8-readability-is-regression-reference-for-existing-ten-probes",
-      "sink-opening-adds-four-absolute-readability-probes",
-      "sink-opening-geometry-and-camera-must-not-change-in-s9",
-      "sink-readability-must-come-from-physical-surface-response-not-screen-outline",
+      "sink-opening-four-probes-pass-absolute-s9-readability-gate",
+      "sink-opening-geometry-and-camera-unchanged-in-s9",
+      "sink-readability-comes-from-physical-surface-response-not-screen-outline",
       "module02-oven-opening-is-600x600-with-95-95-80-80-mdf-fields",
       "stone-is-two-independent-30mm-design-pieces-with-100x20-rear-upstands",
       "sink-uses-true-rounded-stone-hole-and-continuous-undermount-bowl",
@@ -47,6 +47,7 @@
       "full-wall-tile-covers-main-column-return-and-inferred-laundry-wall",
       "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
       "module03-drawer-physical-gaps-remain-2mm-and-f5-recall-is-1",
+      "verified-user-artifact-source-is-914e73c4acbfea62f57629890f99c5fc929ff356",
       "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
     "plan": "docs/plans/fh06-1-implementation-methodology.md",
