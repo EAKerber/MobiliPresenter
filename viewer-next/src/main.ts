@@ -181,7 +181,7 @@ function selectModule(moduleId: string | null): void {
   render();
 }
 
-function pointerNdc(event: PointerEvent): readonly [number, number] {
+function pointerNdc(event: MouseEvent): readonly [number, number] {
   const rect = renderer.domElement.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return [0, 0];
   return [
