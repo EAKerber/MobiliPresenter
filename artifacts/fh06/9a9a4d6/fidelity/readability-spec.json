@@ -1,0 +1,374 @@
+{
+  "schemaVersion": "ReadabilityProbeSet 1.0",
+  "canonicalViewportPx": [
+    1865,
+    967
+  ],
+  "supersampleFactor": 4,
+  "probes": [
+    {
+      "id": "module03/drawer-seam/1-2",
+      "role": "front-seam",
+      "aMm": {
+        "x": 3864.749,
+        "y": 8102.44,
+        "z": 669
+      },
+      "bMm": {
+        "x": 4260.749,
+        "y": 8102.44,
+        "z": 669
+      },
+      "searchBandCanonicalPx": 3,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module03-fronts"
+      ],
+      "aPx4x": [
+        3060.352176486057,
+        2428.8963187985755
+      ],
+      "bPx4x": [
+        3530.2786664518594,
+        2428.8963187985755
+      ],
+      "aCanonicalPx": [
+        765.0880441215143,
+        607.2240796996439
+      ],
+      "bCanonicalPx": [
+        882.5696666129649,
+        607.2240796996439
+      ],
+      "searchBandPx4x": 12
+    },
+    {
+      "id": "module03/drawer-seam/2-3",
+      "role": "front-seam",
+      "aMm": {
+        "x": 3864.749,
+        "y": 8102.44,
+        "z": 480
+      },
+      "bMm": {
+        "x": 4260.749,
+        "y": 8102.44,
+        "z": 480
+      },
+      "searchBandCanonicalPx": 3,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module03-fronts"
+      ],
+      "aPx4x": [
+        3060.352176486057,
+        2653.1794162822534
+      ],
+      "bPx4x": [
+        3530.2786664518594,
+        2653.1794162822534
+      ],
+      "aCanonicalPx": [
+        765.0880441215143,
+        663.2948540705634
+      ],
+      "bCanonicalPx": [
+        882.5696666129649,
+        663.2948540705634
+      ],
+      "searchBandPx4x": 12
+    },
+    {
+      "id": "module03/drawer-seam/3-4",
+      "role": "front-seam",
+      "aMm": {
+        "x": 3864.749,
+        "y": 8102.44,
+        "z": 291
+      },
+      "bMm": {
+        "x": 4260.749,
+        "y": 8102.44,
+        "z": 291
+      },
+      "searchBandCanonicalPx": 3,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module03-fronts"
+      ],
+      "aPx4x": [
+        3060.352176486057,
+        2877.4625137659323
+      ],
+      "bPx4x": [
+        3530.2786664518594,
+        2877.4625137659323
+      ],
+      "aCanonicalPx": [
+        765.0880441215143,
+        719.3656284414831
+      ],
+      "bCanonicalPx": [
+        882.5696666129649,
+        719.3656284414831
+      ],
+      "searchBandPx4x": 12
+    },
+    {
+      "id": "module03/door-seam",
+      "role": "front-seam",
+      "aMm": {
+        "x": 4671.088,
+        "y": 8102.44,
+        "z": 203
+      },
+      "bMm": {
+        "x": 4671.088,
+        "y": 8102.44,
+        "z": 757
+      },
+      "searchBandCanonicalPx": 3,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module03-fronts"
+      ],
+      "aPx4x": [
+        4017.2210047500344,
+        2981.8906226472213
+      ],
+      "bPx4x": [
+        4017.2210047500344,
+        2324.468209917286
+      ],
+      "aCanonicalPx": [
+        1004.3052511875086,
+        745.4726556618053
+      ],
+      "bCanonicalPx": [
+        1004.3052511875086,
+        581.1170524793215
+      ],
+      "searchBandPx4x": 12
+    },
+    {
+      "id": "module01/door-seam",
+      "role": "front-seam",
+      "aMm": {
+        "x": 1950.309,
+        "y": 8270.827,
+        "z": 1750
+      },
+      "bMm": {
+        "x": 1950.309,
+        "y": 8270.827,
+        "z": 2350
+      },
+      "searchBandCanonicalPx": 3,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "promob-dxf:LAYER48,LAYER53"
+      ],
+      "aPx4x": [
+        893.4202678482502,
+        1175.2377344271745
+      ],
+      "bPx4x": [
+        893.4202678482502,
+        491.26349863889664
+      ],
+      "aCanonicalPx": [
+        223.35506696206255,
+        293.8094336067936
+      ],
+      "bCanonicalPx": [
+        223.35506696206255,
+        122.81587465972416
+      ],
+      "searchBandPx4x": 12
+    },
+    {
+      "id": "module06/door-left-center-seam",
+      "role": "front-seam",
+      "aMm": {
+        "x": 4191.427,
+        "y": 8232.44,
+        "z": 1650
+      },
+      "bMm": {
+        "x": 4191.427,
+        "y": 8232.44,
+        "z": 2350
+      },
+      "searchBandCanonicalPx": 3,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module06-fronts"
+      ],
+      "aPx4x": [
+        3448.1580861446055,
+        1283.8254478449232
+      ],
+      "bPx4x": [
+        3448.1580861446055,
+        478.62777562863903
+      ],
+      "aCanonicalPx": [
+        862.0395215361514,
+        320.9563619612308
+      ],
+      "bCanonicalPx": [
+        862.0395215361514,
+        119.65694390715976
+      ],
+      "searchBandPx4x": 12
+    },
+    {
+      "id": "module02/oven-opening-left",
+      "role": "oven-surround",
+      "aMm": {
+        "x": 3167.244,
+        "y": 8102.44,
+        "z": 179
+      },
+      "bMm": {
+        "x": 3167.244,
+        "y": 8102.44,
+        "z": 779
+      },
+      "searchBandCanonicalPx": 4,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module02-front-opening",
+        "design-default:fh06-1:600x600-opening"
+      ],
+      "aPx4x": [
+        2232.6348118810147,
+        3010.3710159784823
+      ],
+      "bPx4x": [
+        2232.6348118810147,
+        2298.3611826969636
+      ],
+      "aCanonicalPx": [
+        558.1587029702537,
+        752.5927539946206
+      ],
+      "bCanonicalPx": [
+        558.1587029702537,
+        574.5902956742409
+      ],
+      "searchBandPx4x": 16
+    },
+    {
+      "id": "module02/oven-opening-right",
+      "role": "oven-surround",
+      "aMm": {
+        "x": 3767.244,
+        "y": 8102.44,
+        "z": 179
+      },
+      "bMm": {
+        "x": 3767.244,
+        "y": 8102.44,
+        "z": 779
+      },
+      "searchBandCanonicalPx": 4,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module02-front-opening",
+        "design-default:fh06-1:600x600-opening"
+      ],
+      "aPx4x": [
+        2944.6446451625334,
+        3010.3710159784823
+      ],
+      "bPx4x": [
+        2944.6446451625334,
+        2298.3611826969636
+      ],
+      "aCanonicalPx": [
+        736.1611612906333,
+        752.5927539946206
+      ],
+      "bCanonicalPx": [
+        736.1611612906333,
+        574.5902956742409
+      ],
+      "searchBandPx4x": 16
+    },
+    {
+      "id": "module02/oven-opening-bottom",
+      "role": "oven-surround",
+      "aMm": {
+        "x": 3167.244,
+        "y": 8102.44,
+        "z": 179
+      },
+      "bMm": {
+        "x": 3767.244,
+        "y": 8102.44,
+        "z": 179
+      },
+      "searchBandCanonicalPx": 4,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module02-front-opening",
+        "design-default:fh06-1:600x600-opening"
+      ],
+      "aPx4x": [
+        2232.6348118810147,
+        3010.3710159784823
+      ],
+      "bPx4x": [
+        2944.6446451625334,
+        3010.3710159784823
+      ],
+      "aCanonicalPx": [
+        558.1587029702537,
+        752.5927539946206
+      ],
+      "bCanonicalPx": [
+        736.1611612906333,
+        752.5927539946206
+      ],
+      "searchBandPx4x": 16
+    },
+    {
+      "id": "module02/oven-opening-top",
+      "role": "oven-surround",
+      "aMm": {
+        "x": 3167.244,
+        "y": 8102.44,
+        "z": 779
+      },
+      "bMm": {
+        "x": 3767.244,
+        "y": 8102.44,
+        "z": 779
+      },
+      "searchBandCanonicalPx": 4,
+      "contrastThreshold": 0.02,
+      "evidenceRefs": [
+        "scene-core:module02-front-opening",
+        "design-default:fh06-1:600x600-opening"
+      ],
+      "aPx4x": [
+        2232.6348118810147,
+        2298.3611826969636
+      ],
+      "bPx4x": [
+        2944.6446451625334,
+        2298.3611826969636
+      ],
+      "aCanonicalPx": [
+        558.1587029702537,
+        574.5902956742409
+      ],
+      "bCanonicalPx": [
+        736.1611612906333,
+        574.5902956742409
+      ],
+      "searchBandPx4x": 16
+    }
+  ]
+}
