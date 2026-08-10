@@ -51,8 +51,19 @@ def validate_probe_sets(baseline_by_id: dict, candidate_by_id: dict, migration: 
     return sorted(unchanged)
 
 
-def recall_is_robust(before: dict) -> bool:
-    threshold = float(before["contrastThreshold"])
+def effective_threshold(before: dict, after: dict) -> tuple[float, str]:
+    before_value = before.get("contrastThreshold")
+    after_value = after.get("contrastThreshold")
+    if before_value is not None and after_value is not None and abs(float(before_value) - float(after_value)) > 1e-12:
+        raise SystemExit(f"READABILITY_THRESHOLD_CHANGED:{before['id']}")
+    if before_value is not None:
+        return float(before_value), "baseline"
+    if after_value is not None:
+        return float(after_value), "candidate-legacy-baseline-fallback"
+    raise SystemExit(f"READABILITY_THRESHOLD_MISSING:{before['id']}")
+
+
+def recall_is_robust(before: dict, threshold: float) -> bool:
     return (
         float(before["medianPeakContrast"]) >= threshold + MAX_MEDIAN_CONTRAST_DROP
         and float(before["p10PeakContrast"]) >= threshold + MAX_P10_CONTRAST_DROP
@@ -72,13 +83,16 @@ def main() -> None:
     for probe_id in comparable_ids:
         before = baseline_by_id[probe_id]
         after = candidate_by_id[probe_id]
-        robust_recall = recall_is_robust(before)
+        threshold, threshold_source = effective_threshold(before, after)
+        robust_recall = recall_is_robust(before, threshold)
         delta = {
             "id": probe_id,
             "edgeRecall": after["edgeRecall"] - before["edgeRecall"],
             "medianPeakContrast": after["medianPeakContrast"] - before["medianPeakContrast"],
             "p10PeakContrast": after["p10PeakContrast"] - before["p10PeakContrast"],
             "medianEdgeOffsetCanonicalPx": after["medianEdgeOffsetCanonicalPx"] - before["medianEdgeOffsetCanonicalPx"],
+            "effectiveContrastThreshold": threshold,
+            "thresholdSource": threshold_source,
             "recallRegressionEnforced": robust_recall,
         }
         reasons = []
@@ -111,6 +125,7 @@ def main() -> None:
                 "medianContrastMargin": MAX_MEDIAN_CONTRAST_DROP,
                 "p10ContrastMargin": MAX_P10_CONTRAST_DROP,
             },
+            "legacyBaselineThresholdMayComeFromSameCandidateProbe": True,
             "nearThresholdRecallIsDiagnosticOnly": True,
             "probeSetChangeRequiresExplicitMigration": True,
         },
