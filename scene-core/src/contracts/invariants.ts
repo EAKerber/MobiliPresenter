@@ -56,9 +56,21 @@ function validateModule(module: ModuleGeometry, path: string): ValidationIssue[]
   const slotIds = new Set<string>();
   for (let i = 0; i < module.applianceSlots.length; i++) {
     const slot = module.applianceSlots[i]!;
-    if (slotIds.has(slot.id)) issues.push({ code: "APPLIANCE_SLOT_ID_DUPLICATE", path: `${path}.applianceSlots[${i}].id`, detail: slot.id });
+    const slotPath = `${path}.applianceSlots[${i}]`;
+    if (slotIds.has(slot.id)) issues.push({ code: "APPLIANCE_SLOT_ID_DUPLICATE", path: `${slotPath}.id`, detail: slot.id });
     slotIds.add(slot.id);
-    if (!positiveDimensions(slot.clearSizeMm)) issues.push({ code: "APPLIANCE_SLOT_DIMENSIONS_INVALID", path: `${path}.applianceSlots[${i}].clearSizeMm`, detail: slot.id });
+    if (!positiveDimensions(slot.clearSizeMm)) issues.push({ code: "APPLIANCE_SLOT_DIMENSIONS_INVALID", path: `${slotPath}.clearSizeMm`, detail: slot.id });
+    if (slot.frontOpening) {
+      if (!(slot.frontOpening.sizeMm.width > 0 && slot.frontOpening.sizeMm.height > 0)) {
+        issues.push({ code: "APPLIANCE_FRONT_OPENING_DIMENSIONS_INVALID", path: `${slotPath}.frontOpening.sizeMm`, detail: slot.id });
+      }
+      if (slot.frontOpening.sizeMm.width > module.dimensions.geometryMm.width || slot.frontOpening.sizeMm.height > module.dimensions.geometryMm.height) {
+        issues.push({ code: "APPLIANCE_FRONT_OPENING_EXCEEDS_MODULE", path: `${slotPath}.frontOpening.sizeMm`, detail: slot.id });
+      }
+      if (slot.frontOpening.status && (!slot.frontOpening.evidenceRefs || slot.frontOpening.evidenceRefs.length === 0)) {
+        issues.push({ code: "APPLIANCE_FRONT_OPENING_EVIDENCE_REQUIRED", path: `${slotPath}.frontOpening.evidenceRefs`, detail: slot.id });
+      }
+    }
   }
   return issues;
 }
