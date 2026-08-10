@@ -8,10 +8,9 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 BASE_URL = "http://127.0.0.1:4173/"
-OUT = Path("/tmp/mobilipresenter-runtime-controls")
-EVIDENCE = Path("/tmp/mobilipresenter-runtime-controls-evidence.json")
+OUT = Path("artifacts/runtime-controls")
+EVIDENCE = OUT / "evidence.json"
 
-MODULE02 = "scene/traditional/module/lower-stove"
 MODULE03 = "scene/traditional/module/lower-sink"
 
 
