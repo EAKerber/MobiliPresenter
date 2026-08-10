@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "build:core": "npm --prefix ../scene-core run build",
+    "verify:core": "npm --prefix ../scene-core run verify",
     "build": "npm run build:core && tsc -p tsconfig.json && vite build",
     "test": "npm run build:core && tsc -p tsconfig.json && node --test tests/*.test.mjs",
-    "verify": "npm run test && vite build"
+    "verify": "npm run verify:core && npm run test && vite build"
   },
   "dependencies": {
     "@mobilipresenter/scene-core": "file:../scene-core",
