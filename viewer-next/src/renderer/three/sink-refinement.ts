@@ -1,4 +1,4 @@
-import type { SceneItem, ScenePackage } from "@mobilipresenter/scene-core";
+import { STONE03_ID, type SceneItem, type ScenePackage } from "@mobilipresenter/scene-core";
 import {
   Box3,
   BoxGeometry,
@@ -15,8 +15,8 @@ import type { ThreeSceneAdapter } from "./scene-adapter.js";
 import type { ThreeMaterialRegistry } from "./materials.js";
 
 const SINK_ITEM_ID = "scene/traditional/fixture/kitchen-sink";
-const SINK_STONE_ID = "scene/traditional/accessory/sink-countertop";
-const SINK_STONE_PRIMITIVE_ID = "scene/traditional/accessory/sink-countertop/slab";
+const SINK_STONE_ID = STONE03_ID;
+const SINK_STONE_PRIMITIVE_ID = `${STONE03_ID}/slab`;
 const RENDER_AABB_TOLERANCE_MM = 0.001;
 
 interface FitData {
@@ -95,9 +95,6 @@ function splitCountertopAroundSink(
   cutout.name = `${stoneItem.id}/visual-cutout`;
   cutout.userData.visualRefinement = "fh06-stone-cutout-v1";
   cutout.userData.openingMm = [openingX, openingY, openingWidth, openingDepth];
-  // Interim FH-06 cutout preserves the authoritative local dimensions exactly.
-  // Rounded stone edges return in S2-S4. GPU BufferGeometry uses float attributes,
-  // so world-space AABB comparison is measured and gated rather than assumed exact.
   if (openingX > 0) cutout.add(part(openingX, slabHeight, slabDepth, stoneMaterial, 0, 0, 0));
   if (slabWidth - rightStart > 0) cutout.add(part(slabWidth - rightStart, slabHeight, slabDepth, stoneMaterial, rightStart, 0, 0));
   if (openingY > 0) cutout.add(part(openingWidth, slabHeight, openingY, stoneMaterial, openingX, 0, 0));
