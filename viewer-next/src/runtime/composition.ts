@@ -29,15 +29,21 @@ import { applyFh06VisualRefinements } from "../renderer/three/visual-refinements
 import { applyFh06FullWallTiles } from "../renderer/three/wall-tiles.js";
 
 export interface ViewerCompositionDiagnostics {
+  readonly cooktopContactId: string;
   readonly cooktopGapMm: number;
+  readonly frontReadabilityId: string;
   readonly frontPhysicalGapMm: readonly number[];
+  readonly ovenReadabilityId: string;
   readonly ovenPhysicalClearanceMm: readonly number[];
   readonly sinkFamilyId: string;
   readonly sinkStoneHole: string;
+  readonly sinkContinuousBowl: boolean;
   readonly faucetPresetId: string;
   readonly faucetHostEntityId: string;
+  readonly underCabProfileId: string;
   readonly underCabHostModuleId: string;
   readonly underCabKelvin: number;
+  readonly underCabAreaLight: boolean;
   readonly wallTileSurfaceCount: number;
 }
 
@@ -126,15 +132,21 @@ export function createViewerComposition(
     adapter,
     ownership,
     diagnostics: {
+      cooktopContactId: cooktopContact.refinementId,
       cooktopGapMm: cooktopContact.afterGapMm,
+      frontReadabilityId: frontReadability.refinementId,
       frontPhysicalGapMm: frontReadability.physicalGapMm,
+      ovenReadabilityId: ovenReadability.refinementId,
       ovenPhysicalClearanceMm: ovenReadability.physicalClearanceMm,
       sinkFamilyId: sinkRefinement.sinkFamilyId,
       sinkStoneHole: sinkRefinement.stoneHoleGeometry,
+      sinkContinuousBowl: sinkRefinement.continuousBowl,
       faucetPresetId: faucetRefinement.presetId,
       faucetHostEntityId: faucetRefinement.hostEntityId,
+      underCabProfileId: underCabRefinement.profileDefinitionId,
       underCabHostModuleId: underCabRefinement.hostModuleId,
       underCabKelvin: underCabRefinement.colorTemperatureK,
+      underCabAreaLight: underCabRefinement.hasActualAreaLight,
       wallTileSurfaceCount: tileRefinement.surfaceCount
     },
     render(): void {
