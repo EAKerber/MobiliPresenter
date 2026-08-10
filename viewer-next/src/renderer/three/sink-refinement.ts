@@ -66,10 +66,12 @@ function splitCountertopAroundSink(
   if (!primitive || primitive.primitive !== "box") throw new Error("SINK_COUNTERTOP_BOX_MISSING");
   const group = adapter.entityGroups.get(stoneItem.id);
   if (!group) throw new Error("SINK_COUNTERTOP_GROUP_MISSING");
-  const original = group.getObjectByName(primitive.id);
+  const primitiveGroup = group.getObjectByName(primitive.id);
+  if (!(primitiveGroup instanceof Group)) throw new Error("SINK_COUNTERTOP_PRIMITIVE_GROUP_MISSING");
+  const original = primitiveGroup.getObjectByName(`${primitive.id}/mesh`);
   if (!(original instanceof Mesh)) throw new Error("SINK_COUNTERTOP_MESH_MISSING");
-  original.updateWorldMatrix(true, false);
-  const outerBefore = new Box3().setFromObject(original);
+  primitiveGroup.updateWorldMatrix(true, true);
+  const outerBefore = new Box3().setFromObject(primitiveGroup);
   const stoneMaterial = original.material as Material;
 
   const openingX = slot.localTransform.translationMm.x - stoneItem.transform.translationMm.x;
@@ -85,7 +87,7 @@ function splitCountertopAroundSink(
     throw new Error("SINK_CUTOUT_OUTSIDE_COUNTERTOP");
   }
 
-  group.remove(original);
+  group.remove(primitiveGroup);
   original.geometry.dispose();
 
   const cutout = new Group();
