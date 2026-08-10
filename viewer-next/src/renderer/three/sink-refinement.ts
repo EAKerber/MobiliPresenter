@@ -94,10 +94,12 @@ function splitCountertopAroundSink(
   cutout.name = `${stoneItem.id}/visual-cutout`;
   cutout.userData.visualRefinement = "fh06-stone-cutout-v1";
   cutout.userData.openingMm = [openingX, openingY, openingWidth, openingDepth];
-  if (openingX > 0) cutout.add(part(openingX, slabHeight, slabDepth, stoneMaterial, 0, 0, 0, 1.5));
-  if (slabWidth - rightStart > 0) cutout.add(part(slabWidth - rightStart, slabHeight, slabDepth, stoneMaterial, rightStart, 0, 0, 1.5));
-  if (openingY > 0) cutout.add(part(openingWidth, slabHeight, openingY, stoneMaterial, openingX, 0, 0, 1.5));
-  if (slabDepth - backStart > 0) cutout.add(part(openingWidth, slabHeight, slabDepth - backStart, stoneMaterial, openingX, backStart, 0, 1.5));
+  // Interim FH-06 cutout must preserve the exact authoritative slab AABB. Rounded
+  // stone edges return in the contracted S2-S4 mesh instead of shrinking this proxy.
+  if (openingX > 0) cutout.add(part(openingX, slabHeight, slabDepth, stoneMaterial, 0, 0, 0));
+  if (slabWidth - rightStart > 0) cutout.add(part(slabWidth - rightStart, slabHeight, slabDepth, stoneMaterial, rightStart, 0, 0));
+  if (openingY > 0) cutout.add(part(openingWidth, slabHeight, openingY, stoneMaterial, openingX, 0, 0));
+  if (slabDepth - backStart > 0) cutout.add(part(openingWidth, slabHeight, slabDepth - backStart, stoneMaterial, openingX, backStart, 0));
   group.add(cutout);
   group.updateWorldMatrix(true, true);
   const outerAfter = new Box3().setFromObject(cutout);
