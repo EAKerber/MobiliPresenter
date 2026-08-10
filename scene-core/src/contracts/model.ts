@@ -68,6 +68,7 @@ export interface ApplianceSlot {
   readonly role: string;
   readonly localTransform: RigidTransform;
   readonly clearSizeMm: DimensionTripleMm;
+  readonly cavitySizeMm?: DimensionTripleMm;
   readonly frontOpening?: ApplianceFrontOpening;
   readonly defaultApplianceId?: string;
   readonly status?: "confirmed" | "inferred";
