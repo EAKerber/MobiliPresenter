@@ -27,6 +27,7 @@ import { applyFh06SinkRefinement } from "../renderer/three/sink-refinement.js";
 import { applyFh06UnderCabProfile } from "../renderer/three/under-cab-profile.js";
 import { applyFh06VisualRefinements } from "../renderer/three/visual-refinements.js";
 import { applyFh06FullWallTiles } from "../renderer/three/wall-tiles.js";
+import { syncRuntimeLighting, syncRuntimeMaterials, syncRuntimeVisibility } from "./sync.js";
 
 export interface ViewerCompositionDiagnostics {
   readonly cooktopContactId: string;
@@ -53,6 +54,10 @@ export interface ViewerComposition {
   readonly adapter: ThreeSceneAdapter;
   readonly ownership: RenderOwnershipAudit;
   readonly diagnostics: ViewerCompositionDiagnostics;
+  syncVisibility(scenePackage: ScenePackage, appearance: AppearancePackage): void;
+  syncMaterials(scenePackage: ScenePackage, appearance: AppearancePackage): void;
+  syncLighting(scenePackage: ScenePackage, appearance: AppearancePackage): void;
+  syncConfiguration(scenePackage: ScenePackage, appearance: AppearancePackage): void;
   render(): void;
   setSize(widthPx: number, heightPx: number): void;
   dispose(): void;
@@ -83,30 +88,30 @@ function disposeSceneResources(scene: Scene): void {
 export function createViewerComposition(
   renderer: WebGLRenderer,
   camera: PerspectiveCamera,
-  scenePackage: ScenePackage,
-  appearance: AppearancePackage,
+  initialScenePackage: ScenePackage,
+  initialAppearance: AppearancePackage,
   options: ViewerCompositionOptions
 ): ViewerComposition {
-  const materials = new ThreeMaterialRegistry(appearance);
-  const adapter = buildThreeScene(scenePackage, (entityId, slot) => materials.resolve(entityId, slot));
-  attachParametricAppliances(adapter, scenePackage, appearance, materials);
+  const materials = new ThreeMaterialRegistry(initialAppearance);
+  const adapter = buildThreeScene(initialScenePackage, (entityId, slot) => materials.resolve(entityId, slot));
+  attachParametricAppliances(adapter, initialScenePackage, initialAppearance, materials);
 
-  const cooktopContact = applyFh06CooktopContact(adapter, scenePackage);
+  const cooktopContact = applyFh06CooktopContact(adapter, initialScenePackage);
   applyFh06VisualRefinements(adapter, materials);
-  const frontReadability = applyFh06FrontReadability(adapter, materials, scenePackage);
-  const ovenReadability = applyFh06OvenReadability(adapter, materials, scenePackage, appearance);
-  const tileRefinement = applyFh06FullWallTiles(adapter, scenePackage);
-  const sinkRefinement = applyFh06SinkRefinement(adapter, materials, scenePackage);
+  const frontReadability = applyFh06FrontReadability(adapter, materials, initialScenePackage);
+  const ovenReadability = applyFh06OvenReadability(adapter, materials, initialScenePackage, initialAppearance);
+  const tileRefinement = applyFh06FullWallTiles(adapter, initialScenePackage);
+  const sinkRefinement = applyFh06SinkRefinement(adapter, materials, initialScenePackage);
   const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
   const underCabRefinement = applyFh06UnderCabProfile(
     adapter,
     materials,
-    scenePackage,
+    initialScenePackage,
     currentUnderCabLightContract
   );
 
   adapter.scene.background = options.background ?? new Color(0xf0ede7);
-  const lighting = buildThreeLighting(scenePackage, appearance);
+  const lighting = buildThreeLighting(initialScenePackage, initialAppearance);
   adapter.scene.add(lighting.root);
   const ownership = auditRenderOwnership(adapter, [lighting.root.name, tileRefinement.groupName]);
   if (!ownership.pass) throw new Error(`VIEWER_RENDER_OWNERSHIP_FAILED:${ownership.unownedTopLevelNames.join(",")}`);
@@ -114,21 +119,31 @@ export function createViewerComposition(
   const environment = installNeutralRoomEnvironment(
     renderer,
     adapter.scene,
-    appearance.lighting.environment.relativeIntensity
+    initialAppearance.lighting.environment.relativeIntensity
   );
   const post = createSelectiveBloomPipeline(
     renderer,
     adapter.scene,
     camera,
-    appearance,
+    initialAppearance,
     options.widthPx,
     options.heightPx
   );
 
+  let currentScenePackage = initialScenePackage;
+  let currentAppearance = initialAppearance;
   let disposed = false;
-  return {
-    scenePackage,
-    appearance,
+  const assertActive = (): void => {
+    if (disposed) throw new Error("VIEWER_COMPOSITION_DISPOSED");
+  };
+
+  const result: ViewerComposition = {
+    get scenePackage(): ScenePackage {
+      return currentScenePackage;
+    },
+    get appearance(): AppearancePackage {
+      return currentAppearance;
+    },
     adapter,
     ownership,
     diagnostics: {
@@ -149,12 +164,38 @@ export function createViewerComposition(
       underCabAreaLight: underCabRefinement.hasActualAreaLight,
       wallTileSurfaceCount: tileRefinement.surfaceCount
     },
+    syncVisibility(scenePackage, appearance): void {
+      assertActive();
+      syncRuntimeVisibility(adapter, lighting, scenePackage, appearance);
+      currentScenePackage = scenePackage;
+      currentAppearance = appearance;
+    },
+    syncMaterials(scenePackage, appearance): void {
+      assertActive();
+      syncRuntimeMaterials(adapter, materials, appearance);
+      currentScenePackage = scenePackage;
+      currentAppearance = appearance;
+    },
+    syncLighting(scenePackage, appearance): void {
+      assertActive();
+      syncRuntimeLighting(adapter.scene, lighting, post, scenePackage, appearance);
+      currentScenePackage = scenePackage;
+      currentAppearance = appearance;
+    },
+    syncConfiguration(scenePackage, appearance): void {
+      assertActive();
+      syncRuntimeVisibility(adapter, lighting, scenePackage, appearance);
+      syncRuntimeMaterials(adapter, materials, appearance);
+      syncRuntimeLighting(adapter.scene, lighting, post, scenePackage, appearance);
+      currentScenePackage = scenePackage;
+      currentAppearance = appearance;
+    },
     render(): void {
-      if (disposed) throw new Error("VIEWER_COMPOSITION_DISPOSED");
+      assertActive();
       post.render();
     },
     setSize(widthPx: number, heightPx: number): void {
-      if (disposed) throw new Error("VIEWER_COMPOSITION_DISPOSED");
+      assertActive();
       post.setSize(widthPx, heightPx);
     },
     dispose(): void {
@@ -167,4 +208,5 @@ export function createViewerComposition(
       adapter.scene.clear();
     }
   };
+  return result;
 }
