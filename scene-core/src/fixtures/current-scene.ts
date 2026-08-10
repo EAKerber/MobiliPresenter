@@ -28,16 +28,24 @@ const accessoryBox = (
   height: number,
   depth: number,
   materialSlot: string,
-  source: string
+  source: string,
+  localTransform: RigidTransform = identityTransform(),
+  extraSources: readonly string[] = []
 ): BoxGeometry => ({
   id,
   primitive: "box",
   role,
-  localTransform: identityTransform(),
+  localTransform,
   sizeMm: { width, height, depth },
   materialSlot,
-  sourceBindingIds: [source]
+  sourceBindingIds: [source, ...extraSources]
 });
+
+export const STONE02_ID = "scene/traditional/accessory/stone-02" as const;
+export const STONE03_ID = "scene/traditional/accessory/stone-03" as const;
+export const STONE_DESIGN_THICKNESS_MM = 30 as const;
+export const STONE_REAR_UPSTAND_HEIGHT_MM = 100 as const;
+export const STONE_REAR_UPSTAND_DEPTH_MM = 20 as const;
 
 export const currentItems: readonly SceneItem[] = [
   {
@@ -104,7 +112,7 @@ export const currentItems: readonly SceneItem[] = [
     slotId: module02.applianceSlots[1]!.id
   },
   {
-    id: "scene/traditional/accessory/stove-countertop",
+    id: STONE02_ID,
     kind: "accessory",
     definitionId: "ACC-STONE-COUNTERTOP",
     transform: t(0, -20, 759.9999),
@@ -113,8 +121,25 @@ export const currentItems: readonly SceneItem[] = [
     controllable: true,
     mountPolicy: "hosted",
     hostId: module02.id,
+    placementStatus: "confirmed",
+    evidenceRefs: [
+      "promob-dxf:LAYER148:countertop-envelope",
+      "user-rule:stone-is-two-pieces-owned-by-module02-and-module03",
+      "design-default:fh06-1:stone-thickness-30-upstand-100x20"
+    ],
     geometry: [
-      accessoryBox("scene/traditional/accessory/stove-countertop/slab", "stone", 791.01, 36, 550, "stone", "placement:LAYER148")
+      accessoryBox(
+        `${STONE02_ID}/slab`, "stone", 791.01, STONE_DESIGN_THICKNESS_MM, 550, "stone",
+        "placement:LAYER148",
+        identityTransform(),
+        ["design-default:fh06-1:stone-thickness-30", "provenance:promob-proxy-thickness-36"]
+      ),
+      accessoryBox(
+        `${STONE02_ID}/upstand`, "stone", 791.01, STONE_REAR_UPSTAND_HEIGHT_MM, STONE_REAR_UPSTAND_DEPTH_MM, "stone",
+        "design-default:fh06-1:rear-upstand",
+        t(0, 530, STONE_DESIGN_THICKNESS_MM),
+        ["user-reference:rear-stone-upstand"]
+      )
     ]
   },
   {
@@ -144,7 +169,7 @@ export const currentItems: readonly SceneItem[] = [
     slotId: module03WithSink.applianceSlots[0]!.id
   },
   {
-    id: "scene/traditional/accessory/sink-countertop",
+    id: STONE03_ID,
     kind: "accessory",
     definitionId: "ACC-STONE-COUNTERTOP",
     transform: t(0, -20.002, 759),
@@ -153,8 +178,25 @@ export const currentItems: readonly SceneItem[] = [
     controllable: true,
     mountPolicy: "hosted",
     hostId: module03WithSink.id,
+    placementStatus: "confirmed",
+    evidenceRefs: [
+      "promob-dxf:LAYER40:countertop-envelope",
+      "user-rule:stone-is-two-pieces-owned-by-module02-and-module03",
+      "design-default:fh06-1:stone-thickness-30-upstand-100x20"
+    ],
     geometry: [
-      accessoryBox("scene/traditional/accessory/sink-countertop/slab", "stone", 1216.68, 18, 550, "stone", "placement:LAYER40")
+      accessoryBox(
+        `${STONE03_ID}/slab`, "stone", 1216.68, STONE_DESIGN_THICKNESS_MM, 550, "stone",
+        "placement:LAYER40",
+        identityTransform(),
+        ["design-default:fh06-1:stone-thickness-30", "provenance:promob-proxy-thickness-18"]
+      ),
+      accessoryBox(
+        `${STONE03_ID}/upstand`, "stone", 1216.68, STONE_REAR_UPSTAND_HEIGHT_MM, STONE_REAR_UPSTAND_DEPTH_MM, "stone",
+        "design-default:fh06-1:rear-upstand",
+        t(0, 530, STONE_DESIGN_THICKNESS_MM),
+        ["user-reference:rear-stone-upstand"]
+      )
     ]
   },
   {
