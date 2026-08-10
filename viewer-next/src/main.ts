@@ -3,7 +3,8 @@ import {
   CURRENT_FIDELITY_SUPERSAMPLE,
   CURRENT_FIDELITY_VIEWPORT,
   currentFixedCamera,
-  currentSceneBase
+  currentSceneBase,
+  resolveMaterialId
 } from "@mobilipresenter/scene-core";
 import {
   ACESFilmicToneMapping,
@@ -47,6 +48,16 @@ import type { StonePresetId } from "./fixtures/stone-presets.js";
 const appElement = document.querySelector<HTMLElement>("#app");
 if (appElement === null) throw new Error("APP_ROOT_NOT_FOUND");
 const app: HTMLElement = appElement;
+
+const MODULE02_ID = moduleIdFromAlias("02");
+const MODULE03_ID = moduleIdFromAlias("03");
+const MODULE06_ID = moduleIdFromAlias("06");
+const OVEN_ID = "scene/traditional/appliance/oven";
+const COOKTOP_ID = "scene/traditional/appliance/cooktop";
+const RANGE_ID = "scene/traditional/appliance/freestanding-range";
+const MICRO_ID = "scene/traditional/appliance/microwave";
+const UNDERCAB_ID = "scene/traditional/accessory/under-cab-led-06";
+const STONE03_ID = "scene/traditional/accessory/stone-03";
 
 const query = new URLSearchParams(window.location.search);
 const fidelityMode = query.get("fidelity") === "1";
@@ -119,6 +130,10 @@ function installSelectionOverlay(target: ViewerComposition): void {
   selectionOverlay.setSelectedModule(interaction.selectedModuleId);
 }
 
+function groupVisible(entityId: string): string {
+  return composition.adapter.entityGroups.get(entityId)?.visible ? "true" : "false";
+}
+
 function syncDatasets(): void {
   const diagnostics = composition.diagnostics;
   app.dataset.sceneId = composition.scenePackage.sceneId;
@@ -127,6 +142,17 @@ function syncDatasets(): void {
   app.dataset.viewerHoveredModule = interaction.hoveredModuleId ?? "none";
   app.dataset.viewerStonePreset = configuration.stonePresetId;
   app.dataset.viewerLightingPreset = configuration.lightingPresetId;
+  app.dataset.viewerLightingPolicy = composition.appearance.lighting.id;
+  app.dataset.viewerModule02Visible = groupVisible(MODULE02_ID);
+  app.dataset.viewerOvenVisible = groupVisible(OVEN_ID);
+  app.dataset.viewerCooktopVisible = groupVisible(COOKTOP_ID);
+  app.dataset.viewerRangeVisible = groupVisible(RANGE_ID);
+  app.dataset.viewerModule06Visible = groupVisible(MODULE06_ID);
+  app.dataset.viewerMicrowaveVisible = groupVisible(MICRO_ID);
+  app.dataset.viewerUnderCabVisible = groupVisible(UNDERCAB_ID);
+  app.dataset.viewerModule03FrontMaterial = resolveMaterialId(composition.appearance, MODULE03_ID, "front");
+  app.dataset.viewerStone03Material = resolveMaterialId(composition.appearance, STONE03_ID, "stone");
+  app.dataset.viewerSelectionOverlayCount = String(selectionOverlay?.root.children.length ?? 0);
   app.dataset.cooktopContact = diagnostics.cooktopContactId;
   app.dataset.cooktopGapMm = diagnostics.cooktopGapMm.toFixed(3);
   app.dataset.frontReadability = diagnostics.frontReadabilityId;
