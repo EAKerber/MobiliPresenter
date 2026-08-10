@@ -97,14 +97,13 @@ jobs:
             /tmp/mobilipresenter-readability-report.json
           python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
 
-      - name: Compare unchanged readability probes against FH-05
+      - name: Compare readability against FH-06.1 S1 baseline
         working-directory: viewer-next
         run: |
           python3 tests/readability_compare.py \
-            ../fidelity/baselines/fh05-readability.json \
+            ../fidelity/baselines/fh06-1-readability.json \
             /tmp/mobilipresenter-readability-report.json \
-            /tmp/mobilipresenter-readability-comparison.json \
-            ../fidelity/migrations/fh06-1-readability-probes.json
+            /tmp/mobilipresenter-readability-comparison.json
           python -m json.tool /tmp/mobilipresenter-readability-comparison.json > /dev/null
 
       - name: Stage visual evidence
