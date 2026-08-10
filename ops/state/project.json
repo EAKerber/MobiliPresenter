@@ -47,7 +47,7 @@
       "full-wall-tile-covers-main-column-return-and-inferred-laundry-wall",
       "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
       "module03-drawer-physical-gaps-remain-2mm-and-f5-recall-is-1",
-      "verified-user-artifact-source-is-914e73c4acbfea62f57629890f99c5fc929ff356",
+      "verified-user-artifact-source-is-21c20fa6d04e40c7882a3b78d42c9c84567128f6",
       "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
     "plan": "docs/plans/fh06-1-implementation-methodology.md",
