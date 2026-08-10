@@ -25,7 +25,7 @@ const SINK_CUTOUT_DARKENING = 0.62;
 const MODULE03_REVEALS = "fh06-s8/module03-drawer-reveals";
 const MODULE02_REVEALS = "fh06-s10/module02-oven-reveals";
 
-function firstMaterial(material: Material | readonly Material[]): Material {
+function firstMaterial(material: Material | Material[]): Material {
   return Array.isArray(material) ? material[0]! : material;
 }
 
