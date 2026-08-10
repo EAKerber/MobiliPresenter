@@ -2,38 +2,30 @@ import {
   createCurrentFidelityOverlayLines,
   CURRENT_FIDELITY_SUPERSAMPLE,
   CURRENT_FIDELITY_VIEWPORT,
-  currentFaucetAnchor,
   currentFixedCamera,
-  currentSceneBase,
-  currentUnderCabLightContract
+  currentSceneBase
 } from "@mobilipresenter/scene-core";
 import {
   ACESFilmicToneMapping,
-  Color,
   SRGBColorSpace,
   WebGLRenderer
 } from "three";
 import { styleAnchorAppearance } from "./fixtures/style-anchor.js";
-import { attachParametricAppliances } from "./renderer/three/appliances.js";
 import {
   createThreeCamera,
   updateThreeCameraCrop,
   updateThreeCameraViewport,
   type PixelCrop
 } from "./renderer/three/camera.js";
-import { applyFh06CooktopContact } from "./renderer/three/cooktop-contact.js";
-import { applyFh06FaucetRefinement } from "./renderer/three/faucet-refinement.js";
 import { buildFidelityOverlay } from "./renderer/three/fidelity-overlay.js";
-import { applyFh06FrontReadability } from "./renderer/three/front-readability.js";
-import { buildThreeLighting, installNeutralRoomEnvironment } from "./renderer/three/lighting.js";
-import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
-import { applyFh06OvenReadability } from "./renderer/three/oven-readability.js";
-import { FH06_GTAO_PROFILE, createSelectiveBloomPipeline } from "./renderer/three/post.js";
-import { buildThreeScene } from "./renderer/three/scene-adapter.js";
-import { applyFh06SinkRefinement } from "./renderer/three/sink-refinement.js";
-import { applyFh06UnderCabProfile } from "./renderer/three/under-cab-profile.js";
-import { applyFh06VisualRefinements } from "./renderer/three/visual-refinements.js";
-import { applyFh06FullWallTiles } from "./renderer/three/wall-tiles.js";
+import { FH06_GTAO_PROFILE } from "./renderer/three/post.js";
+import { createViewerComposition } from "./runtime/composition.js";
+import { parseViewerConfiguration, parseViewerInteraction } from "./runtime/query.js";
+import {
+  configurationFingerprint,
+  deriveViewerAppearance,
+  deriveViewerScene
+} from "./runtime/viewer-state.js";
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (appElement === null) throw new Error("APP_ROOT_NOT_FOUND");
@@ -52,6 +44,10 @@ function parseCrop(raw: string | null): PixelCrop | null {
   return { xPx, yPx, widthPx, heightPx };
 }
 
+const configuration = parseViewerConfiguration(query);
+const interaction = parseViewerInteraction(query);
+const effectiveScene = deriveViewerScene(currentSceneBase, configuration);
+const effectiveAppearance = deriveViewerAppearance(styleAnchorAppearance, effectiveScene, configuration);
 const fidelityCrop = fidelityMode ? parseCrop(query.get("crop")) : null;
 const fidelityFullViewport = {
   widthPx: CURRENT_FIDELITY_VIEWPORT.widthPx * CURRENT_FIDELITY_SUPERSAMPLE,
@@ -61,7 +57,7 @@ const fidelityFullViewport = {
 app.dataset.rendererBackend = "three-webgl2";
 app.dataset.rendererReady = "false";
 app.dataset.frameRendered = "false";
-app.dataset.sceneId = currentSceneBase.sceneId;
+app.dataset.sceneId = effectiveScene.sceneId;
 app.dataset.fidelityMode = fidelityMode ? "true" : "false";
 app.dataset.fidelityOverlay = fidelityOverlayMode ? "true" : "false";
 app.dataset.fidelityCrop = fidelityCrop ? `${fidelityCrop.xPx},${fidelityCrop.yPx},${fidelityCrop.widthPx},${fidelityCrop.heightPx}` : "none";
@@ -69,6 +65,10 @@ app.dataset.colorTreatment = "fh06-s10-neutral-warm-v1";
 app.dataset.occlusion = "gtao-mm-v1";
 app.dataset.occlusionRadiusMm = String(FH06_GTAO_PROFILE.radiusMm);
 app.dataset.occlusionBlend = String(FH06_GTAO_PROFILE.blendIntensity);
+app.dataset.viewerConfiguration = configurationFingerprint(configuration);
+app.dataset.viewerSelectedModule = interaction.selectedModuleId ?? "none";
+app.dataset.viewerStonePreset = configuration.stonePresetId;
+app.dataset.viewerLightingPreset = configuration.lightingPresetId;
 
 const renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
 renderer.outputColorSpace = SRGBColorSpace;
@@ -78,54 +78,46 @@ renderer.shadowMap.enabled = true;
 renderer.setPixelRatio(fidelityCrop ? 1 : Math.min(window.devicePixelRatio || 1, fidelityMode ? CURRENT_FIDELITY_SUPERSAMPLE : 2));
 app.appendChild(renderer.domElement);
 
-const materials = new ThreeMaterialRegistry(styleAnchorAppearance);
-const adapter = buildThreeScene(currentSceneBase, (entityId, slot) => materials.resolve(entityId, slot));
-attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
-const cooktopContact = applyFh06CooktopContact(adapter, currentSceneBase);
-applyFh06VisualRefinements(adapter, materials);
-const frontReadability = applyFh06FrontReadability(adapter, materials, currentSceneBase);
-const ovenReadability = applyFh06OvenReadability(adapter, materials, currentSceneBase, styleAnchorAppearance);
-const tileRefinement = applyFh06FullWallTiles(adapter, currentSceneBase);
-const sinkRefinement = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
-const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
-const underCabRefinement = applyFh06UnderCabProfile(adapter, materials, currentSceneBase, currentUnderCabLightContract);
-app.dataset.cooktopContact = cooktopContact.refinementId;
-app.dataset.cooktopGapMm = cooktopContact.afterGapMm.toFixed(3);
-app.dataset.frontReadability = frontReadability.refinementId;
-app.dataset.frontPhysicalGapMm = frontReadability.physicalGapMm.join(",");
-app.dataset.ovenReadability = ovenReadability.refinementId;
-app.dataset.ovenPhysicalClearanceMm = ovenReadability.physicalClearanceMm.join(",");
+let viewport = { widthPx: 1, heightPx: 1 };
+const camera = createThreeCamera(currentFixedCamera, fidelityCrop ? fidelityFullViewport : viewport);
+const composition = createViewerComposition(
+  renderer,
+  camera,
+  effectiveScene,
+  effectiveAppearance,
+  { widthPx: viewport.widthPx, heightPx: viewport.heightPx }
+);
+
+const diagnostics = composition.diagnostics;
+app.dataset.cooktopContact = diagnostics.cooktopContactId;
+app.dataset.cooktopGapMm = diagnostics.cooktopGapMm.toFixed(3);
+app.dataset.frontReadability = diagnostics.frontReadabilityId;
+app.dataset.frontPhysicalGapMm = diagnostics.frontPhysicalGapMm.join(",");
+app.dataset.ovenReadability = diagnostics.ovenReadabilityId;
+app.dataset.ovenPhysicalClearanceMm = diagnostics.ovenPhysicalClearanceMm.join(",");
 app.dataset.wallTileCoverage = "full-wall";
-app.dataset.wallTileSurfaceCount = String(tileRefinement.surfaceCount);
-app.dataset.sinkRefinement = sinkRefinement.sinkFamilyId;
-app.dataset.sinkStoneHole = sinkRefinement.stoneHoleGeometry;
-app.dataset.sinkContinuousBowl = sinkRefinement.continuousBowl ? "true" : "false";
-app.dataset.faucetRefinement = faucetRefinement.presetId;
-app.dataset.faucetHost = faucetRefinement.hostEntityId;
+app.dataset.wallTileSurfaceCount = String(diagnostics.wallTileSurfaceCount);
+app.dataset.sinkRefinement = diagnostics.sinkFamilyId;
+app.dataset.sinkStoneHole = diagnostics.sinkStoneHole;
+app.dataset.sinkContinuousBowl = diagnostics.sinkContinuousBowl ? "true" : "false";
+app.dataset.faucetRefinement = diagnostics.faucetPresetId;
+app.dataset.faucetHost = diagnostics.faucetHostEntityId;
 app.dataset.underCabProfile = "rear-corner-18mm-45deg";
-app.dataset.underCabKelvin = String(underCabRefinement.colorTemperatureK);
-app.dataset.underCabHost = underCabRefinement.hostModuleId;
-app.dataset.underCabAreaLight = underCabRefinement.hasActualAreaLight ? "true" : "false";
-adapter.scene.background = new Color(0xf0ede7);
+app.dataset.underCabKelvin = String(diagnostics.underCabKelvin);
+app.dataset.underCabHost = diagnostics.underCabHostModuleId;
+app.dataset.underCabAreaLight = diagnostics.underCabAreaLight ? "true" : "false";
+app.dataset.renderOwnership = composition.ownership.pass ? "pass" : "fail";
 
 if (fidelityOverlayMode && !fidelityCrop) {
   const fidelityLines = createCurrentFidelityOverlayLines();
   const fidelityOverlay = buildFidelityOverlay(fidelityLines, { xray: true, opacity: 0.72 });
   fidelityOverlay.renderOrder = 10_000;
-  adapter.scene.add(fidelityOverlay);
+  composition.adapter.scene.add(fidelityOverlay);
   app.dataset.fidelityLineCount = String(fidelityLines.length);
 }
 
-const lighting = buildThreeLighting(currentSceneBase, styleAnchorAppearance);
-adapter.scene.add(lighting.root);
-const environment = installNeutralRoomEnvironment(renderer, adapter.scene, styleAnchorAppearance.lighting.environment.relativeIntensity);
-
-let viewport = { widthPx: 1, heightPx: 1 };
-const camera = createThreeCamera(currentFixedCamera, fidelityCrop ? fidelityFullViewport : viewport);
-const post = createSelectiveBloomPipeline(renderer, adapter.scene, camera, styleAnchorAppearance, viewport.widthPx, viewport.heightPx);
-
 function render(): void {
-  post.render();
+  composition.render();
   app.dataset.frameRendered = "true";
 }
 
@@ -136,7 +128,7 @@ function resize(): void {
   renderer.setSize(widthPx, heightPx, false);
   if (fidelityCrop) updateThreeCameraCrop(camera, currentFixedCamera, fidelityFullViewport, fidelityCrop);
   else updateThreeCameraViewport(camera, currentFixedCamera, viewport);
-  post.setSize(widthPx, heightPx);
+  composition.setSize(widthPx, heightPx);
   render();
 }
 
@@ -147,8 +139,6 @@ resize();
 
 window.addEventListener("pagehide", () => {
   observer.disconnect();
-  post.dispose();
-  environment.dispose();
-  materials.dispose();
+  composition.dispose();
   renderer.dispose();
 }, { once: true });
