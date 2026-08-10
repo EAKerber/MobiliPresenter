@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderConditioning } from "../dist/src/conditioning/conditioning.js";
-import { currentSceneBase } from "../dist/src/fixtures/current-scene.js";
+import { STONE03_ID, currentSceneBase } from "../dist/src/fixtures/current-scene.js";
 import { module03 } from "../dist/src/fixtures/current-geometry.js";
 import { setVisibilityIntent } from "../dist/src/state/scene-state.js";
 
@@ -39,10 +39,10 @@ test("conditioning contains depth, normals, entity, material and edge informatio
 test("hiding a module removes it and hosted accessories from conditioning without mutating geometry", () => {
   const visible = renderConditioning(currentSceneBase, 320, 166);
   assert.ok(visible.entityIds.includes(module03.id));
-  assert.ok(visible.entityIds.some(id => id.endsWith("sink-countertop")));
+  assert.ok(visible.entityIds.includes(STONE03_ID));
   const hiddenScene = setVisibilityIntent(currentSceneBase, module03.id, "off");
   const hidden = renderConditioning(hiddenScene, 320, 166);
   assert.equal(hidden.entityIds.includes(module03.id), false);
-  assert.equal(hidden.entityIds.some(id => id.endsWith("sink-countertop")), false);
+  assert.equal(hidden.entityIds.includes(STONE03_ID), false);
   assert.notDeepEqual(hidden.entityMask, visible.entityMask);
 });
