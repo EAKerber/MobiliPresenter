@@ -84,26 +84,62 @@ export function buildCurrentFidelityReport(scene: ScenePackage = currentSceneBas
   checks.push(check("topology:module06-front-count", "F2", "hard", module06Fronts === 3 ? "pass" : "fail", { expected: 3, observed: module06Fronts, unit: "count" }));
 
   const ovenSlot = m02?.applianceSlots.find(slot => slot.role === "built-in-oven");
+  const surroundPartIds = [
+    "scene/traditional/module/lower-stove/front/oven-left-stile",
+    "scene/traditional/module/lower-stove/front/oven-right-stile",
+    "scene/traditional/module/lower-stove/front/oven-bottom-rail",
+    "scene/traditional/module/lower-stove/front/oven-top-rail"
+  ] as const;
   const hasRequiredSurroundParts = m02
-    ? ["left-side", "right-side", "bottom", "top-front-rail"].every(suffix => m02.geometry.some(primitive => primitive.id.endsWith(`/${suffix}`)))
+    ? surroundPartIds.every(id => m02.geometry.some(primitive => primitive.id === id && primitive.role === "front"))
     : false;
-  const surround = ovenSlot && m02 ? {
-    left: ovenSlot.localTransform.translationMm.x,
-    right: m02.dimensions.geometryMm.width - (ovenSlot.localTransform.translationMm.x + ovenSlot.clearSizeMm.width),
-    bottom: ovenSlot.localTransform.translationMm.z,
-    top: m02.dimensions.geometryMm.height - (ovenSlot.localTransform.translationMm.z + ovenSlot.clearSizeMm.height)
+  const opening = ovenSlot?.frontOpening;
+  const nominalWidth = m02?.dimensions.nominalMm?.width;
+  const nominalHeight = m02?.dimensions.nominalMm?.height;
+  const geometryWidth = m02?.dimensions.geometryMm.width;
+  const nominalFrontOffsetX = nominalWidth !== undefined && geometryWidth !== undefined
+    ? (geometryWidth - nominalWidth) / 2
+    : null;
+  const surround = opening && nominalWidth !== undefined && nominalHeight !== undefined && nominalFrontOffsetX !== null ? {
+    left: opening.localTransform.translationMm.x - nominalFrontOffsetX,
+    right: nominalWidth - ((opening.localTransform.translationMm.x - nominalFrontOffsetX) + opening.sizeMm.width),
+    bottom: opening.localTransform.translationMm.z,
+    top: nominalHeight - (opening.localTransform.translationMm.z + opening.sizeMm.height)
   } : null;
-  const surroundOk = hasRequiredSurroundParts && surround !== null && Object.values(surround).every(value => Math.abs(value - 18) <= 1e-6);
+  const expectedSurround = { left: 95, right: 95, bottom: 80, top: 80 } as const;
+  const surroundOk = hasRequiredSurroundParts
+    && surround !== null
+    && Math.abs(surround.left - expectedSurround.left) <= 1e-6
+    && Math.abs(surround.right - expectedSurround.right) <= 1e-6
+    && Math.abs(surround.bottom - expectedSurround.bottom) <= 1e-6
+    && Math.abs(surround.top - expectedSurround.top) <= 1e-6
+    && opening?.sizeMm.width === 600
+    && opening.sizeMm.height === 600
+    && ovenSlot?.clearSizeMm.width === 600
+    && ovenSlot.clearSizeMm.height === 600
+    && ovenSlot.cavitySizeMm?.width === 755.01
+    && ovenSlot.cavitySizeMm.height === 724
+    && ovenSlot.cavitySizeMm.depth === 525;
   checks.push(check(
     "topology:module02-oven-surround",
     "F2",
     "hard",
     surroundOk ? "pass" : "fail",
     {
-      expected: { left: 18, right: 18, bottom: 18, top: 18, structuralPartsPresent: true },
-      observed: surround ? { ...surround, structuralPartsPresent: hasRequiredSurroundParts } : null,
+      expected: {
+        ...expectedSurround,
+        frontOpeningMm: { width: 600, height: 600 },
+        cavityMm: { width: 755.01, height: 724, depth: 525 },
+        frontPartsPresent: true
+      },
+      observed: surround && opening && ovenSlot ? {
+        ...surround,
+        frontOpeningMm: opening.sizeMm,
+        cavityMm: ovenSlot.cavitySizeMm ?? null,
+        frontPartsPresent: hasRequiredSurroundParts
+      } : null,
       unit: "mm",
-      note: "The MDF surround is structurally present; its poor baseline reading is an F5 render/readability problem, not missing front filler geometry."
+      note: "FH-06.1 separates the confirmed internal cavity from the stable 600x600 visual opening and explicit MDF facade."
     }
   ));
 
@@ -129,9 +165,9 @@ export function buildCurrentFidelityReport(scene: ScenePackage = currentSceneBas
     checks.push(check("hardware:anchors-defined", "F4", "hard", "fail", { expected: currentHardwareAnchors.length, observed: 0, unit: "count", note: error instanceof Error ? error.message : String(error) }));
   }
 
-  checks.push(check("readability:module02-oven-surround", "F5", "soft", "pending", { note: "Geometry passes F2; measure projected local contrast/edge recall around the 18 mm surround." }));
-  checks.push(check("readability:semantic-edge-baseline", "F5", "soft", "pending", { note: "Quantitative edge readability follows the 4x overlay artifact." }));
-  checks.push(check("appearance:human-gate", "F6", "human", "info", { note: "R-07 was rejected as visually sufficient; style anchor remains non-golden." }));
+  checks.push(check("readability:module02-oven-surround", "F5", "soft", "pending", { note: "Measure all four projected edges of the explicit 600x600 opening and MDF fields at targeted 4x." }));
+  checks.push(check("readability:semantic-edge-baseline", "F5", "soft", "pending", { note: "Quantitative edge readability follows the targeted 4x crop artifacts." }));
+  checks.push(check("appearance:human-gate", "F6", "human", "info", { note: "FH-06.1 requires explicit human approval of oven surround and sink station; style anchor remains non-golden." }));
 
   checks.sort((a, b) => `${a.tier}:${a.id}`.localeCompare(`${b.tier}:${b.id}`));
   const hardGatesPass = checks.filter(candidate => candidate.gate === "hard").every(candidate => candidate.status === "pass");
