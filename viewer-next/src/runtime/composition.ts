@@ -108,7 +108,7 @@ export function createViewerComposition(
   adapter.scene.background = options.background ?? new Color(0xf0ede7);
   const lighting = buildThreeLighting(scenePackage, appearance);
   adapter.scene.add(lighting.root);
-  const ownership = auditRenderOwnership(adapter, [lighting.root.name]);
+  const ownership = auditRenderOwnership(adapter, [lighting.root.name, tileRefinement.groupName]);
   if (!ownership.pass) throw new Error(`VIEWER_RENDER_OWNERSHIP_FAILED:${ownership.unownedTopLevelNames.join(",")}`);
 
   const environment = installNeutralRoomEnvironment(
