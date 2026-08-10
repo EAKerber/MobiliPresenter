@@ -22,33 +22,43 @@ def load_migration() -> dict | None:
     if MIGRATION_PATH is None:
         return None
     migration = json.loads(MIGRATION_PATH.read_text(encoding="utf-8"))
-    if migration.get("schemaVersion") != "ReadabilityProbeMigration 1.0":
+    if migration.get("schemaVersion") not in {
+        "ReadabilityProbeMigration 1.0",
+        "ReadabilityProbeMigration 1.1",
+    }:
         raise SystemExit("READABILITY_MIGRATION_SCHEMA_UNSUPPORTED")
     return migration
 
 
-def validate_probe_sets(baseline_by_id: dict, candidate_by_id: dict, migration: dict | None) -> list[str]:
+def validate_probe_sets(baseline_by_id: dict, candidate_by_id: dict, migration: dict | None) -> tuple[list[str], list[str]]:
     baseline_ids = set(baseline_by_id)
     candidate_ids = set(candidate_by_id)
     if migration is None:
         if baseline_ids != candidate_ids:
             raise SystemExit("READABILITY_PROBE_SET_CHANGED")
-        return sorted(baseline_ids)
+        ids = sorted(baseline_ids)
+        return ids, []
 
     unchanged = set(migration.get("unchangedProbeIds", []))
+    rebaselined = set(migration.get("rebaselinedProbeIds", []))
     superseded = set(migration.get("supersededProbeIds", []))
     added = set(migration.get("addedProbeIds", []))
-    if unchanged & superseded or unchanged & added or superseded & added:
-        raise SystemExit("READABILITY_MIGRATION_SETS_OVERLAP")
-    if baseline_ids != unchanged | superseded:
+    groups = [unchanged, rebaselined, superseded, added]
+    for index, group in enumerate(groups):
+        for other in groups[index + 1:]:
+            if group & other:
+                raise SystemExit("READABILITY_MIGRATION_SETS_OVERLAP")
+    if baseline_ids != unchanged | rebaselined | superseded:
         raise SystemExit("READABILITY_MIGRATION_BASELINE_SET_MISMATCH")
-    if candidate_ids != unchanged | added:
+    if candidate_ids != unchanged | rebaselined | added:
         raise SystemExit("READABILITY_MIGRATION_CANDIDATE_SET_MISMATCH")
     if superseded & candidate_ids:
         raise SystemExit("READABILITY_SUPERSEDED_PROBE_STILL_PRESENT")
     if not added <= candidate_ids:
         raise SystemExit("READABILITY_ADDED_PROBE_MISSING")
-    return sorted(unchanged)
+    if rebaselined and migration.get("schemaVersion") != "ReadabilityProbeMigration 1.1":
+        raise SystemExit("READABILITY_REBASELINE_REQUIRES_MIGRATION_1_1")
+    return sorted(unchanged), sorted(rebaselined)
 
 
 def effective_threshold(before: dict, after: dict) -> tuple[float, str]:
@@ -76,7 +86,7 @@ def main() -> None:
     baseline_by_id = {probe["id"]: probe for probe in baseline["probes"]}
     candidate_by_id = {probe["id"]: probe for probe in candidate["probes"]}
     migration = load_migration()
-    comparable_ids = validate_probe_sets(baseline_by_id, candidate_by_id, migration)
+    comparable_ids, rebaselined_ids = validate_probe_sets(baseline_by_id, candidate_by_id, migration)
 
     deltas = []
     regressions = []
@@ -112,7 +122,7 @@ def main() -> None:
     added_ids = sorted(migration.get("addedProbeIds", [])) if migration else []
     superseded_ids = sorted(migration.get("supersededProbeIds", [])) if migration else []
     payload = {
-        "schemaVersion": "ReadabilityComparison 1.2",
+        "schemaVersion": "ReadabilityComparison 1.3",
         "baseline": str(BASELINE_PATH),
         "candidate": str(CANDIDATE_PATH),
         "migration": str(MIGRATION_PATH) if MIGRATION_PATH else None,
@@ -128,11 +138,13 @@ def main() -> None:
             "legacyBaselineThresholdMayComeFromSameCandidateProbe": True,
             "nearThresholdRecallIsDiagnosticOnly": True,
             "probeSetChangeRequiresExplicitMigration": True,
+            "appearanceRebaselineRequiresDedicatedGate": True,
         },
         "pass": not regressions,
         "regressions": regressions,
         "deltas": deltas,
         "comparableProbeIds": comparable_ids,
+        "rebaselinedProbeIds": rebaselined_ids,
         "newProbeIds": added_ids,
         "supersededProbeIds": superseded_ids,
     }
