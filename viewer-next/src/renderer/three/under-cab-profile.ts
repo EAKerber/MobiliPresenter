@@ -33,7 +33,7 @@ function geometryFromSceneVertices(vertices: readonly Vec3[], indices: readonly 
   });
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
+  geometry.setIndex([...indices]);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
