@@ -72,3 +72,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# CI checkpoint: S9 functional implementation is in parent 914e73c4.
