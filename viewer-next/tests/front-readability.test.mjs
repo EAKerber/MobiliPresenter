@@ -5,7 +5,7 @@ import {
   module03WithSink,
   sceneGeometryDigest
 } from "@mobilipresenter/scene-core";
-import { Box3, Mesh, Vector3 } from "three";
+import { Mesh, Vector3 } from "three";
 import { styleAnchorAppearance } from "../dist-ts/src/fixtures/style-anchor.js";
 import { applyFh06FrontReadability } from "../dist-ts/src/renderer/three/front-readability.js";
 import { ThreeMaterialRegistry } from "../dist-ts/src/renderer/three/materials.js";
@@ -89,3 +89,5 @@ test("S8 does not replace the already-readable module03 door geometry", () => {
   assert.equal(door.geometry.userData.visualRefinement, undefined);
   materials.dispose();
 });
+
+// CI checkpoint: S8 implementation is in parent da2012af.
