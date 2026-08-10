@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { validateScenePackage } from "../dist/src/contracts/invariants.js";
 import { currentAppearance } from "../dist/src/fixtures/current-appearance.js";
-import { currentSceneBase } from "../dist/src/fixtures/current-scene.js";
+import { STONE02_ID, STONE03_ID, currentSceneBase } from "../dist/src/fixtures/current-scene.js";
 import { glassDivider, module03WithSink, module04, module05, module07 } from "../dist/src/fixtures/current-context.js";
 import { module02, module06 } from "../dist/src/fixtures/current-geometry.js";
 import { module01 } from "../dist/src/fixtures/current-laundry.js";
@@ -105,10 +105,10 @@ test("module02 and freestanding range form a reversible substitution group", () 
   assert.equal(replacement.get("scene/traditional/appliance/freestanding-range")?.effectiveVisible, true);
 });
 
-test("hosted accessory geometry resolves to audited DXF world coordinates within floating tolerance", () => {
+test("hosted accessory geometry resolves to audited world coordinates within floating tolerance", () => {
   const world = resolveWorldTransforms(currentSceneBase);
-  const stoveStone = currentSceneBase.items.find(item => item.id.endsWith("stove-countertop"));
-  const sinkStone = currentSceneBase.items.find(item => item.id.endsWith("sink-countertop"));
+  const stoveStone = currentSceneBase.items.find(item => item.id === STONE02_ID);
+  const sinkStone = currentSceneBase.items.find(item => item.id === STONE03_ID);
   const led = currentSceneBase.items.find(item => item.id.endsWith("under-cab-led-06"));
   assert.ok(stoveStone && sinkStone && led);
   assertVecAlmost(world.get(stoveStone.id)?.translationMm, { x: 3071.739, y: 8100.44, z: 858.9999 });
