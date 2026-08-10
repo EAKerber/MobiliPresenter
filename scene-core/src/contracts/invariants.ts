@@ -60,6 +60,9 @@ function validateModule(module: ModuleGeometry, path: string): ValidationIssue[]
     if (slotIds.has(slot.id)) issues.push({ code: "APPLIANCE_SLOT_ID_DUPLICATE", path: `${slotPath}.id`, detail: slot.id });
     slotIds.add(slot.id);
     if (!positiveDimensions(slot.clearSizeMm)) issues.push({ code: "APPLIANCE_SLOT_DIMENSIONS_INVALID", path: `${slotPath}.clearSizeMm`, detail: slot.id });
+    if (slot.cavitySizeMm && !positiveDimensions(slot.cavitySizeMm)) {
+      issues.push({ code: "APPLIANCE_CAVITY_DIMENSIONS_INVALID", path: `${slotPath}.cavitySizeMm`, detail: slot.id });
+    }
     if (slot.frontOpening) {
       if (!(slot.frontOpening.sizeMm.width > 0 && slot.frontOpening.sizeMm.height > 0)) {
         issues.push({ code: "APPLIANCE_FRONT_OPENING_DIMENSIONS_INVALID", path: `${slotPath}.frontOpening.sizeMm`, detail: slot.id });
