@@ -21,10 +21,12 @@
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "visual-correction-loop",
-    "checkpoint": "FH-06.1",
-    "nextTransition": "execute-fh06-1-s1-module02-front-opening",
-    "blockers": [],
+    "phase": "human-visual-gate",
+    "checkpoint": "FH-06.1-S8",
+    "nextTransition": "review-verified-fh06-1-s8-artifact-before-further-cosmetic-tuning",
+    "blockers": [
+      "human-f6-appearance-review-required-before-renderer-merge"
+    ],
     "constraints": [
       "fixed-camera-is-product-invariant",
       "scene-core-0.1-is-integrated-foundation",
@@ -34,10 +36,15 @@
       "mm-is-physical-authority-pixels-are-projection-evidence",
       "supersampling-4x-is-targeted-crop-fidelity-profile",
       "f0-through-f4-must-not-regress-during-visual-tuning",
-      "fh05-readability-baseline-is-regression-reference",
-      "oven-surround-and-sink-station-must-pass-fh06-1-spec",
-      "under-cab-lighting-must-pass-fh06-2-spec",
-      "full-wall-tile-is-scene-material-policy",
+      "fh06-1-s8-readability-artifact-is-current-f5-reference",
+      "module02-oven-opening-is-600x600-with-95-95-80-80-mdf-fields",
+      "stone-is-two-independent-30mm-design-pieces-with-100x20-rear-upstands",
+      "sink-uses-true-rounded-stone-hole-and-continuous-undermount-bowl",
+      "faucet-is-core-anchored-high-arc-340mm-255mm-reach",
+      "full-wall-tile-covers-main-column-return-and-inferred-laundry-wall",
+      "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
+      "module03-drawer-physical-gaps-remain-2mm-and-f5-recall-is-1",
+      "verified-user-artifact-source-is-da2012afed848d6f93ad9fa6df2ff755dc3f60dd",
       "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
     "plan": "docs/plans/fh06-1-implementation-methodology.md",
