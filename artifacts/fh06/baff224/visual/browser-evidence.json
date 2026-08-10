@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "browser": "/usr/bin/google-chrome",
+  "url": "http://127.0.0.1:4173/",
+  "viewportPx": [
+    1865,
+    967
+  ],
+  "screenshotBytes": 146226,
+  "requiredDomMarkers": [
+    "data-renderer-backend=\"three-webgl2\"",
+    "data-renderer-ready=\"true\"",
+    "data-frame-rendered=\"true\"",
+    "data-scene-id=\"traditional-complete\"",
+    "data-wall-tile-coverage=\"full-wall\"",
+    "data-wall-tile-surface-count=\"4\"",
+    "data-sink-refinement=\"SINK-UNDERMOUNT-40X34-01\"",
+    "data-sink-stone-hole=\"extruded-shape-with-rounded-hole\"",
+    "data-sink-continuous-bowl=\"true\"",
+    "data-faucet-refinement=\"FAUCET-HIGH-ARC-01\"",
+    "data-faucet-host=\"scene/traditional/accessory/stone-03\""
+  ]
+}
