@@ -1,5 +1,6 @@
 import { Camera, Color, PerspectiveCamera, Scene, ShaderMaterial, Vector2, WebGLRenderer } from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
@@ -8,6 +9,19 @@ import type { AppearancePackage } from "@mobilipresenter/scene-core";
 import { BLOOM_LAYER } from "./lighting.js";
 
 const BLACK = new Color(0x000000);
+
+export const FH06_GTAO_PROFILE = {
+  blendIntensity: 0.38,
+  radiusMm: 72,
+  distanceExponent: 2,
+  thicknessMm: 38,
+  distanceFallOff: 0.92,
+  scale: 1,
+  samples: 16,
+  denoiseRadiusPx: 4,
+  denoiseRings: 2,
+  denoiseSamples: 16
+} as const;
 
 const additiveShader = {
   uniforms: {
@@ -36,6 +50,7 @@ const additiveShader = {
 export interface SelectiveBloomPipeline {
   readonly bloomCamera: PerspectiveCamera;
   readonly bloomComposer: EffectComposer;
+  readonly gtaoPass: GTAOPass;
   readonly finalComposer: EffectComposer;
   render(): void;
   setSize(widthPx: number, heightPx: number): void;
@@ -88,6 +103,30 @@ export function createSelectiveBloomPipeline(
   const basePass = new RenderPass(scene, camera);
   finalComposer.addPass(basePass);
 
+  const gtaoPass = new GTAOPass(
+    scene,
+    camera,
+    widthPx,
+    heightPx,
+    undefined,
+    {
+      radius: FH06_GTAO_PROFILE.radiusMm,
+      distanceExponent: FH06_GTAO_PROFILE.distanceExponent,
+      thickness: FH06_GTAO_PROFILE.thicknessMm,
+      distanceFallOff: FH06_GTAO_PROFILE.distanceFallOff,
+      scale: FH06_GTAO_PROFILE.scale,
+      samples: FH06_GTAO_PROFILE.samples,
+      screenSpaceRadius: false
+    },
+    {
+      radius: FH06_GTAO_PROFILE.denoiseRadiusPx,
+      rings: FH06_GTAO_PROFILE.denoiseRings,
+      samples: FH06_GTAO_PROFILE.denoiseSamples
+    }
+  );
+  gtaoPass.blendIntensity = FH06_GTAO_PROFILE.blendIntensity;
+  finalComposer.addPass(gtaoPass);
+
   const mixMaterial = new ShaderMaterial({
     uniforms: {
       baseTexture: { value: null },
@@ -105,6 +144,7 @@ export function createSelectiveBloomPipeline(
   return {
     bloomCamera,
     bloomComposer,
+    gtaoPass,
     finalComposer,
     render(): void {
       syncBloomCamera(bloomCamera, camera);
@@ -120,6 +160,7 @@ export function createSelectiveBloomPipeline(
     },
     dispose(): void {
       bloomComposer.dispose();
+      gtaoPass.dispose();
       finalComposer.dispose();
       mixMaterial.dispose();
     }
