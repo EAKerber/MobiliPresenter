@@ -46,3 +46,5 @@ test("S10 oven reveal refinement is idempotent", () => {
   assert.equal(matches[0]?.children.length, 4);
   registry.dispose();
 });
+
+// CI checkpoint: S10 physical oven reveal candidate.
