@@ -17,6 +17,7 @@ import type { ThreeMaterialRegistry } from "./materials.js";
 const SINK_ITEM_ID = "scene/traditional/fixture/kitchen-sink";
 const SINK_STONE_ID = "scene/traditional/accessory/sink-countertop";
 const SINK_STONE_PRIMITIVE_ID = "scene/traditional/accessory/sink-countertop/slab";
+const RENDER_AABB_TOLERANCE_MM = 0.001;
 
 interface FitData {
   readonly fittedMm: { readonly width: number; readonly height: number; readonly depth: number };
@@ -94,8 +95,9 @@ function splitCountertopAroundSink(
   cutout.name = `${stoneItem.id}/visual-cutout`;
   cutout.userData.visualRefinement = "fh06-stone-cutout-v1";
   cutout.userData.openingMm = [openingX, openingY, openingWidth, openingDepth];
-  // Interim FH-06 cutout must preserve the exact authoritative slab AABB. Rounded
-  // stone edges return in the contracted S2-S4 mesh instead of shrinking this proxy.
+  // Interim FH-06 cutout preserves the authoritative local dimensions exactly.
+  // Rounded stone edges return in S2-S4. GPU BufferGeometry uses float attributes,
+  // so world-space AABB comparison is measured and gated rather than assumed exact.
   if (openingX > 0) cutout.add(part(openingX, slabHeight, slabDepth, stoneMaterial, 0, 0, 0));
   if (slabWidth - rightStart > 0) cutout.add(part(slabWidth - rightStart, slabHeight, slabDepth, stoneMaterial, rightStart, 0, 0));
   if (openingY > 0) cutout.add(part(openingWidth, slabHeight, openingY, stoneMaterial, openingX, 0, 0));
@@ -161,9 +163,22 @@ function rebuildSink(
   return { proxy, faucetHeightMm: faucetRise };
 }
 
+function maxAabbDriftMm(before: Box3, after: Box3): number {
+  return Math.max(
+    Math.abs(before.min.x - after.min.x),
+    Math.abs(before.min.y - after.min.y),
+    Math.abs(before.min.z - after.min.z),
+    Math.abs(before.max.x - after.max.x),
+    Math.abs(before.max.y - after.max.y),
+    Math.abs(before.max.z - after.max.z)
+  );
+}
+
 export interface SinkRefinementResult {
   readonly openingMm: readonly [number, number, number, number];
   readonly countertopOuterEnvelopePreserved: boolean;
+  readonly countertopOuterEnvelopeDriftMm: number;
+  readonly countertopOuterEnvelopeToleranceMm: number;
   readonly faucetHeightMm: number;
 }
 
@@ -174,11 +189,12 @@ export function applyFh06SinkRefinement(
 ): SinkRefinementResult {
   const stone = splitCountertopAroundSink(adapter, scene);
   const sink = rebuildSink(adapter, registry);
-  const preserved = stone.outerBefore.min.distanceTo(stone.outerAfter.min) < 1e-6
-    && stone.outerBefore.max.distanceTo(stone.outerAfter.max) < 1e-6;
+  const driftMm = maxAabbDriftMm(stone.outerBefore, stone.outerAfter);
   return {
     openingMm: stone.openingMm,
-    countertopOuterEnvelopePreserved: preserved,
+    countertopOuterEnvelopePreserved: driftMm <= RENDER_AABB_TOLERANCE_MM,
+    countertopOuterEnvelopeDriftMm: driftMm,
+    countertopOuterEnvelopeToleranceMm: RENDER_AABB_TOLERANCE_MM,
     faucetHeightMm: sink.faucetHeightMm
   };
 }
