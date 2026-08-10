@@ -65,6 +65,10 @@ def main() -> None:
         'data-sink-continuous-bowl="true"',
         'data-faucet-refinement="FAUCET-HIGH-ARC-01"',
         'data-faucet-host="scene/traditional/accessory/stone-03"',
+        'data-under-cab-profile="rear-corner-18mm-45deg"',
+        'data-under-cab-kelvin="3000"',
+        'data-under-cab-host="scene/traditional/module/upper-sink-microwave"',
+        'data-under-cab-area-light="true"',
     )
     missing = [needle for needle in required if needle not in dom_result.stdout]
     if missing:

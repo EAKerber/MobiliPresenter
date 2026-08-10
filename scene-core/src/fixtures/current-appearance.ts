@@ -38,7 +38,7 @@ export const currentAppearance: AppearancePackage = {
   accessoryDefinitions: [
     accessory({ id: "ACC-STONE-COUNTERTOP", role: "countertop", materialSlots: ["stone"], emitters: [], sourceHints: ["Promob DXF countertop geometry; material is variable by policy"] }),
     accessory({ id: "ACC-PLINTH-LOWER", role: "plinth", materialSlots: ["stone"], emitters: [], sourceHints: ["Promob DXF LAYER145 split by host module for state ownership"] }),
-    accessory({ id: "ACC-UNDERCAB-LED-01", role: "under-cab-light", materialSlots: ["emissive"], emitters: [{ id: "under-cab-line", type: "line", colorTemperatureK: 3200, relativeIntensity: 0.65, localPositionNormalized: [0.5, 0.5, 0.1], localDirection: { x: 0, y: 0, z: -1 } }], sourceHints: ["Promob DXF LAYER115; hosted by module 06"] })
+    accessory({ id: "ACC-UNDERCAB-LED-01", role: "under-cab-light", materialSlots: ["emissive"], emitters: [{ id: "under-cab-line", type: "line", colorTemperatureK: 3000, relativeIntensity: 0.65, localPositionNormalized: [0.5, 0.5, 0.5], localDirection: { x: 0, y: -0.7071067811865476, z: -0.7071067811865476 } }], sourceHints: ["Promob DXF LAYER115 preserves legacy 1200x40.91x32.02 placement envelope; FH-06.2 rear-corner 18mm profile contract controls runtime geometry and light direction"] })
   ],
   materials: [
     material({ id: "wall-white", mappingPolicy: "world-continuous", baseColorSrgb: "#F4F3EE", roughness: 0.86, metallic: 0, opacity: 1, transmission: 0 }),
@@ -53,7 +53,8 @@ export const currentAppearance: AppearancePackage = {
     material({ id: "dark-metal", mappingPolicy: "panel-local", baseColorSrgb: "#27292A", roughness: 0.42, metallic: 0.7, opacity: 1, transmission: 0 }),
     material({ id: "dark-plastic", mappingPolicy: "panel-local", baseColorSrgb: "#333638", roughness: 0.5, metallic: 0, opacity: 1, transmission: 0 }),
     material({ id: "chrome", mappingPolicy: "panel-local", baseColorSrgb: "#D6D8D8", roughness: 0.16, metallic: 1, opacity: 1, transmission: 0 }),
-    material({ id: "emissive-warm", mappingPolicy: "panel-local", baseColorSrgb: "#F4D6A0", roughness: 0.3, metallic: 0.15, opacity: 1, transmission: 0, emissiveSrgb: "#FFD08A", emissiveIntensity: 1 })
+    material({ id: "emissive-warm", mappingPolicy: "panel-local", baseColorSrgb: "#F4D6A0", roughness: 0.3, metallic: 0.15, opacity: 1, transmission: 0, emissiveSrgb: "#FFD08A", emissiveIntensity: 1 }),
+    material({ id: "under-cab-opal-3000k", mappingPolicy: "panel-local", baseColorSrgb: "#FFF1D6", roughness: 0.42, metallic: 0.05, opacity: 1, transmission: 0, emissiveSrgb: "#FFD7A3", emissiveIntensity: 1.1 })
   ],
   assignments: {
     defaultsBySlot: {

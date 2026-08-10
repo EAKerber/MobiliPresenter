@@ -4,7 +4,8 @@ import {
   CURRENT_FIDELITY_VIEWPORT,
   currentFaucetAnchor,
   currentFixedCamera,
-  currentSceneBase
+  currentSceneBase,
+  currentUnderCabLightContract
 } from "@mobilipresenter/scene-core";
 import {
   ACESFilmicToneMapping,
@@ -27,6 +28,7 @@ import { ThreeMaterialRegistry } from "./renderer/three/materials.js";
 import { createSelectiveBloomPipeline } from "./renderer/three/post.js";
 import { buildThreeScene } from "./renderer/three/scene-adapter.js";
 import { applyFh06SinkRefinement } from "./renderer/three/sink-refinement.js";
+import { applyFh06UnderCabProfile } from "./renderer/three/under-cab-profile.js";
 import { applyFh06VisualRefinements } from "./renderer/three/visual-refinements.js";
 import { applyFh06FullWallTiles } from "./renderer/three/wall-tiles.js";
 
@@ -76,6 +78,7 @@ applyFh06VisualRefinements(adapter, materials);
 const tileRefinement = applyFh06FullWallTiles(adapter, currentSceneBase);
 const sinkRefinement = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
 const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
+const underCabRefinement = applyFh06UnderCabProfile(adapter, materials, currentSceneBase, currentUnderCabLightContract);
 app.dataset.wallTileCoverage = "full-wall";
 app.dataset.wallTileSurfaceCount = String(tileRefinement.surfaceCount);
 app.dataset.sinkRefinement = sinkRefinement.sinkFamilyId;
@@ -83,6 +86,10 @@ app.dataset.sinkStoneHole = sinkRefinement.stoneHoleGeometry;
 app.dataset.sinkContinuousBowl = sinkRefinement.continuousBowl ? "true" : "false";
 app.dataset.faucetRefinement = faucetRefinement.presetId;
 app.dataset.faucetHost = faucetRefinement.hostEntityId;
+app.dataset.underCabProfile = "rear-corner-18mm-45deg";
+app.dataset.underCabKelvin = String(underCabRefinement.colorTemperatureK);
+app.dataset.underCabHost = underCabRefinement.hostModuleId;
+app.dataset.underCabAreaLight = underCabRefinement.hasActualAreaLight ? "true" : "false";
 adapter.scene.background = new Color(0xf3f2ee);
 
 if (fidelityOverlayMode && !fidelityCrop) {
