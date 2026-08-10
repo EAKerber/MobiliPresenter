@@ -52,7 +52,7 @@ test("washer and fridge honor Promob target envelopes rather than source-style d
   assert.deepEqual(fridgeFit.fittedMm, { width: 809, height: 1900, depth: 750 });
 });
 
-test("micro uses letterbox fit and oven preserves nominal front inside larger slot", () => {
+test("micro uses letterbox fit and oven preserves 596x596 front inside explicit 600x600 opening", () => {
   const micro = applianceItems.find(item => item.definitionId === "AP-MICRO-01");
   const oven = applianceItems.find(item => item.definitionId === "AP-OVEN-01");
   assert.ok(micro && oven);
@@ -60,8 +60,19 @@ test("micro uses letterbox fit and oven preserves nominal front inside larger sl
   const ovenFit = resolveApplianceFit(currentSceneBase, oven, definitionFor(oven));
   assert.equal(microFit.fittedMm.width, 550);
   assert.ok(microFit.offsetMm[2] > 0);
+  assert.deepEqual(ovenFit.envelopeMm, { width: 600, height: 600, depth: 525 });
   assert.deepEqual(ovenFit.fittedMm, { width: 596, height: 596, depth: 525 });
-  assert.ok(ovenFit.offsetMm[0] > 0);
+  assert.equal(ovenFit.offsetMm[0], 2);
+  assert.equal(ovenFit.offsetMm[2], 0);
+
+  const placement = resolveItemPlacementTransform(currentSceneBase, oven);
+  assert.deepEqual(placement.translationMm, { x: 3167.244, y: 8102.44, z: 181 });
+  const visualFrontOrigin = {
+    x: placement.translationMm.x + ovenFit.offsetMm[0],
+    y: placement.translationMm.y,
+    z: placement.translationMm.z + ovenFit.offsetMm[2]
+  };
+  assert.deepEqual(visualFrontOrigin, { x: 3169.244, y: 8102.44, z: 181 });
 });
 
 test("parametric family generation is deterministic for same definition and fit", () => {
