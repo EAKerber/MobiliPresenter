@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "browser": "/usr/bin/google-chrome",
+  "url": "http://127.0.0.1:4173/",
+  "viewportPx": [
+    1865,
+    967
+  ],
+  "screenshotBytes": 134659,
+  "requiredDomMarkers": [
+    "data-renderer-backend=\"three-webgl2\"",
+    "data-renderer-ready=\"true\"",
+    "data-frame-rendered=\"true\"",
+    "data-scene-id=\"traditional-complete\"",
+    "data-sink-refinement=\"SINK-UNDERMOUNT-40X34-01\"",
+    "data-sink-stone-hole=\"extruded-shape-with-rounded-hole\"",
+    "data-sink-continuous-bowl=\"true\""
+  ]
+}
