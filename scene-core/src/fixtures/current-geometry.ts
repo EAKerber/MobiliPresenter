@@ -2,6 +2,7 @@ import type {
   ApplianceFrontOpening,
   ApplianceSlot,
   BoxGeometry,
+  DimensionTripleMm,
   EnvironmentGeometry,
   FaceGeometry,
   ModuleGeometry
@@ -71,7 +72,8 @@ const slot = (
   defaultApplianceId: string,
   status: "confirmed" | "inferred",
   evidenceRefs: readonly string[],
-  frontOpening?: ApplianceFrontOpening
+  frontOpening?: ApplianceFrontOpening,
+  cavitySizeMm?: DimensionTripleMm
 ): ApplianceSlot => ({
   id,
   role,
@@ -80,7 +82,8 @@ const slot = (
   defaultApplianceId,
   status,
   evidenceRefs,
-  ...(frontOpening ? { frontOpening } : {})
+  ...(frontOpening ? { frontOpening } : {}),
+  ...(cavitySizeMm ? { cavitySizeMm } : {})
 });
 
 export const currentEnvironment: EnvironmentGeometry = {
@@ -142,19 +145,20 @@ export const module02: ModuleGeometry = {
     slot(
       "scene/traditional/module/lower-stove/slot/oven",
       "built-in-oven",
-      t(18, 5, 18),
-      755.01,
-      724,
+      t(MODULE02_OVEN_OPENING_X, -18, MODULE02_OVEN_OPENING_Z),
+      600,
+      600,
       525,
       "AP-OVEN-01",
-      "confirmed",
-      ["technical-sheet:module-02", "promob-dxf:LAYER134-139"],
+      "inferred",
+      ["user-reference:module02-oven-surround", "design-default:fh06-1:60cm-built-in-oven-opening", "technical-sheet:module-02", "promob-dxf:LAYER134-139"],
       {
         localTransform: t(MODULE02_OVEN_OPENING_X, -18, MODULE02_OVEN_OPENING_Z),
         sizeMm: { width: 600, height: 600 },
         status: "inferred",
         evidenceRefs: ["user-reference:module02-oven-surround", "design-default:fh06-1:60cm-built-in-oven-opening"]
-      }
+      },
+      { width: 755.01, height: 724, depth: 525 }
     ),
     slot("scene/traditional/module/lower-stove/slot/cooktop", "cooktop", t(95.505, -5, 796), 600, 60, 520, "AP-COOKTOP-01", "inferred", ["style-anchor:target-render", "promob-dxf:LAYER148-countertop"])
   ]
