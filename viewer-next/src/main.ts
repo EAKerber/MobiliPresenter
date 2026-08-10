@@ -268,6 +268,56 @@ const runtimeApi: ViewerRuntimeControlApi = {
 
 (window as Window & { __MOBILIPRESENTER_VIEWER__?: ViewerRuntimeControlApi }).__MOBILIPRESENTER_VIEWER__ = runtimeApi;
 
+interface RendererResourceSnapshot {
+  readonly geometries: number;
+  readonly textures: number;
+  readonly programs: number;
+}
+
+function rendererResourceSnapshot(): RendererResourceSnapshot {
+  return {
+    geometries: renderer.info.memory.geometries,
+    textures: renderer.info.memory.textures,
+    programs: renderer.info.programs?.length ?? 0
+  };
+}
+
+function resourceSnapshotText(value: RendererResourceSnapshot): string {
+  return `${value.geometries},${value.textures},${value.programs}`;
+}
+
+function runLifecycleExercise(): void {
+  const cycle = (): void => {
+    runtimeApi.setModuleVisibility("02", "off");
+    runtimeApi.setModuleVisibility("02", "inherit");
+    runtimeApi.setFrontPreset("03", "neutral-greige");
+    runtimeApi.setStonePreset("graphite-speckled");
+    runtimeApi.setLightingPreset("warm-worktop");
+    runtimeApi.selectModule("03");
+    runtimeApi.selectModule(null);
+    runtimeApi.resetConfiguration();
+  };
+
+  cycle();
+  const before = rendererResourceSnapshot();
+  cycle();
+  cycle();
+  const after = rendererResourceSnapshot();
+  const pass =
+    after.geometries <= before.geometries &&
+    after.textures <= before.textures &&
+    after.programs <= before.programs;
+
+  app.dataset.viewerLifecycleBefore = resourceSnapshotText(before);
+  app.dataset.viewerLifecycleAfter = resourceSnapshotText(after);
+  app.dataset.viewerLifecycleStatus = pass ? "pass" : "fail";
+  syncDatasets();
+  render();
+  if (!pass) {
+    throw new Error(`VIEWER_RESOURCE_GROWTH:${resourceSnapshotText(before)}:${resourceSnapshotText(after)}`);
+  }
+}
+
 function resize(): void {
   const widthPx = Math.max(1, Math.round(app.clientWidth));
   const heightPx = Math.max(1, Math.round(app.clientHeight));
@@ -283,6 +333,7 @@ const observer = new ResizeObserver(resize);
 observer.observe(app);
 app.dataset.rendererReady = "true";
 resize();
+if (query.get("exercise") === "lifecycle") runLifecycleExercise();
 
 window.addEventListener("pagehide", () => {
   observer.disconnect();
