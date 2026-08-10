@@ -119,6 +119,17 @@ CASES = (
             marker("viewer-selection-overlay-count", "1"),
         ),
     },
+    {
+        "id": "lifecycle",
+        "params": {"exercise": "lifecycle"},
+        "markers": (
+            marker("viewer-lifecycle-status", "pass"),
+            marker("viewer-module02-visible", "true"),
+            marker("viewer-range-visible", "false"),
+            marker("viewer-lighting-preset", "canonical"),
+            marker("viewer-selection-overlay-count", "0"),
+        ),
+    },
 )
 
 
@@ -174,6 +185,7 @@ def main() -> None:
             "resolvedMaterialsObserved": True,
             "lightingPolicyObserved": True,
             "selectionOverlayObserved": True,
+            "repeatedRebuildLifecycleObserved": True,
         },
     }
     EVIDENCE.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
