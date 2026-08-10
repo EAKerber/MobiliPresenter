@@ -1,21 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CURRENT_FIDELITY_VIEWPORT,
   currentFaucetAnchor,
+  currentFixedCamera,
   currentSceneBase,
   currentUnderCabLightContract,
   module02,
   module03WithSink,
   module06
 } from "@mobilipresenter/scene-core";
+import { Box3, Mesh, Vector3 } from "three";
 import { styleAnchorAppearance } from "../dist-ts/src/fixtures/style-anchor.js";
 import { attachParametricAppliances } from "../dist-ts/src/renderer/three/appliances.js";
+import { createThreeCamera } from "../dist-ts/src/renderer/three/camera.js";
 import { applyFh06FaucetRefinement } from "../dist-ts/src/renderer/three/faucet-refinement.js";
 import {
   auditRenderOwnership,
   selectableModuleIdForObject
 } from "../dist-ts/src/renderer/three/ownership.js";
-import { createModuleSelectionOverlay } from "../dist-ts/src/renderer/three/selection.js";
+import {
+  createModuleSelectionOverlay,
+  pickModuleAtNdc
+} from "../dist-ts/src/renderer/three/selection.js";
 import { buildThreeScene } from "../dist-ts/src/renderer/three/scene-adapter.js";
 import { applyFh06SinkRefinement } from "../dist-ts/src/renderer/three/sink-refinement.js";
 import { applyFh06UnderCabProfile } from "../dist-ts/src/renderer/three/under-cab-profile.js";
@@ -54,6 +61,40 @@ test("picking an owned child maps through hosted ownership to its module", () =>
   const led = adapter.entityGroups.get("scene/traditional/accessory/under-cab-led-06")?.children[0];
   assert.ok(led);
   assert.equal(selectableModuleIdForObject(adapter, currentSceneBase, led), module06.id);
+  registry.dispose();
+});
+
+test("direct raycast picks a visible module and excludes the same hidden root", () => {
+  const { registry, adapter } = buildOwnedAdapter();
+  const target = adapter.entityGroups.get(module03WithSink.id);
+  assert.ok(target);
+
+  for (const group of adapter.entityGroups.values()) group.visible = false;
+  target.visible = true;
+  target.updateWorldMatrix(true, true);
+
+  let targetMesh = null;
+  target.traverse(object => {
+    if (targetMesh === null && object instanceof Mesh) targetMesh = object;
+  });
+  assert.ok(targetMesh, "module03 must expose at least one raycastable mesh");
+
+  const camera = createThreeCamera(currentFixedCamera, CURRENT_FIDELITY_VIEWPORT);
+  const worldCenter = new Box3().setFromObject(targetMesh).getCenter(new Vector3());
+  const projected = worldCenter.clone().project(camera);
+  assert.ok(Number.isFinite(projected.x) && Number.isFinite(projected.y));
+  assert.ok(Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1, "target mesh must be inside the canonical view");
+
+  assert.equal(
+    pickModuleAtNdc(adapter, currentSceneBase, camera, [projected.x, projected.y]),
+    module03WithSink.id
+  );
+
+  target.visible = false;
+  assert.equal(
+    pickModuleAtNdc(adapter, currentSceneBase, camera, [projected.x, projected.y]),
+    null
+  );
   registry.dispose();
 });
 
