@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "browser": "/usr/bin/google-chrome",
+  "url": "http://127.0.0.1:4173/",
+  "viewportPx": [
+    1865,
+    967
+  ],
+  "screenshotBytes": 252945,
+  "requiredDomMarkers": [
+    "data-renderer-backend=\"three-webgl2\"",
+    "data-renderer-ready=\"true\"",
+    "data-frame-rendered=\"true\"",
+    "data-scene-id=\"traditional-complete\"",
+    "data-color-treatment=\"fh06-s10-neutral-warm-v1\"",
+    "data-occlusion=\"gtao-mm-v1\"",
+    "data-occlusion-radius-mm=\"72\"",
+    "data-occlusion-blend=\"0.38\"",
+    "data-cooktop-contact=\"fh06-s10-cooktop-stone-contact-v1\"",
+    "data-cooktop-gap-mm=\"1.000\"",
+    "data-front-readability=\"module03-drawer-bevel-recess-v1\"",
+    "data-front-physical-gap-mm=\"2,2,2\"",
+    "data-oven-readability=\"fh06-s10-oven-physical-reveal-v1\"",
+    "data-oven-physical-clearance-mm=\"2,2,2,2\"",
+    "data-wall-tile-coverage=\"full-wall\"",
+    "data-wall-tile-surface-count=\"4\"",
+    "data-sink-refinement=\"SINK-UNDERMOUNT-40X34-01\"",
+    "data-sink-stone-hole=\"extruded-shape-with-rounded-hole\"",
+    "data-sink-continuous-bowl=\"true\"",
+    "data-faucet-refinement=\"FAUCET-HIGH-ARC-01\"",
+    "data-faucet-host=\"scene/traditional/accessory/stone-03\"",
+    "data-under-cab-profile=\"rear-corner-18mm-45deg\"",
+    "data-under-cab-kelvin=\"3000\"",
+    "data-under-cab-host=\"scene/traditional/module/upper-sink-microwave\"",
+    "data-under-cab-area-light=\"true\""
+  ]
+}

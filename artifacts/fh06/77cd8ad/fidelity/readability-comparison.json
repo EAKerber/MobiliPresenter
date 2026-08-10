@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "ReadabilityComparison 1.3",
+  "baseline": "../fidelity/baselines/fh06-1-s8-readability.json",
+  "candidate": "/tmp/mobilipresenter-readability-report.json",
+  "migration": "../fidelity/migrations/fh06-1-s10-appearance-probes.json",
+  "policy": {
+    "maxRecallDrop": 0.05,
+    "maxMedianContrastDrop": 0.015,
+    "maxP10ContrastDrop": 0.01,
+    "maxMedianOffsetIncreaseCanonicalPx": 0.5,
+    "recallRequiresBaselineMargin": {
+      "medianContrastMargin": 0.015,
+      "p10ContrastMargin": 0.01
+    },
+    "legacyBaselineThresholdMayComeFromSameCandidateProbe": true,
+    "nearThresholdRecallIsDiagnosticOnly": true,
+    "probeSetChangeRequiresExplicitMigration": true,
+    "appearanceRebaselineRequiresDedicatedGate": true
+  },
+  "pass": true,
+  "regressions": [],
+  "deltas": [
+    {
+      "id": "module01/door-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.02765941176470582,
+      "p10PeakContrast": 0.0256317647058823,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module03/door-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": 0.037063137254901984,
+      "p10PeakContrast": 0.03329184313725497,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    },
+    {
+      "id": "module06/door-left-center-seam",
+      "edgeRecall": 0.0,
+      "medianPeakContrast": -0.00798078431372548,
+      "p10PeakContrast": -0.007284705882353082,
+      "medianEdgeOffsetCanonicalPx": 0.0,
+      "effectiveContrastThreshold": 0.02,
+      "thresholdSource": "baseline",
+      "recallRegressionEnforced": true,
+      "regressionReasons": []
+    }
+  ],
+  "comparableProbeIds": [
+    "module01/door-seam",
+    "module03/door-seam",
+    "module06/door-left-center-seam"
+  ],
+  "rebaselinedProbeIds": [
+    "module02/oven-opening-bottom",
+    "module02/oven-opening-left",
+    "module02/oven-opening-right",
+    "module02/oven-opening-top",
+    "module03/drawer-seam/1-2",
+    "module03/drawer-seam/2-3",
+    "module03/drawer-seam/3-4"
+  ],
+  "newProbeIds": [
+    "sink/opening/back",
+    "sink/opening/front",
+    "sink/opening/left",
+    "sink/opening/right"
+  ],
+  "supersededProbeIds": []
+}

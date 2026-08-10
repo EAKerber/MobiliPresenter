@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "S10ReadabilityGate 1.0",
+  "report": "/tmp/mobilipresenter-readability-report.json",
+  "pass": true,
+  "policy": {
+    "oven": {
+      "minEdgeRecall": 0.9,
+      "minMedianPeakContrast": 0.12,
+      "minP10PeakContrast": 0.1,
+      "maxMedianEdgeOffsetCanonicalPx": 1.0,
+      "maxP95EdgeOffsetCanonicalPx": 1.25
+    },
+    "drawers": {
+      "minEdgeRecall": 0.95,
+      "minMedianPeakContrast": 0.12,
+      "minP10PeakContrast": 0.1,
+      "maxMedianEdgeOffsetCanonicalPx": 0.75,
+      "maxMedianContrastSpread": 0.02
+    },
+    "rationale": "S10 intentionally changes lower-cabinet material response. Oven and drawer metric endpoints remain fixed, but appearance quality is gated absolutely instead of preserving historical contrast values."
+  },
+  "oven": [
+    {
+      "id": "module02/oven-opening-left",
+      "pass": true,
+      "reasons": [],
+      "metrics": {
+        "id": "module02/oven-opening-left",
+        "role": "oven-surround",
+        "samples": 48,
+        "contrastThreshold": 0.02,
+        "edgeRecall": 1.0,
+        "medianPeakContrast": 0.19273215686274509,
+        "p10PeakContrast": 0.19031203921568632,
+        "medianEdgeOffsetCanonicalPx": 0.25,
+        "p95EdgeOffsetCanonicalPx": 0.25
+      }
+    },
+    {
+      "id": "module02/oven-opening-right",
+      "pass": true,
+      "reasons": [],
+      "metrics": {
+        "id": "module02/oven-opening-right",
+        "role": "oven-surround",
+        "samples": 48,
+        "contrastThreshold": 0.02,
+        "edgeRecall": 1.0,
+        "medianPeakContrast": 0.18853529411764708,
+        "p10PeakContrast": 0.18453113725490194,
+        "medianEdgeOffsetCanonicalPx": 0.25,
+        "p95EdgeOffsetCanonicalPx": 1.0
+      }
+    },
+    {
+      "id": "module02/oven-opening-bottom",
+      "pass": true,
+      "reasons": [],
+      "metrics": {
+        "id": "module02/oven-opening-bottom",
+        "role": "oven-surround",
+        "samples": 48,
+        "contrastThreshold": 0.02,
+        "edgeRecall": 1.0,
+        "medianPeakContrast": 0.1888105882352941,
+        "p10PeakContrast": 0.18866901960784307,
+        "medianEdgeOffsetCanonicalPx": 0.25,
+        "p95EdgeOffsetCanonicalPx": 0.25
+      }
+    },
+    {
+      "id": "module02/oven-opening-top",
+      "pass": true,
+      "reasons": [],
+      "metrics": {
+        "id": "module02/oven-opening-top",
+        "role": "oven-surround",
+        "samples": 48,
+        "contrastThreshold": 0.02,
+        "edgeRecall": 1.0,
+        "medianPeakContrast": 0.21482470588235297,
+        "p10PeakContrast": 0.21057603921568627,
+        "medianEdgeOffsetCanonicalPx": 0.75,
+        "p95EdgeOffsetCanonicalPx": 0.75
+      }
+    }
+  ],
+  "drawers": {
+    "probes": [
+      {
+        "id": "module03/drawer-seam/1-2",
+        "pass": true,
+        "reasons": [],
+        "metrics": {
+          "id": "module03/drawer-seam/1-2",
+          "role": "front-seam",
+          "samples": 48,
+          "contrastThreshold": 0.02,
+          "edgeRecall": 1.0,
+          "medianPeakContrast": 0.17327607843137252,
+          "p10PeakContrast": 0.17131529411764704,
+          "medianEdgeOffsetCanonicalPx": 0.0,
+          "p95EdgeOffsetCanonicalPx": 0.0
+        }
+      },
+      {
+        "id": "module03/drawer-seam/2-3",
+        "pass": true,
+        "reasons": [],
+        "metrics": {
+          "id": "module03/drawer-seam/2-3",
+          "role": "front-seam",
+          "samples": 48,
+          "contrastThreshold": 0.02,
+          "edgeRecall": 1.0,
+          "medianPeakContrast": 0.17103999999999997,
+          "p10PeakContrast": 0.17062313725490194,
+          "medianEdgeOffsetCanonicalPx": 0.25,
+          "p95EdgeOffsetCanonicalPx": 0.25
+        }
+      },
+      {
+        "id": "module03/drawer-seam/3-4",
+        "pass": true,
+        "reasons": [],
+        "metrics": {
+          "id": "module03/drawer-seam/3-4",
+          "role": "front-seam",
+          "samples": 48,
+          "contrastThreshold": 0.02,
+          "edgeRecall": 1.0,
+          "medianPeakContrast": 0.17454470588235296,
+          "p10PeakContrast": 0.1730007843137255,
+          "medianEdgeOffsetCanonicalPx": 0.25,
+          "p95EdgeOffsetCanonicalPx": 0.25
+        }
+      }
+    ],
+    "medianContrastSpread": 0.003504705882352993,
+    "uniformityPass": true
+  },
+  "failures": []
+}
