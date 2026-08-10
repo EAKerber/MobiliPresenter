@@ -9,8 +9,9 @@ CANDIDATE_PATH = Path(sys.argv[2])
 OUTPUT_PATH = Path(sys.argv[3] if len(sys.argv) > 3 else "/tmp/mobilipresenter-readability-comparison.json")
 MIGRATION_PATH = Path(sys.argv[4]) if len(sys.argv) > 4 else None
 
-# These are regression tolerances, not desired-quality thresholds. They allow tiny
-# raster variation while preventing an unrelated visual edit from degrading a seam.
+# Regression tolerances, not desired-quality thresholds. Continuous contrast/offset
+# metrics remain authoritative near the edge-detection threshold so a tiny contrast
+# change cannot create a false 1.0 -> 0.0 recall cliff.
 MAX_RECALL_DROP = 0.05
 MAX_MEDIAN_CONTRAST_DROP = 0.015
 MAX_P10_CONTRAST_DROP = 0.01
@@ -50,6 +51,14 @@ def validate_probe_sets(baseline_by_id: dict, candidate_by_id: dict, migration: 
     return sorted(unchanged)
 
 
+def recall_is_robust(before: dict) -> bool:
+    threshold = float(before["contrastThreshold"])
+    return (
+        float(before["medianPeakContrast"]) >= threshold + MAX_MEDIAN_CONTRAST_DROP
+        and float(before["p10PeakContrast"]) >= threshold + MAX_P10_CONTRAST_DROP
+    )
+
+
 def main() -> None:
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     candidate = json.loads(CANDIDATE_PATH.read_text(encoding="utf-8"))
@@ -63,15 +72,17 @@ def main() -> None:
     for probe_id in comparable_ids:
         before = baseline_by_id[probe_id]
         after = candidate_by_id[probe_id]
+        robust_recall = recall_is_robust(before)
         delta = {
             "id": probe_id,
             "edgeRecall": after["edgeRecall"] - before["edgeRecall"],
             "medianPeakContrast": after["medianPeakContrast"] - before["medianPeakContrast"],
             "p10PeakContrast": after["p10PeakContrast"] - before["p10PeakContrast"],
             "medianEdgeOffsetCanonicalPx": after["medianEdgeOffsetCanonicalPx"] - before["medianEdgeOffsetCanonicalPx"],
+            "recallRegressionEnforced": robust_recall,
         }
         reasons = []
-        if delta["edgeRecall"] < -MAX_RECALL_DROP:
+        if robust_recall and delta["edgeRecall"] < -MAX_RECALL_DROP:
             reasons.append("edge-recall")
         if delta["medianPeakContrast"] < -MAX_MEDIAN_CONTRAST_DROP:
             reasons.append("median-contrast")
@@ -87,7 +98,7 @@ def main() -> None:
     added_ids = sorted(migration.get("addedProbeIds", [])) if migration else []
     superseded_ids = sorted(migration.get("supersededProbeIds", [])) if migration else []
     payload = {
-        "schemaVersion": "ReadabilityComparison 1.1",
+        "schemaVersion": "ReadabilityComparison 1.2",
         "baseline": str(BASELINE_PATH),
         "candidate": str(CANDIDATE_PATH),
         "migration": str(MIGRATION_PATH) if MIGRATION_PATH else None,
@@ -96,6 +107,11 @@ def main() -> None:
             "maxMedianContrastDrop": MAX_MEDIAN_CONTRAST_DROP,
             "maxP10ContrastDrop": MAX_P10_CONTRAST_DROP,
             "maxMedianOffsetIncreaseCanonicalPx": MAX_OFFSET_INCREASE_PX,
+            "recallRequiresBaselineMargin": {
+                "medianContrastMargin": MAX_MEDIAN_CONTRAST_DROP,
+                "p10ContrastMargin": MAX_P10_CONTRAST_DROP,
+            },
+            "nearThresholdRecallIsDiagnosticOnly": True,
             "probeSetChangeRequiresExplicitMigration": True,
         },
         "pass": not regressions,
