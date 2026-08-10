@@ -100,3 +100,5 @@ test("changing the stone preset does not change the S4 sink cutout or placement 
   light.materials.dispose();
   graphite.materials.dispose();
 });
+
+// CI checkpoint: S4 is published atomically in parent 00a0b297.
