@@ -145,7 +145,7 @@ export const module02: ModuleGeometry = {
     slot(
       "scene/traditional/module/lower-stove/slot/oven",
       "built-in-oven",
-      t(MODULE02_OVEN_OPENING_X, -18, MODULE02_OVEN_OPENING_Z),
+      t(MODULE02_OVEN_OPENING_X, -18, MODULE02_OVEN_OPENING_Z + 2),
       600,
       600,
       525,
