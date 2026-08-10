@@ -64,9 +64,10 @@ BASE_MARKERS = (
     marker("frame-rendered", "true"),
     marker("render-ownership", "pass"),
     marker("scene-id", "traditional-complete"),
+    marker("viewer-transition-mode", "incremental-domain-sync-v1"),
 )
 
-CASES = (
+VISUAL_CASES = (
     {
         "id": "baseline",
         "params": {},
@@ -125,22 +126,21 @@ CASES = (
             marker("viewer-selection-overlay-count", "1"),
         ),
     },
-    *(
-        {
-            "id": f"lifecycle-{family}",
-            "params": {"exercise": f"lifecycle-{family}"},
-            "screenshot": False,
-            "lifecycle": True,
-            "markers": (
-                marker("viewer-lifecycle-status", "pass"),
-                marker("viewer-lifecycle-family", family),
-                marker("viewer-module02-visible", "true"),
-                marker("viewer-range-visible", "false"),
-                marker("viewer-lighting-preset", "canonical"),
-            ),
-        }
-        for family in ("visibility", "appearance", "lighting", "selection")
-    ),
+)
+
+LIFECYCLE_CASES = tuple(
+    {
+        "id": f"lifecycle-{family}",
+        "params": {"exercise": f"lifecycle-{family}"},
+        "markers": (
+            marker("viewer-lifecycle-status", "pass"),
+            marker("viewer-lifecycle-family", family),
+            marker("viewer-module02-visible", "true"),
+            marker("viewer-range-visible", "false"),
+            marker("viewer-lighting-preset", "canonical"),
+        ),
+    }
+    for family in ("visibility", "appearance", "lighting")
 )
 
 
@@ -149,10 +149,9 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, object]] = []
 
-    for case in CASES:
+    for case in VISUAL_CASES:
         case_id = str(case["id"])
-        params = case["params"]
-        query = urlencode(params)
+        query = urlencode(case["params"])
         url = BASE_URL + (f"?{query}" if query else "")
         dom_path = OUT / f"{case_id}.html"
         screenshot_path = OUT / f"{case_id}.png"
@@ -161,45 +160,58 @@ def main() -> None:
         if dom_result.returncode != 0:
             raise SystemExit(f"RUNTIME_DOM_FAILED:{case_id}:{dom_result.stderr[-2000:]}")
         dom_path.write_text(dom_result.stdout, encoding="utf-8")
-
         required = BASE_MARKERS + tuple(case["markers"])
         missing = [needle for needle in required if needle not in dom_result.stdout]
         if missing:
             raise SystemExit(f"RUNTIME_DOM_GATE_FAILED:{case_id}:{missing}")
 
-        result: dict[str, object] = {
+        shot_result = run(chrome_args(chrome) + [f"--screenshot={screenshot_path}", url])
+        if shot_result.returncode != 0 or not screenshot_path.is_file():
+            raise SystemExit(f"RUNTIME_SCREENSHOT_FAILED:{case_id}:{shot_result.stderr[-2000:]}")
+        width, height = png_size(screenshot_path)
+        if (width, height) != (1865, 967):
+            raise SystemExit(f"RUNTIME_SCREENSHOT_SIZE_MISMATCH:{case_id}:{width}x{height}")
+        if screenshot_path.stat().st_size < 10_000:
+            raise SystemExit(f"RUNTIME_SCREENSHOT_SUSPICIOUSLY_SMALL:{case_id}:{screenshot_path.stat().st_size}")
+
+        results.append({
             "id": case_id,
             "url": url,
+            "viewportPx": [width, height],
+            "screenshotBytes": screenshot_path.stat().st_size,
             "markers": list(required),
-        }
+        })
 
-        if bool(case.get("screenshot", True)):
-            shot_result = run(chrome_args(chrome) + [f"--screenshot={screenshot_path}", url])
-            if shot_result.returncode != 0 or not screenshot_path.is_file():
-                raise SystemExit(f"RUNTIME_SCREENSHOT_FAILED:{case_id}:{shot_result.stderr[-2000:]}")
-            width, height = png_size(screenshot_path)
-            if (width, height) != (1865, 967):
-                raise SystemExit(f"RUNTIME_SCREENSHOT_SIZE_MISMATCH:{case_id}:{width}x{height}")
-            if screenshot_path.stat().st_size < 10_000:
-                raise SystemExit(f"RUNTIME_SCREENSHOT_SUSPICIOUSLY_SMALL:{case_id}:{screenshot_path.stat().st_size}")
-            result["viewportPx"] = [width, height]
-            result["screenshotBytes"] = screenshot_path.stat().st_size
-        else:
-            result["screenshot"] = "skipped-nonvisual-gate"
+    for case in LIFECYCLE_CASES:
+        case_id = str(case["id"])
+        url = BASE_URL + "?" + urlencode(case["params"])
+        dom_path = OUT / f"{case_id}.html"
+        dom_result = run(chrome_args(chrome) + ["--dump-dom", url])
+        if dom_result.returncode != 0:
+            raise SystemExit(f"RUNTIME_DOM_FAILED:{case_id}:{dom_result.stderr[-2000:]}")
+        dom_path.write_text(dom_result.stdout, encoding="utf-8")
+        required = BASE_MARKERS + tuple(case["markers"])
+        missing = [needle for needle in required if needle not in dom_result.stdout]
+        if missing:
+            raise SystemExit(f"RUNTIME_DOM_GATE_FAILED:{case_id}:{missing}")
 
-        if bool(case.get("lifecycle", False)):
-            before = data_attr(dom_result.stdout, "viewer-lifecycle-before")
-            after = data_attr(dom_result.stdout, "viewer-lifecycle-after")
-            duration = data_attr(dom_result.stdout, "viewer-lifecycle-duration-ms")
-            if before is None or after is None or duration is None:
-                raise SystemExit(f"RUNTIME_LIFECYCLE_EVIDENCE_MISSING:{case_id}")
-            result["lifecycle"] = {
+        before = data_attr(dom_result.stdout, "viewer-lifecycle-before")
+        after = data_attr(dom_result.stdout, "viewer-lifecycle-after")
+        duration = data_attr(dom_result.stdout, "viewer-lifecycle-duration-ms")
+        if before is None or after is None or duration is None:
+            raise SystemExit(f"RUNTIME_LIFECYCLE_EVIDENCE_MISSING:{case_id}")
+
+        results.append({
+            "id": case_id,
+            "url": url,
+            "screenshot": "skipped-nonvisual-gate",
+            "markers": list(required),
+            "lifecycle": {
                 "before": before,
                 "after": after,
                 "durationMs": float(duration),
-            }
-
-        results.append(result)
+            },
+        })
 
     evidence = {
         "schemaVersion": "ViewerRuntimeControlsEvidence 0.1.0",
@@ -213,7 +225,8 @@ def main() -> None:
             "resolvedMaterialsObserved": True,
             "lightingPolicyObserved": True,
             "selectionOverlayObserved": True,
-            "boundedLifecycleFamiliesObserved": ["visibility", "appearance", "lighting", "selection"],
+            "boundedLifecycleFamiliesObserved": ["visibility", "appearance", "lighting"],
+            "selectionInteractionLifecycleCoveredByStructuralTest": True,
         },
     }
     EVIDENCE.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
