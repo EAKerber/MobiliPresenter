@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "MobiliPresenterUserArtifactManifest 1.0",
+  "status": "verified-ci-artifact",
+  "source": {
+    "branch": "renderer/fixed-view-realistic-v1",
+    "commit": "c45a015c9a717cebab7d8893f40cb1a480f6015f",
+    "workflowRunId": 31349306706
+  },
+  "files": [
+    {
+      "path": "fh06-c45a015-verified-bundle.zip",
+      "sizeBytes": 473557,
+      "sha256": "e7a3984dcd8cdf5e395182864cc19f4ce1fb687e9b318873c179b741a965a4f5"
+    },
+    {
+      "path": "fidelity/fidelity-dom.html",
+      "sizeBytes": 889,
+      "sha256": "4a4d9f12821290a284ebe9fca0c4221b6f3a84b857822700797448b3954dabcb"
+    },
+    {
+      "path": "fidelity/fidelity-evidence.json",
+      "sizeBytes": 691,
+      "sha256": "42b1f4a28414d245f551578ccc10dcb271b16e38b3cee9b231b91ca4549997d4"
+    },
+    {
+      "path": "fidelity/fidelity-overlay-1x.png",
+      "sizeBytes": 189296,
+      "sha256": "b7b8496d8048e4b7f49b484d059afb4d13a7286c09e7055ab0edf880cd2638bd"
+    },
+    {
+      "path": "fidelity/preview.log",
+      "sizeBytes": 77,
+      "sha256": "ae24f783560c59deed04caeff90ef3b84a3c0d3a50ca749550cfeeed2c58dd88"
+    },
+    {
+      "path": "fidelity/readability-comparison.json",
+      "sizeBytes": 4425,
+      "sha256": "da4f974eae1ae937d04cae52ea00ef7882ee4f51cca743e9b927ded01c727a0f"
+    },
+    {
+      "path": "fidelity/readability-crops/module01.png",
+      "sizeBytes": 4294,
+      "sha256": "b2117c271d397eb60393fb1b247feb88a9b1409703092ea26ca002e36265dca4"
+    },
+    {
+      "path": "fidelity/readability-crops/module02.png",
+      "sizeBytes": 141425,
+      "sha256": "4c85179fdceea04bfa84c04e214af7e579732a6a8264237891323e1b512e06a6"
+    },
+    {
+      "path": "fidelity/readability-crops/module03.png",
+      "sizeBytes": 9446,
+      "sha256": "41e6e1c453acfdd4bdd229ec56bd38be170080699af5353c236b28efe863b3dc"
+    },
+    {
+      "path": "fidelity/readability-crops/module06.png",
+      "sizeBytes": 4114,
+      "sha256": "f14e62aed0f62f791bbd280148b6c1c3cf134edb2fe5cb1da53e11529462fd9b"
+    },
+    {
+      "path": "fidelity/readability-crops.json",
+      "sizeBytes": 3430,
+      "sha256": "eaf42bc99a4976f58df5e05ac768993828bf5262ec41cc4c94796fc1a9393922"
+    },
+    {
+      "path": "fidelity/readability-report.json",
+      "sizeBytes": 3931,
+      "sha256": "b39a0feb548bb889b400517685e10d5a456589843b0b4939aaab55cc74bdc972"
+    },
+    {
+      "path": "fidelity/readability-spec.json",
+      "sizeBytes": 7899,
+      "sha256": "6ae5eb866312eade901aff0a366fbee90118647ec1fd03a92047b5ff500cab15"
+    },
+    {
+      "path": "visual/browser-evidence.json",
+      "sizeBytes": 360,
+      "sha256": "4f2e6014439d7c0b6d1cbc8b5fa3bfebdbc83a9f2f7a002ddf736d90d894c726"
+    },
+    {
+      "path": "visual/preview.log",
+      "sizeBytes": 77,
+      "sha256": "ae24f783560c59deed04caeff90ef3b84a3c0d3a50ca749550cfeeed2c58dd88"
+    },
+    {
+      "path": "visual/renderer-baseline.png",
+      "sizeBytes": 128579,
+      "sha256": "ae4012344a4629a0ea3cc4ae217420ed27de1b0719c487f8fb7d9db0d70f3ba7"
+    },
+    {
+      "path": "visual/renderer-dom.html",
+      "sizeBytes": 859,
+      "sha256": "9e5d8898e95b4eecfa2b17706d2df7820e027e0365d5b893604ca861cf37f348"
+    }
+  ]
+}
