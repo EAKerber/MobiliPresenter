@@ -6,6 +6,8 @@ import struct
 import subprocess
 from pathlib import Path
 
+from runtime_controls_smoke import main as runtime_controls_smoke
+
 URL = "http://127.0.0.1:4173/"
 DOM = Path("/tmp/mobilipresenter-viewer-dom.html")
 SCREENSHOT = Path("/tmp/mobilipresenter-viewer.png")
@@ -79,6 +81,7 @@ def main() -> None:
         'data-under-cab-kelvin="3000"',
         'data-under-cab-host="scene/traditional/module/upper-sink-microwave"',
         'data-under-cab-area-light="true"',
+        'data-render-ownership="pass"',
     )
     missing = [needle for needle in required if needle not in dom_result.stdout]
     if missing:
@@ -103,6 +106,8 @@ def main() -> None:
     }
     EVIDENCE.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
     print(json.dumps(evidence, indent=2))
+
+    runtime_controls_smoke()
 
 
 if __name__ == "__main__":
