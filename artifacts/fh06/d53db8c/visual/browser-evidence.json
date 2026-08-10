@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "browser": "/usr/bin/google-chrome",
+  "url": "http://127.0.0.1:4173/",
+  "viewportPx": [
+    1865,
+    967
+  ],
+  "screenshotBytes": 134524,
+  "requiredDomMarkers": [
+    "data-renderer-backend=\"three-webgl2\"",
+    "data-renderer-ready=\"true\"",
+    "data-frame-rendered=\"true\"",
+    "data-scene-id=\"traditional-complete\""
+  ]
+}

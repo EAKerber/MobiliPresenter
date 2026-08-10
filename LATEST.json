@@ -1,10 +1,10 @@
 {
   "schemaVersion": "MobiliPresenterArtifactPointer 1.0",
-  "sourceCommit": "b7069e23e064743e4922390a01f1b10efe324b5b",
-  "sourceShortSha": "b7069e2",
-  "workflowRunId": 31349349167,
-  "path": "artifacts/fh06/b7069e2",
-  "manifest": "artifacts/fh06/b7069e2/ARTIFACTS.json",
-  "bundle": "artifacts/fh06/b7069e2/fh06-b7069e2-verified-bundle.zip",
-  "preview": "artifacts/fh06/b7069e2/visual/renderer-baseline.png"
+  "sourceCommit": "d53db8c387a103150f09d4549331f004d542f309",
+  "sourceShortSha": "d53db8c",
+  "workflowRunId": 31349365700,
+  "path": "artifacts/fh06/d53db8c",
+  "manifest": "artifacts/fh06/d53db8c/ARTIFACTS.json",
+  "bundle": "artifacts/fh06/d53db8c/fh06-d53db8c-verified-bundle.zip",
+  "preview": "artifacts/fh06/d53db8c/visual/renderer-baseline.png"
 }
