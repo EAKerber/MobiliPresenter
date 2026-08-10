@@ -28,6 +28,7 @@ import { createSelectiveBloomPipeline } from "./renderer/three/post.js";
 import { buildThreeScene } from "./renderer/three/scene-adapter.js";
 import { applyFh06SinkRefinement } from "./renderer/three/sink-refinement.js";
 import { applyFh06VisualRefinements } from "./renderer/three/visual-refinements.js";
+import { applyFh06FullWallTiles } from "./renderer/three/wall-tiles.js";
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (appElement === null) throw new Error("APP_ROOT_NOT_FOUND");
@@ -60,11 +61,7 @@ app.dataset.fidelityMode = fidelityMode ? "true" : "false";
 app.dataset.fidelityOverlay = fidelityOverlayMode ? "true" : "false";
 app.dataset.fidelityCrop = fidelityCrop ? `${fidelityCrop.xPx},${fidelityCrop.yPx},${fidelityCrop.widthPx},${fidelityCrop.heightPx}` : "none";
 
-const renderer = new WebGLRenderer({
-  antialias: true,
-  alpha: false,
-  powerPreference: "high-performance"
-});
+const renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
 renderer.outputColorSpace = SRGBColorSpace;
 renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -73,14 +70,14 @@ renderer.setPixelRatio(fidelityCrop ? 1 : Math.min(window.devicePixelRatio || 1,
 app.appendChild(renderer.domElement);
 
 const materials = new ThreeMaterialRegistry(styleAnchorAppearance);
-const adapter = buildThreeScene(
-  currentSceneBase,
-  (entityId, slot) => materials.resolve(entityId, slot)
-);
+const adapter = buildThreeScene(currentSceneBase, (entityId, slot) => materials.resolve(entityId, slot));
 attachParametricAppliances(adapter, currentSceneBase, styleAnchorAppearance, materials);
 applyFh06VisualRefinements(adapter, materials);
+const tileRefinement = applyFh06FullWallTiles(adapter, currentSceneBase);
 const sinkRefinement = applyFh06SinkRefinement(adapter, materials, currentSceneBase);
 const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
+app.dataset.wallTileCoverage = "full-wall";
+app.dataset.wallTileSurfaceCount = String(tileRefinement.surfaceCount);
 app.dataset.sinkRefinement = sinkRefinement.sinkFamilyId;
 app.dataset.sinkStoneHole = sinkRefinement.stoneHoleGeometry;
 app.dataset.sinkContinuousBowl = sinkRefinement.continuousBowl ? "true" : "false";
@@ -98,22 +95,11 @@ if (fidelityOverlayMode && !fidelityCrop) {
 
 const lighting = buildThreeLighting(currentSceneBase, styleAnchorAppearance);
 adapter.scene.add(lighting.root);
-const environment = installNeutralRoomEnvironment(
-  renderer,
-  adapter.scene,
-  styleAnchorAppearance.lighting.environment.relativeIntensity
-);
+const environment = installNeutralRoomEnvironment(renderer, adapter.scene, styleAnchorAppearance.lighting.environment.relativeIntensity);
 
 let viewport = { widthPx: 1, heightPx: 1 };
 const camera = createThreeCamera(currentFixedCamera, fidelityCrop ? fidelityFullViewport : viewport);
-const post = createSelectiveBloomPipeline(
-  renderer,
-  adapter.scene,
-  camera,
-  styleAnchorAppearance,
-  viewport.widthPx,
-  viewport.heightPx
-);
+const post = createSelectiveBloomPipeline(renderer, adapter.scene, camera, styleAnchorAppearance, viewport.widthPx, viewport.heightPx);
 
 function render(): void {
   post.render();
@@ -125,11 +111,8 @@ function resize(): void {
   const heightPx = Math.max(1, Math.round(app.clientHeight));
   viewport = { widthPx, heightPx };
   renderer.setSize(widthPx, heightPx, false);
-  if (fidelityCrop) {
-    updateThreeCameraCrop(camera, currentFixedCamera, fidelityFullViewport, fidelityCrop);
-  } else {
-    updateThreeCameraViewport(camera, currentFixedCamera, viewport);
-  }
+  if (fidelityCrop) updateThreeCameraCrop(camera, currentFixedCamera, fidelityFullViewport, fidelityCrop);
+  else updateThreeCameraViewport(camera, currentFixedCamera, viewport);
   post.setSize(widthPx, heightPx);
   render();
 }

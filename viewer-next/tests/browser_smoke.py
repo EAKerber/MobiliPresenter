@@ -58,6 +58,8 @@ def main() -> None:
         'data-renderer-ready="true"',
         'data-frame-rendered="true"',
         'data-scene-id="traditional-complete"',
+        'data-wall-tile-coverage="full-wall"',
+        'data-wall-tile-surface-count="4"',
         'data-sink-refinement="SINK-UNDERMOUNT-40X34-01"',
         'data-sink-stone-hole="extruded-shape-with-rounded-hole"',
         'data-sink-continuous-bowl="true"',

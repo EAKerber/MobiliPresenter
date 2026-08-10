@@ -20,7 +20,7 @@ function setup() {
   return { appearance, materials, adapter };
 }
 
-test("FH-06 visual refinements never mutate Scene Core geometry", () => {
+test("FH-06 hood refinement never mutates Scene Core geometry", () => {
   const before = sceneGeometryDigest(currentSceneBase);
   const { materials, adapter } = setup();
   applyFh06VisualRefinements(adapter, materials);
@@ -40,18 +40,5 @@ test("hood refinement replaces box proxy with recognizable slim/retractable feat
   assert.ok(fit?.fittedMm.width > 0);
   assert.ok(fit?.fittedMm.height > 0);
   assert.ok(fit?.fittedMm.depth > 0);
-  materials.dispose();
-});
-
-test("wall tile guide is appearance-only, metric and separate from authoritative environment geometry", () => {
-  const { materials, adapter } = setup();
-  applyFh06VisualRefinements(adapter, materials);
-  const tiles = adapter.scene.getObjectByName("fh06-wall-tile-guide");
-  assert.ok(tiles);
-  assert.equal(tiles.userData.appearanceOnly, true);
-  assert.equal(tiles.userData.status, "style-inferred");
-  assert.equal(tiles.userData.tileGridMm, 400);
-  assert.ok(tiles.children.length > 10);
-  assert.equal(currentSceneBase.environment.some(entity => entity.id.includes("tile")), false);
   materials.dispose();
 });
