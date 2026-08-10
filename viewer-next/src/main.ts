@@ -90,6 +90,7 @@ app.dataset.colorTreatment = "fh06-s10-neutral-warm-v1";
 app.dataset.occlusion = "gtao-mm-v1";
 app.dataset.occlusionRadiusMm = String(FH06_GTAO_PROFILE.radiusMm);
 app.dataset.occlusionBlend = String(FH06_GTAO_PROFILE.blendIntensity);
+app.dataset.viewerTransitionMode = "incremental-domain-sync-v1";
 
 const renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
 renderer.outputColorSpace = SRGBColorSpace;
@@ -111,7 +112,7 @@ function buildComposition(state: ViewerConfigurationState): ViewerComposition {
   });
 }
 
-let composition = buildComposition(configuration);
+const composition = buildComposition(configuration);
 let selectionOverlay: ModuleSelectionOverlay | null = null;
 
 function installFidelityOverlay(target: ViewerComposition): void {
@@ -184,19 +185,29 @@ function render(): void {
 
 function applyConfigurationAction(action: ViewerConfigurationAction): void {
   const proposed = reduceViewerConfiguration(configuration, action);
-  const nextComposition = buildComposition(proposed);
-  const previousComposition = composition;
-  const previousSelectionOverlay = selectionOverlay;
+  const nextScene = deriveViewerScene(currentSceneBase, proposed);
+  const nextAppearance = deriveViewerAppearance(styleAnchorAppearance, nextScene, proposed);
+
+  switch (action.type) {
+    case "set-module-visibility":
+      composition.syncVisibility(nextScene, nextAppearance);
+      break;
+    case "set-front-preset":
+    case "clear-front-preset":
+    case "set-stone-preset":
+      composition.syncMaterials(nextScene, nextAppearance);
+      break;
+    case "set-lighting-preset":
+      composition.syncLighting(nextScene, nextAppearance);
+      break;
+    case "reset-configuration":
+      composition.syncConfiguration(nextScene, nextAppearance);
+      break;
+  }
 
   configuration = proposed;
-  composition = nextComposition;
-  selectionOverlay = null;
-  installFidelityOverlay(composition);
-  installSelectionOverlay(composition);
-  previousSelectionOverlay?.dispose();
-  previousComposition.dispose();
+  selectionOverlay?.setSelectedModule(interaction.selectedModuleId);
   syncDatasets();
-  composition.setSize(viewport.widthPx, viewport.heightPx);
   render();
 }
 
