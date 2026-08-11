@@ -1,7 +1,9 @@
 import copy
 import importlib.util
+import os
 import unittest
 from pathlib import Path
+from unittest import mock
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "agent.py"
 spec = importlib.util.spec_from_file_location("agent_tool", MODULE_PATH)
@@ -96,6 +98,15 @@ class GitOps12Tests(unittest.TestCase):
         check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "ops/git-ops-1.2"})
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["context"], "operations")
+
+    def test_ci_branch_name_uses_pull_request_head_ref(self):
+        with mock.patch.dict(os.environ, {"GITHUB_HEAD_REF": "ops/git-ops-1.2", "GITHUB_REF_NAME": "31/merge"}, clear=False):
+            self.assertEqual(agent.ci_branch_name(), "ops/git-ops-1.2")
+
+    def test_branch_refs_prefers_origin_remote_inventory(self):
+        remote = "origin/main\t" + "a" * 40 + "\norigin/ui/live\t" + "b" * 40 + "\norigin/HEAD\t" + "c" * 40
+        with mock.patch.object(agent, "run_git", side_effect=[(True, remote)]):
+            self.assertEqual(agent.branch_refs(), {"main": "a" * 40, "ui/live": "b" * 40})
 
     def test_prune_plan_protects_state_and_open_pr_heads(self):
         state = self.between_increments_state()
