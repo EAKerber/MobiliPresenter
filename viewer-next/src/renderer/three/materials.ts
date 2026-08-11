@@ -22,6 +22,13 @@ export const WOOD_GRAIN_MATERIAL_ID = "front-wood" as const;
 export const WOOD_GRAIN_SHADER_VERSION = "module-mm-world-z-v2" as const;
 const WOOD_GRAIN_TWO_PI = Math.PI * 2;
 
+export const BRUSHED_METAL_MATERIAL_ID = "inox-brushed" as const;
+export const BRUSHED_METAL_RESPONSE_VERSION = "anisotropic-pbr-v1" as const;
+export const BRUSHED_METAL_RESPONSE = {
+  anisotropy: 0.62,
+  anisotropyRotationRad: 0
+} as const;
+
 interface ProceduralWoodMetadata {
   readonly version: typeof WOOD_GRAIN_SHADER_VERSION;
   readonly mappingPolicy: "module-continuous";
@@ -193,8 +200,30 @@ diffuseColor.rgb = clamp(diffuseColor.rgb * (1.0 + mpWoodTone), 0.0, 1.0);
   material.needsUpdate = true;
 }
 
+function installBrushedMetalResponse(material: PbrMaterial, definition: MaterialDefinition): void {
+  if (definition.id !== BRUSHED_METAL_MATERIAL_ID) return;
+  if (!(material instanceof MeshPhysicalMaterial)) {
+    throw new Error(`BRUSHED_METAL_REQUIRES_PHYSICAL_MATERIAL:${definition.id}`);
+  }
+  if (definition.grainDirection !== "u") {
+    throw new Error(`BRUSHED_METAL_DIRECTION_INVALID:${definition.grainDirection ?? "missing"}`);
+  }
+  material.anisotropy = BRUSHED_METAL_RESPONSE.anisotropy;
+  material.anisotropyRotation = BRUSHED_METAL_RESPONSE.anisotropyRotationRad;
+  material.userData.brushedMetalResponse = {
+    version: BRUSHED_METAL_RESPONSE_VERSION,
+    grainDirection: definition.grainDirection,
+    anisotropy: BRUSHED_METAL_RESPONSE.anisotropy,
+    anisotropyRotationRad: BRUSHED_METAL_RESPONSE.anisotropyRotationRad,
+    rasterMap: false
+  };
+}
+
 function createThreeMaterial(definition: MaterialDefinition): PbrMaterial {
-  const physical = definition.transmission > 0 || definition.opacity < 1;
+  const physical =
+    definition.transmission > 0 ||
+    definition.opacity < 1 ||
+    definition.id === BRUSHED_METAL_MATERIAL_ID;
   const common = {
     color: definition.baseColorSrgb,
     roughness: definition.roughness,
@@ -231,6 +260,7 @@ function createThreeMaterial(definition: MaterialDefinition): PbrMaterial {
   if (definition.grainDirection) material.userData.grainDirection = definition.grainDirection;
   installWorldSpaceStoneSpeckle(material, definition);
   installModuleContinuousWoodGrain(material, definition);
+  installBrushedMetalResponse(material, definition);
   return material;
 }
 
