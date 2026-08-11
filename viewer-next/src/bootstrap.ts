@@ -1,7 +1,6 @@
 import "./main.js";
-import { moduleIdFromAlias } from "./runtime/query.js";
+import { createViewerUiApi, type ViewerEngineControlPort } from "./api/ui-adapter.js";
 import { mountRuntimeControls, type RuntimeControlsUi } from "./ui/runtime-controls.js";
-import type { ViewerRuntimeControlApi } from "./main.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("APP_ROOT_NOT_FOUND");
@@ -13,16 +12,11 @@ app.dataset.viewerControls = controlsEnabled ? "true" : "false";
 let controls: RuntimeControlsUi | null = null;
 
 if (controlsEnabled) {
-  const runtime = (window as Window & { __MOBILIPRESENTER_VIEWER__?: ViewerRuntimeControlApi }).__MOBILIPRESENTER_VIEWER__;
+  const runtime = (window as Window & { __MOBILIPRESENTER_VIEWER__?: ViewerEngineControlPort }).__MOBILIPRESENTER_VIEWER__;
   if (!runtime) throw new Error("VIEWER_RUNTIME_API_NOT_FOUND");
+  const uiApi = createViewerUiApi(runtime);
 
-  controls = mountRuntimeControls(document.body, {
-    ...runtime,
-    isModuleVisible(alias: string): boolean {
-      const moduleId = moduleIdFromAlias(alias);
-      return runtime.getConfiguration().visibilityByModule[moduleId] !== "off";
-    }
-  });
+  controls = mountRuntimeControls(document.body, uiApi);
 
   const refreshAfterSceneClick = (event: MouseEvent): void => {
     if (!(event.target instanceof HTMLCanvasElement)) return;
