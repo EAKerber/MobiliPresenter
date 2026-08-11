@@ -17,6 +17,11 @@ export type PbrMaterial = MeshStandardMaterial | MeshPhysicalMaterial;
 const STONE_SPECKLE_PREFIX = "stone-speckled-";
 const STONE_SPECKLE_SHADER_VERSION = "world-mm-v1";
 const STONE_SPECKLE_SEED = 37.137;
+export const STONE_SURFACE_RESPONSE_VERSION = "world-mm-roughness-v2" as const;
+export const STONE_ROUGHNESS_RESPONSE = {
+  coarseAmplitude: 0.04,
+  fineAmplitude: 0.02
+} as const;
 
 export const WOOD_GRAIN_MATERIAL_ID = "front-wood" as const;
 export const WOOD_GRAIN_SHADER_VERSION = "module-mm-world-z-v2" as const;
@@ -56,17 +61,27 @@ function installWorldSpaceStoneSpeckle(material: PbrMaterial, definition: Materi
 
   material.userData.proceduralStoneSpeckle = {
     version: STONE_SPECKLE_SHADER_VERSION,
+    surfaceResponseVersion: STONE_SURFACE_RESPONSE_VERSION,
     worldSpaceMm: true,
     macroScaleMm,
     coarseCellMm,
     fineCellMm,
-    seed: STONE_SPECKLE_SEED
+    seed: STONE_SPECKLE_SEED,
+    roughnessResponse: { ...STONE_ROUGHNESS_RESPONSE },
+    rasterMap: false,
+    bumpMap: false,
+    normalMap: false
   };
 
   material.onBeforeCompile = shader => {
     const worldToken = "#include <worldpos_vertex>";
     const colorToken = "#include <color_fragment>";
-    if (!shader.vertexShader.includes(worldToken) || !shader.fragmentShader.includes(colorToken)) {
+    const roughnessToken = "#include <roughnessmap_fragment>";
+    if (
+      !shader.vertexShader.includes(worldToken) ||
+      !shader.fragmentShader.includes(colorToken) ||
+      !shader.fragmentShader.includes(roughnessToken)
+    ) {
       throw new Error(`STONE_SPECKLE_SHADER_HOOK_MISSING:${definition.id}`);
     }
 
@@ -93,12 +108,18 @@ float mpLightMask = smoothstep(0.925, 0.999, mpFineNoise) * 0.34;
 diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(dark)}, mpDarkMask);
 diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(light)}, mpLightMask);
 `;
-    shader.fragmentShader = fragmentHeader + shader.fragmentShader.replace(
-      colorToken,
-      `${colorToken}\n${speckle}`
-    );
+    const roughnessResponse = `
+float mpStoneRoughnessVariation =
+  (mpCoarseNoise - 0.5) * ${STONE_ROUGHNESS_RESPONSE.coarseAmplitude.toFixed(6)} +
+  (mpFineNoise - 0.5) * ${STONE_ROUGHNESS_RESPONSE.fineAmplitude.toFixed(6)};
+roughnessFactor = clamp(roughnessFactor + mpStoneRoughnessVariation, 0.04, 1.0);
+`;
+    shader.fragmentShader = fragmentHeader + shader.fragmentShader
+      .replace(colorToken, `${colorToken}\n${speckle}`)
+      .replace(roughnessToken, `${roughnessToken}\n${roughnessResponse}`);
   };
-  material.customProgramCacheKey = () => `mobilipresenter:${STONE_SPECKLE_SHADER_VERSION}:${definition.id}`;
+  material.customProgramCacheKey = () =>
+    `mobilipresenter:${STONE_SPECKLE_SHADER_VERSION}:${STONE_SURFACE_RESPONSE_VERSION}:${definition.id}`;
   material.needsUpdate = true;
 }
 
