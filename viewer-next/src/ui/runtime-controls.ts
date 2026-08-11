@@ -1,32 +1,14 @@
-import { STONE_PRESETS, STONE_PRESET_IDS, type StonePresetId } from "../fixtures/stone-presets.js";
-import { FRONT_PRESETS, FRONT_PRESET_IDS, LIGHTING_PRESETS, LIGHTING_PRESET_IDS, type FrontPresetId, type LightingPresetId } from "../runtime/presets.js";
-import { moduleIdFromAlias, type ModuleAlias } from "../runtime/query.js";
-import type { ViewerConfigurationState, ViewerInteractionState, ViewerVisibilityOverride } from "../runtime/viewer-state.js";
+import type {
+  FrontPresetId,
+  LightingPresetId,
+  StonePresetId,
+  ViewerUiApi
+} from "../api/ui-contract.js";
 import "./runtime-controls.css";
-
-const MODULE_ALIASES: readonly ModuleAlias[] = ["01", "02", "03", "04", "05", "06", "07"];
-
-export interface RuntimeControlsApi {
-  getConfiguration(): ViewerConfigurationState;
-  getInteraction(): ViewerInteractionState;
-  isModuleVisible(alias: string): boolean;
-  setModuleVisibility(alias: string, value: ViewerVisibilityOverride): void;
-  setFrontPreset(alias: string, presetId: FrontPresetId): void;
-  clearFrontPreset(alias: string): void;
-  setStonePreset(presetId: StonePresetId): void;
-  setLightingPreset(presetId: LightingPresetId): void;
-  resetConfiguration(): void;
-  selectModule(alias: string | null): void;
-}
 
 export interface RuntimeControlsUi {
   refresh(): void;
   dispose(): void;
-}
-
-function aliasForModuleId(moduleId: string | null): ModuleAlias | null {
-  if (!moduleId) return null;
-  return MODULE_ALIASES.find(alias => moduleIdFromAlias(alias) === moduleId) ?? null;
 }
 
 function button(label: string, className = "viewer-controls__button"): HTMLButtonElement {
@@ -49,7 +31,8 @@ function section(label: string): { root: HTMLElement; row: HTMLElement } {
   return { root, row };
 }
 
-export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi): RuntimeControlsUi {
+export function mountRuntimeControls(host: HTMLElement, api: ViewerUiApi): RuntimeControlsUi {
+  const catalog = api.getCatalog();
   const launcher = button("Controles", "viewer-controls-launcher");
   launcher.setAttribute("aria-expanded", "true");
 
@@ -74,8 +57,8 @@ export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi)
   panel.append(header);
 
   const modules = section("Módulo");
-  const moduleButtons = new Map<ModuleAlias, HTMLButtonElement>();
-  for (const alias of MODULE_ALIASES) {
+  const moduleButtons = new Map<(typeof catalog.modules)[number], HTMLButtonElement>();
+  for (const alias of catalog.modules) {
     const item = button(alias);
     item.dataset.moduleAlias = alias;
     item.addEventListener("click", () => runAction(() => api.selectModule(alias)));
@@ -102,33 +85,33 @@ export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi)
   const originalFront = button("Original");
   fronts.row.append(originalFront);
   const frontButtons = new Map<FrontPresetId, HTMLButtonElement>();
-  for (const presetId of FRONT_PRESET_IDS) {
-    const item = button(FRONT_PRESETS[presetId].label);
-    item.dataset.frontPreset = presetId;
+  for (const preset of catalog.frontPresets) {
+    const item = button(preset.label);
+    item.dataset.frontPreset = preset.id;
     fronts.row.append(item);
-    frontButtons.set(presetId, item);
+    frontButtons.set(preset.id, item);
   }
   panel.append(fronts.root);
 
   const stones = section("Pedra");
   const stoneButtons = new Map<StonePresetId, HTMLButtonElement>();
-  for (const presetId of STONE_PRESET_IDS) {
-    const item = button(STONE_PRESETS[presetId].label);
-    item.dataset.stonePreset = presetId;
-    item.addEventListener("click", () => runAction(() => api.setStonePreset(presetId)));
+  for (const preset of catalog.stonePresets) {
+    const item = button(preset.label);
+    item.dataset.stonePreset = preset.id;
+    item.addEventListener("click", () => runAction(() => api.setStonePreset(preset.id)));
     stones.row.append(item);
-    stoneButtons.set(presetId, item);
+    stoneButtons.set(preset.id, item);
   }
   panel.append(stones.root);
 
   const lights = section("Iluminação");
   const lightButtons = new Map<LightingPresetId, HTMLButtonElement>();
-  for (const presetId of LIGHTING_PRESET_IDS) {
-    const item = button(LIGHTING_PRESETS[presetId].label);
-    item.dataset.lightingPreset = presetId;
-    item.addEventListener("click", () => runAction(() => api.setLightingPreset(presetId)));
+  for (const preset of catalog.lightingPresets) {
+    const item = button(preset.label);
+    item.dataset.lightingPreset = preset.id;
+    item.addEventListener("click", () => runAction(() => api.setLightingPreset(preset.id)));
     lights.row.append(item);
-    lightButtons.set(presetId, item);
+    lightButtons.set(preset.id, item);
   }
   panel.append(lights.root);
 
@@ -174,35 +157,36 @@ export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi)
   close.addEventListener("click", () => setOpen(false));
 
   visibilityButton.addEventListener("click", () => {
-    const alias = aliasForModuleId(api.getInteraction().selectedModuleId);
+    const snapshot = api.getSnapshot();
+    const alias = snapshot.selectedModuleAlias;
     if (!alias) return;
-    const visible = api.isModuleVisible(alias);
+    const visible = snapshot.visibilityByModule[alias] !== "off";
     runAction(() => api.setModuleVisibility(alias, visible ? "off" : "inherit"));
   });
 
   originalFront.addEventListener("click", () => {
-    const alias = aliasForModuleId(api.getInteraction().selectedModuleId);
+    const alias = api.getSnapshot().selectedModuleAlias;
     if (!alias) return;
     runAction(() => api.clearFrontPreset(alias));
   });
 
   for (const [presetId, item] of frontButtons) {
     item.addEventListener("click", () => {
-      const alias = aliasForModuleId(api.getInteraction().selectedModuleId);
+      const alias = api.getSnapshot().selectedModuleAlias;
       if (!alias) return;
       runAction(() => api.setFrontPreset(alias, presetId));
     });
   }
 
   function refresh(): void {
-    const configuration = api.getConfiguration();
-    const interaction = api.getInteraction();
-    const selectedAlias = aliasForModuleId(interaction.selectedModuleId);
+    const snapshot = api.getSnapshot();
+    const selectedAlias = snapshot.selectedModuleAlias;
 
     for (const [alias, item] of moduleButtons) {
       const selected = alias === selectedAlias;
+      const visible = snapshot.visibilityByModule[alias] !== "off";
       item.setAttribute("aria-pressed", selected ? "true" : "false");
-      item.title = api.isModuleVisible(alias) ? `Módulo ${alias} visível` : `Módulo ${alias} oculto`;
+      item.title = visible ? `Módulo ${alias} visível` : `Módulo ${alias} oculto`;
     }
 
     if (!selectedAlias) {
@@ -212,7 +196,7 @@ export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi)
       originalFront.disabled = true;
       for (const item of frontButtons.values()) item.disabled = true;
     } else {
-      const visible = api.isModuleVisible(selectedAlias);
+      const visible = snapshot.visibilityByModule[selectedAlias] !== "off";
       selectedName.textContent = `Módulo ${selectedAlias}`;
       selectedState.textContent = visible ? "visível" : "oculto";
       visibilityButton.disabled = false;
@@ -220,8 +204,7 @@ export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi)
       originalFront.disabled = false;
       for (const item of frontButtons.values()) item.disabled = false;
 
-      const selectedId = moduleIdFromAlias(selectedAlias);
-      const activeFront = configuration.frontPresetByModule[selectedId] ?? null;
+      const activeFront = snapshot.frontPresetByModule[selectedAlias] ?? null;
       originalFront.setAttribute("aria-pressed", activeFront === null ? "true" : "false");
       for (const [presetId, item] of frontButtons) {
         item.setAttribute("aria-pressed", activeFront === presetId ? "true" : "false");
@@ -229,10 +212,10 @@ export function mountRuntimeControls(host: HTMLElement, api: RuntimeControlsApi)
     }
 
     for (const [presetId, item] of stoneButtons) {
-      item.setAttribute("aria-pressed", configuration.stonePresetId === presetId ? "true" : "false");
+      item.setAttribute("aria-pressed", snapshot.stonePresetId === presetId ? "true" : "false");
     }
     for (const [presetId, item] of lightButtons) {
-      item.setAttribute("aria-pressed", configuration.lightingPresetId === presetId ? "true" : "false");
+      item.setAttribute("aria-pressed", snapshot.lightingPresetId === presetId ? "true" : "false");
     }
   }
 
