@@ -5,6 +5,7 @@ import {
   DoubleSide,
   FrontSide,
   Material,
+  Matrix4,
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial
@@ -16,6 +17,21 @@ export type PbrMaterial = MeshStandardMaterial | MeshPhysicalMaterial;
 const STONE_SPECKLE_PREFIX = "stone-speckled-";
 const STONE_SPECKLE_SHADER_VERSION = "world-mm-v1";
 const STONE_SPECKLE_SEED = 37.137;
+
+export const WOOD_GRAIN_MATERIAL_ID = "front-wood" as const;
+export const WOOD_GRAIN_SHADER_VERSION = "module-mm-world-z-v1" as const;
+const WOOD_GRAIN_TWO_PI = Math.PI * 2;
+
+interface ProceduralWoodMetadata {
+  readonly version: typeof WOOD_GRAIN_SHADER_VERSION;
+  readonly mappingPolicy: "module-continuous";
+  readonly grainDirection: "world-z";
+  readonly physicalScaleMm: readonly [number, number];
+  readonly coarseBandMm: number;
+  readonly fineBandMm: number;
+  readonly colorAmplitude: number;
+  readonly worldToModule: Matrix4;
+}
 
 function glslColor(color: Color): string {
   return `vec3(${color.r.toFixed(6)}, ${color.g.toFixed(6)}, ${color.b.toFixed(6)})`;
@@ -78,6 +94,84 @@ diffuseColor.rgb = mix(diffuseColor.rgb, ${glslColor(light)}, mpLightMask);
   material.needsUpdate = true;
 }
 
+function installModuleContinuousWoodGrain(material: PbrMaterial, definition: MaterialDefinition): void {
+  if (definition.id !== WOOD_GRAIN_MATERIAL_ID) return;
+  if (definition.mappingPolicy !== "module-continuous") {
+    throw new Error(`WOOD_GRAIN_MAPPING_POLICY_INVALID:${definition.mappingPolicy}`);
+  }
+  if (definition.grainDirection !== "world-z") {
+    throw new Error(`WOOD_GRAIN_DIRECTION_INVALID:${definition.grainDirection ?? "missing"}`);
+  }
+  const physicalScaleMm = definition.physicalTextureScaleMm;
+  if (!physicalScaleMm) throw new Error("WOOD_GRAIN_PHYSICAL_SCALE_MISSING");
+
+  const [acrossScaleMm, alongScaleMm] = physicalScaleMm;
+  const coarseBandMm = acrossScaleMm / 18;
+  const fineBandMm = acrossScaleMm / 72;
+  const longWaveMm = alongScaleMm / 5;
+  const shortWaveMm = alongScaleMm / 17;
+  const colorAmplitude = 0.052;
+  const worldToModule = new Matrix4();
+  const metadata: ProceduralWoodMetadata = {
+    version: WOOD_GRAIN_SHADER_VERSION,
+    mappingPolicy: "module-continuous",
+    grainDirection: "world-z",
+    physicalScaleMm: [acrossScaleMm, alongScaleMm],
+    coarseBandMm,
+    fineBandMm,
+    colorAmplitude,
+    worldToModule
+  };
+  material.userData.proceduralWoodGrain = metadata;
+
+  material.onBeforeCompile = shader => {
+    const worldToken = "#include <worldpos_vertex>";
+    const colorToken = "#include <color_fragment>";
+    if (!shader.vertexShader.includes(worldToken) || !shader.fragmentShader.includes(colorToken)) {
+      throw new Error(`WOOD_GRAIN_SHADER_HOOK_MISSING:${definition.id}`);
+    }
+
+    shader.uniforms.mpWoodWorldToModule = { value: worldToModule };
+    shader.vertexShader = `
+uniform mat4 mpWoodWorldToModule;
+varying vec3 vMpWoodWorldPosition;
+varying vec3 vMpWoodModulePosition;
+${shader.vertexShader}`.replace(
+      worldToken,
+      `${worldToken}
+vMpWoodWorldPosition = worldPosition.xyz;
+vMpWoodModulePosition = (mpWoodWorldToModule * worldPosition).xyz;`
+    );
+
+    const grain = `
+float mpWoodAlongMm = vMpWoodWorldPosition.y;
+float mpWoodAcrossMm = vMpWoodModulePosition.x;
+float mpWoodMeander =
+  sin(mpWoodAlongMm / ${longWaveMm.toFixed(6)}) * 0.58 +
+  sin(mpWoodAlongMm / ${shortWaveMm.toFixed(6)} + 1.713) * 0.22;
+float mpWoodCoarse = 0.5 + 0.5 * sin(
+  (mpWoodAcrossMm / ${coarseBandMm.toFixed(6)} + mpWoodMeander) * ${WOOD_GRAIN_TWO_PI.toFixed(6)}
+);
+float mpWoodFine = 0.5 + 0.5 * sin(
+  (mpWoodAcrossMm / ${fineBandMm.toFixed(6)} + mpWoodMeander * 0.31 + 0.37) * ${WOOD_GRAIN_TWO_PI.toFixed(6)}
+);
+float mpWoodTone =
+  (mpWoodCoarse - 0.5) * ${(colorAmplitude * 1.35).toFixed(6)} +
+  (mpWoodFine - 0.5) * ${(colorAmplitude * 0.52).toFixed(6)};
+diffuseColor.rgb = clamp(diffuseColor.rgb * (1.0 + mpWoodTone), 0.0, 1.0);
+`;
+    shader.fragmentShader = `
+varying vec3 vMpWoodWorldPosition;
+varying vec3 vMpWoodModulePosition;
+${shader.fragmentShader}`.replace(
+      colorToken,
+      `${colorToken}\n${grain}`
+    );
+  };
+  material.customProgramCacheKey = () => `mobilipresenter:${WOOD_GRAIN_SHADER_VERSION}:${definition.id}`;
+  material.needsUpdate = true;
+}
+
 function createThreeMaterial(definition: MaterialDefinition): PbrMaterial {
   const physical = definition.transmission > 0 || definition.opacity < 1;
   const common = {
@@ -115,6 +209,7 @@ function createThreeMaterial(definition: MaterialDefinition): PbrMaterial {
   }
   if (definition.grainDirection) material.userData.grainDirection = definition.grainDirection;
   installWorldSpaceStoneSpeckle(material, definition);
+  installModuleContinuousWoodGrain(material, definition);
   return material;
 }
 
@@ -166,6 +261,51 @@ export class ThreeMaterialRegistry {
     for (const material of this.#cache.values()) material.dispose();
     this.#cache.clear();
   }
+}
+
+export interface ModuleContinuousMaterialBindingResult {
+  readonly bindingId: "module-continuous-material-mapping-v1";
+  readonly boundMeshCount: number;
+  readonly moduleIds: readonly string[];
+}
+
+export function bindModuleContinuousMaterialMappings(
+  adapter: ThreeSceneAdapter,
+  appearance: AppearancePackage
+): ModuleContinuousMaterialBindingResult {
+  const moduleIds = new Set<string>();
+  let boundMeshCount = 0;
+
+  for (const moduleId of Object.keys(appearance.assignments.entityOverrides).sort()) {
+    const group = adapter.entityGroups.get(moduleId);
+    if (!group || group.userData.entityKind !== "module") continue;
+    group.updateWorldMatrix(true, true);
+    group.traverse(object => {
+      if (!(object instanceof Mesh)) return;
+      if (!(object.material instanceof MeshStandardMaterial || object.material instanceof MeshPhysicalMaterial)) return;
+      if (object.material.name !== WOOD_GRAIN_MATERIAL_ID) return;
+      const metadata = object.material.userData.proceduralWoodGrain as ProceduralWoodMetadata | undefined;
+      if (!metadata || !(metadata.worldToModule instanceof Matrix4)) return;
+      if (object.userData.moduleContinuousMaterialMapping === WOOD_GRAIN_SHADER_VERSION) return;
+
+      const prior = object.onBeforeRender;
+      object.onBeforeRender = function (...args): void {
+        group.updateWorldMatrix(true, false);
+        metadata.worldToModule.copy(group.matrixWorld).invert();
+        prior.call(this, ...args);
+      };
+      object.userData.moduleContinuousMaterialMapping = WOOD_GRAIN_SHADER_VERSION;
+      object.userData.moduleContinuousMaterialOwner = moduleId;
+      boundMeshCount += 1;
+      moduleIds.add(moduleId);
+    });
+  }
+
+  return {
+    bindingId: "module-continuous-material-mapping-v1",
+    boundMeshCount,
+    moduleIds: [...moduleIds].sort()
+  };
 }
 
 export function syncThreeMaterials(
