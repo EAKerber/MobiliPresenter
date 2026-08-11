@@ -11,8 +11,9 @@ import {
   INTERACTION_HIGHLIGHT_ID,
   resolveModuleInteractionTargets
 } from "../dist-ts/src/renderer/three/interaction-highlight.js";
-import { INTERACTION_OUTLINE_PROFILE } from "../dist-ts/src/renderer/three/post.js";
 import { ThreeMaterialRegistry } from "../dist-ts/src/renderer/three/materials.js";
+import { moduleIdForEntity } from "../dist-ts/src/renderer/three/ownership.js";
+import { INTERACTION_OUTLINE_PROFILE } from "../dist-ts/src/renderer/three/post.js";
 import { buildThreeScene, syncThreeVisibility } from "../dist-ts/src/renderer/three/scene-adapter.js";
 
 function build() {
@@ -21,7 +22,14 @@ function build() {
   return { registry, adapter };
 }
 
-test("selection and hover resolve to stable module roots without creating scene objects", () => {
+function entityIdForGroup(adapter, group) {
+  for (const [entityId, candidate] of adapter.entityGroups) {
+    if (candidate === group) return entityId;
+  }
+  return null;
+}
+
+test("selection and hover resolve complete visible ownership domains without creating scene objects", () => {
   const { registry, adapter } = build();
   const sceneChildCount = adapter.scene.children.length;
   const module02Root = adapter.entityGroups.get(module02.id);
@@ -29,10 +37,22 @@ test("selection and hover resolve to stable module roots without creating scene 
   assert.ok(module02Root && module03Root);
 
   const targets = resolveModuleInteractionTargets(adapter, currentSceneBase, module03WithSink.id, module02.id);
-  assert.deepEqual(targets.selected, [module03Root]);
-  assert.deepEqual(targets.hovered, [module02Root]);
+  assert.ok(targets.selected.includes(module03Root));
+  assert.ok(targets.hovered.includes(module02Root));
+  assert.ok(targets.selected.length > 1, "module03 should include hosted technical entities in its highlight domain");
+  assert.ok(targets.hovered.length > 1, "module02 should include hosted appliances/accessories in its highlight domain");
   assert.equal(targets.selectedModuleId, module03WithSink.id);
   assert.equal(targets.hoveredModuleId, module02.id);
+  for (const group of targets.selected) {
+    const entityId = entityIdForGroup(adapter, group);
+    assert.ok(entityId);
+    assert.equal(moduleIdForEntity(currentSceneBase, entityId), module03WithSink.id);
+  }
+  for (const group of targets.hovered) {
+    const entityId = entityIdForGroup(adapter, group);
+    assert.ok(entityId);
+    assert.equal(moduleIdForEntity(currentSceneBase, entityId), module02.id);
+  }
   assert.equal(adapter.scene.children.length, sceneChildCount);
 
   for (let index = 0; index < 100; index += 1) {
@@ -42,8 +62,8 @@ test("selection and hover resolve to stable module roots without creating scene 
       index % 2 === 0 ? module03WithSink.id : null,
       index % 2 === 0 ? module02.id : module03WithSink.id
     );
-    assert.ok(alternating.selected.length <= 1);
-    assert.ok(alternating.hovered.length <= 1);
+    assert.ok(alternating.selected.every(group => adapter.scene.children.includes(group)));
+    assert.ok(alternating.hovered.every(group => adapter.scene.children.includes(group)));
   }
   assert.equal(adapter.scene.children.length, sceneChildCount);
   assert.equal(adapter.entityGroups.get(module02.id), module02Root);
@@ -51,7 +71,7 @@ test("selection and hover resolve to stable module roots without creating scene 
   registry.dispose();
 });
 
-test("selected module suppresses hover outline on the same module", () => {
+test("selected module suppresses hover outline on the same ownership domain", () => {
   const { registry, adapter } = build();
   const root = adapter.entityGroups.get(module03WithSink.id);
   assert.ok(root);
@@ -61,13 +81,14 @@ test("selected module suppresses hover outline on the same module", () => {
     module03WithSink.id,
     module03WithSink.id
   );
-  assert.deepEqual(targets.selected, [root]);
+  assert.ok(targets.selected.includes(root));
+  assert.ok(targets.selected.length > 1);
   assert.deepEqual(targets.hovered, []);
   assert.equal(targets.hoveredModuleId, null);
   registry.dispose();
 });
 
-test("hidden modules cannot remain selected or hovered highlight targets", () => {
+test("hidden modules and hosted descendants cannot remain highlight targets", () => {
   const { registry, adapter } = build();
   const hiddenScene = setVisibilityIntent(currentSceneBase, module03WithSink.id, "off");
   syncThreeVisibility(adapter, hiddenScene);
