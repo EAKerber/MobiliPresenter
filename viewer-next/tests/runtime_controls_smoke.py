@@ -80,6 +80,7 @@ VISUAL_CASES = (
             marker("viewer-microwave-visible", "true"),
             marker("viewer-under-cab-visible", "true"),
             marker("viewer-lighting-preset", "canonical"),
+            marker("viewer-interaction-highlight", "module-outline-interaction-v1"),
         ),
     },
     {
@@ -124,6 +125,17 @@ VISUAL_CASES = (
         "markers": (
             marker("viewer-selected-module", MODULE03),
             marker("viewer-selection-overlay-count", "1"),
+            marker("viewer-selection-highlight-count", "1"),
+            marker("viewer-hover-highlight-count", "0"),
+        ),
+    },
+    {
+        "id": "hover",
+        "params": {"hover": "03"},
+        "markers": (
+            marker("viewer-hovered-module", MODULE03),
+            marker("viewer-selection-highlight-count", "0"),
+            marker("viewer-hover-highlight-count", "1"),
         ),
     },
 )
@@ -214,7 +226,7 @@ def main() -> None:
         })
 
     evidence = {
-        "schemaVersion": "ViewerRuntimeControlsEvidence 0.1.0",
+        "schemaVersion": "ViewerRuntimeControlsEvidence 0.2.0",
         "status": "PASS",
         "browser": chrome,
         "caseCount": len(results),
@@ -224,7 +236,9 @@ def main() -> None:
             "module06HostedVisibilityObserved": True,
             "resolvedMaterialsObserved": True,
             "lightingPolicyObserved": True,
-            "selectionOverlayObserved": True,
+            "selectionHighlightObserved": True,
+            "hoverHighlightObserved": True,
+            "selectedWinsOverHoverCoveredByStructuralTest": True,
             "boundedLifecycleFamiliesObserved": ["visibility", "appearance", "lighting"],
             "selectionInteractionLifecycleCoveredByStructuralTest": True,
         },
