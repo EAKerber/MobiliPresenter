@@ -1,0 +1,229 @@
+:root {
+  --ui-flat-selected: color-mix(in srgb, var(--ui-taupe-soft) 72%, transparent);
+  --ui-flat-hover: color-mix(in srgb, var(--ui-bg-subtle) 62%, transparent);
+}
+
+/* The repository codename is internal and must not become product-facing branding. */
+.viewer-shell__mark {
+  display: none !important;
+}
+
+.viewer-shell__rail {
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  padding-top: 14px !important;
+}
+
+.viewer-shell__rail-nav {
+  align-content: start !important;
+}
+
+.viewer-shell button,
+.viewer-technical-detail button,
+.viewer-module-row__checkmark,
+.viewer-module-row__thumbnail {
+  box-shadow: none !important;
+}
+
+.viewer-shell__rail-button {
+  position: relative;
+  border: 0 !important;
+  border-left: 2px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.viewer-shell__rail-button:hover {
+  background: var(--ui-flat-hover) !important;
+}
+
+.viewer-shell__rail-button[data-active="true"],
+.viewer-shell__rail-button[aria-pressed="true"] {
+  border-left-color: var(--ui-taupe) !important;
+  background: var(--ui-flat-selected) !important;
+  box-shadow: none !important;
+}
+
+.viewer-shell__rail-symbol {
+  width: 28px !important;
+  height: 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.viewer-shell__rail-symbol svg {
+  width: 23px;
+  height: 23px;
+  display: block;
+}
+
+.viewer-shell__reset .viewer-shell__rail-symbol {
+  font-size: inherit !important;
+}
+
+.viewer-icon-button {
+  width: 38px !important;
+  height: 38px !important;
+  border-color: transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.viewer-icon-button:hover {
+  border-color: transparent !important;
+  background: var(--ui-flat-hover) !important;
+}
+
+.viewer-module-row__thumbnail {
+  background: var(--ui-bg-surface-raised) !important;
+}
+
+.viewer-module-row__thumbnail span {
+  background: transparent !important;
+}
+
+.viewer-finish-option,
+.viewer-accessory-option {
+  border: 1px solid color-mix(in srgb, var(--ui-border-strong) 72%, transparent) !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-standard), background var(--ui-motion-fast) var(--ui-ease-standard), color var(--ui-motion-fast) var(--ui-ease-standard) !important;
+}
+
+.viewer-finish-option:hover:not(:disabled),
+.viewer-accessory-option:hover:not(:disabled) {
+  border-color: var(--ui-border-strong) !important;
+  background: var(--ui-flat-hover) !important;
+  box-shadow: none !important;
+}
+
+.viewer-finish-option::before,
+.viewer-accessory-option::before {
+  background: var(--ui-bg-surface) !important;
+  box-shadow: none !important;
+}
+
+.viewer-finish-option[aria-pressed="true"],
+.viewer-accessory-option[aria-pressed="true"] {
+  border-color: var(--ui-taupe) !important;
+  background: var(--ui-flat-selected) !important;
+  box-shadow: none !important;
+}
+
+.viewer-technical-gallery__option {
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.viewer-technical-gallery__option:hover {
+  background: transparent !important;
+  border-bottom-color: color-mix(in srgb, var(--ui-taupe) 38%, transparent) !important;
+}
+
+.viewer-technical-gallery__option[aria-pressed="true"] {
+  border-bottom-color: var(--ui-taupe) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.viewer-technical-gallery__fidelity-note {
+  margin: 3px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 9px;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.viewer-semantic-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--ui-taupe);
+}
+
+.viewer-semantic-icon svg {
+  width: 21px;
+  height: 21px;
+  display: block;
+}
+
+.viewer-technical-card > h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.viewer-technical-card > h3 > .viewer-semantic-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.viewer-technical-card > h3 > .viewer-semantic-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.viewer-technical-card__list {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+
+.viewer-technical-card__list li {
+  position: relative;
+  min-height: 24px;
+  padding-left: 31px;
+}
+
+.viewer-technical-card__list li > .viewer-semantic-icon {
+  position: absolute;
+  top: -2px;
+  left: 0;
+}
+
+.viewer-technical-card__stack-item--icon {
+  grid-template-columns: 28px minmax(0, 1fr) !important;
+  column-gap: 9px !important;
+}
+
+.viewer-technical-card__stack-item--icon > .viewer-semantic-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.viewer-technical-card__stack-item--icon > strong,
+.viewer-technical-card__stack-item--icon > span:not(.viewer-semantic-icon) {
+  grid-column: 2;
+}
+
+.viewer-technical-card__stack-item[data-component-id="module02/component/outlet-20a"] > .viewer-semantic-icon {
+  color: var(--ui-text-secondary);
+}
+
+@media (max-width: 719px) {
+  .viewer-shell__rail {
+    grid-template-rows: none !important;
+    padding-top: inherit !important;
+  }
+
+  .viewer-shell__rail-button {
+    border-left: 0 !important;
+    border-bottom: 2px solid transparent !important;
+  }
+
+  .viewer-shell__rail-button[data-active="true"],
+  .viewer-shell__rail-button[aria-pressed="true"] {
+    border-left-color: transparent !important;
+    border-bottom-color: var(--ui-taupe) !important;
+  }
+}
