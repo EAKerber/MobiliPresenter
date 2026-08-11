@@ -78,6 +78,10 @@ jobs:
         working-directory: viewer-next
         run: python3 tests/browser_smoke.py
 
+      - name: Browser product UI smoke
+        working-directory: viewer-next
+        run: python3 tests/runtime_ui_smoke.py
+
       - name: Browser fidelity overlay
         working-directory: viewer-next
         run: python3 tests/fidelity_smoke.py
