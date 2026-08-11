@@ -23,7 +23,11 @@ import {
   resolveModuleInteractionTargets
 } from "../renderer/three/interaction-highlight.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "../renderer/three/lighting.js";
-import { ThreeMaterialRegistry } from "../renderer/three/materials.js";
+import {
+  WOOD_GRAIN_SHADER_VERSION,
+  ThreeMaterialRegistry,
+  bindModuleContinuousMaterialMappings
+} from "../renderer/three/materials.js";
 import { applyFh06OvenReadability } from "../renderer/three/oven-readability.js";
 import { auditRenderOwnership, type RenderOwnershipAudit } from "../renderer/three/ownership.js";
 import { createSelectiveBloomPipeline } from "../renderer/three/post.js";
@@ -43,6 +47,9 @@ export interface ViewerCompositionDiagnostics {
   readonly hardwareHandleCount: number;
   readonly hardwareAnchorCount: number;
   readonly interactionHighlightId: string;
+  readonly materialMappingId: string;
+  readonly woodGrainShaderVersion: string;
+  readonly initialWoodMappedMeshCount: number;
   readonly ovenReadabilityId: string;
   readonly ovenPhysicalClearanceMm: readonly number[];
   readonly sinkFamilyId: string;
@@ -120,6 +127,7 @@ export function createViewerComposition(
     initialScenePackage,
     currentUnderCabLightContract
   );
+  const initialMaterialMapping = bindModuleContinuousMaterialMappings(adapter);
 
   adapter.scene.background = options.background ?? new Color(0xf0ede7);
   const lighting = buildThreeLighting(initialScenePackage, initialAppearance);
@@ -158,6 +166,9 @@ export function createViewerComposition(
     );
     post.setInteractionTargets(targets.selected, targets.hovered);
   };
+  const refreshMaterialMappings = (): void => {
+    bindModuleContinuousMaterialMappings(adapter);
+  };
 
   const result: ViewerComposition = {
     get scenePackage(): ScenePackage {
@@ -177,6 +188,9 @@ export function createViewerComposition(
       hardwareHandleCount: hardwareRefinement.handleCount,
       hardwareAnchorCount: hardwareRefinement.handleCount,
       interactionHighlightId: INTERACTION_HIGHLIGHT_ID,
+      materialMappingId: initialMaterialMapping.bindingId,
+      woodGrainShaderVersion: WOOD_GRAIN_SHADER_VERSION,
+      initialWoodMappedMeshCount: initialMaterialMapping.boundMeshCount,
       ovenReadabilityId: ovenReadability.refinementId,
       ovenPhysicalClearanceMm: ovenReadability.physicalClearanceMm,
       sinkFamilyId: sinkRefinement.sinkFamilyId,
@@ -200,6 +214,7 @@ export function createViewerComposition(
     syncMaterials(scenePackage, appearance): void {
       assertActive();
       syncRuntimeMaterials(adapter, materials, appearance);
+      refreshMaterialMappings();
       currentScenePackage = scenePackage;
       currentAppearance = appearance;
     },
@@ -213,6 +228,7 @@ export function createViewerComposition(
       assertActive();
       syncRuntimeVisibility(adapter, lighting, scenePackage, appearance);
       syncRuntimeMaterials(adapter, materials, appearance);
+      refreshMaterialMappings();
       syncRuntimeLighting(adapter.scene, lighting, post, scenePackage, appearance);
       currentScenePackage = scenePackage;
       currentAppearance = appearance;
