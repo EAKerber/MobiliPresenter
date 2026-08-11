@@ -14,9 +14,10 @@ test("runtime query composes hide, front, stone and light state", () => {
   assert.equal(state.lightingPresetId, "warm-worktop");
 });
 
-test("runtime query selection maps stable module aliases", () => {
-  const interaction = parseViewerInteraction(new URLSearchParams("select=06"));
+test("runtime query selection and hover map stable module aliases independently", () => {
+  const interaction = parseViewerInteraction(new URLSearchParams("select=06&hover=03"));
   assert.equal(interaction.selectedModuleId, module06.id);
+  assert.equal(interaction.hoveredModuleId, module03WithSink.id);
 });
 
 test("runtime query rejects unknown aliases and presets", () => {
@@ -24,4 +25,5 @@ test("runtime query rejects unknown aliases and presets", () => {
   assert.throws(() => parseViewerConfiguration(new URLSearchParams("front=02:magenta")), /VIEWER_FRONT_PRESET_NOT_FOUND/);
   assert.throws(() => parseViewerConfiguration(new URLSearchParams("stone=unknown")), /VIEWER_STONE_PRESET_NOT_FOUND/);
   assert.throws(() => parseViewerConfiguration(new URLSearchParams("light=unknown")), /VIEWER_LIGHTING_PRESET_NOT_FOUND/);
+  assert.throws(() => parseViewerInteraction(new URLSearchParams("hover=99")), /VIEWER_MODULE_ALIAS_UNKNOWN/);
 });
