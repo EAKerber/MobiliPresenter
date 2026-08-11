@@ -37,23 +37,29 @@
     },
     "development": {
       "type": "object",
-      "required": ["initiative", "phase", "checkpoint", "nextTransition", "blockers", "constraints"],
+      "required": ["initiative", "phase", "checkpoint", "nextTransition", "blockers", "constraints", "plan", "prNumber"],
       "properties": {
         "initiative": {"type": "string", "minLength": 1},
         "phase": {"type": "string", "minLength": 1},
         "checkpoint": {"type": "string", "minLength": 1},
         "nextTransition": {"type": "string", "minLength": 1},
         "blockers": {"type": "array", "items": {"type": "string"}},
-        "constraints": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+        "constraints": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "plan": {"type": "string", "minLength": 1},
+        "prNumber": {"type": "integer", "minimum": 1}
       }
     },
     "operations": {
       "type": "object",
       "required": ["toolboxPhase", "canonicalState", "commands"],
       "properties": {
-        "toolboxPhase": {"type": "string", "minLength": 1},
+        "toolboxPhase": {"const": "phase-1.1-coherence"},
         "canonicalState": {"const": "ops/state/project.json"},
-        "commands": {"type": "array", "items": {"enum": ["status", "doctor", "verify"]}, "uniqueItems": true}
+        "commands": {
+          "type": "array",
+          "items": {"enum": ["status", "doctor", "verify", "checkpoint", "handoff"]},
+          "uniqueItems": true
+        }
       }
     }
   }

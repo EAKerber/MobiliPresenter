@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "ReadabilityProbeMigration 1.0",
+  "fromBaseline": "fidelity/baselines/fh05-readability.json",
+  "reason": "FH-06.1 replaces the old internal-cavity edge probes with the explicit 600x600 oven front-opening edges.",
+  "unchangedProbeIds": [
+    "module01/door-seam",
+    "module03/door-seam",
+    "module03/drawer-seam/1-2",
+    "module03/drawer-seam/2-3",
+    "module03/drawer-seam/3-4",
+    "module06/door-left-center-seam"
+  ],
+  "supersededProbeIds": [
+    "module02/oven-surround-left",
+    "module02/oven-surround-right"
+  ],
+  "addedProbeIds": [
+    "module02/oven-opening-left",
+    "module02/oven-opening-right",
+    "module02/oven-opening-bottom",
+    "module02/oven-opening-top"
+  ],
+  "policy": {
+    "compareUnchangedAgainstFH05": true,
+    "supersededProbesMustBeAbsent": true,
+    "addedProbesMustBePresent": true,
+    "addedProbesBecomeBaselineOnlyAfterS1HardGatesAndBrowserArtifactPass": true
+  }
+}

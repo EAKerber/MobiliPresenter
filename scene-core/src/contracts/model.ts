@@ -23,7 +23,8 @@ export type EntityKind = "environment" | "module" | "appliance" | "fixture" | "a
 export type VisibilityIntent = "auto" | "on" | "off";
 export type MountPolicy = "standalone" | "hosted";
 export type SemanticLayer = 0 | 1 | 2;
-export type GeometryRole = "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "wall" | "column" | "other";
+export type PlacementStatus = "confirmed" | "inferred";
+export type GeometryRole = "panel" | "front" | "shelf" | "back" | "top" | "bottom" | "side" | "divider" | "glass" | "wall" | "column" | "stone" | "plinth" | "light-profile" | "other";
 
 export interface DimensionTripleMm { readonly width: number; readonly height: number; readonly depth: number; }
 export interface DimensionEvidence {
@@ -55,12 +56,23 @@ export interface FaceGeometry extends GeometryPrimitiveBase {
 }
 export type GeometryPrimitive = BoxGeometry | FaceGeometry;
 
+export interface ApplianceFrontOpening {
+  readonly localTransform: RigidTransform;
+  readonly sizeMm: { readonly width: number; readonly height: number };
+  readonly status?: "confirmed" | "inferred";
+  readonly evidenceRefs?: readonly string[];
+}
+
 export interface ApplianceSlot {
   readonly id: string;
   readonly role: string;
   readonly localTransform: RigidTransform;
   readonly clearSizeMm: DimensionTripleMm;
+  readonly cavitySizeMm?: DimensionTripleMm;
+  readonly frontOpening?: ApplianceFrontOpening;
   readonly defaultApplianceId?: string;
+  readonly status?: "confirmed" | "inferred";
+  readonly evidenceRefs?: readonly string[];
 }
 
 export interface SceneEntityBase {
@@ -78,6 +90,10 @@ export interface SceneItem extends SceneEntityBase {
   readonly kind: "appliance" | "fixture" | "accessory";
   readonly definitionId: string;
   readonly slotId?: string;
+  readonly targetEnvelopeMm?: DimensionTripleMm;
+  readonly geometry?: readonly GeometryPrimitive[];
+  readonly placementStatus?: PlacementStatus;
+  readonly evidenceRefs?: readonly string[];
 }
 
 export interface ModuleGeometry extends SceneEntityBase {
@@ -104,6 +120,13 @@ export interface SourceBinding {
   readonly sourceSelector: { readonly layer?: string; readonly entityType?: "3DFACE" | "LINE"; };
   readonly targetEntityId: string;
   readonly targetRole: string;
+}
+
+export interface SubstitutionGroup {
+  readonly id: string;
+  readonly primaryEntityId: string;
+  readonly replacementEntityId: string;
+  readonly policy: "replacement-when-primary-hidden";
 }
 
 export interface FixedPerspectiveCamera {
@@ -138,6 +161,7 @@ export interface ScenePackage {
   readonly items: readonly SceneItem[];
   readonly modules: readonly ModuleGeometry[];
   readonly sourceBindings: readonly SourceBinding[];
+  readonly substitutionGroups?: readonly SubstitutionGroup[];
 }
 
 export function identityTransform(): RigidTransform {

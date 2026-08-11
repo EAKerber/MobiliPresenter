@@ -1,6 +1,9 @@
 [build]
-  command = "python3 deploy.py"
-  publish = "site"
+  command = "npm --prefix scene-core install --ignore-scripts --no-audit --no-fund && npm --prefix viewer-next install --ignore-scripts --no-audit --no-fund && npm --prefix viewer-next run build"
+  publish = "viewer-next/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
 
 [[headers]]
   for = "/*.webp"

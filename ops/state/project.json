@@ -14,17 +14,21 @@
     "publishedBranch": "main"
   },
   "published": {
-    "release": "V7.0-I5",
+    "release": "ViewerNext-Preview-2026-08-11",
     "url": "https://mobilipresenter.netlify.app/",
-    "artifactManifest": "snapshot/mobile/manifest.json",
-    "artifactSha256": "38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae"
+    "artifactManifest": "ops/published/viewer-next-current.json",
+    "artifactSha256": "84f8fcd8e925c13678d07c646d1c34dcd90e7be62e55ee50ee257cefb6807e19"
   },
   "development": {
     "initiative": "Fixed View Renderer 0.1",
-    "phase": "visual-correction-loop",
-    "checkpoint": "FH-06",
-    "nextTransition": "correct-highest-priority-f5-f6-failures-without-f0-f4-regression",
-    "blockers": [],
+    "phase": "human-visual-gate",
+    "checkpoint": "FH-06.1-S10",
+    "nextTransition": "define-geometry-derived-technical-view-contract-and-fix-valid-selection-without-tpc",
+    "blockers": [
+      "human-f6-appearance-review-required-before-renderer-merge",
+      "ui-handoff-30-technical-view-fidelity-required-before-primary-technical-presentation",
+      "ui-contract-28-valid-selection-without-tpc-must-degrade-gracefully"
+    ],
     "constraints": [
       "fixed-camera-is-product-invariant",
       "scene-core-0.1-is-integrated-foundation",
@@ -34,9 +38,28 @@
       "mm-is-physical-authority-pixels-are-projection-evidence",
       "supersampling-4x-is-targeted-crop-fidelity-profile",
       "f0-through-f4-must-not-regress-during-visual-tuning",
-      "fh05-readability-baseline-is-regression-reference"
+      "unaffected-readability-probes-remain-regression-compared-to-s8",
+      "s10-oven-probes-use-explicit-absolute-appearance-gate-after-mdf-material-migration",
+      "s10-drawer-probes-require-absolute-readability-and-median-contrast-spread-lte-0.02",
+      "sink-opening-four-probes-pass-absolute-s9-readability-gate",
+      "module02-oven-opening-is-600x600-with-95-95-80-80-mdf-fields",
+      "module02-and-module03-fronts-share-the-same-tuned-front-wood-material",
+      "module02-oven-physical-clearance-remains-2mm-on-all-four-sides",
+      "cooktop-render-contact-is-1mm-above-stone02-without-mutating-core-slot",
+      "contact-fidelity-hard-gate-measures-cooktop-stone-gap-as-1mm-plusminus-0.01mm",
+      "gtao-occlusion-profile-is-mm-scaled-radius72-blend0.38",
+      "module03-drawer-physical-gaps-remain-2mm",
+      "stone-is-two-independent-30mm-design-pieces-with-100x20-rear-upstands",
+      "sink-uses-true-rounded-stone-hole-and-continuous-undermount-bowl",
+      "faucet-is-core-anchored-high-arc-340mm-255mm-reach",
+      "full-wall-tile-covers-main-column-return-and-inferred-laundry-wall",
+      "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
+      "technical-view-fidelity-must-be-traceable-to-geometry-authority",
+      "ui-must-not-reconstruct-domain-geometry-or-mask-tpc-unavailability",
+      "verified-user-artifact-source-is-77cd8adb7bdc1f15a58a2f5e55269a0b302b99ac",
+      "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
-    "plan": "docs/plans/fidelity-harness-v1.md",
+    "plan": "docs/plans/fh06-1-implementation-methodology.md",
     "prNumber": 6
   },
   "operations": {

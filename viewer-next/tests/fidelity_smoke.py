@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+import json
+import shutil
+import struct
+import subprocess
+from pathlib import Path
+
+BASE = "http://127.0.0.1:4173/"
+OVERLAY_URL = f"{BASE}?fidelity=1&overlay=1"
+DOM = Path("/tmp/mobilipresenter-fidelity-dom.html")
+OVERLAY_SCREENSHOT = Path("/tmp/mobilipresenter-fidelity-overlay-1x.png")
+EVIDENCE = Path("/tmp/mobilipresenter-fidelity-evidence.json")
+CANONICAL = (1865, 967)
+
+
+def find_chrome() -> str:
+    for candidate in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        path = shutil.which(candidate)
+        if path:
+            return path
+    raise SystemExit("CHROME_NOT_FOUND")
+
+
+def chrome_args(chrome: str) -> list[str]:
+    return [
+        chrome,
+        "--headless=new",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--ignore-gpu-blocklist",
+        "--enable-webgl",
+        "--enable-unsafe-swiftshader",
+        "--use-angle=swiftshader",
+        f"--window-size={CANONICAL[0]},{CANONICAL[1]}",
+        "--force-device-scale-factor=1",
+        "--virtual-time-budget=8000",
+    ]
+
+
+def run(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, text=True, capture_output=True, check=False, timeout=120)
+
+
+def png_size(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"FIDELITY_SCREENSHOT_NOT_PNG:{path}")
+    return struct.unpack(">II", data[16:24])
+
+
+def main() -> None:
+    chrome = find_chrome()
+    dom_result = run(chrome_args(chrome) + ["--dump-dom", OVERLAY_URL])
+    if dom_result.returncode != 0:
+        raise SystemExit(f"FIDELITY_CHROME_DOM_FAILED:{dom_result.stderr[-2000:]}")
+    DOM.write_text(dom_result.stdout, encoding="utf-8")
+    required = (
+        'data-renderer-backend="three-webgl2"',
+        'data-renderer-ready="true"',
+        'data-frame-rendered="true"',
+        'data-scene-id="traditional-complete"',
+        'data-fidelity-mode="true"',
+        'data-fidelity-overlay="true"',
+        'data-fidelity-line-count=',
+    )
+    missing = [needle for needle in required if needle not in dom_result.stdout]
+    if missing:
+        raise SystemExit(f"FIDELITY_DOM_GATE_FAILED:{missing}\n{dom_result.stderr[-2000:]}")
+
+    shot = run(chrome_args(chrome) + [f"--screenshot={OVERLAY_SCREENSHOT}", OVERLAY_URL])
+    if shot.returncode != 0 or not OVERLAY_SCREENSHOT.is_file():
+        raise SystemExit(f"FIDELITY_OVERLAY_SCREENSHOT_FAILED:{shot.stderr[-2000:]}")
+    size = png_size(OVERLAY_SCREENSHOT)
+    if size != CANONICAL:
+        raise SystemExit(f"FIDELITY_OVERLAY_SIZE_MISMATCH:{size}")
+
+    evidence = {
+        "status": "PASS",
+        "browser": chrome,
+        "canonicalViewportPx": list(CANONICAL),
+        "overlayScreenshot": {"path": str(OVERLAY_SCREENSHOT), "bytes": OVERLAY_SCREENSHOT.stat().st_size, "size": list(size)},
+        "measurementPolicy": "4x precision is provided by targeted off-axis crops; no monolithic 7460x3868 framebuffer is required",
+        "requiredDomMarkers": list(required),
+    }
+    EVIDENCE.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    print(json.dumps(evidence, indent=2))
+
+
+if __name__ == "__main__":
+    main()

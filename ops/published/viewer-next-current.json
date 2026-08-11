@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "SourceBuild 1.0",
+  "release": "ViewerNext-Preview-2026-08-11",
+  "sha256": "84f8fcd8e925c13678d07c646d1c34dcd90e7be62e55ee50ee257cefb6807e19",
+  "fingerprintKind": "sha256(sourceBase|sourcePaths|buildCommand|publishPath)",
+  "sourceBranch": "main",
+  "sourceBase": "cefcff09e3e4fe0d0da356f529964a21cb6313dd",
+  "sourcePaths": ["scene-core", "viewer-next"],
+  "buildCommand": "npm --prefix scene-core install --ignore-scripts --no-audit --no-fund && npm --prefix viewer-next install --ignore-scripts --no-audit --no-fund && npm --prefix viewer-next run build",
+  "publishPath": "viewer-next/dist",
+  "defaultUiMode": "renderer-only",
+  "uiPreviewQuery": "?controls=1",
+  "rollback": {
+    "branch": "backup/netlify-v7.0-i5-2026-08-11",
+    "mode": "snapshot-chunks",
+    "manifest": "snapshot/mobile/manifest.json",
+    "release": "V7.0-I5",
+    "sha256": "38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae"
+  }
+}

@@ -1,0 +1,205 @@
+name: Viewer Next
+
+on:
+  push:
+    branches:
+      - "renderer/**"
+    paths:
+      - "viewer-next/**"
+      - "scene-core/**"
+      - "fidelity/**"
+      - ".github/workflows/viewer-next.yml"
+  pull_request:
+    paths:
+      - "viewer-next/**"
+      - "scene-core/**"
+      - "fidelity/**"
+      - ".github/workflows/viewer-next.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: viewer-next-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Scene Core toolchain
+        working-directory: scene-core
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Install Viewer Next toolchain
+        working-directory: viewer-next
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Viewer Next
+        working-directory: viewer-next
+        run: npm run verify
+
+      - name: Generate readability probe specification
+        working-directory: scene-core
+        run: |
+          npm run build
+          node tools/fidelity-readability-spec.mjs /tmp/mobilipresenter-readability-spec.json
+          python -m json.tool /tmp/mobilipresenter-readability-spec.json > /dev/null
+
+      - name: Start Viewer Next preview
+        working-directory: viewer-next
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/mobilipresenter-viewer-next.log 2>&1 &
+          echo $! > /tmp/mobilipresenter-viewer-next.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/mobilipresenter-viewer-next.log
+          exit 1
+
+      - name: Browser WebGL baseline
+        working-directory: viewer-next
+        run: python3 tests/browser_smoke.py
+
+      - name: Browser fidelity overlay
+        working-directory: viewer-next
+        run: python3 tests/fidelity_smoke.py
+
+      - name: Capture targeted 4x readability crops
+        working-directory: viewer-next
+        run: |
+          python3 tests/readability_capture.py \
+            /tmp/mobilipresenter-readability-spec.json \
+            /tmp/mobilipresenter-readability-crops \
+            /tmp/mobilipresenter-readability-crops.json
+          python -m json.tool /tmp/mobilipresenter-readability-crops.json > /dev/null
+
+      - name: Measure semantic seam readability
+        working-directory: viewer-next
+        run: |
+          python3 tests/readability_analyze.py \
+            /tmp/mobilipresenter-readability-spec.json \
+            /tmp/mobilipresenter-readability-crops.json \
+            /tmp/mobilipresenter-readability-crops \
+            /tmp/mobilipresenter-readability-report.json
+          python -m json.tool /tmp/mobilipresenter-readability-report.json > /dev/null
+
+      - name: Compare unaffected readability probes against S8
+        working-directory: viewer-next
+        run: |
+          python3 tests/readability_compare.py \
+            ../fidelity/baselines/fh06-1-s8-readability.json \
+            /tmp/mobilipresenter-readability-report.json \
+            /tmp/mobilipresenter-readability-comparison.json \
+            ../fidelity/migrations/fh06-1-s10-appearance-probes.json
+          python -m json.tool /tmp/mobilipresenter-readability-comparison.json > /dev/null
+
+      - name: Gate S10 oven and drawer readability
+        working-directory: viewer-next
+        run: |
+          python3 tests/s10_readability_gate.py \
+            /tmp/mobilipresenter-readability-report.json \
+            /tmp/mobilipresenter-s10-readability-gate.json
+          python -m json.tool /tmp/mobilipresenter-s10-readability-gate.json > /dev/null
+
+      - name: Gate sink station readability
+        working-directory: viewer-next
+        run: |
+          python3 tests/sink_readability_gate.py \
+            /tmp/mobilipresenter-readability-report.json \
+            /tmp/mobilipresenter-sink-readability-gate.json
+          python -m json.tool /tmp/mobilipresenter-sink-readability-gate.json > /dev/null
+
+      - name: Stage visual evidence
+        if: always()
+        run: |
+          mkdir -p viewer-next/artifacts viewer-next/fidelity-artifacts
+          if [ -f /tmp/mobilipresenter-viewer.png ]; then
+            cp /tmp/mobilipresenter-viewer.png viewer-next/artifacts/renderer-baseline.png
+          fi
+          if [ -f /tmp/mobilipresenter-browser-evidence.json ]; then
+            cp /tmp/mobilipresenter-browser-evidence.json viewer-next/artifacts/browser-evidence.json
+          fi
+          if [ -f /tmp/mobilipresenter-viewer-dom.html ]; then
+            cp /tmp/mobilipresenter-viewer-dom.html viewer-next/artifacts/renderer-dom.html
+          fi
+          if [ -f /tmp/mobilipresenter-viewer-next.log ]; then
+            cp /tmp/mobilipresenter-viewer-next.log viewer-next/artifacts/preview.log
+            cp /tmp/mobilipresenter-viewer-next.log viewer-next/fidelity-artifacts/preview.log
+          fi
+          if [ -f /tmp/mobilipresenter-fidelity-overlay-1x.png ]; then
+            cp /tmp/mobilipresenter-fidelity-overlay-1x.png viewer-next/fidelity-artifacts/fidelity-overlay-1x.png
+          fi
+          if [ -f /tmp/mobilipresenter-fidelity-evidence.json ]; then
+            cp /tmp/mobilipresenter-fidelity-evidence.json viewer-next/fidelity-artifacts/fidelity-evidence.json
+          fi
+          if [ -f /tmp/mobilipresenter-fidelity-dom.html ]; then
+            cp /tmp/mobilipresenter-fidelity-dom.html viewer-next/fidelity-artifacts/fidelity-dom.html
+          fi
+          if [ -f /tmp/mobilipresenter-readability-spec.json ]; then
+            cp /tmp/mobilipresenter-readability-spec.json viewer-next/fidelity-artifacts/readability-spec.json
+          fi
+          if [ -f /tmp/mobilipresenter-readability-crops.json ]; then
+            cp /tmp/mobilipresenter-readability-crops.json viewer-next/fidelity-artifacts/readability-crops.json
+          fi
+          if [ -d /tmp/mobilipresenter-readability-crops ]; then
+            cp -R /tmp/mobilipresenter-readability-crops viewer-next/fidelity-artifacts/readability-crops
+          fi
+          if [ -f /tmp/mobilipresenter-readability-report.json ]; then
+            cp /tmp/mobilipresenter-readability-report.json viewer-next/fidelity-artifacts/readability-report.json
+          fi
+          if [ -f /tmp/mobilipresenter-readability-comparison.json ]; then
+            cp /tmp/mobilipresenter-readability-comparison.json viewer-next/fidelity-artifacts/readability-comparison.json
+          fi
+          if [ -f /tmp/mobilipresenter-s10-readability-gate.json ]; then
+            cp /tmp/mobilipresenter-s10-readability-gate.json viewer-next/fidelity-artifacts/s10-readability-gate.json
+          fi
+          if [ -f /tmp/mobilipresenter-sink-readability-gate.json ]; then
+            cp /tmp/mobilipresenter-sink-readability-gate.json viewer-next/fidelity-artifacts/sink-readability-gate.json
+          fi
+
+      - name: Persist user-facing artifacts to temporary branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/renderer/fixed-view-realistic-v1'
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          python3 tools/persist-viewer-artifacts.py \
+            --artifact-dir viewer-next/artifacts \
+            --branch "artifact/viewer-next-${RUN_ID}" \
+            --source-sha "$SOURCE_SHA"
+
+      - name: Upload visual baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: viewer-next-visual-baseline
+          path: viewer-next/artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fidelity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: viewer-next-fidelity-overlay
+          path: viewer-next/fidelity-artifacts/
+          if-no-files-found: warn
+          retention-days: 14

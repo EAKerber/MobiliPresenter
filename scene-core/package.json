@@ -3,11 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:dxf": "python3 -m unittest discover -s tests_py",
-    "verify": "npm run test && npm run test:dxf"
+    "verify": "npm run test && npm run test:dxf",
+    "fidelity:report": "npm run build && node tools/fidelity-report.mjs"
   },
   "devDependencies": {
     "typescript": "5.8.3"
