@@ -396,7 +396,12 @@ export const lighting08TechnicalCatalog: TechnicalCatalogEntry = {
     }
   ],
   controls: [
-    { kind: "visibility", label: "Exibir perfil", binding: "viewer-visibility", implementationStatus: "bound" },
+    {
+      kind: "visibility",
+      label: "Exibir perfil",
+      binding: "viewer-visibility",
+      implementationStatus: "declared-not-bound"
+    },
     {
       kind: "activation",
       label: "Ligar iluminação",
