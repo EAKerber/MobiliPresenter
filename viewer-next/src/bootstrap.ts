@@ -7,7 +7,9 @@ const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("APP_ROOT_NOT_FOUND");
 
 const query = new URLSearchParams(window.location.search);
-const controlsEnabled = query.get("controls") === "1" && query.get("fidelity") !== "1";
+// Preview-only policy: controls are visible by default on the temporary Netlify branch.
+// `controls=0` remains available for baseline inspection; fidelity mode always suppresses UI.
+const controlsEnabled = query.get("controls") !== "0" && query.get("fidelity") !== "1";
 app.dataset.viewerControls = controlsEnabled ? "true" : "false";
 
 let controls: RuntimeControlsUi | null = null;
