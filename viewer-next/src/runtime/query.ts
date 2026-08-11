@@ -80,10 +80,20 @@ export function parseViewerConfiguration(query: URLSearchParams): ViewerConfigur
 }
 
 export function parseViewerInteraction(query: URLSearchParams): ViewerInteractionState {
+  let state = createDefaultViewerInteraction();
   const selected = query.get("select");
-  if (!selected) return createDefaultViewerInteraction();
-  return reduceViewerInteraction(createDefaultViewerInteraction(), {
-    type: "select-module",
-    moduleId: moduleIdFromAlias(selected)
-  });
+  if (selected) {
+    state = reduceViewerInteraction(state, {
+      type: "select-module",
+      moduleId: moduleIdFromAlias(selected)
+    });
+  }
+  const hovered = query.get("hover");
+  if (hovered) {
+    state = reduceViewerInteraction(state, {
+      type: "hover-module",
+      moduleId: moduleIdFromAlias(hovered)
+    });
+  }
+  return state;
 }
