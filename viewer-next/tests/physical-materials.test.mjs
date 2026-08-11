@@ -15,7 +15,7 @@ import {
 } from "../dist-ts/src/renderer/three/materials.js";
 import { buildThreeScene } from "../dist-ts/src/renderer/three/scene-adapter.js";
 
-test("front-wood honors the existing physical scale and world-z grain contract without raster textures", () => {
+test("front-wood honors physical scale and world-z grain without raster textures", () => {
   const registry = new ThreeMaterialRegistry(styleAnchorAppearance);
   const material = registry.materialByDefinitionId(WOOD_GRAIN_MATERIAL_ID);
   const metadata = material.userData.proceduralWoodGrain;
@@ -25,18 +25,19 @@ test("front-wood honors the existing physical scale and world-z grain contract w
   assert.equal(metadata.mappingPolicy, "module-continuous");
   assert.equal(metadata.grainDirection, "world-z");
   assert.deepEqual(metadata.physicalScaleMm, [600, 1200]);
-  assert.equal(metadata.coarseBandMm, 600 / 18);
-  assert.equal(metadata.fineBandMm, 600 / 72);
-  assert.ok(metadata.colorAmplitude <= 0.06);
+  assert.deepEqual(metadata.macroCellMm, [75, 1200 / 1.8]);
+  assert.equal(metadata.fiberBandMm, 600 / 52);
+  assert.deepEqual(metadata.fineCellMm, [6.25, 240]);
+  assert.ok(metadata.colorAmplitude <= 0.05);
   assert.ok(metadata.worldToModule instanceof Matrix4);
   assert.equal(material.map, null);
   assert.equal(material.normalMap, null);
   assert.equal(material.roughnessMap, null);
-  assert.match(material.customProgramCacheKey(), /module-mm-world-z-v1:front-wood/);
+  assert.match(material.customProgramCacheKey(), /module-mm-world-z-v2:front-wood/);
   registry.dispose();
 });
 
-test("wood shader injects metric module and world coordinates deterministically", () => {
+test("wood shader injects deterministic anisotropic noise in metric module/world coordinates", () => {
   const registry = new ThreeMaterialRegistry(styleAnchorAppearance);
   const material = registry.materialByDefinitionId(WOOD_GRAIN_MATERIAL_ID);
   const shader = {
@@ -50,10 +51,15 @@ test("wood shader injects metric module and world coordinates deterministically"
   assert.match(shader.vertexShader, /vMpWoodWorldPosition/);
   assert.match(shader.vertexShader, /vMpWoodModulePosition/);
   assert.match(shader.vertexShader, /mpWoodWorldToModule \* worldPosition/);
+  assert.match(shader.fragmentShader, /mpWoodHash/);
+  assert.match(shader.fragmentShader, /mpWoodNoise/);
   assert.match(shader.fragmentShader, /mpWoodAlongMm = vMpWoodWorldPosition\.y/);
   assert.match(shader.fragmentShader, /mpWoodAcrossMm = vMpWoodModulePosition\.x/);
-  assert.match(shader.fragmentShader, /33\.333333/);
-  assert.match(shader.fragmentShader, /8\.333333/);
+  assert.match(shader.fragmentShader, /75\.000000/);
+  assert.match(shader.fragmentShader, /666\.666667/);
+  assert.match(shader.fragmentShader, /11\.538462/);
+  assert.match(shader.fragmentShader, /6\.250000/);
+  assert.doesNotMatch(shader.fragmentShader, /mpWoodCoarse/);
 
   const second = {
     vertexShader: "void main(){\n#include <worldpos_vertex>\n}",
@@ -80,9 +86,6 @@ test("module-continuous binding keeps one shared material while resetting mappin
   const module03Group = adapter.entityGroups.get(module03WithSink.id);
   assert.ok(module02Group && module03Group);
 
-  const mesh02 = module02Group.getObjectByProperty("type", "Mesh");
-  const mesh03 = module03Group.getObjectByProperty("type", "Mesh");
-  assert.ok(mesh02 instanceof Mesh && mesh03 instanceof Mesh);
   const woodMesh02 = [];
   const woodMesh03 = [];
   module02Group.traverse(object => {
