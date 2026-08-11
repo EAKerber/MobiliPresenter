@@ -17,6 +17,7 @@ import { attachParametricAppliances } from "../renderer/three/appliances.js";
 import { applyFh06CooktopContact } from "../renderer/three/cooktop-contact.js";
 import { applyFh06FaucetRefinement } from "../renderer/three/faucet-refinement.js";
 import { applyFh06FrontReadability } from "../renderer/three/front-readability.js";
+import { applyHardwareRefinement } from "../renderer/three/hardware-refinement.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "../renderer/three/lighting.js";
 import { ThreeMaterialRegistry } from "../renderer/three/materials.js";
 import { applyFh06OvenReadability } from "../renderer/three/oven-readability.js";
@@ -34,6 +35,9 @@ export interface ViewerCompositionDiagnostics {
   readonly cooktopGapMm: number;
   readonly frontReadabilityId: string;
   readonly frontPhysicalGapMm: readonly number[];
+  readonly hardwareRefinementId: string;
+  readonly hardwareAnchorCount: number;
+  readonly hardwareDefinitionIds: readonly string[];
   readonly ovenReadabilityId: string;
   readonly ovenPhysicalClearanceMm: readonly number[];
   readonly sinkFamilyId: string;
@@ -99,6 +103,7 @@ export function createViewerComposition(
   const cooktopContact = applyFh06CooktopContact(adapter, initialScenePackage);
   applyFh06VisualRefinements(adapter, materials);
   const frontReadability = applyFh06FrontReadability(adapter, materials, initialScenePackage);
+  const hardwareRefinement = applyHardwareRefinement(adapter, materials, initialScenePackage);
   const ovenReadability = applyFh06OvenReadability(adapter, materials, initialScenePackage, initialAppearance);
   const tileRefinement = applyFh06FullWallTiles(adapter, initialScenePackage);
   const sinkRefinement = applyFh06SinkRefinement(adapter, materials, initialScenePackage);
@@ -151,6 +156,9 @@ export function createViewerComposition(
       cooktopGapMm: cooktopContact.afterGapMm,
       frontReadabilityId: frontReadability.refinementId,
       frontPhysicalGapMm: frontReadability.physicalGapMm,
+      hardwareRefinementId: hardwareRefinement.refinementId,
+      hardwareAnchorCount: hardwareRefinement.anchorCount,
+      hardwareDefinitionIds: hardwareRefinement.hardwareDefinitionIds,
       ovenReadabilityId: ovenReadability.refinementId,
       ovenPhysicalClearanceMm: ovenReadability.physicalClearanceMm,
       sinkFamilyId: sinkRefinement.sinkFamilyId,
