@@ -1,10 +1,10 @@
 import {
-  applyTransform,
+  composeTransforms,
   currentHardwareAnchors,
   currentHardwareDefinitions,
-  invertTransform,
+  hardwareAnchorUvMm,
+  quaternionFromAxisAngle,
   resolveHardwareAnchor,
-  resolveWorldTransforms,
   type HardwareAnchor,
   type HardwareDefinition,
   type ScenePackage
@@ -14,10 +14,11 @@ import {
   CylinderGeometry,
   Group,
   Mesh,
+  Vector3,
   type Material,
   type Object3D
 } from "three";
-import { sceneVectorToThree } from "./coordinates.js";
+import { applySceneTransform, sceneVectorToThree } from "./coordinates.js";
 import type { ThreeMaterialRegistry } from "./materials.js";
 import type { ThreeSceneAdapter } from "./scene-adapter.js";
 
@@ -25,7 +26,9 @@ export const HARDWARE_REFINEMENT_ID = "hardware-anchors-parametric-v1" as const;
 export const HARDWARE_RENDER_MATERIAL_ID = "dark-metal" as const;
 
 const ROOT_PREFIX = "hardware:";
-const EPSILON_MM = 1e-6;
+const EPSILON_MM = 0.01;
+const IDENTITY_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;
+const VERTICAL_ROTATION = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, Math.PI / 2);
 
 export interface HardwareRefinementResult {
   readonly refinementId: typeof HARDWARE_REFINEMENT_ID;
@@ -53,8 +56,7 @@ function createBarHandle(
   const root = new Group();
   const panelPlaneZ = -anchor.normalOffsetMm;
   const barRearZ = panelPlaneZ + definition.standoffDepthMm;
-  const supportDepth = definition.standoffDepthMm;
-  const supportCenterZ = panelPlaneZ + supportDepth / 2;
+  const supportCenterZ = panelPlaneZ + definition.standoffDepthMm / 2;
 
   const bar = meshPart(
     new BoxGeometry(definition.barLengthMm, definition.barWidthMm, definition.barDepthMm),
@@ -66,7 +68,7 @@ function createBarHandle(
 
   for (const side of [-1, 1] as const) {
     const support = meshPart(
-      new BoxGeometry(definition.supportWidthMm, definition.supportWidthMm, supportDepth),
+      new BoxGeometry(definition.supportWidthMm, definition.supportWidthMm, definition.standoffDepthMm),
       material,
       side < 0 ? "support-a" : "support-b"
     );
@@ -75,7 +77,6 @@ function createBarHandle(
     root.add(support);
   }
 
-  if (anchor.orientation === "vertical") root.rotation.z = Math.PI / 2;
   root.userData.mountSpacingMm = definition.mountSpacingMm;
   root.userData.barLengthMm = definition.barLengthMm;
   root.userData.standoffDepthMm = definition.standoffDepthMm;
@@ -123,12 +124,19 @@ function definitionById(definitions: readonly HardwareDefinition[], id: string):
   return definition;
 }
 
-function moduleLocalAnchorPosition(scene: ScenePackage, anchor: HardwareAnchor): ReturnType<typeof sceneVectorToThree> {
-  const resolved = resolveHardwareAnchor(scene, anchor);
-  const moduleWorld = resolveWorldTransforms(scene).get(anchor.hostEntityId);
-  if (!moduleWorld) throw new Error(`HARDWARE_HOST_WORLD_NOT_FOUND:${anchor.hostEntityId}`);
-  const localScene = applyTransform(invertTransform(moduleWorld), resolved.worldMm);
-  return sceneVectorToThree(localScene);
+function applyAnchorLocalTransform(root: Group, scene: ScenePackage, anchor: HardwareAnchor): void {
+  const module = scene.modules.find(candidate => candidate.id === anchor.hostEntityId);
+  if (!module) throw new Error(`HARDWARE_HOST_NOT_FOUND:${anchor.hostEntityId}`);
+  const primitive = module.geometry.find(candidate => candidate.id === anchor.hostGeometryId);
+  if (!primitive || primitive.primitive !== "box" || primitive.role !== "front") {
+    throw new Error(`HARDWARE_HOST_MUST_BE_FRONT_BOX:${anchor.hostGeometryId}`);
+  }
+  const [uMm, vMm] = hardwareAnchorUvMm(primitive, anchor);
+  const anchorOnFront = {
+    translationMm: { x: uMm, y: -anchor.normalOffsetMm, z: vMm },
+    rotation: anchor.orientation === "vertical" ? VERTICAL_ROTATION : IDENTITY_ROTATION
+  };
+  applySceneTransform(root, composeTransforms(primitive.localTransform, anchorOnFront));
 }
 
 function assertHandleRoot(root: Object3D, anchor: HardwareAnchor): void {
@@ -165,7 +173,7 @@ export function applyHardwareRefinement(
 
     const root = createHardwareHandle(definition, anchor, material);
     root.name = name;
-    root.position.copy(moduleLocalAnchorPosition(scene, anchor));
+    applyAnchorLocalTransform(root, scene, anchor);
     root.userData.anchorId = anchor.id;
     root.userData.hostEntityId = anchor.hostEntityId;
     root.userData.hostGeometryId = anchor.hostGeometryId;
@@ -177,11 +185,12 @@ export function applyHardwareRefinement(
     const resolved = resolveHardwareAnchor(scene, anchor);
     host.updateWorldMatrix(true, true);
     root.updateWorldMatrix(true, true);
-    const actual = root.getWorldPosition(sceneVectorToThree({ x: 0, y: 0, z: 0 }));
+    const actual = root.getWorldPosition(new Vector3());
     const expected = sceneVectorToThree(resolved.worldMm);
-    if (actual.distanceTo(expected) > EPSILON_MM) {
+    const driftMm = actual.distanceTo(expected);
+    if (driftMm > EPSILON_MM) {
       host.remove(root);
-      throw new Error(`HARDWARE_RENDER_ANCHOR_DRIFT:${anchor.id}:${actual.distanceTo(expected)}`);
+      throw new Error(`HARDWARE_RENDER_ANCHOR_DRIFT:${anchor.id}:${driftMm}`);
     }
   }
 
