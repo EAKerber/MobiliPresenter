@@ -270,16 +270,15 @@ export interface ModuleContinuousMaterialBindingResult {
 }
 
 export function bindModuleContinuousMaterialMappings(
-  adapter: ThreeSceneAdapter,
-  appearance: AppearancePackage
+  adapter: ThreeSceneAdapter
 ): ModuleContinuousMaterialBindingResult {
   const moduleIds = new Set<string>();
   let boundMeshCount = 0;
 
-  for (const moduleId of Object.keys(appearance.assignments.entityOverrides).sort()) {
-    const group = adapter.entityGroups.get(moduleId);
-    if (!group || group.userData.entityKind !== "module") continue;
+  for (const [moduleId, group] of [...adapter.entityGroups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    if (group.userData.entityKind !== "module") continue;
     group.updateWorldMatrix(true, true);
+    const worldToModule = group.matrixWorld.clone().invert();
     group.traverse(object => {
       if (!(object instanceof Mesh)) return;
       if (!(object.material instanceof MeshStandardMaterial || object.material instanceof MeshPhysicalMaterial)) return;
@@ -290,8 +289,7 @@ export function bindModuleContinuousMaterialMappings(
 
       const prior = object.onBeforeRender;
       object.onBeforeRender = function (...args): void {
-        group.updateWorldMatrix(true, false);
-        metadata.worldToModule.copy(group.matrixWorld).invert();
+        metadata.worldToModule.copy(worldToModule);
         prior.call(this, ...args);
       };
       object.userData.moduleContinuousMaterialMapping = WOOD_GRAIN_SHADER_VERSION;
