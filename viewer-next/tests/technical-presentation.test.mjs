@@ -78,12 +78,13 @@ test("finish policies expose controlled option ids while Appearance remains mate
   assert.ok(front?.options.every(option => option.materialId.length > 0));
 });
 
-test("lighting 08 declares activation separately from visibility and resolves module04/module06 dependencies", () => {
+test("lighting 08 declares own visibility and activation separately and resolves module04/module06 dependencies", () => {
   const initial = createDefaultViewerConfiguration();
   const available = getCurrentTechnicalPresentationByAlias(initial, "08");
   assert.equal(available.target.entityId, UNDER_CAB_LIGHT_ITEM_ID);
   assert.equal(available.availability.available, true);
   assert.deepEqual(available.controls.map(control => control.kind), ["visibility", "activation"]);
+  assert.equal(available.controls.find(control => control.kind === "visibility")?.implementationStatus, "declared-not-bound");
   assert.equal(available.controls.find(control => control.kind === "activation")?.implementationStatus, "declared-not-bound");
 
   const hidden04 = reduceViewerConfiguration(initial, {
