@@ -15,7 +15,11 @@ import {
   STONE_PRESETS,
   withStonePreset
 } from "../dist-ts/src/fixtures/stone-presets.js";
-import { ThreeMaterialRegistry } from "../dist-ts/src/renderer/three/materials.js";
+import {
+  STONE_ROUGHNESS_RESPONSE,
+  STONE_SURFACE_RESPONSE_VERSION,
+  ThreeMaterialRegistry
+} from "../dist-ts/src/renderer/three/materials.js";
 
 function appearanceFor(id) {
   return withStonePreset(currentAppearance, id);
@@ -44,7 +48,7 @@ test("each preset assigns the same material to stone-02 and stone-03 without tou
   }
 });
 
-test("stone preset material installs deterministic world-space millimeter speckle", () => {
+test("stone preset material installs deterministic world-space millimeter speckle and bounded roughness response", () => {
   const appearance = appearanceFor("light-speckled");
   const registry = new ThreeMaterialRegistry(appearance);
   const stone02 = registry.resolve(STONE02_ID, "stone");
@@ -56,22 +60,30 @@ test("stone preset material installs deterministic world-space millimeter speckl
   assert.deepEqual(stone02.userData.physicalTextureScaleMm, [600, 600]);
   assert.deepEqual(stone02.userData.proceduralStoneSpeckle, {
     version: "world-mm-v1",
+    surfaceResponseVersion: STONE_SURFACE_RESPONSE_VERSION,
     worldSpaceMm: true,
     macroScaleMm: 600,
     coarseCellMm: 20,
     fineCellMm: 5,
-    seed: 37.137
+    seed: 37.137,
+    roughnessResponse: { ...STONE_ROUGHNESS_RESPONSE },
+    rasterMap: false,
+    bumpMap: false,
+    normalMap: false
   });
-  assert.equal(stone02.customProgramCacheKey(), "mobilipresenter:world-mm-v1:stone-speckled-light");
+  assert.equal(
+    stone02.customProgramCacheKey(),
+    `mobilipresenter:world-mm-v1:${STONE_SURFACE_RESPONSE_VERSION}:stone-speckled-light`
+  );
   registry.dispose();
 });
 
-test("stone shader injects world-position mapping and keeps pattern phase independent of entity id", () => {
+test("stone shader injects world-position color and roughness response independent of entity id", () => {
   const registry = new ThreeMaterialRegistry(appearanceFor("graphite-speckled"));
   const stone = registry.resolve(STONE02_ID, "stone");
   const shader = {
     vertexShader: "void main() {\n#include <worldpos_vertex>\n}",
-    fragmentShader: "void main() {\nvec4 diffuseColor = vec4(1.0);\n#include <color_fragment>\n}",
+    fragmentShader: "void main() {\nvec4 diffuseColor = vec4(1.0);\nfloat roughnessFactor = 0.43;\n#include <color_fragment>\n#include <roughnessmap_fragment>\n}",
     uniforms: {}
   };
   stone.onBeforeCompile(shader, {});
@@ -79,5 +91,10 @@ test("stone shader injects world-position mapping and keeps pattern phase indepe
   assert.match(shader.fragmentShader, /mpStoneHash/);
   assert.match(shader.fragmentShader, /vMpWorldPosition \/ 20\.000000/);
   assert.match(shader.fragmentShader, /vMpWorldPosition \/ 5\.000000/);
+  assert.match(shader.fragmentShader, /roughnessFactor = clamp/);
+  assert.match(shader.fragmentShader, /0\.040000/);
+  assert.match(shader.fragmentShader, /0\.020000/);
+  assert.doesNotMatch(shader.fragmentShader, new RegExp(STONE02_ID));
+  assert.doesNotMatch(shader.fragmentShader, new RegExp(STONE03_ID));
   registry.dispose();
 });
