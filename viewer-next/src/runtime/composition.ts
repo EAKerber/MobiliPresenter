@@ -14,6 +14,7 @@ import {
   WebGLRenderer
 } from "three";
 import { attachParametricAppliances } from "../renderer/three/appliances.js";
+import { applyCabinetFrontEdgeResponse } from "../renderer/three/cabinet-front-edge.js";
 import { applyFh06CooktopContact } from "../renderer/three/cooktop-contact.js";
 import { applyFh06FaucetRefinement } from "../renderer/three/faucet-refinement.js";
 import { applyFh06FrontReadability } from "../renderer/three/front-readability.js";
@@ -116,6 +117,7 @@ export function createViewerComposition(
   const cooktopContact = applyFh06CooktopContact(adapter, initialScenePackage);
   applyFh06VisualRefinements(adapter, materials);
   const frontReadability = applyFh06FrontReadability(adapter, materials, initialScenePackage);
+  applyCabinetFrontEdgeResponse(adapter, initialScenePackage);
   const hardwareRefinement = attachCurrentHardware(adapter, initialScenePackage, materials);
   const ovenReadability = applyFh06OvenReadability(adapter, materials, initialScenePackage, initialAppearance);
   const tileRefinement = applyFh06FullWallTiles(adapter, initialScenePackage);
