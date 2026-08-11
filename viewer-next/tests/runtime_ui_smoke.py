@@ -68,9 +68,20 @@ def capture(chrome: str, url: str, name: str, width: int, height: int) -> dict[s
     }
 
 
+def dump_dom(chrome: str, url: str, name: str, required: tuple[str, ...]) -> None:
+    result = run(chrome_args(chrome, 1366, 768) + ["--dump-dom", url])
+    if result.returncode != 0:
+        raise SystemExit(f"RUNTIME_UI_DOM_FAILED:{name}:{result.stderr[-2000:]}")
+    (OUT / f"{name}.html").write_text(result.stdout, encoding="utf-8")
+    missing = [needle for needle in required if needle not in result.stdout]
+    if missing:
+        raise SystemExit(f"RUNTIME_UI_DOM_GATE_FAILED:{name}:{missing}")
+
+
 def main() -> None:
     chrome = find_chrome()
     OUT.mkdir(parents=True, exist_ok=True)
+
     params = {
         "controls": "1",
         "select": "02",
@@ -80,19 +91,15 @@ def main() -> None:
         "light": "warm-worktop",
     }
     url = BASE_URL + "?" + urlencode(params)
-    dom_path = OUT / "runtime-ui.html"
-
-    dom_result = run(chrome_args(chrome, 1366, 768) + ["--dump-dom", url])
-    if dom_result.returncode != 0:
-        raise SystemExit(f"RUNTIME_UI_DOM_FAILED:{dom_result.stderr[-2000:]}")
-    dom_path.write_text(dom_result.stdout, encoding="utf-8")
-
     required = (
         'data-renderer-ready="true"',
         'data-frame-rendered="true"',
         'data-viewer-controls="true"',
         'data-viewer-runtime-ui="mounted"',
         'data-viewer-detail-open="true"',
+        'data-viewer-sidebar-open="false"',
+        'data-sidebar-rail="true"',
+        'data-detail-expanded="true"',
         'data-viewer-module02-visible="false"',
         'data-viewer-range-visible="true"',
         'data-viewer-stone-preset="graphite-speckled"',
@@ -108,31 +115,52 @@ def main() -> None:
         'data-front-preset="neutral-greige"',
         'data-stone-preset="graphite-speckled"',
         'data-lighting-preset="warm-worktop"',
+        'data-technical-gallery="hero"',
         'data-technical-view=',
+        'data-technical-view-option=',
         'Módulo 02',
-        'Vistas técnicas',
+        'Vistas do módulo',
+        'Ferragens e componentes',
     )
-    missing = [needle for needle in required if needle not in dom_result.stdout]
-    if missing:
-        raise SystemExit(f"RUNTIME_UI_DOM_GATE_FAILED:{missing}")
+    dump_dom(chrome, url, "runtime-ui", required)
+
+    placeholder_url = BASE_URL + "?" + urlencode({"controls": "1", "select": "01"})
+    placeholder_required = (
+        'data-viewer-detail-open="true"',
+        'data-detail-expanded="true"',
+        'data-module-alias="01"',
+        'data-placeholder="true"',
+        'Descrição comercial a definir',
+        'Artes técnicas a definir',
+        'Especificações a definir',
+        'Componentes a definir',
+        'Acabamento a definir',
+    )
+    dump_dom(chrome, placeholder_url, "runtime-ui-placeholder", placeholder_required)
 
     captures = [
         capture(chrome, url, "runtime-ui-desktop", 1366, 768),
         capture(chrome, url, "runtime-ui-mobile", 390, 844),
+        capture(chrome, placeholder_url, "runtime-ui-placeholder", 1366, 768),
     ]
 
     evidence = {
-        "schemaVersion": "ViewerRuntimeUiEvidence 0.2.0",
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.3.0",
         "status": "PASS",
         "url": url,
+        "placeholderUrl": placeholder_url,
         "captures": captures,
         "requiredDomMarkers": list(required),
+        "placeholderDomMarkers": list(placeholder_required),
         "invariants": {
             "canonicalBaselineControlsRemainOptIn": True,
-            "productSidebarMounted": True,
+            "compactSelectorRailMounted": True,
+            "selectorDrawerStartsCollapsed": True,
             "moduleVisibilitySeparatedFromInspection": True,
-            "sidebarPagerMounted": True,
+            "selectionPersistsIndependentlyFromDetailState": True,
+            "technicalGalleryUsesOneDominantView": True,
             "technicalDetailDerivedFromContract": True,
+            "missingTechnicalContentUsesPlaceholders": True,
             "frontPresetProjected": True,
             "stonePresetProjected": True,
             "lightingPresetProjected": True,
