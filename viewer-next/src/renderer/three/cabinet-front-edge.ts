@@ -10,6 +10,7 @@ import type { ThreeSceneAdapter } from "./scene-adapter.js";
 
 export const CABINET_FRONT_EDGE_RESPONSE_ID = "cabinet-front-edge-bevel-v1" as const;
 export const CABINET_FRONT_EDGE_BEVEL_MM = 1.25 as const;
+export const CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM = 0.001 as const;
 const CABINET_FRONT_EDGE_SEGMENTS = 3;
 const EXISTING_S8_BEVEL_ID = "fh06-s8-front-bevel-v1";
 
@@ -49,7 +50,7 @@ function assertEnvelope(mesh: Mesh, primitive: FrontBoxPrimitive): void {
   if (!(box instanceof Box3)) throw new Error(`CABINET_FRONT_BOUNDING_BOX_MISSING:${primitive.id}`);
   const size = box.getSize(new Vector3());
   const expected = primitive.sizeMm;
-  const tolerance = 1e-6;
+  const tolerance = CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM;
   if (
     Math.abs(size.x - expected.width) > tolerance ||
     Math.abs(size.y - expected.height) > tolerance ||
@@ -64,6 +65,7 @@ function assertEnvelope(mesh: Mesh, primitive: FrontBoxPrimitive): void {
 export interface CabinetFrontEdgeResponseResult {
   readonly refinementId: typeof CABINET_FRONT_EDGE_RESPONSE_ID;
   readonly bevelMm: typeof CABINET_FRONT_EDGE_BEVEL_MM;
+  readonly envelopeToleranceMm: typeof CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM;
   readonly totalFrontCount: number;
   readonly refinedFrontCount: number;
   readonly preservedExistingBevelCount: number;
@@ -125,6 +127,7 @@ export function applyCabinetFrontEdgeResponse(
   return {
     refinementId: CABINET_FRONT_EDGE_RESPONSE_ID,
     bevelMm: CABINET_FRONT_EDGE_BEVEL_MM,
+    envelopeToleranceMm: CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM,
     totalFrontCount: bindings.length,
     refinedFrontCount,
     preservedExistingBevelCount,
