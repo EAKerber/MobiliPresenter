@@ -6,6 +6,10 @@ import { moduleIdFromAlias, type ModuleAlias } from "../runtime/query.js";
 import type { ViewerConfigurationState, ViewerInteractionState } from "../runtime/viewer-state.js";
 import {
   VIEWER_UI_CONTRACT_VERSION,
+  type FrontPresetId,
+  type LightingPresetId,
+  type StonePresetId,
+  type ViewerUiApi,
   type ViewerUiCatalog,
   type ViewerUiSnapshot,
   type ViewerVisibilityOverride
@@ -20,6 +24,18 @@ export const CURRENT_VIEWER_UI_CATALOG: ViewerUiCatalog = {
   lightingPresets: LIGHTING_PRESET_IDS.map(id => ({ id, label: LIGHTING_PRESETS[id].label }))
 };
 
+export interface ViewerEngineControlPort {
+  getConfiguration(): ViewerConfigurationState;
+  getInteraction(): ViewerInteractionState;
+  setModuleVisibility(alias: string, value: ViewerVisibilityOverride): void;
+  setFrontPreset(alias: string, presetId: FrontPresetId): void;
+  clearFrontPreset(alias: string): void;
+  setStonePreset(presetId: StonePresetId): void;
+  setLightingPreset(presetId: LightingPresetId): void;
+  resetConfiguration(): void;
+  selectModule(alias: string | null): void;
+}
+
 export function moduleAliasFromId(moduleId: string | null): ModuleAlias | null {
   if (moduleId === null) return null;
   return VIEWER_UI_MODULE_ALIASES.find(alias => moduleIdFromAlias(alias) === moduleId) ?? null;
@@ -30,7 +46,7 @@ export function createViewerUiSnapshot(
   interaction: ViewerInteractionState
 ): ViewerUiSnapshot {
   const visibilityByModule = {} as Record<ModuleAlias, ViewerVisibilityOverride>;
-  const frontPresetByModule: Partial<Record<ModuleAlias, ViewerUiSnapshot["frontPresetByModule"][ModuleAlias]>> = {};
+  const frontPresetByModule: Partial<Record<ModuleAlias, FrontPresetId>> = {};
 
   for (const alias of VIEWER_UI_MODULE_ALIASES) {
     const moduleId = moduleIdFromAlias(alias);
@@ -56,5 +72,20 @@ export function createViewerUiSnapshot(
     selectedTechnicalViewAssets: selectedTechnicalPresentation === null
       ? []
       : renderAllTechnicalViews(selectedTechnicalPresentation)
+  };
+}
+
+export function createViewerUiApi(runtime: ViewerEngineControlPort): ViewerUiApi {
+  return {
+    contractVersion: VIEWER_UI_CONTRACT_VERSION,
+    getCatalog: () => CURRENT_VIEWER_UI_CATALOG,
+    getSnapshot: () => createViewerUiSnapshot(runtime.getConfiguration(), runtime.getInteraction()),
+    setModuleVisibility: (alias, value) => runtime.setModuleVisibility(alias, value),
+    setFrontPreset: (alias, presetId) => runtime.setFrontPreset(alias, presetId),
+    clearFrontPreset: alias => runtime.clearFrontPreset(alias),
+    setStonePreset: presetId => runtime.setStonePreset(presetId),
+    setLightingPreset: presetId => runtime.setLightingPreset(presetId),
+    resetConfiguration: () => runtime.resetConfiguration(),
+    selectModule: alias => runtime.selectModule(alias)
   };
 }
