@@ -1,8 +1,8 @@
 # MobiliPresenter — UI/UX Decision Log 0.1
 
 Status: **ativo**  
-Branch de autoria: `ui/style-guide-v0.1`  
-Baseline: `integration/viewer-parallel-v0.1` @ `277b0fc088f5e32de236782b293f39feea6e163e`
+Branch de autoria original: `ui/style-guide-v0.1`  
+Baseline inicial: `integration/viewer-parallel-v0.1` @ `277b0fc088f5e32de236782b293f39feea6e163e`
 
 Este arquivo registra decisões de produto/UX que orientam a implementação visual. Ele evita que decisões já tomadas voltem a ser tratadas como questões em aberto por novos agentes.
 
@@ -12,23 +12,19 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Status:** accepted
 
-**Decisão:** no estado sem detalhe aberto, o render ocupa toda a coluna direita do viewer.
+**Decisão:** no estado sem detalhe aberto, o render ocupa toda a área disponível à direita da superfície compacta de navegação/configuração.
 
 **Racional:** o produto é uma apresentação contextual do mobiliário; controles devem servir ao render e não competir com ele.
-
-**Consequência:** a sidebar é a única superfície persistente de configuração no desktop.
 
 ---
 
 ## UI-D002 — Detalhe abre abaixo do render
 
-**Status:** accepted
+**Status:** superseded por `UI-D024`
 
-**Decisão:** selecionar um módulo revela a ficha técnica na parte inferior da coluna direita e reduz verticalmente o render.
+**Decisão original:** selecionar um módulo revela a ficha técnica na parte inferior da coluna direita e reduz verticalmente o render.
 
-**Racional:** manter contexto espacial e composição visíveis enquanto o usuário lê dados técnicos.
-
-**Não fazer:** navegar para uma página separada, substituir o render ou abrir modal de tela cheia como padrão desktop.
+**Motivo da substituição:** seleção e expansão da ficha agora são estados distintos. Selecionar ainda pode abrir a ficha como comportamento inicial, mas recolhê-la não deseleciona o módulo.
 
 ---
 
@@ -56,13 +52,11 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 ## UI-D005 — Sidebar possui três páginas
 
-**Status:** accepted
+**Status:** superseded por `UI-D022`
 
-**Decisão:** `Módulos`, `Cores` e `Acessórios` são páginas irmãs da mesma sidebar.
+**Decisão original:** `Módulos`, `Cores` e `Acessórios` são páginas irmãs de uma sidebar persistente com navegação no rodapé.
 
-**Racional:** manter a coluna lateral compacta e previsível em vez de empilhar listas grandes de configuração.
-
-**Implementação preferida:** navegação fixa no rodapé da sidebar; no mobile, equivalente em navegação inferior do painel.
+**Motivo da substituição:** as três páginas continuam irmãs, mas passam a ser acessadas por rail compacto + drawer recolhível para devolver largura ao render e à apresentação técnica.
 
 ---
 
@@ -130,17 +124,17 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Racional:** elas comunicam geometria e composição mais rapidamente que longos blocos de texto.
 
-**Mobile:** uma vista dominante por vez, com paginação/scroll horizontal complementar.
+**Refino v0.2:** priorizar uma vista dominante com seletor compacto das demais antes de recorrer a várias miniaturas simultâneas ou carrossel com scroll.
 
 ---
 
 ## UI-D012 — Blocos técnicos aparecem somente quando há conteúdo
 
-**Status:** accepted
+**Status:** superseded por `UI-D021`
 
-**Decisão:** Especificação, Construção, Ferragens, Elétrica, Acabamento, Dependências e Avisos são blocos condicionais.
+**Decisão original:** blocos técnicos sem dados eram omitidos para evitar caixas vazias.
 
-**Racional:** evitar caixas vazias e falsa impressão de completude.
+**Motivo da substituição:** o usuário decidiu que lacunas relevantes devem preservar o espaço editorial por meio de placeholders explícitos, sem inventar conteúdo.
 
 ---
 
@@ -188,7 +182,7 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Status:** accepted
 
-**Decisão:** animações ficam concentradas em abertura/fechamento de ficha, troca de página lateral e feedback de controles, com duração curta e `prefers-reduced-motion`.
+**Decisão:** animações ficam concentradas em abertura/fechamento de ficha, drawer lateral e feedback de controles, com duração curta e `prefers-reduced-motion`.
 
 **Racional:** motion deve tornar a mudança de layout compreensível, não criar personalidade ornamental que dispute atenção com o render.
 
@@ -221,6 +215,70 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 **Decisão:** trabalho normal desta frente modifica `viewer-next/src/ui/**`, assets visuais exclusivos e testes de UI. Mudanças em `src/api/**`, runtime, renderer, presentation, fixtures ou Scene Core exigem transição coordenada.
 
 **Racional:** cumprir o contrato de desenvolvimento paralelo UI × Engine e reduzir conflitos.
+
+---
+
+## UI-D021 — Ausência relevante usa placeholder explícito
+
+**Status:** accepted
+
+**Decisão:** quando uma informação esperada pela composição comercial estiver ausente, a UI preserva o espaço com placeholder neutro e claramente pendente.
+
+**Exemplos:** `Descrição comercial a definir`, `Artes técnicas a definir`, `Componentes a definir`, `Acabamento a definir`.
+
+**Racional:** manter consistência editorial sem inventar fatos e sem fazer layouts incompletos colapsarem de forma imprevisível.
+
+**Não fazer:** preencher lacuna com inferência visual, texto comercial fabricado ou valor técnico aproximado.
+
+---
+
+## UI-D022 — Seletores usam rail compacto + drawer recolhível
+
+**Status:** accepted
+
+**Decisão:** `Módulos`, `Cores` e `Acessórios` permanecem destinos irmãos, mas a superfície persistente é um rail estreito. O conteúdo de configuração abre em drawer e pode ser recolhido.
+
+**Racional:** devolver largura permanente ao render e às artes técnicas, reduzindo a aparência de painel administrativo.
+
+**Comportamento preferido:** selecionar um módulo recolhe o drawer automaticamente e deixa o rail acessível.
+
+---
+
+## UI-D023 — Scroll é último recurso de layout
+
+**Status:** accepted
+
+**Decisão:** antes de adicionar overflow rolável, tentar nesta ordem: `reflow → disclosure → seleção/paginação → scroll`.
+
+**Racional:** scrolls aninhados reduzem compreensão espacial, especialmente em mobile, e desperdiçam área que pode ser recuperada por hierarquia melhor.
+
+**Gate:** evitar scroll dentro de cards; ficha técnica possui no máximo uma superfície vertical principal de scroll; listas laterais podem rolar quando o número de opções realmente exceder o drawer.
+
+**Estilo:** quando necessário, scrollbar fina, discreta, com contraste maior em hover e sem track ornamental.
+
+---
+
+## UI-D024 — Seleção e expansão da ficha são estados independentes
+
+**Status:** accepted
+
+**Decisão:** um módulo pode permanecer selecionado com a ficha recolhida. Fechar a ficha não chama `selectModule(null)`.
+
+**Racional:** o módulo selecionado continua sendo contexto para Cores/Acessórios e não deve ser perdido só porque o usuário quer recuperar espaço do render.
+
+**Comportamento:** nova seleção pode abrir a ficha inicialmente; depois, `detailExpanded` é controlado localmente pela UI sem duplicar autoridade de domínio.
+
+---
+
+## UI-D025 — Ficha assume intenção promocional sem inventar marketing
+
+**Status:** accepted
+
+**Decisão:** a ficha deve inspirar visualização e compra por composição, hierarquia, escala das artes e destaque de materiais/ferragens. Texto promocional só aparece quando houver fonte autoritativa; caso contrário, usa placeholder.
+
+**Racional:** o produto não é apenas um inspetor técnico. As referências fornecidas são materiais comerciais e a UI deve refletir essa intenção, mantendo rigor factual.
+
+**Consequência:** uma vista técnica dominante e uma composição editorial têm prioridade sobre grids densos de propriedades e controles permanentemente visíveis.
 
 ---
 
