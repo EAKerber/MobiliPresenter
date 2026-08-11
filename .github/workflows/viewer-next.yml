@@ -3,6 +3,7 @@ name: Viewer Next
 on:
   push:
     branches:
+      - "main"
       - "renderer/**"
     paths:
       - "viewer-next/**"
