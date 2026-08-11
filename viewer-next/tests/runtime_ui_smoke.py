@@ -124,17 +124,19 @@ def main() -> None:
     )
     dump_dom(chrome, url, "runtime-ui", required)
 
-    placeholder_url = BASE_URL + "?" + urlencode({"controls": "1", "select": "01"})
+    # Module 03 is a supported TPC target but deliberately has no authored
+    # function/marketing summary and no notices. Those genuine omissions are
+    # the safe product-real fixture for the placeholder contract.
+    placeholder_url = BASE_URL + "?" + urlencode({"controls": "1", "select": "03"})
     placeholder_required = (
         'data-viewer-detail-open="true"',
         'data-detail-expanded="true"',
-        'data-module-alias="01"',
+        'data-module-alias="03"',
         'data-placeholder="true"',
         'Descrição comercial a definir',
-        'Artes técnicas a definir',
-        'Especificações a definir',
-        'Componentes a definir',
-        'Acabamento a definir',
+        'Sem observações publicadas',
+        'data-technical-gallery="hero"',
+        'Corrediça telescópica reforçada H45',
     )
     dump_dom(chrome, placeholder_url, "runtime-ui-placeholder", placeholder_required)
 
@@ -145,7 +147,7 @@ def main() -> None:
     ]
 
     evidence = {
-        "schemaVersion": "ViewerRuntimeUiEvidence 0.3.0",
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.3.1",
         "status": "PASS",
         "url": url,
         "placeholderUrl": placeholder_url,
@@ -160,7 +162,8 @@ def main() -> None:
             "selectionPersistsIndependentlyFromDetailState": True,
             "technicalGalleryUsesOneDominantView": True,
             "technicalDetailDerivedFromContract": True,
-            "missingTechnicalContentUsesPlaceholders": True,
+            "missingPublishedFieldsUsePlaceholders": True,
+            "unsupportedTechnicalTargetsNotFabricatedByUi": True,
             "frontPresetProjected": True,
             "stonePresetProjected": True,
             "lightingPresetProjected": True,
