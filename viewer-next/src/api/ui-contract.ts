@@ -32,7 +32,6 @@ export interface ViewerUiCatalog {
 export interface ViewerUiSnapshot {
   readonly contractVersion: typeof VIEWER_UI_CONTRACT_VERSION;
   readonly selectedModuleAlias: ModuleAlias | null;
-  readonly hoveredModuleAlias: ModuleAlias | null;
   readonly visibilityByModule: Readonly<Record<ModuleAlias, ViewerVisibilityOverride>>;
   readonly frontPresetByModule: Readonly<Partial<Record<ModuleAlias, FrontPresetId>>>;
   readonly stonePresetId: StonePresetId;
@@ -41,13 +40,10 @@ export interface ViewerUiSnapshot {
   readonly selectedTechnicalViewAssets: readonly TechnicalDiagramAsset[];
 }
 
-export type ViewerUiListener = (snapshot: ViewerUiSnapshot) => void;
-
 export interface ViewerUiApi {
   readonly contractVersion: typeof VIEWER_UI_CONTRACT_VERSION;
   getCatalog(): ViewerUiCatalog;
   getSnapshot(): ViewerUiSnapshot;
-  subscribe(listener: ViewerUiListener): () => void;
   setModuleVisibility(alias: ModuleAlias, value: ViewerVisibilityOverride): void;
   setFrontPreset(alias: ModuleAlias, presetId: FrontPresetId): void;
   clearFrontPreset(alias: ModuleAlias): void;
