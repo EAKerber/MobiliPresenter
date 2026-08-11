@@ -1,6 +1,16 @@
-import { Camera, Color, PerspectiveCamera, Scene, ShaderMaterial, Vector2, WebGLRenderer } from "three";
+import {
+  Camera,
+  Color,
+  PerspectiveCamera,
+  Scene,
+  ShaderMaterial,
+  Vector2,
+  WebGLRenderer,
+  type Object3D
+} from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { OutlinePass } from "three/addons/postprocessing/OutlinePass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
@@ -21,6 +31,23 @@ export const FH06_GTAO_PROFILE = {
   denoiseRadiusPx: 4,
   denoiseRings: 2,
   denoiseSamples: 16
+} as const;
+
+export const INTERACTION_OUTLINE_PROFILE = {
+  selected: {
+    visibleEdgeColor: 0xc5a35a,
+    hiddenEdgeColor: 0x6f5a2f,
+    edgeStrength: 2.7,
+    edgeGlow: 0.08,
+    edgeThickness: 1.15
+  },
+  hovered: {
+    visibleEdgeColor: 0xe8e2d8,
+    hiddenEdgeColor: 0x8c877e,
+    edgeStrength: 1.35,
+    edgeGlow: 0,
+    edgeThickness: 0.75
+  }
 } as const;
 
 const additiveShader = {
@@ -51,7 +78,10 @@ export interface SelectiveBloomPipeline {
   readonly bloomCamera: PerspectiveCamera;
   readonly bloomComposer: EffectComposer;
   readonly gtaoPass: GTAOPass;
+  readonly selectedOutlinePass: OutlinePass;
+  readonly hoveredOutlinePass: OutlinePass;
   readonly finalComposer: EffectComposer;
+  setInteractionTargets(selected: readonly Object3D[], hovered: readonly Object3D[]): void;
   render(): void;
   setSize(widthPx: number, heightPx: number): void;
   setAppearance(appearance: AppearancePackage): void;
@@ -75,6 +105,19 @@ function syncBloomCamera(target: PerspectiveCamera, source: PerspectiveCamera): 
 
 export function objectParticipatesInBloom(camera: Camera, objectLayersMask: number): boolean {
   return (camera.layers.mask & objectLayersMask) !== 0;
+}
+
+function configureOutlinePass(
+  pass: OutlinePass,
+  profile: typeof INTERACTION_OUTLINE_PROFILE.selected | typeof INTERACTION_OUTLINE_PROFILE.hovered
+): void {
+  pass.visibleEdgeColor.setHex(profile.visibleEdgeColor);
+  pass.hiddenEdgeColor.setHex(profile.hiddenEdgeColor);
+  pass.edgeStrength = profile.edgeStrength;
+  pass.edgeGlow = profile.edgeGlow;
+  pass.edgeThickness = profile.edgeThickness;
+  pass.pulsePeriod = 0;
+  pass.selectedObjects = [];
 }
 
 export function createSelectiveBloomPipeline(
@@ -122,6 +165,14 @@ export function createSelectiveBloomPipeline(
   gtaoPass.blendIntensity = FH06_GTAO_PROFILE.blendIntensity;
   finalComposer.addPass(gtaoPass);
 
+  const hoveredOutlinePass = new OutlinePass(new Vector2(widthPx, heightPx), scene, camera);
+  configureOutlinePass(hoveredOutlinePass, INTERACTION_OUTLINE_PROFILE.hovered);
+  finalComposer.addPass(hoveredOutlinePass);
+
+  const selectedOutlinePass = new OutlinePass(new Vector2(widthPx, heightPx), scene, camera);
+  configureOutlinePass(selectedOutlinePass, INTERACTION_OUTLINE_PROFILE.selected);
+  finalComposer.addPass(selectedOutlinePass);
+
   const mixMaterial = new ShaderMaterial({
     uniforms: {
       baseTexture: { value: null },
@@ -146,7 +197,13 @@ export function createSelectiveBloomPipeline(
     bloomCamera,
     bloomComposer,
     gtaoPass,
+    selectedOutlinePass,
+    hoveredOutlinePass,
     finalComposer,
+    setInteractionTargets(selected, hovered): void {
+      selectedOutlinePass.selectedObjects = [...selected];
+      hoveredOutlinePass.selectedObjects = [...hovered];
+    },
     render(): void {
       syncBloomCamera(bloomCamera, camera);
       const previousBackground = scene.background;
@@ -164,6 +221,8 @@ export function createSelectiveBloomPipeline(
     },
     dispose(): void {
       bloomComposer.dispose();
+      hoveredOutlinePass.dispose();
+      selectedOutlinePass.dispose();
       gtaoPass.dispose();
       finalComposer.dispose();
       mixMaterial.dispose();
