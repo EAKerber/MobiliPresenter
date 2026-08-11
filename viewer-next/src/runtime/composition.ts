@@ -18,6 +18,10 @@ import { applyFh06CooktopContact } from "../renderer/three/cooktop-contact.js";
 import { applyFh06FaucetRefinement } from "../renderer/three/faucet-refinement.js";
 import { applyFh06FrontReadability } from "../renderer/three/front-readability.js";
 import { attachCurrentHardware } from "../renderer/three/hardware.js";
+import {
+  INTERACTION_HIGHLIGHT_ID,
+  resolveModuleInteractionTargets
+} from "../renderer/three/interaction-highlight.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "../renderer/three/lighting.js";
 import { ThreeMaterialRegistry } from "../renderer/three/materials.js";
 import { applyFh06OvenReadability } from "../renderer/three/oven-readability.js";
@@ -37,6 +41,8 @@ export interface ViewerCompositionDiagnostics {
   readonly frontPhysicalGapMm: readonly number[];
   readonly hardwareRefinementId: string;
   readonly hardwareHandleCount: number;
+  readonly hardwareAnchorCount: number;
+  readonly interactionHighlightId: string;
   readonly ovenReadabilityId: string;
   readonly ovenPhysicalClearanceMm: readonly number[];
   readonly sinkFamilyId: string;
@@ -61,6 +67,7 @@ export interface ViewerComposition {
   syncMaterials(scenePackage: ScenePackage, appearance: AppearancePackage): void;
   syncLighting(scenePackage: ScenePackage, appearance: AppearancePackage): void;
   syncConfiguration(scenePackage: ScenePackage, appearance: AppearancePackage): void;
+  syncInteraction(selectedModuleId: string | null, hoveredModuleId: string | null): void;
   render(): void;
   setSize(widthPx: number, heightPx: number): void;
   dispose(): void;
@@ -136,9 +143,20 @@ export function createViewerComposition(
 
   let currentScenePackage = initialScenePackage;
   let currentAppearance = initialAppearance;
+  let currentSelectedModuleId: string | null = null;
+  let currentHoveredModuleId: string | null = null;
   let disposed = false;
   const assertActive = (): void => {
     if (disposed) throw new Error("VIEWER_COMPOSITION_DISPOSED");
+  };
+  const applyInteractionTargets = (): void => {
+    const targets = resolveModuleInteractionTargets(
+      adapter,
+      currentScenePackage,
+      currentSelectedModuleId,
+      currentHoveredModuleId
+    );
+    post.setInteractionTargets(targets.selected, targets.hovered);
   };
 
   const result: ViewerComposition = {
@@ -157,6 +175,8 @@ export function createViewerComposition(
       frontPhysicalGapMm: frontReadability.physicalGapMm,
       hardwareRefinementId: hardwareRefinement.refinementId,
       hardwareHandleCount: hardwareRefinement.handleCount,
+      hardwareAnchorCount: hardwareRefinement.handleCount,
+      interactionHighlightId: INTERACTION_HIGHLIGHT_ID,
       ovenReadabilityId: ovenReadability.refinementId,
       ovenPhysicalClearanceMm: ovenReadability.physicalClearanceMm,
       sinkFamilyId: sinkRefinement.sinkFamilyId,
@@ -175,6 +195,7 @@ export function createViewerComposition(
       syncRuntimeVisibility(adapter, lighting, scenePackage, appearance);
       currentScenePackage = scenePackage;
       currentAppearance = appearance;
+      applyInteractionTargets();
     },
     syncMaterials(scenePackage, appearance): void {
       assertActive();
@@ -195,6 +216,13 @@ export function createViewerComposition(
       syncRuntimeLighting(adapter.scene, lighting, post, scenePackage, appearance);
       currentScenePackage = scenePackage;
       currentAppearance = appearance;
+      applyInteractionTargets();
+    },
+    syncInteraction(selectedModuleId, hoveredModuleId): void {
+      assertActive();
+      currentSelectedModuleId = selectedModuleId;
+      currentHoveredModuleId = hoveredModuleId;
+      applyInteractionTargets();
     },
     render(): void {
       assertActive();
