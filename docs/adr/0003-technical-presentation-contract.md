@@ -54,12 +54,13 @@ A iluminação sob o aéreo é uma entidade funcional própria, diferente do pre
 - host físico existente: módulo 06;
 - dependência técnica adicional fornecida pelo usuário: módulo 04;
 - módulo 04 também é o host técnico do ponto de interruptor/acabamento da fiação;
-- `visibility` significa presença/ocultação do perfil;
+- `visibility` significa presença/ocultação própria do perfil;
 - `activation` significa emissor ligado/desligado mantendo o perfil presente;
-- o TPC-01 declara `activation` como capacidade `declared-not-bound`;
-- o estado ligado/desligado só poderá se tornar `bound` quando for incorporado à autoridade runtime (`ViewerConfigurationState` ou sucessor). O TPC não cria um segundo store de estado.
+- a visibilidade efetiva por host já existe: ocultar o módulo 06 oculta o LED hospedado;
+- o VRC atual, porém, ainda não expõe controle direto da entidade 08; portanto **visibilidade própria e activation são ambas `declared-not-bound`** no TPC-01;
+- esses controles só poderão se tornar `bound` quando forem incorporados à autoridade runtime (`ViewerConfigurationState` ou sucessor). O TPC não cria um segundo store de estado.
 
-Assim, ocultar e desligar são operações ortogonais por contrato, mas apenas ocultar está implementado no runtime neste incremento.
+Assim, presença e emissão são operações ortogonais por contrato. O comportamento herdado do host físico continua funcionando, mas o controle independente da iluminação fica explicitamente para o próximo binding de runtime, em vez de ser simulado na UI.
 
 ## Acabamentos
 
@@ -105,7 +106,7 @@ O objetivo é permitir que um agente de UI altere composição, hierarquia, resp
 5. referências de entidades, dependências e acabamentos devem resolver;
 6. módulos 03 e 04 preservam nominal vs. geometria;
 7. módulo 03 fornece layout interno 390/400/400 proveniente da folha técnica;
-8. iluminação 08 separa `visibility` de `activation` e fica indisponível quando módulo 04 ou 06 requerido não está efetivamente visível;
+8. iluminação 08 separa `visibility` de `activation`, declara ambos os controles próprios como ainda não ligados ao runtime e fica indisponível quando módulo 04 ou 06 requerido não está efetivamente visível;
 9. SVG técnico é determinístico e não depende de DOM/WebGL;
 10. gates Viewer Next/Fidelity existentes não podem regredir.
 
@@ -113,4 +114,4 @@ O objetivo é permitir que um agente de UI altere composição, hierarquia, resp
 
 A futura interface deixa de ser responsável por gerar fichas técnicas. Sua responsabilidade passa a ser consumir `TechnicalPresentationPackage` e assets técnicos derivados, escolhendo apenas como apresentá-los.
 
-A implementação de `activation` real da iluminação e a expansão do catálogo para módulos 01/05/06/07 ficam para incrementos posteriores e não devem ser escondidas dentro da UI.
+O binding runtime dos controles próprios de visibilidade/activation da iluminação e a expansão do catálogo para módulos 01/05/06/07 ficam para incrementos posteriores e não devem ser escondidos dentro da UI.
