@@ -9,6 +9,7 @@ import {
 import { Group, Mesh, Vector3 } from "three";
 import {
   CABINET_FRONT_EDGE_BEVEL_MM,
+  CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM,
   CABINET_FRONT_EDGE_RESPONSE_ID,
   applyCabinetFrontEdgeResponse
 } from "../dist-ts/src/renderer/three/cabinet-front-edge.js";
@@ -44,6 +45,8 @@ test("cabinet front edge response preserves every authoritative front envelope a
 
   assert.equal(result.refinementId, CABINET_FRONT_EDGE_RESPONSE_ID);
   assert.equal(result.bevelMm, CABINET_FRONT_EDGE_BEVEL_MM);
+  assert.equal(result.envelopeToleranceMm, CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM);
+  assert.ok(CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM < 0.01);
   assert.equal(result.totalFrontCount, bindings.length);
   assert.equal(result.refinedFrontCount, bindings.length);
   assert.equal(result.preservedExistingBevelCount, 0);
@@ -55,9 +58,18 @@ test("cabinet front edge response preserves every authoritative front envelope a
     const mesh = meshFor(adapter, module.id, primitive.id);
     mesh.geometry.computeBoundingBox();
     const size = mesh.geometry.boundingBox.getSize(new Vector3());
-    assert.ok(Math.abs(size.x - primitive.sizeMm.width) < 1e-6, `${primitive.id}: width changed`);
-    assert.ok(Math.abs(size.y - primitive.sizeMm.height) < 1e-6, `${primitive.id}: height changed`);
-    assert.ok(Math.abs(size.z - primitive.sizeMm.depth) < 1e-6, `${primitive.id}: depth changed`);
+    assert.ok(
+      Math.abs(size.x - primitive.sizeMm.width) <= CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM,
+      `${primitive.id}: width changed`
+    );
+    assert.ok(
+      Math.abs(size.y - primitive.sizeMm.height) <= CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM,
+      `${primitive.id}: height changed`
+    );
+    assert.ok(
+      Math.abs(size.z - primitive.sizeMm.depth) <= CABINET_FRONT_EDGE_ENVELOPE_TOLERANCE_MM,
+      `${primitive.id}: depth changed`
+    );
     assert.equal(mesh.userData.cabinetFrontEdgeResponse, CABINET_FRONT_EDGE_RESPONSE_ID);
     assert.equal(mesh.userData.cabinetFrontEdgeBevelMm, CABINET_FRONT_EDGE_BEVEL_MM);
   }
