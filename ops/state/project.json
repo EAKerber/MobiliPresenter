@@ -10,8 +10,23 @@
   },
   "git": {
     "controlBranch": "main",
-    "activeDevelopmentBranch": "renderer/fixed-view-realistic-v1",
-    "publishedBranch": "main"
+    "activeDevelopmentBranch": null,
+    "publishedBranch": "main",
+    "preserveBranches": [
+      "renderer/fixed-view-realistic-v1",
+      "integration/viewer-parallel-v0.1",
+      "feature/viewer-runtime-controls-v0.1",
+      "feature/viewer-runtime-ui-v0.1",
+      "architecture/technical-presentation-contract-v0.1",
+      "planning/scope-and-documentation",
+      "ui/style-guide-v0.1",
+      "ui/product-shell-v0.1",
+      "ui/promotional-detail-v0.2",
+      "tmp/fh06-user-artifacts",
+      "backup/netlify-v7.0-i5-2026-08-11",
+      "archive/v7.0-i5-recovery",
+      "archive/legacy-fixed-view-variants-2026-08-11"
+    ]
   },
   "published": {
     "release": "ViewerNext-Preview-2026-08-11",
@@ -20,12 +35,11 @@
     "artifactSha256": "84f8fcd8e925c13678d07c646d1c34dcd90e7be62e55ee50ee257cefb6807e19"
   },
   "development": {
-    "initiative": "Fixed View Renderer 0.1",
-    "phase": "human-visual-gate",
-    "checkpoint": "FH-06.1-S10",
-    "nextTransition": "define-geometry-derived-technical-view-contract-and-fix-valid-selection-without-tpc",
+    "initiative": "Viewer Next — Technical Presentation Fidelity",
+    "phase": "between-increments",
+    "checkpoint": "POST-H6-PUBLISHED",
+    "nextTransition": "open-developer-slice-for-geometry-derived-technical-views",
     "blockers": [
-      "human-f6-appearance-review-required-before-renderer-merge",
       "ui-handoff-30-technical-view-fidelity-required-before-primary-technical-presentation",
       "ui-contract-28-valid-selection-without-tpc-must-degrade-gracefully"
     ],
@@ -59,12 +73,12 @@
       "verified-user-artifact-source-is-77cd8adb7bdc1f15a58a2f5e55269a0b302b99ac",
       "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
-    "plan": "docs/plans/fh06-1-implementation-methodology.md",
-    "prNumber": 6
+    "plan": "docs/plans/developer-continuation-2026-08.md",
+    "prNumber": null
   },
   "operations": {
-    "toolboxPhase": "phase-1.1-coherence",
+    "toolboxPhase": "phase-1.2-branch-hygiene",
     "canonicalState": "ops/state/project.json",
-    "commands": ["status", "doctor", "verify", "checkpoint", "handoff"]
+    "commands": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]
   }
 }
