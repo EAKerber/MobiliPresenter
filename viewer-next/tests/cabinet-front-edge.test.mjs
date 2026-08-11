@@ -36,11 +36,17 @@ function meshFor(adapter, moduleId, primitiveId) {
   return mesh;
 }
 
-test("cabinet front edge response preserves every authoritative front envelope and Scene Core digest", () => {
+test("cabinet front edge response preserves authoritative envelopes, shadow policy and Scene Core digest", () => {
   const registry = new ThreeMaterialRegistry(currentAppearance);
   const adapter = buildThreeScene(currentSceneBase, (entityId, slot) => registry.resolve(entityId, slot));
   const before = sceneGeometryDigest(currentSceneBase);
   const bindings = frontBindings();
+  const shadowPolicyByPrimitive = new Map(
+    bindings.map(({ module, primitive }) => {
+      const mesh = meshFor(adapter, module.id, primitive.id);
+      return [primitive.id, { castShadow: mesh.castShadow, receiveShadow: mesh.receiveShadow }];
+    })
+  );
   const result = applyCabinetFrontEdgeResponse(adapter, currentSceneBase);
 
   assert.equal(result.refinementId, CABINET_FRONT_EDGE_RESPONSE_ID);
@@ -72,6 +78,11 @@ test("cabinet front edge response preserves every authoritative front envelope a
     );
     assert.equal(mesh.userData.cabinetFrontEdgeResponse, CABINET_FRONT_EDGE_RESPONSE_ID);
     assert.equal(mesh.userData.cabinetFrontEdgeBevelMm, CABINET_FRONT_EDGE_BEVEL_MM);
+    assert.deepEqual(
+      { castShadow: mesh.castShadow, receiveShadow: mesh.receiveShadow },
+      shadowPolicyByPrimitive.get(primitive.id),
+      `${primitive.id}: shadow policy changed`
+    );
   }
 
   registry.dispose();
