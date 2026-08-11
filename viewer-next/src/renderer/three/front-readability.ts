@@ -6,6 +6,7 @@ import {
   MeshStandardMaterial
 } from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { applyCabinetFrontEdgeResponse } from "./cabinet-front-edge.js";
 import type { ThreeMaterialRegistry } from "./materials.js";
 import type { ThreeSceneAdapter } from "./scene-adapter.js";
 
@@ -162,6 +163,7 @@ export function applyFh06FrontReadability(
   }
   replaceDrawerGeometry(adapter, drawers);
   createRevealGroup(adapter, registry, seams);
+  applyCabinetFrontEdgeResponse(adapter, scene);
   const unchanged = sceneGeometryDigest(scene) === before;
   if (!unchanged) throw new Error("S8_MUTATED_SCENE_CORE_GEOMETRY");
   return {
