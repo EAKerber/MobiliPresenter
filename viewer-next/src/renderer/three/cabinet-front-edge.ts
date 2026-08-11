@@ -113,8 +113,6 @@ export function applyCabinetFrontEdgeResponse(
     geometry.userData.bevelMm = CABINET_FRONT_EDGE_BEVEL_MM;
     geometry.userData.authoritativeSizeMm = { ...primitive.sizeMm };
     mesh.geometry = geometry;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
     mesh.userData.cabinetFrontEdgeResponse = CABINET_FRONT_EDGE_RESPONSE_ID;
     mesh.userData.cabinetFrontEdgeBevelMm = CABINET_FRONT_EDGE_BEVEL_MM;
     assertEnvelope(mesh, primitive);
