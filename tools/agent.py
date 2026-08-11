@@ -63,18 +63,29 @@ def run_gh_json(endpoint: str) -> tuple[bool, Any]:
         return False, "gh returned non-JSON output"
 
 
+def ci_branch_name() -> str | None:
+    head_ref = os.environ.get("GITHUB_HEAD_REF")
+    if head_ref:
+        return head_ref
+    if os.environ.get("GITHUB_REF_TYPE") == "branch":
+        ref_name = os.environ.get("GITHUB_REF_NAME")
+        return ref_name or None
+    return None
+
+
 def observed_git() -> dict[str, Any]:
     inside_ok, inside = run_git("rev-parse", "--is-inside-work-tree")
     if not inside_ok or inside != "true":
         return {"available": shutil.which("git") is not None, "worktree": False}
     branch_ok, branch = run_git("branch", "--show-current")
+    observed_branch = branch if branch_ok and branch else ci_branch_name()
     head_ok, head = run_git("rev-parse", "HEAD")
     remote_ok, remote = run_git("remote", "get-url", "origin")
     dirty_ok, porcelain = run_git("status", "--porcelain")
     return {
         "available": True,
         "worktree": True,
-        "branch": branch if branch_ok else None,
+        "branch": observed_branch,
         "head": head if head_ok else None,
         "origin": remote if remote_ok else None,
         "dirty": bool(porcelain) if dirty_ok else None,
@@ -455,18 +466,27 @@ def command_handoff(as_json: bool, include_remote: bool) -> int:
     return 0 if verify["ok"] else ERROR_EXIT
 
 
-def local_branch_refs() -> dict[str, str]:
-    ok, output = run_git("for-each-ref", "--format=%(refname:short)\t%(objectname)", "refs/heads")
-    if not ok:
-        raise RuntimeError(f"BRANCH_INVENTORY_FAILED:{output}")
+def branch_refs() -> dict[str, str]:
+    remote_ok, remote_output = run_git("for-each-ref", "--format=%(refname:short)\t%(objectname)", "refs/remotes/origin")
     refs: dict[str, str] = {}
-    for line in output.splitlines():
+    if remote_ok:
+        for line in remote_output.splitlines():
+            if not line.strip():
+                continue
+            name, sha = line.split("\t", 1)
+            if name in {"origin/HEAD", "origin"} or not name.startswith("origin/"):
+                continue
+            refs[name.removeprefix("origin/")] = sha
+    if refs:
+        return refs
+
+    local_ok, local_output = run_git("for-each-ref", "--format=%(refname:short)\t%(objectname)", "refs/heads")
+    if not local_ok:
+        raise RuntimeError(f"BRANCH_INVENTORY_FAILED:{local_output}")
+    for line in local_output.splitlines():
         if not line.strip():
             continue
-        try:
-            name, sha = line.split("\t", 1)
-        except ValueError as exc:
-            raise RuntimeError(f"BRANCH_INVENTORY_INVALID:{line}") from exc
+        name, sha = line.split("\t", 1)
         refs[name] = sha
     return refs
 
@@ -535,7 +555,7 @@ def command_git_prune_plan(as_json: bool) -> int:
     errors = validate_state_shape(state)
     if errors:
         raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
-    refs = local_branch_refs()
+    refs = branch_refs()
     remote_ok, open_pr_heads, remote_error = observe_open_pr_heads(state)
     plan = build_prune_plan(state, refs, open_pr_heads if remote_ok else None)
     if not remote_ok:
