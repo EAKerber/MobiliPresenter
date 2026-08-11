@@ -21,7 +21,7 @@ permissions:
 
 concurrency:
   group: viewer-next-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -176,93 +176,15 @@ jobs:
           fi
 
       - name: Persist user-facing artifacts to temporary branch
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/renderer/fixed-view-realistic-v1' && success() }}
+        if: github.event_name == 'push' && github.ref == 'refs/heads/renderer/fixed-view-realistic-v1'
         env:
-          ARTIFACT_BRANCH: tmp/fh06-user-artifacts
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git fetch origin "${ARTIFACT_BRANCH}:refs/remotes/origin/${ARTIFACT_BRANCH}"
-          rm -rf /tmp/mobilipresenter-user-artifacts
-          git worktree add --force -B "${ARTIFACT_BRANCH}" /tmp/mobilipresenter-user-artifacts "refs/remotes/origin/${ARTIFACT_BRANCH}"
-
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          DEST="/tmp/mobilipresenter-user-artifacts/artifacts/fh06/${SHORT_SHA}"
-          rm -rf "${DEST}"
-          mkdir -p "${DEST}"
-          cp -R viewer-next/artifacts "${DEST}/visual"
-          cp -R viewer-next/fidelity-artifacts "${DEST}/fidelity"
-          (
-            cd "${DEST}"
-            zip -q -r "fh06-${SHORT_SHA}-verified-bundle.zip" visual fidelity
-          )
-
-          SOURCE_SHA="${GITHUB_SHA}" SOURCE_BRANCH="${GITHUB_REF_NAME}" RUN_ID="${GITHUB_RUN_ID}" DEST="${DEST}" python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-
-          dest = Path(os.environ["DEST"])
-          files = []
-          for path in sorted(dest.rglob("*")):
-              if not path.is_file() or path.name == "ARTIFACTS.json":
-                  continue
-              data = path.read_bytes()
-              files.append({
-                  "path": str(path.relative_to(dest)).replace("\\", "/"),
-                  "sizeBytes": len(data),
-                  "sha256": hashlib.sha256(data).hexdigest(),
-              })
-          manifest = {
-              "schemaVersion": "MobiliPresenterUserArtifactManifest 1.0",
-              "status": "verified-ci-artifact",
-              "source": {
-                  "branch": os.environ["SOURCE_BRANCH"],
-                  "commit": os.environ["SOURCE_SHA"],
-                  "workflowRunId": int(os.environ["RUN_ID"]),
-              },
-              "files": files,
-          }
-          (dest / "ARTIFACTS.json").write_text(
-              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
-              encoding="utf-8",
-          )
-          PY
-
-          SHORT_SHA="${SHORT_SHA}" SOURCE_SHA="${GITHUB_SHA}" RUN_ID="${GITHUB_RUN_ID}" python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          root = Path("/tmp/mobilipresenter-user-artifacts")
-          short_sha = os.environ["SHORT_SHA"]
-          latest = {
-              "schemaVersion": "MobiliPresenterArtifactPointer 1.0",
-              "sourceCommit": os.environ["SOURCE_SHA"],
-              "sourceShortSha": short_sha,
-              "workflowRunId": int(os.environ["RUN_ID"]),
-              "path": f"artifacts/fh06/{short_sha}",
-              "manifest": f"artifacts/fh06/{short_sha}/ARTIFACTS.json",
-              "bundle": f"artifacts/fh06/{short_sha}/fh06-{short_sha}-verified-bundle.zip",
-              "preview": f"artifacts/fh06/{short_sha}/visual/renderer-baseline.png",
-          }
-          (root / "LATEST.json").write_text(
-              json.dumps(latest, indent=2, ensure_ascii=False) + "\n",
-              encoding="utf-8",
-          )
-          PY
-
-          cd /tmp/mobilipresenter-user-artifacts
-          git add ARTIFACTS-README.md LATEST.json artifacts/fh06
-          if git diff --cached --quiet; then
-            echo "Artifact branch already contains this verified set."
-            exit 0
-          fi
-          git commit -m "artifacts — persistir FH-06 ${SHORT_SHA}"
-          git push origin "HEAD:refs/heads/${ARTIFACT_BRANCH}"
+          python3 tools/persist-viewer-artifacts.py \
+            --artifact-dir viewer-next/artifacts \
+            --branch "artifact/viewer-next-${RUN_ID}" \
+            --source-sha "$SOURCE_SHA"
 
       - name: Upload visual baseline
         if: always()
@@ -281,53 +203,3 @@ jobs:
           path: viewer-next/fidelity-artifacts/
           if-no-files-found: warn
           retention-days: 14
-
-  ci-status:
-    needs: verify
-    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/renderer/fixed-view-realistic-v1' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout artifact branch
-        uses: actions/checkout@v4
-        with:
-          ref: tmp/fh06-user-artifacts
-          fetch-depth: 1
-
-      - name: Persist Viewer Next run status
-        env:
-          VERIFY_RESULT: ${{ needs.verify.result }}
-          SOURCE_SHA: ${{ github.sha }}
-          SOURCE_BRANCH: ${{ github.ref_name }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          payload = {
-              "schemaVersion": "MobiliPresenterCiStatus 1.0",
-              "workflow": "Viewer Next",
-              "sourceCommit": os.environ["SOURCE_SHA"],
-              "sourceBranch": os.environ["SOURCE_BRANCH"],
-              "workflowRunId": int(os.environ["RUN_ID"]),
-              "workflowRunAttempt": int(os.environ["RUN_ATTEMPT"]),
-              "verifyResult": os.environ["VERIFY_RESULT"],
-          }
-          Path("CI-LATEST.json").write_text(
-              json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-              encoding="utf-8",
-          )
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CI-LATEST.json
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "ci — registrar Viewer Next ${SOURCE_SHA:0:7} ${VERIFY_RESULT}"
-          git push origin HEAD:refs/heads/tmp/fh06-user-artifacts
