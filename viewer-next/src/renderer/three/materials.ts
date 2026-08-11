@@ -19,7 +19,7 @@ const STONE_SPECKLE_SHADER_VERSION = "world-mm-v1";
 const STONE_SPECKLE_SEED = 37.137;
 
 export const WOOD_GRAIN_MATERIAL_ID = "front-wood" as const;
-export const WOOD_GRAIN_SHADER_VERSION = "module-mm-world-z-v1" as const;
+export const WOOD_GRAIN_SHADER_VERSION = "module-mm-world-z-v2" as const;
 const WOOD_GRAIN_TWO_PI = Math.PI * 2;
 
 interface ProceduralWoodMetadata {
@@ -27,8 +27,9 @@ interface ProceduralWoodMetadata {
   readonly mappingPolicy: "module-continuous";
   readonly grainDirection: "world-z";
   readonly physicalScaleMm: readonly [number, number];
-  readonly coarseBandMm: number;
-  readonly fineBandMm: number;
+  readonly macroCellMm: readonly [number, number];
+  readonly fiberBandMm: number;
+  readonly fineCellMm: readonly [number, number];
   readonly colorAmplitude: number;
   readonly worldToModule: Matrix4;
 }
@@ -106,19 +107,19 @@ function installModuleContinuousWoodGrain(material: PbrMaterial, definition: Mat
   if (!physicalScaleMm) throw new Error("WOOD_GRAIN_PHYSICAL_SCALE_MISSING");
 
   const [acrossScaleMm, alongScaleMm] = physicalScaleMm;
-  const coarseBandMm = acrossScaleMm / 18;
-  const fineBandMm = acrossScaleMm / 72;
-  const longWaveMm = alongScaleMm / 5;
-  const shortWaveMm = alongScaleMm / 17;
-  const colorAmplitude = 0.052;
+  const macroCellMm = [acrossScaleMm / 8, alongScaleMm / 1.8] as const;
+  const fiberBandMm = acrossScaleMm / 52;
+  const fineCellMm = [acrossScaleMm / 96, alongScaleMm / 5] as const;
+  const colorAmplitude = 0.044;
   const worldToModule = new Matrix4();
   const metadata: ProceduralWoodMetadata = {
     version: WOOD_GRAIN_SHADER_VERSION,
     mappingPolicy: "module-continuous",
     grainDirection: "world-z",
     physicalScaleMm: [acrossScaleMm, alongScaleMm],
-    coarseBandMm,
-    fineBandMm,
+    macroCellMm,
+    fiberBandMm,
+    fineCellMm,
     colorAmplitude,
     worldToModule
   };
@@ -143,27 +144,47 @@ vMpWoodWorldPosition = worldPosition.xyz;
 vMpWoodModulePosition = (mpWoodWorldToModule * worldPosition).xyz;`
     );
 
+    const fragmentHeader = `
+varying vec3 vMpWoodWorldPosition;
+varying vec3 vMpWoodModulePosition;
+float mpWoodHash(vec2 p) {
+  vec3 p3 = fract(p.xyx * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float mpWoodNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mpWoodHash(i), mpWoodHash(i + vec2(1.0, 0.0)), f.x),
+    mix(mpWoodHash(i + vec2(0.0, 1.0)), mpWoodHash(i + vec2(1.0, 1.0)), f.x),
+    f.y
+  );
+}
+`;
     const grain = `
 float mpWoodAlongMm = vMpWoodWorldPosition.y;
 float mpWoodAcrossMm = vMpWoodModulePosition.x;
-float mpWoodMeander =
-  sin(mpWoodAlongMm / ${longWaveMm.toFixed(6)}) * 0.58 +
-  sin(mpWoodAlongMm / ${shortWaveMm.toFixed(6)} + 1.713) * 0.22;
-float mpWoodCoarse = 0.5 + 0.5 * sin(
-  (mpWoodAcrossMm / ${coarseBandMm.toFixed(6)} + mpWoodMeander) * ${WOOD_GRAIN_TWO_PI.toFixed(6)}
+float mpWoodMacro = mpWoodNoise(
+  vec2(mpWoodAcrossMm / ${macroCellMm[0].toFixed(6)}, mpWoodAlongMm / ${macroCellMm[1].toFixed(6)}) + vec2(3.17, 11.43)
 );
-float mpWoodFine = 0.5 + 0.5 * sin(
-  (mpWoodAcrossMm / ${fineBandMm.toFixed(6)} + mpWoodMeander * 0.31 + 0.37) * ${WOOD_GRAIN_TWO_PI.toFixed(6)}
+float mpWoodWarp = mpWoodNoise(
+  vec2(mpWoodAcrossMm / ${(macroCellMm[0] * 1.7).toFixed(6)}, mpWoodAlongMm / ${(macroCellMm[1] * 0.55).toFixed(6)}) + vec2(19.2, 4.7)
+) - 0.5;
+float mpWoodFiber = 0.5 + 0.5 * sin(
+  (mpWoodAcrossMm / ${fiberBandMm.toFixed(6)} + (mpWoodMacro - 0.5) * 1.35 + mpWoodWarp * 0.85) * ${WOOD_GRAIN_TWO_PI.toFixed(6)}
+);
+float mpWoodFine = mpWoodNoise(
+  vec2(mpWoodAcrossMm / ${fineCellMm[0].toFixed(6)}, mpWoodAlongMm / ${fineCellMm[1].toFixed(6)}) + vec2(41.7, 7.3)
 );
 float mpWoodTone =
-  (mpWoodCoarse - 0.5) * ${(colorAmplitude * 1.35).toFixed(6)} +
-  (mpWoodFine - 0.5) * ${(colorAmplitude * 0.52).toFixed(6)};
+  (mpWoodMacro - 0.5) * 0.055 +
+  (mpWoodFiber - 0.5) * 0.020 +
+  (mpWoodFine - 0.5) * 0.012;
 diffuseColor.rgb = clamp(diffuseColor.rgb * (1.0 + mpWoodTone), 0.0, 1.0);
 `;
-    shader.fragmentShader = `
-varying vec3 vMpWoodWorldPosition;
-varying vec3 vMpWoodModulePosition;
-${shader.fragmentShader}`.replace(
+    shader.fragmentShader = fragmentHeader + shader.fragmentShader.replace(
       colorToken,
       `${colorToken}\n${grain}`
     );
