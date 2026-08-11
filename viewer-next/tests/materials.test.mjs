@@ -8,10 +8,13 @@ import {
   setEntityMaterialOverride
 } from "@mobilipresenter/scene-core";
 import { Mesh, MeshPhysicalMaterial, MeshStandardMaterial } from "three";
+import { STONE_PRESETS, withStonePreset } from "../dist-ts/src/fixtures/stone-presets.js";
 import {
   BRUSHED_METAL_MATERIAL_ID,
   BRUSHED_METAL_RESPONSE,
   BRUSHED_METAL_RESPONSE_VERSION,
+  STONE_ROUGHNESS_RESPONSE,
+  STONE_SURFACE_RESPONSE_VERSION,
   ThreeMaterialRegistry,
   syncThreeMaterials
 } from "../dist-ts/src/renderer/three/materials.js";
@@ -56,6 +59,33 @@ test("opaque MDF stays MeshStandardMaterial while glass and brushed inox use exp
     anisotropyRotationRad: BRUSHED_METAL_RESPONSE.anisotropyRotationRad,
     rasterMap: false
   });
+  registry.dispose();
+});
+
+test("stone presets keep their physical 600mm mapping and add bounded procedural roughness response", () => {
+  const appearance = withStonePreset(currentAppearance, "light-speckled");
+  const registry = new ThreeMaterialRegistry(appearance);
+  const preset = STONE_PRESETS["light-speckled"];
+  const stone = registry.materialByDefinitionId(preset.materialId);
+
+  assert.ok(stone instanceof MeshStandardMaterial);
+  assert.equal(stone.name, preset.materialId);
+  assert.equal(stone.roughness, preset.roughness);
+  assert.deepEqual(stone.userData.physicalTextureScaleMm, [600, 600]);
+  assert.deepEqual(stone.userData.proceduralStoneSpeckle, {
+    version: "world-mm-v1",
+    surfaceResponseVersion: STONE_SURFACE_RESPONSE_VERSION,
+    worldSpaceMm: true,
+    macroScaleMm: 600,
+    coarseCellMm: 20,
+    fineCellMm: 5,
+    seed: 37.137,
+    roughnessResponse: { ...STONE_ROUGHNESS_RESPONSE },
+    rasterMap: false,
+    bumpMap: false,
+    normalMap: false
+  });
+  assert.match(stone.customProgramCacheKey(), /world-mm-v1:world-mm-roughness-v2/);
   registry.dispose();
 });
 
