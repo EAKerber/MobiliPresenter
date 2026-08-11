@@ -20,11 +20,7 @@ import {
 } from "./renderer/three/camera.js";
 import { buildFidelityOverlay } from "./renderer/three/fidelity-overlay.js";
 import { FH06_GTAO_PROFILE } from "./renderer/three/post.js";
-import {
-  createModuleSelectionOverlay,
-  pickModuleAtNdc,
-  type ModuleSelectionOverlay
-} from "./renderer/three/selection.js";
+import { pickModuleAtNdc } from "./renderer/three/selection.js";
 import { createViewerComposition, type ViewerComposition } from "./runtime/composition.js";
 import {
   moduleIdFromAlias,
@@ -113,7 +109,6 @@ function buildComposition(state: ViewerConfigurationState): ViewerComposition {
 }
 
 const composition = buildComposition(configuration);
-let selectionOverlay: ModuleSelectionOverlay | null = null;
 
 function installFidelityOverlay(target: ViewerComposition): void {
   if (!fidelityOverlayMode || fidelityCrop) return;
@@ -124,19 +119,21 @@ function installFidelityOverlay(target: ViewerComposition): void {
   app.dataset.fidelityLineCount = String(fidelityLines.length);
 }
 
-function installSelectionOverlay(target: ViewerComposition): void {
-  selectionOverlay?.dispose();
-  selectionOverlay = createModuleSelectionOverlay(target.adapter, target.scenePackage);
-  target.adapter.scene.add(selectionOverlay.root);
-  selectionOverlay.setSelectedModule(interaction.selectedModuleId);
-}
-
 function groupVisible(entityId: string): string {
   return composition.adapter.entityGroups.get(entityId)?.visible ? "true" : "false";
 }
 
+function visibleInteractionCount(moduleId: string | null): number {
+  if (moduleId === null) return 0;
+  return composition.adapter.entityGroups.get(moduleId)?.visible ? 1 : 0;
+}
+
 function syncDatasets(): void {
   const diagnostics = composition.diagnostics;
+  const selectedCount = visibleInteractionCount(interaction.selectedModuleId);
+  const hoveredCount = interaction.hoveredModuleId === interaction.selectedModuleId
+    ? 0
+    : visibleInteractionCount(interaction.hoveredModuleId);
   app.dataset.sceneId = composition.scenePackage.sceneId;
   app.dataset.viewerConfiguration = configurationFingerprint(configuration);
   app.dataset.viewerSelectedModule = interaction.selectedModuleId ?? "none";
@@ -153,7 +150,13 @@ function syncDatasets(): void {
   app.dataset.viewerUnderCabVisible = groupVisible(UNDERCAB_ID);
   app.dataset.viewerModule03FrontMaterial = resolveMaterialId(composition.appearance, MODULE03_ID, "front");
   app.dataset.viewerStone03Material = resolveMaterialId(composition.appearance, STONE03_ID, "stone");
-  app.dataset.viewerSelectionOverlayCount = String(selectionOverlay?.root.children.length ?? 0);
+  app.dataset.viewerInteractionHighlight = diagnostics.interactionHighlightId;
+  app.dataset.viewerSelectionHighlightCount = String(selectedCount);
+  app.dataset.viewerHoverHighlightCount = String(hoveredCount);
+  // Compatibility marker retained for the VRC-01 browser contract while the visual implementation moves to postprocessing.
+  app.dataset.viewerSelectionOverlayCount = String(selectedCount);
+  app.dataset.hardwareRefinement = diagnostics.hardwareRefinementId;
+  app.dataset.hardwareAnchorCount = String(diagnostics.hardwareAnchorCount);
   app.dataset.cooktopContact = diagnostics.cooktopContactId;
   app.dataset.cooktopGapMm = diagnostics.cooktopGapMm.toFixed(3);
   app.dataset.frontReadability = diagnostics.frontReadabilityId;
@@ -175,7 +178,7 @@ function syncDatasets(): void {
 }
 
 installFidelityOverlay(composition);
-installSelectionOverlay(composition);
+composition.syncInteraction(interaction.selectedModuleId, interaction.hoveredModuleId);
 syncDatasets();
 
 function render(): void {
@@ -206,14 +209,21 @@ function applyConfigurationAction(action: ViewerConfigurationAction): void {
   }
 
   configuration = proposed;
-  selectionOverlay?.setSelectedModule(interaction.selectedModuleId);
   syncDatasets();
   render();
 }
 
 function selectModule(moduleId: string | null): void {
   interaction = reduceViewerInteraction(interaction, { type: "select-module", moduleId });
-  selectionOverlay?.setSelectedModule(moduleId);
+  composition.syncInteraction(interaction.selectedModuleId, interaction.hoveredModuleId);
+  syncDatasets();
+  render();
+}
+
+function setHoveredModule(moduleId: string | null): void {
+  if (moduleId === interaction.hoveredModuleId) return;
+  interaction = reduceViewerInteraction(interaction, { type: "hover-module", moduleId });
+  composition.syncInteraction(interaction.selectedModuleId, interaction.hoveredModuleId);
   syncDatasets();
   render();
 }
@@ -229,9 +239,11 @@ function pointerNdc(event: MouseEvent): readonly [number, number] {
 
 renderer.domElement.addEventListener("pointermove", event => {
   const moduleId = pickModuleAtNdc(composition.adapter, composition.scenePackage, camera, pointerNdc(event));
-  if (moduleId === interaction.hoveredModuleId) return;
-  interaction = reduceViewerInteraction(interaction, { type: "hover-module", moduleId });
-  app.dataset.viewerHoveredModule = moduleId ?? "none";
+  setHoveredModule(moduleId);
+});
+
+renderer.domElement.addEventListener("pointerleave", () => {
+  setHoveredModule(null);
 });
 
 renderer.domElement.addEventListener("click", event => {
@@ -372,7 +384,6 @@ if (lifecycleExercise?.startsWith("lifecycle-")) {
 
 window.addEventListener("pagehide", () => {
   observer.disconnect();
-  selectionOverlay?.dispose();
   composition.dispose();
   renderer.dispose();
 }, { once: true });
