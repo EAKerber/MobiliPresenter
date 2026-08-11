@@ -81,8 +81,14 @@ test("composition order preserves S8 drawer bevels and makes H6 idempotent on al
   const registry = new ThreeMaterialRegistry(currentAppearance);
   const adapter = buildThreeScene(currentSceneBase, (entityId, slot) => registry.resolve(entityId, slot));
   applyFh06FrontReadability(adapter, registry, currentSceneBase);
+  const first = applyCabinetFrontEdgeResponse(adapter, currentSceneBase);
 
   const bindings = frontBindings();
+  assert.equal(first.totalFrontCount, bindings.length);
+  assert.equal(first.refinedFrontCount, bindings.length - 4);
+  assert.equal(first.preservedExistingBevelCount, 4);
+  assert.equal(first.alreadyRefinedCount, 0);
+
   const geometryByPrimitive = new Map(
     bindings.map(({ module, primitive }) => [primitive.id, meshFor(adapter, module.id, primitive.id).geometry])
   );
@@ -110,9 +116,10 @@ test("hardware still attaches after generalized front edge refinement without mo
   const registry = new ThreeMaterialRegistry(currentAppearance);
   const adapter = buildThreeScene(currentSceneBase, (entityId, slot) => registry.resolve(entityId, slot));
   applyFh06FrontReadability(adapter, registry, currentSceneBase);
+  applyCabinetFrontEdgeResponse(adapter, currentSceneBase);
   const hardware = attachCurrentHardware(adapter, currentSceneBase, registry);
 
   assert.equal(hardware.handleCount, currentHardwareAnchors.length);
-  assert.equal(hardware.refinementId, "hardware-anchors-parametric-v1");
+  assert.equal(hardware.refinementId, "hardware-anchors-v0.1");
   registry.dispose();
 });
