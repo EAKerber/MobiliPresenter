@@ -1,23 +1,32 @@
 import type { TechnicalPresentationPackage } from "../presentation/contracts.js";
+import type { TechnicalDiagramAsset } from "../presentation/technical-diagram.js";
+import type { StonePresetId } from "../fixtures/stone-presets.js";
+import type { FrontPresetId, LightingPresetId } from "../runtime/presets.js";
+import type { ModuleAlias } from "../runtime/query.js";
+import type { ViewerVisibilityOverride } from "../runtime/viewer-state.js";
 
 export const VIEWER_UI_CONTRACT_VERSION = "ViewerUiContract 0.1.0" as const;
 
-export type ModuleAlias = "01" | "02" | "03" | "04" | "05" | "06" | "07";
-export type ViewerVisibilityOverride = "inherit" | "on" | "off";
-export type FrontPresetId = "warm-wood" | "neutral-greige";
-export type StonePresetId = "light-speckled" | "warm-beige-speckled" | "graphite-speckled";
-export type LightingPresetId = "canonical" | "soft-neutral" | "warm-worktop";
+export type {
+  FrontPresetId,
+  LightingPresetId,
+  ModuleAlias,
+  StonePresetId,
+  TechnicalDiagramAsset,
+  TechnicalPresentationPackage,
+  ViewerVisibilityOverride
+};
 
-export interface ViewerUiOption {
-  readonly id: string;
+export interface ViewerUiOption<TId extends string = string> {
+  readonly id: TId;
   readonly label: string;
 }
 
 export interface ViewerUiCatalog {
   readonly modules: readonly ModuleAlias[];
-  readonly frontPresets: readonly ViewerUiOption[];
-  readonly stonePresets: readonly ViewerUiOption[];
-  readonly lightingPresets: readonly ViewerUiOption[];
+  readonly frontPresets: readonly ViewerUiOption<FrontPresetId>[];
+  readonly stonePresets: readonly ViewerUiOption<StonePresetId>[];
+  readonly lightingPresets: readonly ViewerUiOption<LightingPresetId>[];
 }
 
 export interface ViewerUiSnapshot {
@@ -29,6 +38,7 @@ export interface ViewerUiSnapshot {
   readonly stonePresetId: StonePresetId;
   readonly lightingPresetId: LightingPresetId;
   readonly selectedTechnicalPresentation: TechnicalPresentationPackage | null;
+  readonly selectedTechnicalViewAssets: readonly TechnicalDiagramAsset[];
 }
 
 export type ViewerUiListener = (snapshot: ViewerUiSnapshot) => void;
