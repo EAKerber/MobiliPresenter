@@ -18,11 +18,21 @@
     },
     "git": {
       "type": "object",
-      "required": ["controlBranch", "activeDevelopmentBranch", "publishedBranch"],
+      "required": ["controlBranch", "activeDevelopmentBranch", "publishedBranch", "preserveBranches"],
       "properties": {
         "controlBranch": {"type": "string", "minLength": 1},
-        "activeDevelopmentBranch": {"type": "string", "minLength": 1},
-        "publishedBranch": {"type": "string", "minLength": 1}
+        "activeDevelopmentBranch": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "publishedBranch": {"type": "string", "minLength": 1},
+        "preserveBranches": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
       }
     },
     "published": {
@@ -46,18 +56,23 @@
         "blockers": {"type": "array", "items": {"type": "string"}},
         "constraints": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "plan": {"type": "string", "minLength": 1},
-        "prNumber": {"type": "integer", "minimum": 1}
+        "prNumber": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "null"}
+          ]
+        }
       }
     },
     "operations": {
       "type": "object",
       "required": ["toolboxPhase", "canonicalState", "commands"],
       "properties": {
-        "toolboxPhase": {"const": "phase-1.1-coherence"},
+        "toolboxPhase": {"enum": ["phase-1.1-coherence", "phase-1.2-branch-hygiene"]},
         "canonicalState": {"const": "ops/state/project.json"},
         "commands": {
           "type": "array",
-          "items": {"enum": ["status", "doctor", "verify", "checkpoint", "handoff"]},
+          "items": {"enum": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]},
           "uniqueItems": true
         }
       }
