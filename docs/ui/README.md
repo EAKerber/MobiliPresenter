@@ -5,25 +5,28 @@ Esta pasta é a entrada documental da frente de interface de produto.
 ## Leitura obrigatória
 
 1. `style-guide-v0.1.md` — linguagem visual, layout, componentes, responsividade, acessibilidade e gates.
-2. `decisions-v0.1.md` — decisões de UX já tomadas e seu racional.
-3. `../architecture/ui-engine-parallel-development.md` — ownership de paths, imports permitidos e fluxo paralelo UI × Engine.
-4. `../adr/0003-technical-presentation-contract.md` — autoridade e proveniência do conteúdo técnico.
-5. `../../viewer-next/src/api/ui-contract.ts` — contrato executável consumido pela UI.
+2. `decisions-v0.1.md` — decisões de UX já tomadas, incluindo as revisões v0.2 de placeholders, scroll, rail/drawer e seleção × ficha.
+3. `promotional-detail-v0.2.md` — recorte executável atual e seus gates.
+4. `../architecture/ui-engine-parallel-development.md` — ownership de paths, imports permitidos e fluxo paralelo UI × Engine.
+5. `../adr/0003-technical-presentation-contract.md` — autoridade e proveniência do conteúdo técnico.
+6. `../../viewer-next/src/api/ui-contract.ts` — contrato executável consumido pela UI.
 
 ## Escopo atual da frente de UI
 
-- shell do viewer com sidebar à esquerda;
-- paginação lateral `Módulos / Cores / Acessórios`;
+- viewer com rail compacto e drawer recolhível para `Módulos / Cores / Acessórios`;
 - lista de módulos com visibilidade separada de inspeção;
-- ficha técnica inferior quando um módulo está selecionado;
+- seleção do módulo independente da expansão/recolhimento da ficha;
+- ficha inferior com direção editorial/promocional e uma vista técnica dominante;
+- placeholders explícitos quando informação esperada estiver ausente;
 - apresentação responsiva de `TechnicalPresentationPackage` e SVGs técnicos derivados;
-- linguagem visual comercial/técnica inspirada nas referências fornecidas pelo usuário;
+- auditoria de scroll baseada em `reflow → disclosure → seleção/paginação → scroll`;
 - desktop e mobile;
-- sem definir neste recorte a linguagem final de highlight do módulo dentro do render.
+- sem definir neste recorte a linguagem final de highlight do módulo dentro do render;
+- sem resolver neste recorte o enquadramento definitivo do canvas em telas pequenas.
 
 ## Regra operacional
 
-Esta frente nasce do baseline validado:
+Esta frente nasceu do baseline validado:
 
 `integration/viewer-parallel-v0.1` @ `277b0fc088f5e32de236782b293f39feea6e163e`
 
