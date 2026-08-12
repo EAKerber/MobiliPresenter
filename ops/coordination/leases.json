@@ -1,6 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "d11b2301ef63d6cc53cdafc6904617a2192876aa",
+  "revision": "25aa525a7b8f6fed46f792d9e1144930b20b06ef",
   "intents": [],
   "leases": [
     {
@@ -17,22 +17,6 @@
       "acquiredAt": "2026-08-12T05:24:03Z",
       "renewedAt": "2026-08-12T05:24:03Z",
       "expiresAt": "2026-08-12T05:26:03Z",
-      "ttlSeconds": 120
-    },
-    {
-      "leaseId": "break-target:31566267331:1:0",
-      "resource": "file:ops/coordination/probes/break-target-31566267331-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "engine",
-        "session": "gha-break-target:31566267331:1",
-        "branch": "engine/break-target-probe",
-        "pr": 950001
-      },
-      "reason": "live break-glass probe",
-      "acquiredAt": "2026-08-12T05:24:00Z",
-      "renewedAt": "2026-08-12T05:24:00Z",
-      "expiresAt": "2026-08-12T05:26:00Z",
       "ttlSeconds": 120
     }
   ]
