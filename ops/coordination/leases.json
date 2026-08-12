@@ -1,6 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "e1ffce054c8cf0ae302255f9dd7b66aec48cb67f",
+  "revision": "82207b894e237c50a994ff63270d0f9515619ff5",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "cli-acquire:31566267331:1:0",
+      "resource": "file:ops/coordination/probes/cli-restart-31566267331-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "engine",
+        "session": "gha-cli-restart:31566267331:1",
+        "branch": "engine/cli-restart-probe",
+        "pr": 940001
+      },
+      "reason": "live CLI restart/session recovery probe",
+      "acquiredAt": "2026-08-12T05:23:47Z",
+      "renewedAt": "2026-08-12T05:23:47Z",
+      "expiresAt": "2026-08-12T05:25:47Z",
+      "ttlSeconds": 120
+    }
+  ]
 }
