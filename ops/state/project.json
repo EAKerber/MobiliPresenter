@@ -35,14 +35,11 @@
     "artifactSha256": "84f8fcd8e925c13678d07c646d1c34dcd90e7be62e55ee50ee257cefb6807e19"
   },
   "development": {
-    "initiative": "Viewer Next — Technical Presentation Fidelity",
+    "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "POST-H6-PUBLISHED",
-    "nextTransition": "open-developer-slice-for-geometry-derived-technical-views",
-    "blockers": [
-      "ui-handoff-30-technical-view-fidelity-required-before-primary-technical-presentation",
-      "ui-contract-28-valid-selection-without-tpc-must-degrade-gracefully"
-    ],
+    "checkpoint": "POST-GUIDED-CONFIGURATOR-0.3-INTEGRATED",
+    "nextTransition": "open-developer-slice-for-responsive-fixed-frame-v0.1",
+    "blockers": [],
     "constraints": [
       "fixed-camera-is-product-invariant",
       "scene-core-0.1-is-integrated-foundation",
@@ -70,6 +67,10 @@
       "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
       "technical-view-fidelity-must-be-traceable-to-geometry-authority",
       "ui-must-not-reconstruct-domain-geometry-or-mask-tpc-unavailability",
+      "technical-presentation-availability-0.1.1-is-integrated",
+      "technical-front-views-02-03-are-geometry-derived-with-partial-coverage",
+      "guided-configurator-ui-0.3-is-integrated-baseline",
+      "responsive-fixed-frame-must-preserve-fixed-camera-and-forbid-heuristic-pan-zoom-focus",
       "verified-user-artifact-source-is-77cd8adb7bdc1f15a58a2f5e55269a0b302b99ac",
       "user-facing-artifacts-require-durable-temp-branch-readback"
     ],
