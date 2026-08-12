@@ -1,23 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "34ed6697c3a5ebe2d4a2fcb58b133afea69a87c5",
+  "revision": "82eeda69a7bd01540755c13dc1782505cf9d1026",
   "intents": [],
   "leases": [
     {
-      "leaseId": "orphan-acquire:31565370985:1:0",
+      "leaseId": "recovery-acquire:31565370985:1:0",
       "resource": "file:ops/coordination/probes/orphan-31565370985-1.shared",
       "mode": "exclusive-write",
       "owner": {
-        "role": "engine",
-        "session": "gha-orphan:31565370985:1",
-        "branch": "engine/orphan-probe",
-        "pr": 910003
+        "role": "ui",
+        "session": "gha-recovery:31565370985:1",
+        "branch": "ui/recovery-probe",
+        "pr": 910004
       },
-      "reason": "live orphan expiry probe",
-      "acquiredAt": "2026-08-12T05:06:39Z",
-      "renewedAt": "2026-08-12T05:06:39Z",
-      "expiresAt": "2026-08-12T05:06:59Z",
-      "ttlSeconds": 20
+      "reason": "recover resource after orphan TTL expiry",
+      "acquiredAt": "2026-08-12T05:07:03Z",
+      "renewedAt": "2026-08-12T05:07:03Z",
+      "expiresAt": "2026-08-12T05:08:03Z",
+      "ttlSeconds": 60
     }
   ]
 }
