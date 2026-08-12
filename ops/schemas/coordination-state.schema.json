@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/coordination-state-0.1.json",
+  "title": "MobiliPresenter CoordinationState 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "intents", "leases"],
+  "properties": {
+    "schemaVersion": {"const": "CoordinationState 0.1"},
+    "revision": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+      ]
+    },
+    "intents": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/intent"}
+    },
+    "leases": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/lease"}
+    }
+  },
+  "$defs": {
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "session", "branch", "pr"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "session": {"type": "string", "minLength": 1},
+        "branch": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ]
+        },
+        "pr": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intentId", "resource", "owner", "reason", "createdAt", "expiresAt"],
+      "properties": {
+        "intentId": {"type": "string", "minLength": 1},
+        "resource": {"type": "string", "pattern": "^(file|path|branch):.+$"},
+        "owner": {"$ref": "#/$defs/owner"},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 500},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "expiresAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "leaseId",
+        "resource",
+        "mode",
+        "owner",
+        "reason",
+        "acquiredAt",
+        "renewedAt",
+        "expiresAt",
+        "ttlSeconds"
+      ],
+      "properties": {
+        "leaseId": {"type": "string", "minLength": 1},
+        "resource": {"type": "string", "pattern": "^(file|path|branch):.+$"},
+        "mode": {"const": "exclusive-write"},
+        "owner": {"$ref": "#/$defs/owner"},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 500},
+        "acquiredAt": {"type": "string", "format": "date-time"},
+        "renewedAt": {"type": "string", "format": "date-time"},
+        "expiresAt": {"type": "string", "format": "date-time"},
+        "ttlSeconds": {"type": "integer", "minimum": 1, "maximum": 14400}
+      }
+    }
+  }
+}
