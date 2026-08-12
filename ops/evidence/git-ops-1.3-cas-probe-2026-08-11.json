@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "CoordinationEvidence 0.1",
+  "repository": "EAKerber/MobiliPresenter",
+  "observedMain": "e4638530154841663630dbb603bed39495a4b462",
+  "authorityBranch": "coordination/leases",
+  "resource": "file:ops/coordination/probe.shared",
+  "initialAuthorityHead": "5ff874a7c509f76c2ce34a36bb5a7c42be018374",
+  "race": {
+    "uiCandidate": "ff04fa6d1cf0cfe5822e095489b7ceda25993d50",
+    "engineCandidate": "cb9b159c823807679852a9448c9aa97e8bd7bcad",
+    "commonParent": "5ff874a7c509f76c2ce34a36bb5a7c42be018374",
+    "uiAdvance": "success",
+    "engineAdvance": {
+      "result": "rejected",
+      "status": 422,
+      "reason": "Update is not a fast forward"
+    },
+    "winnerReadback": "ff04fa6d1cf0cfe5822e095489b7ceda25993d50",
+    "winnerOwnerSession": "cas-probe-ui"
+  },
+  "handoff": {
+    "uiRelease": "e922813f6f3e5c438fe5ba8f8023c89fc1d5cc8c",
+    "engineAcquireAfterRelease": "eb7a011c04e3bc4fd44754602de9c16ff14ca101",
+    "engineRelease": "5c9c63eeb278bf2696ed35fa674a66f116ff995c"
+  },
+  "finalReadback": {
+    "authorityHead": "5c9c63eeb278bf2696ed35fa674a66f116ff995c",
+    "revisionBasis": "eb7a011c04e3bc4fd44754602de9c16ff14ca101",
+    "intentCount": 0,
+    "leaseCount": 0
+  },
+  "result": {
+    "GL13-12-single-winner-cas": "PASS",
+    "post-release-reacquire": "PASS",
+    "authority-clean-after-probe": "PASS",
+    "main-untouched": "PASS"
+  },
+  "note": "Evidence is derived from independent GitHub ref/state readback. The losing sibling commit remains non-authoritative. No semantic product path was modified."
+}
