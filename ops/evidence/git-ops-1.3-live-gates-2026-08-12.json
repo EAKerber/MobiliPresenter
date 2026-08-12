@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "GitOps13LiveEvidence 0.1",
+  "repository": "EAKerber/MobiliPresenter",
+  "operationalBranch": "ops/git-ops-1.3-coordination-leases",
+  "authorityBranch": "coordination/leases",
+  "pullRequest": 32,
+  "run": {
+    "id": 31563964505,
+    "headSha": "ffd4e89601ed26e695729e7fa278e04396b44e09",
+    "conclusion": "success",
+    "detachedHead": true,
+    "artifact": {
+      "name": "coordination-live-probes",
+      "id": 9128808484,
+      "sha256": "0e46b39617b1e27d8db195340f6ee5412ba9ccfd3ef3a2d37503ee887308ecb1",
+      "sizeBytes": 2690,
+      "fileCount": 4
+    }
+  },
+  "authorityAdapter": {
+    "result": "pass",
+    "owner": {
+      "role": "gitops",
+      "session": "gha:31563964505:1",
+      "branch": "ops/git-ops-1.3-coordination-leases",
+      "pr": 32
+    },
+    "resource": "file:ops/coordination/probes/gha-31563964505-1.shared",
+    "initialHead": "a90761cdfab489590a60f4b0b075a1e2fb60c890",
+    "acquireHead": "a6fcbccf6daca1bcca1ddf6c48511d45a8a68d58",
+    "releaseHead": "1f6c3f49b9d1e5855d4087c1ac59ed1ab05d4a62",
+    "authorityNowInitial": "2026-08-12T04:40:56Z",
+    "authorityNowFinal": "2026-08-12T04:41:05Z",
+    "leaseLeftActive": false
+  },
+  "ciEnforcement": {
+    "result": "pass",
+    "resource": "file:ops/coordination/probes/ci-bypass-31563964505-1.shared",
+    "owner": {
+      "role": "engine",
+      "session": "gha-ci-enforcement:31563964505:1",
+      "branch": "engine/enforcement-probe",
+      "pr": 900001
+    },
+    "bypassIdentity": {
+      "branch": "ui/enforcement-bypass",
+      "pr": 900002
+    },
+    "acquireHead": "0ce18fd90e203c4ef885853b4c785e859a32f37c",
+    "releaseHead": "154f455b7d417997fc6f74bd263ce056d9f53f98",
+    "foreignDiffBlockedWith": "LOCK_OWNERSHIP_VIOLATION",
+    "matchingOwnerAllowed": true,
+    "unrelatedResourceAllowed": true,
+    "leaseLeftActive": false
+  },
+  "ttlRecovery": {
+    "result": "pass",
+    "heldResource": "file:ops/coordination/probes/held-31563964505-1.shared",
+    "independentResource": "file:ops/coordination/probes/independent-31563964505-1.shared",
+    "orphanResource": "file:ops/coordination/probes/orphan-31563964505-1.shared",
+    "holderAcquireHead": "e11dbc26014e99f450dfa51d9cbb862c99173f15",
+    "peerAcquireHead": "073d1bd42c043972eeeeebb4f5bcc3ef8a139f53",
+    "peerReleaseHead": "27690719a201b6d26bd67220f5484b6ef417a87d",
+    "holderReleaseHead": "afaaa96598e58c18a15753d8fdea6898f9efb006",
+    "orphanAcquireHead": "38e3b256fa2212aeab96f6a7de7b4c34fbb3a97a",
+    "authorityNowBeforeExpiry": "2026-08-12T04:41:39Z",
+    "authorityNowAfterExpiry": "2026-08-12T04:41:57Z",
+    "waitedSeconds": 17.0,
+    "recoveryAcquireHead": "4367a289ed469e6dadd3bb3a8008bde701e47717",
+    "recoveryReleaseHead": "480e9649b88526486363bf1e94e26256fe3518db",
+    "independentResourceAvailableWhileForeignLeaseHeld": true,
+    "orphanExpiredWithoutRelease": true,
+    "reacquiredAfterExpiry": true,
+    "leaseLeftActive": false
+  },
+  "heartbeat": {
+    "result": "pass",
+    "owner": {
+      "role": "engine",
+      "session": "gha-heartbeat:31563964505:1",
+      "branch": "engine/heartbeat-probe",
+      "pr": 920001
+    },
+    "resource": "file:ops/coordination/probes/heartbeat-31563964505-1.shared",
+    "acquireHead": "dab30cfd2f6d42b008e4feba69dd10f3ad1430b4",
+    "renewHead": "23afab671b0a038b757cfcd1dbc0cc2d34da5bad",
+    "releaseHead": "ea64b0d2f061a040fb7ef2cff3c7c65188a4197b",
+    "originalRenewedAt": "2026-08-12T04:42:10Z",
+    "originalExpiresAt": "2026-08-12T04:42:30Z",
+    "renewedAt": "2026-08-12T04:42:21Z",
+    "renewedExpiresAt": "2026-08-12T04:42:41Z",
+    "authorityNowAfterOriginalExpiry": "2026-08-12T04:42:32Z",
+    "expiryExtended": true,
+    "leaseActivePastOriginalExpiry": true,
+    "leaseLeftActive": false
+  },
+  "protocolDiscoveries": [
+    {
+      "code": "GITHUB_REF_READ_AFTER_WRITE_STALENESS",
+      "description": "A successful non-force ref update can be acknowledged before a subsequent ref read observes the new child commit. Readback now validates state at the exact published commit, accepts a current descendant, retries when the observed current head is still an ancestor of the published commit, and fails on divergence."
+    },
+    {
+      "code": "REMOTE_TRANSPORT_TIMEOUT_REQUIRED",
+      "description": "Authenticated gh api transport is bounded by an explicit timeout and fails closed with COORDINATION_REMOTE_TIMEOUT rather than leaving an operation indefinitely ambiguous."
+    }
+  ],
+  "gatesProven": [
+    "single-winner-cas",
+    "atomic-batch-core",
+    "remote-authority-time",
+    "non-force-ref-update",
+    "readback-under-concurrency",
+    "detached-head-ci",
+    "tooling-guard-core",
+    "ci-bypass-detection",
+    "independent-resource-progress",
+    "ttl-orphan-recovery",
+    "heartbeat-renewal",
+    "release-cleanup"
+  ],
+  "stillExperimental": true,
+  "canonicalPolicy": "Git Ops 1.2",
+  "promotionDeferred": true
+}
