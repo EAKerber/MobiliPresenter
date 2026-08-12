@@ -17,6 +17,7 @@ from tools import coordination
 DEFAULT_REPOSITORY = "EAKerber/MobiliPresenter"
 DEFAULT_AUTHORITY_BRANCH = "coordination/leases"
 DEFAULT_STATE_PATH = "ops/coordination/leases.json"
+DEFAULT_GH_TIMEOUT_SECONDS = 30
 
 
 class CoordinationRemoteError(RuntimeError):
@@ -73,11 +74,14 @@ class GhApiTransport:
 
     This transport intentionally exposes only the primitive needed by the
     coordination authority adapter. It never falls back to local time or a
-    local coordination file when remote observation fails.
+    local coordination file when remote observation fails or stalls.
     """
 
-    def __init__(self, gh_executable: str = "gh") -> None:
+    def __init__(self, gh_executable: str = "gh", timeout_seconds: int = DEFAULT_GH_TIMEOUT_SECONDS) -> None:
+        if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool) or timeout_seconds <= 0:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "timeout_seconds must be positive integer")
         self.gh_executable = gh_executable
+        self.timeout_seconds = timeout_seconds
 
     @staticmethod
     def _parse_included(output: str) -> ApiResponse:
@@ -115,13 +119,20 @@ class GhApiTransport:
         if payload is not None:
             command.extend(["--input", "-"])
         command.append(endpoint)
-        proc = subprocess.run(
-            command,
-            input=json.dumps(payload, separators=(",", ":")) if payload is not None else None,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            proc = subprocess.run(
+                command,
+                input=json.dumps(payload, separators=(",", ":")) if payload is not None else None,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=self.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CoordinationRemoteError(
+                "COORDINATION_REMOTE_TIMEOUT",
+                f"gh api exceeded {self.timeout_seconds}s for {method.upper()} {endpoint}",
+            ) from exc
         response = self._parse_included(proc.stdout) if include_headers else ApiResponse(None, {}, proc.stdout)
         if proc.returncode != 0:
             detail = (proc.stderr or response.body or proc.stdout).strip()
