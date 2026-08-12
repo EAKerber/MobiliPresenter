@@ -1,6 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "1620bb05a5487436c455638725cca6b6d0d6558a",
+  "revision": "2832f4f39cd017cfcf1ac420660895d81f0c3f75",
   "intents": [],
   "leases": [
     {
@@ -15,8 +15,8 @@
       },
       "reason": "live heartbeat renewal probe",
       "acquiredAt": "2026-08-12T05:09:55Z",
-      "renewedAt": "2026-08-12T05:09:55Z",
-      "expiresAt": "2026-08-12T05:10:15Z",
+      "renewedAt": "2026-08-12T05:10:06Z",
+      "expiresAt": "2026-08-12T05:10:26Z",
       "ttlSeconds": 20
     }
   ]
