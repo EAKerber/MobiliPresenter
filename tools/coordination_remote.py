@@ -202,31 +202,42 @@ class GitHubCoordinationAuthority:
         encoded_ref = quote(ref, safe="")
         return f"repos/{self.repository}/contents/{encoded_path}?ref={encoded_ref}"
 
+    def _read_commit_tree(self, commit_sha: str) -> str:
+        response = self.transport.request("GET", f"repos/{self.repository}/git/commits/{commit_sha}")
+        payload = _json_body(response, operation="read authority commit")
+        return _require_sha(
+            payload.get("tree", {}).get("sha") if isinstance(payload.get("tree"), dict) else None,
+            "authority tree",
+        )
+
+    def _read_state(self, ref: str) -> dict[str, Any]:
+        response = self.transport.request("GET", self._state_endpoint(ref))
+        payload = _json_body(response, operation="read coordination state")
+        encoded = payload.get("content")
+        encoding = payload.get("encoding")
+        if not isinstance(encoded, str) or encoding != "base64":
+            raise CoordinationRemoteError("COORDINATION_REMOTE_INVALID_RESPONSE", "coordination state content is not base64")
+        try:
+            decoded = base64.b64decode(encoded, validate=False).decode("utf-8")
+            state = json.loads(decoded)
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_INVALID_STATE", "cannot decode coordination state") from exc
+        if not isinstance(state, dict):
+            raise CoordinationRemoteError("COORDINATION_REMOTE_INVALID_STATE", "coordination state root is not object")
+        coordination.validate_state(state)
+        return state
+
     def observe(self) -> AuthorityObservation:
         try:
             ref_response = self.transport.request("GET", self._ref_endpoint, include_headers=True)
             ref_payload = _json_body(ref_response, operation="read authority ref")
             authority_now = _server_time(ref_response.headers)
-            head_sha = _require_sha(ref_payload.get("object", {}).get("sha") if isinstance(ref_payload.get("object"), dict) else None, "authority head")
-
-            commit_response = self.transport.request("GET", f"repos/{self.repository}/git/commits/{head_sha}")
-            commit_payload = _json_body(commit_response, operation="read authority commit")
-            tree_sha = _require_sha(commit_payload.get("tree", {}).get("sha") if isinstance(commit_payload.get("tree"), dict) else None, "authority tree")
-
-            state_response = self.transport.request("GET", self._state_endpoint(head_sha))
-            state_payload = _json_body(state_response, operation="read coordination state")
-            encoded = state_payload.get("content")
-            encoding = state_payload.get("encoding")
-            if not isinstance(encoded, str) or encoding != "base64":
-                raise CoordinationRemoteError("COORDINATION_REMOTE_INVALID_RESPONSE", "coordination state content is not base64")
-            try:
-                decoded = base64.b64decode(encoded, validate=False).decode("utf-8")
-                state = json.loads(decoded)
-            except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise CoordinationRemoteError("COORDINATION_REMOTE_INVALID_STATE", "cannot decode coordination state") from exc
-            if not isinstance(state, dict):
-                raise CoordinationRemoteError("COORDINATION_REMOTE_INVALID_STATE", "coordination state root is not object")
-            coordination.validate_state(state)
+            head_sha = _require_sha(
+                ref_payload.get("object", {}).get("sha") if isinstance(ref_payload.get("object"), dict) else None,
+                "authority head",
+            )
+            tree_sha = self._read_commit_tree(head_sha)
+            state = self._read_state(head_sha)
             return AuthorityObservation(head_sha=head_sha, tree_sha=tree_sha, state=state, authority_now=authority_now)
         except CoordinationRemoteError:
             raise
@@ -273,6 +284,38 @@ class GitHubCoordinationAuthority:
                 raise CoordinationRemoteError("COORDINATION_REF_DRIFT", "authority advanced after observation") from exc
             raise CoordinationRemoteError("COORDINATION_REMOTE_WRITE_FAILED", exc.detail) from exc
 
+    def _is_ancestor(self, ancestor_sha: str, head_sha: str) -> bool:
+        if ancestor_sha == head_sha:
+            return True
+        response = self.transport.request(
+            "GET",
+            f"repos/{self.repository}/compare/{ancestor_sha}...{head_sha}",
+        )
+        payload = _json_body(response, operation="compare authority ancestry")
+        status = payload.get("status")
+        merge_base = payload.get("merge_base_commit")
+        merge_base_sha = merge_base.get("sha") if isinstance(merge_base, dict) else None
+        return status in {"ahead", "identical"} and merge_base_sha == ancestor_sha
+
+    def _verify_published_transition(self, commit_sha: str, candidate: dict[str, Any]) -> None:
+        try:
+            state_at_commit = self._read_state(commit_sha)
+            if state_at_commit != candidate:
+                raise CoordinationRemoteError(
+                    "COORDINATION_READBACK_MISMATCH",
+                    f"state at published commit {commit_sha} differs from candidate",
+                )
+            current = self.observe()
+            if not self._is_ancestor(commit_sha, current.head_sha):
+                raise CoordinationRemoteError(
+                    "COORDINATION_READBACK_MISMATCH",
+                    f"published commit {commit_sha} is not ancestor of current head {current.head_sha}",
+                )
+        except CoordinationRemoteError:
+            raise
+        except ApiError as exc:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_UNAVAILABLE", exc.detail) from exc
+
     def mutate(
         self,
         planner: Callable[[dict[str, Any], datetime], tuple[dict[str, Any], dict[str, Any]]],
@@ -301,14 +344,7 @@ class GitHubCoordinationAuthority:
         except ApiError as exc:
             raise CoordinationRemoteError("COORDINATION_REMOTE_WRITE_FAILED", exc.detail) from exc
 
-        readback = self.observe()
-        if readback.head_sha != commit_sha:
-            raise CoordinationRemoteError(
-                "COORDINATION_READBACK_MISMATCH",
-                f"expected head {commit_sha}, observed {readback.head_sha}",
-            )
-        if readback.state != candidate:
-            raise CoordinationRemoteError("COORDINATION_READBACK_MISMATCH", "state differs after ref update")
+        self._verify_published_transition(commit_sha, candidate)
         return AppliedTransition(
             before_sha=observed.head_sha,
             after_sha=commit_sha,
