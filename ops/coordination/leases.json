@@ -1,23 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "c571eea74126b0eba2104d386767afe672ce3b1e",
+  "revision": "2b96fbaa66dc15b57cd96a23e1b9a6b139bb5cf5",
   "intents": [],
   "leases": [
     {
-      "leaseId": "heartbeat-acquire:31564379371:1:0",
-      "resource": "file:ops/coordination/probes/heartbeat-31564379371-1.shared",
+      "leaseId": "gha-acquire:31564986773:1:0",
+      "resource": "file:ops/coordination/probes/gha-31564986773-1.shared",
       "mode": "exclusive-write",
       "owner": {
-        "role": "engine",
-        "session": "gha-heartbeat:31564379371:1",
-        "branch": "engine/heartbeat-probe",
-        "pr": 920001
+        "role": "gitops",
+        "session": "gha:31564986773:1",
+        "branch": "ops/git-ops-1.3-coordination-leases",
+        "pr": 32
       },
-      "reason": "live heartbeat renewal probe",
-      "acquiredAt": "2026-08-12T04:50:16Z",
-      "renewedAt": "2026-08-12T04:50:27Z",
-      "expiresAt": "2026-08-12T04:50:47Z",
-      "ttlSeconds": 20
+      "reason": "GitHub Actions live adapter probe",
+      "acquiredAt": "2026-08-12T04:58:41Z",
+      "renewedAt": "2026-08-12T04:58:41Z",
+      "expiresAt": "2026-08-12T05:03:41Z",
+      "ttlSeconds": 300
     }
   ]
 }
