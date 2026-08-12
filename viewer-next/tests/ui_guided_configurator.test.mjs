@@ -8,7 +8,7 @@ const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 test("guided configurator exposes the approved four-stage architecture", () => {
   for (const label of ["Módulos", "Acabamentos", "Acessórios", "Resumo"]) {
-    assert.match(ui, new RegExp(`label: \\"${label}\\"`));
+    assert.ok(ui.includes(`label: "${label}"`), `missing guided step label: ${label}`);
   }
   assert.match(ui, /data\.configuratorStep/);
   assert.match(ui, /aria-current/);
