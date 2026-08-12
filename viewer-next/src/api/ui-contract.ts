@@ -5,7 +5,7 @@ import type { FrontPresetId, LightingPresetId } from "../runtime/presets.js";
 import type { ModuleAlias } from "../runtime/query.js";
 import type { ViewerVisibilityOverride } from "../runtime/viewer-state.js";
 
-export const VIEWER_UI_CONTRACT_VERSION = "ViewerUiContract 0.1.0" as const;
+export const VIEWER_UI_CONTRACT_VERSION = "ViewerUiContract 0.1.1" as const;
 
 export type {
   FrontPresetId,
@@ -29,6 +29,11 @@ export interface ViewerUiCatalog {
   readonly lightingPresets: readonly ViewerUiOption<LightingPresetId>[];
 }
 
+export type ViewerUiTechnicalPresentationAvailability =
+  | { readonly status: "none"; readonly reason: null }
+  | { readonly status: "ready"; readonly reason: null }
+  | { readonly status: "unavailable"; readonly reason: "technical-catalog-entry-missing" };
+
 export interface ViewerUiSnapshot {
   readonly contractVersion: typeof VIEWER_UI_CONTRACT_VERSION;
   readonly selectedModuleAlias: ModuleAlias | null;
@@ -36,6 +41,7 @@ export interface ViewerUiSnapshot {
   readonly frontPresetByModule: Readonly<Partial<Record<ModuleAlias, FrontPresetId>>>;
   readonly stonePresetId: StonePresetId;
   readonly lightingPresetId: LightingPresetId;
+  readonly selectedTechnicalPresentationAvailability: ViewerUiTechnicalPresentationAvailability;
   readonly selectedTechnicalPresentation: TechnicalPresentationPackage | null;
   readonly selectedTechnicalViewAssets: readonly TechnicalDiagramAsset[];
 }
