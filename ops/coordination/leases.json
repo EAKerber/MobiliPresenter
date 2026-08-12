@@ -1,6 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "8dfe00b8c05f47f852b904bb4bc6ba990b6440ea",
+  "revision": "e0ed4b355985eb502b5ac86aeb190fd9bc87d86e",
   "intents": [],
   "leases": [
     {
@@ -33,6 +33,22 @@
       "acquiredAt": "2026-08-12T05:00:35Z",
       "renewedAt": "2026-08-12T05:00:35Z",
       "expiresAt": "2026-08-12T05:02:35Z",
+      "ttlSeconds": 120
+    },
+    {
+      "leaseId": "foreign:31564986773:1:0",
+      "resource": "file:ops/coordination/probes/foreign-31564986773-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "ui",
+        "session": "gha-foreign:31564986773:1",
+        "branch": "ui/foreign-pr-probe",
+        "pr": 930002
+      },
+      "reason": "live closed PR cleanup probe",
+      "acquiredAt": "2026-08-12T05:00:40Z",
+      "renewedAt": "2026-08-12T05:00:40Z",
+      "expiresAt": "2026-08-12T05:02:40Z",
       "ttlSeconds": 120
     }
   ]
