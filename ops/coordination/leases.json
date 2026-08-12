@@ -1,8 +1,24 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "59ec78310de955180531554fc29d6c42b98aa4df",
+  "revision": "eddcbe0137c2aa668ff74f9054cee42106f812bb",
   "intents": [],
   "leases": [
+    {
+      "leaseId": "break-foreign:31565400482:1:0",
+      "resource": "file:ops/coordination/probes/break-foreign-31565400482-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "ui",
+        "session": "gha-break-foreign:31565400482:1",
+        "branch": "ui/break-foreign-probe",
+        "pr": 950002
+      },
+      "reason": "live break-glass probe",
+      "acquiredAt": "2026-08-12T05:11:12Z",
+      "renewedAt": "2026-08-12T05:11:12Z",
+      "expiresAt": "2026-08-12T05:13:12Z",
+      "ttlSeconds": 120
+    },
     {
       "leaseId": "break-target:31565400482:1:0",
       "resource": "file:ops/coordination/probes/break-target-31565400482-1.shared",
