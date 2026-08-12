@@ -116,11 +116,18 @@ jobs:
           COORDINATION_RECOVERY_PROBE_OUTPUT: /tmp/coordination-recovery-probe.json
         run: python tools/coordination_recovery_probe.py
 
+      - name: Live heartbeat renewal probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COORDINATION_HEARTBEAT_PROBE_OUTPUT: /tmp/coordination-heartbeat-probe.json
+        run: python tools/coordination_heartbeat_probe.py
+
       - name: Validate probe evidence
         run: |
           python -m json.tool /tmp/coordination-live-probe.json > /dev/null
           python -m json.tool /tmp/coordination-ci-probe.json > /dev/null
           python -m json.tool /tmp/coordination-recovery-probe.json > /dev/null
+          python -m json.tool /tmp/coordination-heartbeat-probe.json > /dev/null
 
       - name: Upload coordination probe evidence
         uses: actions/upload-artifact@v4
@@ -130,4 +137,5 @@ jobs:
             /tmp/coordination-live-probe.json
             /tmp/coordination-ci-probe.json
             /tmp/coordination-recovery-probe.json
+            /tmp/coordination-heartbeat-probe.json
           if-no-files-found: error
