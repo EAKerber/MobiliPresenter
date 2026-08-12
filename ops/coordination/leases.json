@@ -1,8 +1,24 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "7560efd96485d205b9997e9420c60add23d705ac",
+  "revision": "4ae4b4f2b7715b1318e56d8e34c1d20e4df737ae",
   "intents": [],
   "leases": [
+    {
+      "leaseId": "parallel-independent:ui:31566267331:1:0",
+      "resource": "file:ops/coordination/probes/parallel-independent-31566267331-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "ui",
+        "session": "gha-parallel-ui:31566267331:1",
+        "branch": "ui/promotional-detail-v0.2",
+        "pr": 27
+      },
+      "reason": "parallel loser continues on independent resource",
+      "acquiredAt": "2026-08-12T05:24:53Z",
+      "renewedAt": "2026-08-12T05:24:53Z",
+      "expiresAt": "2026-08-12T05:26:53Z",
+      "ttlSeconds": 120
+    },
     {
       "leaseId": "parallel-acquire:engine:31566267331:1:0",
       "resource": "file:ops/coordination/probes/parallel-shared-31566267331-1.shared",
