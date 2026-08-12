@@ -23,10 +23,9 @@ test("module visibility stays separate from contextual inspection", () => {
 });
 
 test("closing product detail preserves selected module", () => {
-  const closeHandler = ui.match(/Fechar detalhes do módulo[\s\S]*?close\.addEventListener\("click", \(\) => \{([\s\S]*?)\n    \}\);/);
-  assert.ok(closeHandler, "detail close handler must exist");
-  assert.match(closeHandler[1], /detailExpanded = false/);
-  assert.doesNotMatch(closeHandler[1], /selectModule\(null\)/);
+  assert.match(ui, /close\.setAttribute\("aria-label", `Fechar detalhes do módulo \$\{alias\}`\)/);
+  assert.match(ui, /detailExpanded = false/);
+  assert.doesNotMatch(ui, /api\.selectModule\(null\)/);
 });
 
 test("UI consumes explicit presentation availability and fidelity", () => {
