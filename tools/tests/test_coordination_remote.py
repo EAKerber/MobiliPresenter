@@ -259,6 +259,55 @@ class CoordinationRemoteTests(unittest.TestCase):
         self.assertEqual(result.after_sha, HEAD1)
         transport.assert_consumed()
 
+    def test_stale_parent_ref_after_apply_is_retried(self):
+        base_state = coordination.empty_state()
+        expected_state, _ = planned_intent(base_state, transition_id="remote-intent-stale")
+
+        steps = observation_steps(HEAD0, TREE0, base_state)
+        steps.extend(
+            [
+                ("POST", "git/blobs", False, json_response({"sha": BLOB1})),
+                ("POST", "git/trees", False, json_response({"sha": TREE1})),
+                ("POST", "git/commits", False, json_response({"sha": HEAD1})),
+                ("PATCH", "git/refs/heads/coordination%2Fleases", False, json_response({"object": {"sha": HEAD1}})),
+                ("GET", f"?ref={HEAD1}", False, state_response(expected_state)),
+            ]
+        )
+        steps.extend(observation_steps(HEAD0, TREE0, base_state))
+        steps.extend(
+            [
+                (
+                    "GET",
+                    f"compare/{HEAD1}...{HEAD0}",
+                    False,
+                    json_response({"status": "behind", "merge_base_commit": {"sha": HEAD0}}),
+                ),
+                (
+                    "GET",
+                    f"compare/{HEAD0}...{HEAD1}",
+                    False,
+                    json_response({"status": "ahead", "merge_base_commit": {"sha": HEAD0}}),
+                ),
+            ]
+        )
+        steps.extend(observation_steps(HEAD1, TREE1, expected_state))
+        transport = ScriptedTransport(steps)
+        authority = GitHubCoordinationAuthority(transport, readback_retry_seconds=0)
+
+        def planner(state, authority_now):
+            return coordination.plan_intent(
+                state,
+                ["file:ops/coordination/adapter-probe.shared"],
+                OWNER,
+                "remote adapter test",
+                authority_now,
+                "remote-intent-stale",
+            )
+
+        result = authority.mutate(planner, message="coordination: stale ref retry")
+        self.assertEqual(result.after_sha, HEAD1)
+        transport.assert_consumed()
+
     def test_diverged_head_after_apply_is_readback_mismatch(self):
         base_state = coordination.empty_state()
         expected_state, _ = planned_intent(base_state, transition_id="remote-intent-mismatch")
@@ -274,16 +323,24 @@ class CoordinationRemoteTests(unittest.TestCase):
             ]
         )
         steps.extend(observation_steps(HEAD_OTHER, TREE1, expected_state))
-        steps.append(
-            (
-                "GET",
-                f"compare/{HEAD1}...{HEAD_OTHER}",
-                False,
-                json_response({"status": "diverged", "merge_base_commit": {"sha": HEAD0}}),
-            )
+        steps.extend(
+            [
+                (
+                    "GET",
+                    f"compare/{HEAD1}...{HEAD_OTHER}",
+                    False,
+                    json_response({"status": "diverged", "merge_base_commit": {"sha": HEAD0}}),
+                ),
+                (
+                    "GET",
+                    f"compare/{HEAD_OTHER}...{HEAD1}",
+                    False,
+                    json_response({"status": "diverged", "merge_base_commit": {"sha": HEAD0}}),
+                ),
+            ]
         )
         transport = ScriptedTransport(steps)
-        authority = GitHubCoordinationAuthority(transport)
+        authority = GitHubCoordinationAuthority(transport, readback_retry_seconds=0)
 
         def planner(state, authority_now):
             return coordination.plan_intent(
