@@ -1,6 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "ae3a3ad93806b30a0be9cd1b09523b14593acb92",
+  "revision": "98d05ff350e5e4b1fa6db122d4e5e3e293e14da0",
   "intents": [],
   "leases": [
     {
@@ -15,8 +15,8 @@
       },
       "reason": "live CLI restart/session recovery probe",
       "acquiredAt": "2026-08-12T05:05:36Z",
-      "renewedAt": "2026-08-12T05:05:36Z",
-      "expiresAt": "2026-08-12T05:07:36Z",
+      "renewedAt": "2026-08-12T05:05:41Z",
+      "expiresAt": "2026-08-12T05:07:41Z",
       "ttlSeconds": 120
     }
   ]
