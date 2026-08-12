@@ -1,6 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "2b659cb7891d46d7aa6b0468fbef28a67254019a",
+  "revision": "448625435af9d26b3dcd2068d5e172f21379189c",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "heartbeat-acquire:31564379371:1:0",
+      "resource": "file:ops/coordination/probes/heartbeat-31564379371-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "engine",
+        "session": "gha-heartbeat:31564379371:1",
+        "branch": "engine/heartbeat-probe",
+        "pr": 920001
+      },
+      "reason": "live heartbeat renewal probe",
+      "acquiredAt": "2026-08-12T04:50:16Z",
+      "renewedAt": "2026-08-12T04:50:16Z",
+      "expiresAt": "2026-08-12T04:50:36Z",
+      "ttlSeconds": 20
+    }
+  ]
 }
