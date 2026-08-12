@@ -61,6 +61,11 @@ export function createViewerUiSnapshot(
     interaction.selectedModuleId
   );
   const selectedTechnicalPresentation = presentationResult.presentation;
+  const selectedTechnicalPresentationAvailability = presentationResult.status === "unavailable"
+    ? { status: "unavailable" as const, reason: presentationResult.reason }
+    : presentationResult.status === "ready"
+      ? { status: "ready" as const, reason: null }
+      : { status: "none" as const, reason: null };
 
   return {
     contractVersion: VIEWER_UI_CONTRACT_VERSION,
@@ -69,10 +74,7 @@ export function createViewerUiSnapshot(
     frontPresetByModule,
     stonePresetId: configuration.stonePresetId,
     lightingPresetId: configuration.lightingPresetId,
-    selectedTechnicalPresentationAvailability: {
-      status: presentationResult.status,
-      reason: presentationResult.reason
-    },
+    selectedTechnicalPresentationAvailability,
     selectedTechnicalPresentation,
     selectedTechnicalViewAssets: selectedTechnicalPresentation === null
       ? []
