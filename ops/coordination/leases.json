@@ -1,6 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "ecfbf8a2d404963a79ab9c07df7f7c0a5a5be46f",
+  "revision": "1c4d48b32259d4c5d2418e4c5f60bee4830ca93c",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "holder-acquire:31565400482:1:0",
+      "resource": "file:ops/coordination/probes/held-31565400482-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "engine",
+        "session": "gha-holder:31565400482:1",
+        "branch": "engine/independent-probe",
+        "pr": 910001
+      },
+      "reason": "hold one resource while peer acquires another",
+      "acquiredAt": "2026-08-12T05:08:58Z",
+      "renewedAt": "2026-08-12T05:08:58Z",
+      "expiresAt": "2026-08-12T05:10:58Z",
+      "ttlSeconds": 120
+    }
+  ]
 }
