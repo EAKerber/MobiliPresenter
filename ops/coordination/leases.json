@@ -1,23 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "d29e925ebc8bb5a3fbf2894b4ee7d89d19abea5e",
+  "revision": "ea96ad1228323458002e804b5745d095b3f2e133",
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "ci-probe-acquire:31563671118:1:0",
-      "resource": "file:ops/coordination/probes/ci-bypass-31563671118-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "engine",
-        "session": "gha-ci-enforcement:31563671118:1",
-        "branch": "engine/enforcement-probe",
-        "pr": 900001
-      },
-      "reason": "live CI ownership violation probe",
-      "acquiredAt": "2026-08-12T04:34:40Z",
-      "renewedAt": "2026-08-12T04:34:40Z",
-      "expiresAt": "2026-08-12T04:39:40Z",
-      "ttlSeconds": 300
-    }
-  ]
+  "leases": []
 }
