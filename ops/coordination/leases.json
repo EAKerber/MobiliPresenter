@@ -1,23 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "9353852ce59d0ffe84d16fd30a5c84db8c02f3d5",
+  "revision": "b8fe35b10f2ba3c37ec42b3632ecfd8c2d258115",
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "parallel-acquire:engine:31566267331:1:0",
-      "resource": "file:ops/coordination/probes/parallel-shared-31566267331-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "engine",
-        "session": "gha-parallel-engine:31566267331:1",
-        "branch": "engine/technical-presentation-fidelity-v0.1",
-        "pr": null
-      },
-      "reason": "parallel UI x Engine single-winner probe",
-      "acquiredAt": "2026-08-12T05:24:32Z",
-      "renewedAt": "2026-08-12T05:24:32Z",
-      "expiresAt": "2026-08-12T05:29:32Z",
-      "ttlSeconds": 300
-    }
-  ]
+  "leases": []
 }
