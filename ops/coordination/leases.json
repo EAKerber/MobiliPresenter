@@ -1,40 +1,8 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "e0ed4b355985eb502b5ac86aeb190fd9bc87d86e",
+  "revision": "c12faea812fea0eff4d950b94fce967f8a7a2563",
   "intents": [],
   "leases": [
-    {
-      "leaseId": "closed-a:31564986773:1:0",
-      "resource": "file:ops/coordination/probes/closed-a-31564986773-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "engine",
-        "session": "gha-closed-a:31564986773:1",
-        "branch": "engine/closed-pr-probe",
-        "pr": 930001
-      },
-      "reason": "live closed PR cleanup probe",
-      "acquiredAt": "2026-08-12T05:00:31Z",
-      "renewedAt": "2026-08-12T05:00:31Z",
-      "expiresAt": "2026-08-12T05:02:31Z",
-      "ttlSeconds": 120
-    },
-    {
-      "leaseId": "closed-b:31564986773:1:0",
-      "resource": "file:ops/coordination/probes/closed-b-31564986773-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "engine",
-        "session": "gha-closed-b:31564986773:1",
-        "branch": "engine/closed-pr-probe",
-        "pr": 930001
-      },
-      "reason": "live closed PR cleanup probe",
-      "acquiredAt": "2026-08-12T05:00:35Z",
-      "renewedAt": "2026-08-12T05:00:35Z",
-      "expiresAt": "2026-08-12T05:02:35Z",
-      "ttlSeconds": 120
-    },
     {
       "leaseId": "foreign:31564986773:1:0",
       "resource": "file:ops/coordination/probes/foreign-31564986773-1.shared",
