@@ -7,7 +7,6 @@ import os
 import subprocess
 import sys
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -17,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from tools import coordination  # noqa: E402
 from tools.coordination_remote import (  # noqa: E402
+    AppliedTransition,
     CoordinationRemoteError,
     GhApiTransport,
     GitHubCoordinationAuthority,
@@ -112,6 +112,18 @@ def _print(payload: Any, *, as_json: bool) -> None:
         print(payload)
 
 
+def _transition_payload(action: str, result: AppliedTransition) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "action": action,
+        "beforeSha": result.before_sha,
+        "afterSha": result.after_sha,
+        "authorityNow": result.authority_now.isoformat(),
+        "state": result.state,
+        "event": result.event,
+    }
+
+
 def command_status(authority: GitHubCoordinationAuthority) -> dict[str, Any]:
     observed = authority.observe()
     current = coordination.compact_expired(observed.state, observed.authority_now)
@@ -148,7 +160,7 @@ def command_intent(authority: GitHubCoordinationAuthority, args: argparse.Namesp
         )
 
     result = authority.mutate(planner, message=f"coordination: intent {transition_id}")
-    return {"ok": True, "action": "intent", **asdict(result)}
+    return _transition_payload("intent", result)
 
 
 def command_acquire(authority: GitHubCoordinationAuthority, args: argparse.Namespace, owner: dict[str, Any]) -> dict[str, Any]:
@@ -173,7 +185,7 @@ def command_acquire(authority: GitHubCoordinationAuthority, args: argparse.Names
         )
 
     result = authority.mutate(planner, message=f"coordination: acquire {transition_id}")
-    return {"ok": True, "action": "acquire", **asdict(result)}
+    return _transition_payload("acquire", result)
 
 
 def command_renew(authority: GitHubCoordinationAuthority, args: argparse.Namespace, owner: dict[str, Any]) -> dict[str, Any]:
@@ -185,7 +197,7 @@ def command_renew(authority: GitHubCoordinationAuthority, args: argparse.Namespa
         return coordination.plan_renew_mine(state, owner, authority_now, transition_id)
 
     result = authority.mutate(planner, message=f"coordination: renew {transition_id}")
-    return {"ok": True, "action": "renew", **asdict(result)}
+    return _transition_payload("renew", result)
 
 
 def command_release(authority: GitHubCoordinationAuthority, args: argparse.Namespace, owner: dict[str, Any]) -> dict[str, Any]:
@@ -199,7 +211,7 @@ def command_release(authority: GitHubCoordinationAuthority, args: argparse.Names
         return coordination.plan_release(state, owner, authority_now, transition_id, resources=args.resources)
 
     result = authority.mutate(planner, message=f"coordination: release {transition_id}")
-    return {"ok": True, "action": "release", **asdict(result)}
+    return _transition_payload("release", result)
 
 
 def command_guard(authority: GitHubCoordinationAuthority, args: argparse.Namespace, owner: dict[str, Any]) -> dict[str, Any]:
