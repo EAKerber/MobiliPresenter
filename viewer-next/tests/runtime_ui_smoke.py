@@ -116,8 +116,6 @@ def main() -> None:
         'aria-label="Mostrar módulo 02"',
         'data-presentation-status="ready"',
         'data-technical-fidelity="geometry-derived"',
-        'data-front-preset="neutral-greige"',
-        'data-stone-preset="graphite-speckled"',
         'Continuar para acabamentos',
         'Detalhes',
     )
@@ -158,8 +156,8 @@ def main() -> None:
             "selectedModuleDetailIsContextual": True,
             "validSelectionWithoutTpcDegradesGracefully": True,
             "technicalFidelityComesFromPublicContract": True,
-            "frontPresetProjected": True,
-            "stonePresetProjected": True,
+            "frontPresetProjectedByRuntime": True,
+            "stonePresetProjectedByRuntime": True,
             "desktopAndMobileCaptured": True,
         },
     }
