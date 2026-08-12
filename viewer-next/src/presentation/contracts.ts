@@ -1,12 +1,15 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
 export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.0" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.0" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.1" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
 export type TechnicalViewPlane = "width-height" | "depth-height" | "width-depth";
 export type TechnicalViewKind = "orthographic" | "internal" | "isometric" | "detail";
+export type TechnicalViewFidelity = "schematic" | "geometry-derived" | "authored";
+export type TechnicalViewCoverage = "envelope" | "authored-layout" | "module-front-primitives" | "appliance-front-openings";
+export type TechnicalViewOmission = "hardware" | "hidden-geometry";
 export type TechnicalNoticeSeverity = "info" | "important" | "warning";
 export type TechnicalDependencyRelation = "requires-present" | "control-point-host" | "technical-support";
 export type TechnicalControlKind = "visibility" | "activation";
@@ -109,6 +112,41 @@ export interface TechnicalViewRequest {
   readonly source: "scene-envelope" | "scene-geometry" | "authored-internal-layout" | "external-contract";
 }
 
+export interface TechnicalPoint2Mm {
+  readonly horizontalMm: number;
+  readonly verticalMm: number;
+}
+
+export interface TechnicalProjectedPrimitive {
+  readonly id: string;
+  readonly role: string;
+  readonly pointsMm: readonly TechnicalPoint2Mm[];
+  readonly sourceBindingIds: readonly string[];
+}
+
+export interface TechnicalProjectedOpening {
+  readonly id: string;
+  readonly slotId: string;
+  readonly role: string;
+  readonly pointsMm: readonly TechnicalPoint2Mm[];
+  readonly status: "confirmed" | "inferred";
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface CompiledTechnicalViewGeometry {
+  readonly viewId: string;
+  readonly plane: "width-height";
+  readonly coordinateUnit: "mm";
+  readonly boundsMm: {
+    readonly horizontal: number;
+    readonly vertical: number;
+  };
+  readonly primitives: readonly TechnicalProjectedPrimitive[];
+  readonly openings: readonly TechnicalProjectedOpening[];
+  readonly coverage: readonly TechnicalViewCoverage[];
+  readonly omitted: readonly TechnicalViewOmission[];
+}
+
 export interface TechnicalCatalogEntry {
   readonly schemaVersion: typeof TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION;
   readonly id: string;
@@ -165,6 +203,7 @@ export interface TechnicalPresentationPackage {
   readonly controls: readonly TechnicalControlCapability[];
   readonly finishes: readonly CompiledFinishPolicy[];
   readonly technicalViews: readonly TechnicalViewRequest[];
+  readonly technicalViewGeometry: readonly CompiledTechnicalViewGeometry[];
   readonly sourceRefs: readonly TechnicalSourceRef[];
   readonly provenance: {
     readonly physicalAuthority: "scene-core";

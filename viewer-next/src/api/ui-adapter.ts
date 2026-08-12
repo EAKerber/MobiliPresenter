@@ -1,5 +1,5 @@
 import { STONE_PRESETS, STONE_PRESET_IDS } from "../fixtures/stone-presets.js";
-import { getSelectedTechnicalPresentation } from "../presentation/current-service.js";
+import { getSelectedTechnicalPresentationResult } from "../presentation/current-service.js";
 import { renderAllTechnicalViews } from "../presentation/technical-diagram.js";
 import { FRONT_PRESETS, FRONT_PRESET_IDS, LIGHTING_PRESETS, LIGHTING_PRESET_IDS } from "../runtime/presets.js";
 import { moduleIdFromAlias, type ModuleAlias } from "../runtime/query.js";
@@ -56,10 +56,16 @@ export function createViewerUiSnapshot(
   }
 
   const selectedModuleAlias = moduleAliasFromId(interaction.selectedModuleId);
-  const selectedTechnicalPresentation = getSelectedTechnicalPresentation(
+  const presentationResult = getSelectedTechnicalPresentationResult(
     configuration,
     interaction.selectedModuleId
   );
+  const selectedTechnicalPresentation = presentationResult.presentation;
+  const selectedTechnicalPresentationAvailability = presentationResult.status === "unavailable"
+    ? { status: "unavailable" as const, reason: presentationResult.reason }
+    : presentationResult.status === "ready"
+      ? { status: "ready" as const, reason: null }
+      : { status: "none" as const, reason: null };
 
   return {
     contractVersion: VIEWER_UI_CONTRACT_VERSION,
@@ -68,6 +74,7 @@ export function createViewerUiSnapshot(
     frontPresetByModule,
     stonePresetId: configuration.stonePresetId,
     lightingPresetId: configuration.lightingPresetId,
+    selectedTechnicalPresentationAvailability,
     selectedTechnicalPresentation,
     selectedTechnicalViewAssets: selectedTechnicalPresentation === null
       ? []

@@ -20,6 +20,7 @@ import {
   type TechnicalCatalogEntry,
   type TechnicalPresentationPackage
 } from "./contracts.js";
+import { compileGeometryDerivedTechnicalViews } from "./technical-view-geometry.js";
 
 export interface TechnicalPresentationCompilerInput {
   readonly scene: ScenePackage;
@@ -113,7 +114,6 @@ export function validateTechnicalCatalog(scene: ScenePackage, catalog: readonly 
       throw new Error(`TECHNICAL_CATALOG_TARGET_KIND_MISMATCH:${entry.target.entityId}:${target.kind}`);
     }
 
-    // Catalog authors may choose how dimensions are presented, but may not duplicate physical values.
     const dimensionPolicy = entry.dimensions as unknown as Record<string, unknown> | undefined;
     for (const forbidden of ["primaryMm", "nominalMm", "geometryMm", "widthMm", "heightMm", "depthMm"]) {
       if (dimensionPolicy && forbidden in dimensionPolicy) {
@@ -190,6 +190,9 @@ export function compileTechnicalPresentation(
     controls: entry.controls,
     finishes: entry.finishes.map(policy => compileFinish(policy, input.appearance, input.configuration)),
     technicalViews: entry.technicalViews,
+    technicalViewGeometry: target.kind === "module"
+      ? compileGeometryDerivedTechnicalViews(target, entry.technicalViews)
+      : [],
     sourceRefs: entry.sourceRefs,
     provenance: {
       physicalAuthority: "scene-core",
