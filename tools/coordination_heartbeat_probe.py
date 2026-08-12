@@ -62,7 +62,11 @@ def main() -> int:
         "pr": 920001,
     }
     resource = f"file:ops/coordination/probes/heartbeat-{run_id}-{attempt}.shared"
-    authority = GitHubCoordinationAuthority(GhApiTransport())
+    authority = GitHubCoordinationAuthority(
+        GhApiTransport(),
+        readback_attempts=20,
+        readback_retry_seconds=0.5,
+    )
 
     acquired = None
     renewed = None
@@ -210,6 +214,7 @@ def main() -> int:
         "authorityNowAfterOriginalExpiry": post_original_expiry.authority_now.isoformat(),
         "waitBeforeRenewSeconds": wait_before_renew,
         "waitAfterRenewSeconds": waited_after_renew,
+        "readbackWindowSeconds": 10.0,
         "expiryExtended": True,
         "leaseActivePastOriginalExpiry": True,
         "leaseLeftActive": False,
