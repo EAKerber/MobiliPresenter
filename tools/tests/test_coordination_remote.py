@@ -79,6 +79,20 @@ def observation_steps(head, tree, state, *, date=SERVER_DATE):
     ]
 
 
+def planned_intent(base_state, transition_id="remote-intent-1"):
+    planned, event = coordination.plan_intent(
+        base_state,
+        ["file:ops/coordination/adapter-probe.shared"],
+        OWNER,
+        "remote adapter test",
+        NOW,
+        transition_id,
+    )
+    expected = copy.deepcopy(planned)
+    expected["revision"] = HEAD0
+    return expected, event
+
+
 class CoordinationRemoteTests(unittest.TestCase):
     def test_parse_gh_included_response(self):
         response = GhApiTransport._parse_included(
@@ -129,16 +143,7 @@ class CoordinationRemoteTests(unittest.TestCase):
 
     def test_mutate_builds_single_parent_commit_force_false_and_readbacks(self):
         base_state = coordination.empty_state()
-        planned, planned_event = coordination.plan_intent(
-            base_state,
-            ["file:ops/coordination/adapter-probe.shared"],
-            OWNER,
-            "remote adapter test",
-            NOW,
-            "remote-intent-1",
-        )
-        expected_state = copy.deepcopy(planned)
-        expected_state["revision"] = HEAD0
+        expected_state, planned_event = planned_intent(base_state)
 
         steps = observation_steps(HEAD0, TREE0, base_state)
         steps.extend(
@@ -147,6 +152,7 @@ class CoordinationRemoteTests(unittest.TestCase):
                 ("POST", "git/trees", False, json_response({"sha": TREE1})),
                 ("POST", "git/commits", False, json_response({"sha": HEAD1})),
                 ("PATCH", "git/refs/heads/coordination%2Fleases", False, json_response({"object": {"sha": HEAD1}})),
+                ("GET", f"?ref={HEAD1}", False, state_response(expected_state)),
             ]
         )
         steps.extend(observation_steps(HEAD1, TREE1, expected_state))
@@ -211,18 +217,11 @@ class CoordinationRemoteTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "COORDINATION_REF_DRIFT")
         transport.assert_consumed()
 
-    def test_readback_head_mismatch_is_not_reported_as_success(self):
+    def test_concurrent_descendant_after_apply_is_valid_readback(self):
         base_state = coordination.empty_state()
-        planned, _ = coordination.plan_intent(
-            base_state,
-            ["file:ops/coordination/adapter-probe.shared"],
-            OWNER,
-            "readback mismatch",
-            NOW,
-            "remote-intent-mismatch",
-        )
-        candidate = copy.deepcopy(planned)
-        candidate["revision"] = HEAD0
+        expected_state, _ = planned_intent(base_state, transition_id="remote-intent-descendant")
+        descendant_state = copy.deepcopy(expected_state)
+        descendant_state["revision"] = HEAD1
 
         steps = observation_steps(HEAD0, TREE0, base_state)
         steps.extend(
@@ -231,9 +230,18 @@ class CoordinationRemoteTests(unittest.TestCase):
                 ("POST", "git/trees", False, json_response({"sha": TREE1})),
                 ("POST", "git/commits", False, json_response({"sha": HEAD1})),
                 ("PATCH", "git/refs/heads/coordination%2Fleases", False, json_response({"object": {"sha": HEAD1}})),
+                ("GET", f"?ref={HEAD1}", False, state_response(expected_state)),
             ]
         )
-        steps.extend(observation_steps(HEAD_OTHER, TREE1, candidate))
+        steps.extend(observation_steps(HEAD_OTHER, TREE1, descendant_state))
+        steps.append(
+            (
+                "GET",
+                f"compare/{HEAD1}...{HEAD_OTHER}",
+                False,
+                json_response({"status": "ahead", "merge_base_commit": {"sha": HEAD1}}),
+            )
+        )
         transport = ScriptedTransport(steps)
         authority = GitHubCoordinationAuthority(transport)
 
@@ -242,7 +250,47 @@ class CoordinationRemoteTests(unittest.TestCase):
                 state,
                 ["file:ops/coordination/adapter-probe.shared"],
                 OWNER,
-                "readback mismatch",
+                "remote adapter test",
+                authority_now,
+                "remote-intent-descendant",
+            )
+
+        result = authority.mutate(planner, message="coordination: descendant-safe readback")
+        self.assertEqual(result.after_sha, HEAD1)
+        transport.assert_consumed()
+
+    def test_diverged_head_after_apply_is_readback_mismatch(self):
+        base_state = coordination.empty_state()
+        expected_state, _ = planned_intent(base_state, transition_id="remote-intent-mismatch")
+
+        steps = observation_steps(HEAD0, TREE0, base_state)
+        steps.extend(
+            [
+                ("POST", "git/blobs", False, json_response({"sha": BLOB1})),
+                ("POST", "git/trees", False, json_response({"sha": TREE1})),
+                ("POST", "git/commits", False, json_response({"sha": HEAD1})),
+                ("PATCH", "git/refs/heads/coordination%2Fleases", False, json_response({"object": {"sha": HEAD1}})),
+                ("GET", f"?ref={HEAD1}", False, state_response(expected_state)),
+            ]
+        )
+        steps.extend(observation_steps(HEAD_OTHER, TREE1, expected_state))
+        steps.append(
+            (
+                "GET",
+                f"compare/{HEAD1}...{HEAD_OTHER}",
+                False,
+                json_response({"status": "diverged", "merge_base_commit": {"sha": HEAD0}}),
+            )
+        )
+        transport = ScriptedTransport(steps)
+        authority = GitHubCoordinationAuthority(transport)
+
+        def planner(state, authority_now):
+            return coordination.plan_intent(
+                state,
+                ["file:ops/coordination/adapter-probe.shared"],
+                OWNER,
+                "remote adapter test",
                 authority_now,
                 "remote-intent-mismatch",
             )
@@ -250,6 +298,39 @@ class CoordinationRemoteTests(unittest.TestCase):
         with self.assertRaises(CoordinationRemoteError) as caught:
             authority.mutate(planner, message="coordination: readback mismatch")
 
+        self.assertEqual(caught.exception.code, "COORDINATION_READBACK_MISMATCH")
+        transport.assert_consumed()
+
+    def test_published_commit_state_mismatch_is_not_success(self):
+        base_state = coordination.empty_state()
+        expected_state, _ = planned_intent(base_state, transition_id="remote-intent-state-mismatch")
+        wrong_state = coordination.empty_state(revision=HEAD0)
+
+        steps = observation_steps(HEAD0, TREE0, base_state)
+        steps.extend(
+            [
+                ("POST", "git/blobs", False, json_response({"sha": BLOB1})),
+                ("POST", "git/trees", False, json_response({"sha": TREE1})),
+                ("POST", "git/commits", False, json_response({"sha": HEAD1})),
+                ("PATCH", "git/refs/heads/coordination%2Fleases", False, json_response({"object": {"sha": HEAD1}})),
+                ("GET", f"?ref={HEAD1}", False, state_response(wrong_state)),
+            ]
+        )
+        transport = ScriptedTransport(steps)
+        authority = GitHubCoordinationAuthority(transport)
+
+        def planner(state, authority_now):
+            return coordination.plan_intent(
+                state,
+                ["file:ops/coordination/adapter-probe.shared"],
+                OWNER,
+                "remote adapter test",
+                authority_now,
+                "remote-intent-state-mismatch",
+            )
+
+        with self.assertRaises(CoordinationRemoteError) as caught:
+            authority.mutate(planner, message="coordination: published state mismatch")
         self.assertEqual(caught.exception.code, "COORDINATION_READBACK_MISMATCH")
         transport.assert_consumed()
 
