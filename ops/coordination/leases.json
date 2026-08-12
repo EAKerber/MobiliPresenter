@@ -1,6 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "3e4d7198fc303bf5219efd1525246590d9063001",
+  "revision": "bd1d136a6b4524c6681e49b286cd87ca58c9e0dc",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "orphan-acquire:31563376899:1:0",
+      "resource": "file:ops/coordination/probes/orphan-31563376899-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "engine",
+        "session": "gha-orphan:31563376899:1",
+        "branch": "engine/orphan-probe",
+        "pr": 910001
+      },
+      "reason": "live orphan expiry probe",
+      "acquiredAt": "2026-08-12T04:29:26Z",
+      "renewedAt": "2026-08-12T04:29:26Z",
+      "expiresAt": "2026-08-12T04:29:28Z",
+      "ttlSeconds": 2
+    }
+  ]
 }
