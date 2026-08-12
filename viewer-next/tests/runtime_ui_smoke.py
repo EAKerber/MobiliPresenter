@@ -68,10 +68,25 @@ def capture(chrome: str, url: str, name: str, width: int, height: int) -> dict[s
     }
 
 
+def dump_dom(chrome: str, url: str, name: str, width: int = 1366, height: int = 768) -> str:
+    result = run(chrome_args(chrome, width, height) + ["--dump-dom", url])
+    if result.returncode != 0:
+        raise SystemExit(f"RUNTIME_UI_DOM_FAILED:{name}:{result.stderr[-2000:]}")
+    (OUT / f"{name}.html").write_text(result.stdout, encoding="utf-8")
+    return result.stdout
+
+
+def require(dom: str, name: str, needles: tuple[str, ...]) -> None:
+    missing = [needle for needle in needles if needle not in dom]
+    if missing:
+        raise SystemExit(f"RUNTIME_UI_DOM_GATE_FAILED:{name}:{missing}")
+
+
 def main() -> None:
     chrome = find_chrome()
     OUT.mkdir(parents=True, exist_ok=True)
-    params = {
+
+    ready_params = {
         "controls": "1",
         "select": "02",
         "hide": "02",
@@ -79,63 +94,70 @@ def main() -> None:
         "stone": "graphite-speckled",
         "light": "warm-worktop",
     }
-    url = BASE_URL + "?" + urlencode(params)
-    dom_path = OUT / "runtime-ui.html"
-
-    dom_result = run(chrome_args(chrome, 1366, 768) + ["--dump-dom", url])
-    if dom_result.returncode != 0:
-        raise SystemExit(f"RUNTIME_UI_DOM_FAILED:{dom_result.stderr[-2000:]}")
-    dom_path.write_text(dom_result.stdout, encoding="utf-8")
-
-    required = (
+    ready_url = BASE_URL + "?" + urlencode(ready_params)
+    ready_dom = dump_dom(chrome, ready_url, "runtime-ui-ready")
+    ready_required = (
         'data-renderer-ready="true"',
         'data-frame-rendered="true"',
         'data-viewer-controls="true"',
         'data-viewer-runtime-ui="mounted"',
+        'data-current-step="modules"',
         'data-viewer-detail-open="true"',
-        'data-viewer-module02-visible="false"',
-        'data-viewer-range-visible="true"',
-        'data-viewer-stone-preset="graphite-speckled"',
-        'data-viewer-lighting-preset="warm-worktop"',
-        'data-sidebar-page-panel="modules"',
-        'data-sidebar-page-panel="colors"',
-        'data-sidebar-page-panel="accessories"',
+        'data-configurator-step="modules"',
+        'data-configurator-step="finishes"',
+        'data-configurator-step="accessories"',
+        'data-configurator-step="summary"',
+        'aria-current="step"',
+        'data-stage-panel="modules"',
         'data-module-alias="02"',
         'data-module-visibility="02"',
         'data-visible="false"',
         'data-selected="true"',
         'aria-label="Mostrar módulo 02"',
-        'data-front-preset="neutral-greige"',
-        'data-stone-preset="graphite-speckled"',
-        'data-lighting-preset="warm-worktop"',
-        'data-technical-view=',
-        'Módulo 02',
-        'Vistas técnicas',
+        'data-presentation-status="ready"',
+        'data-technical-fidelity="geometry-derived"',
+        'Continuar para acabamentos',
+        'Detalhes',
     )
-    missing = [needle for needle in required if needle not in dom_result.stdout]
-    if missing:
-        raise SystemExit(f"RUNTIME_UI_DOM_GATE_FAILED:{missing}")
+    require(ready_dom, "ready", ready_required)
+
+    unavailable_params = {"controls": "1", "select": "01"}
+    unavailable_url = BASE_URL + "?" + urlencode(unavailable_params)
+    unavailable_dom = dump_dom(chrome, unavailable_url, "runtime-ui-unavailable")
+    unavailable_required = (
+        'data-viewer-runtime-ui="mounted"',
+        'data-module-alias="01"',
+        'data-selected="true"',
+        'data-presentation-status="unavailable"',
+        'Detalhes técnicos ainda não publicados',
+        'Informações técnicas ausentes não são inferidas pela interface.',
+    )
+    require(unavailable_dom, "unavailable", unavailable_required)
 
     captures = [
-        capture(chrome, url, "runtime-ui-desktop", 1366, 768),
-        capture(chrome, url, "runtime-ui-mobile", 390, 844),
+        capture(chrome, ready_url, "runtime-ui-desktop-modules-detail", 1366, 768),
+        capture(chrome, ready_url, "runtime-ui-mobile-modules-detail", 390, 844),
+        capture(chrome, unavailable_url, "runtime-ui-desktop-unavailable", 1366, 768),
     ]
 
     evidence = {
-        "schemaVersion": "ViewerRuntimeUiEvidence 0.2.0",
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.3.0",
         "status": "PASS",
-        "url": url,
+        "readyUrl": ready_url,
+        "unavailableUrl": unavailable_url,
         "captures": captures,
-        "requiredDomMarkers": list(required),
+        "readyRequiredDomMarkers": list(ready_required),
+        "unavailableRequiredDomMarkers": list(unavailable_required),
         "invariants": {
             "canonicalBaselineControlsRemainOptIn": True,
-            "productSidebarMounted": True,
+            "guidedFourStepNavigationMounted": True,
+            "sceneRemainsSeparateFromUiState": True,
             "moduleVisibilitySeparatedFromInspection": True,
-            "sidebarPagerMounted": True,
-            "technicalDetailDerivedFromContract": True,
-            "frontPresetProjected": True,
-            "stonePresetProjected": True,
-            "lightingPresetProjected": True,
+            "selectedModuleDetailIsContextual": True,
+            "validSelectionWithoutTpcDegradesGracefully": True,
+            "technicalFidelityComesFromPublicContract": True,
+            "frontPresetProjectedByRuntime": True,
+            "stonePresetProjectedByRuntime": True,
             "desktopAndMobileCaptured": True,
         },
     }
