@@ -21,6 +21,12 @@ DEFAULT_STATE_PATH = "ops/coordination/leases.json"
 DEFAULT_GH_TIMEOUT_SECONDS = 30
 DEFAULT_READBACK_ATTEMPTS = 5
 DEFAULT_READBACK_RETRY_SECONDS = 0.25
+DEFAULT_TRANSIENT_ATTEMPTS = 3
+DEFAULT_TRANSIENT_RETRY_SECONDS = 0.5
+DEFAULT_REF_UPDATE_ATTEMPTS = 2
+TRANSIENT_HTTP_STATUSES = {502, 503, 504}
+GITOPS_COMMITTER_NAME = "MobiliPresenter GitOps"
+GITOPS_COMMITTER_EMAIL = "gitops@mobilipresenter.local"
 
 
 class CoordinationRemoteError(RuntimeError):
@@ -75,9 +81,9 @@ class Transport(Protocol):
 class GhApiTransport:
     """Minimal GitHub REST transport backed by authenticated `gh api`.
 
-    This transport intentionally exposes only the primitive needed by the
-    coordination authority adapter. It never falls back to local time or a
-    local coordination file when remote observation fails or stalls.
+    The transport itself does one bounded process invocation. Higher-level
+    authority code decides which operations are safe to retry. There is never
+    a fallback to local time or a local coordination state.
     """
 
     def __init__(self, gh_executable: str = "gh", timeout_seconds: int = DEFAULT_GH_TIMEOUT_SECONDS) -> None:
@@ -176,6 +182,12 @@ def _require_sha(value: Any, label: str) -> str:
     return value
 
 
+def _iso_git_time(value: datetime) -> str:
+    if value.tzinfo is None:
+        raise CoordinationRemoteError("COORDINATION_TIME_UNAVAILABLE", "commit time must be timezone-aware")
+    return value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 class GitHubCoordinationAuthority:
     def __init__(
         self,
@@ -186,17 +198,29 @@ class GitHubCoordinationAuthority:
         state_path: str = DEFAULT_STATE_PATH,
         readback_attempts: int = DEFAULT_READBACK_ATTEMPTS,
         readback_retry_seconds: float = DEFAULT_READBACK_RETRY_SECONDS,
+        transient_attempts: int = DEFAULT_TRANSIENT_ATTEMPTS,
+        transient_retry_seconds: float = DEFAULT_TRANSIENT_RETRY_SECONDS,
+        ref_update_attempts: int = DEFAULT_REF_UPDATE_ATTEMPTS,
     ) -> None:
         if not isinstance(readback_attempts, int) or isinstance(readback_attempts, bool) or readback_attempts <= 0:
             raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "readback_attempts must be positive integer")
         if not isinstance(readback_retry_seconds, (int, float)) or isinstance(readback_retry_seconds, bool) or readback_retry_seconds < 0:
             raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "readback_retry_seconds must be non-negative")
+        if not isinstance(transient_attempts, int) or isinstance(transient_attempts, bool) or transient_attempts <= 0:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "transient_attempts must be positive integer")
+        if not isinstance(transient_retry_seconds, (int, float)) or isinstance(transient_retry_seconds, bool) or transient_retry_seconds < 0:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "transient_retry_seconds must be non-negative")
+        if not isinstance(ref_update_attempts, int) or isinstance(ref_update_attempts, bool) or ref_update_attempts <= 0:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "ref_update_attempts must be positive integer")
         self.transport = transport
         self.repository = repository
         self.authority_branch = authority_branch
         self.state_path = state_path
         self.readback_attempts = readback_attempts
         self.readback_retry_seconds = float(readback_retry_seconds)
+        self.transient_attempts = transient_attempts
+        self.transient_retry_seconds = float(transient_retry_seconds)
+        self.ref_update_attempts = ref_update_attempts
 
     @property
     def _ref_endpoint(self) -> str:
@@ -213,8 +237,51 @@ class GitHubCoordinationAuthority:
         encoded_ref = quote(ref, safe="")
         return f"repos/{self.repository}/contents/{encoded_path}?ref={encoded_ref}"
 
+    @staticmethod
+    def _is_transient_api_error(exc: ApiError) -> bool:
+        return exc.status in TRANSIENT_HTTP_STATUSES
+
+    def _request_retryable(
+        self,
+        method: str,
+        endpoint: str,
+        *,
+        payload: dict[str, Any] | None = None,
+        include_headers: bool = False,
+    ) -> ApiResponse:
+        last: Exception | None = None
+        for attempt in range(self.transient_attempts):
+            try:
+                return self.transport.request(
+                    method,
+                    endpoint,
+                    payload=payload,
+                    include_headers=include_headers,
+                )
+            except ApiError as exc:
+                last = exc
+                retryable = self._is_transient_api_error(exc)
+            except CoordinationRemoteError as exc:
+                last = exc
+                retryable = exc.code == "COORDINATION_REMOTE_TIMEOUT"
+            if not retryable or attempt + 1 >= self.transient_attempts:
+                raise last
+            if self.transient_retry_seconds:
+                time.sleep(self.transient_retry_seconds)
+        assert last is not None
+        raise last
+
+    def _read_ref(self) -> tuple[str, datetime]:
+        response = self._request_retryable("GET", self._ref_endpoint, include_headers=True)
+        payload = _json_body(response, operation="read authority ref")
+        head_sha = _require_sha(
+            payload.get("object", {}).get("sha") if isinstance(payload.get("object"), dict) else None,
+            "authority head",
+        )
+        return head_sha, _server_time(response.headers)
+
     def _read_commit_tree(self, commit_sha: str) -> str:
-        response = self.transport.request("GET", f"repos/{self.repository}/git/commits/{commit_sha}")
+        response = self._request_retryable("GET", f"repos/{self.repository}/git/commits/{commit_sha}")
         payload = _json_body(response, operation="read authority commit")
         return _require_sha(
             payload.get("tree", {}).get("sha") if isinstance(payload.get("tree"), dict) else None,
@@ -222,7 +289,7 @@ class GitHubCoordinationAuthority:
         )
 
     def _read_state(self, ref: str) -> dict[str, Any]:
-        response = self.transport.request("GET", self._state_endpoint(ref))
+        response = self._request_retryable("GET", self._state_endpoint(ref))
         payload = _json_body(response, operation="read coordination state")
         encoded = payload.get("content")
         encoding = payload.get("encoding")
@@ -240,13 +307,7 @@ class GitHubCoordinationAuthority:
 
     def observe(self) -> AuthorityObservation:
         try:
-            ref_response = self.transport.request("GET", self._ref_endpoint, include_headers=True)
-            ref_payload = _json_body(ref_response, operation="read authority ref")
-            authority_now = _server_time(ref_response.headers)
-            head_sha = _require_sha(
-                ref_payload.get("object", {}).get("sha") if isinstance(ref_payload.get("object"), dict) else None,
-                "authority head",
-            )
+            head_sha, authority_now = self._read_ref()
             tree_sha = self._read_commit_tree(head_sha)
             state = self._read_state(head_sha)
             return AuthorityObservation(head_sha=head_sha, tree_sha=tree_sha, state=state, authority_now=authority_now)
@@ -256,7 +317,7 @@ class GitHubCoordinationAuthority:
             raise CoordinationRemoteError("COORDINATION_REMOTE_UNAVAILABLE", exc.detail) from exc
 
     def _create_blob(self, content: str) -> str:
-        response = self.transport.request(
+        response = self._request_retryable(
             "POST",
             f"repos/{self.repository}/git/blobs",
             payload={"content": content, "encoding": "utf-8"},
@@ -264,7 +325,7 @@ class GitHubCoordinationAuthority:
         return _require_sha(_json_body(response, operation="create authority blob").get("sha"), "blob sha")
 
     def _create_tree(self, base_tree_sha: str, blob_sha: str) -> str:
-        response = self.transport.request(
+        response = self._request_retryable(
             "POST",
             f"repos/{self.repository}/git/trees",
             payload={
@@ -274,31 +335,30 @@ class GitHubCoordinationAuthority:
         )
         return _require_sha(_json_body(response, operation="create authority tree").get("sha"), "tree sha")
 
-    def _create_commit(self, parent_sha: str, tree_sha: str, message: str) -> str:
-        response = self.transport.request(
+    def _create_commit(self, parent_sha: str, tree_sha: str, message: str, authority_now: datetime) -> str:
+        identity = {
+            "name": GITOPS_COMMITTER_NAME,
+            "email": GITOPS_COMMITTER_EMAIL,
+            "date": _iso_git_time(authority_now),
+        }
+        payload = {
+            "message": message,
+            "tree": tree_sha,
+            "parents": [parent_sha],
+            "author": identity,
+            "committer": identity,
+        }
+        response = self._request_retryable(
             "POST",
             f"repos/{self.repository}/git/commits",
-            payload={"message": message, "tree": tree_sha, "parents": [parent_sha]},
+            payload=payload,
         )
         return _require_sha(_json_body(response, operation="create authority commit").get("sha"), "commit sha")
-
-    def _advance_ref(self, commit_sha: str) -> None:
-        try:
-            self.transport.request(
-                "PATCH",
-                self._update_ref_endpoint,
-                payload={"sha": commit_sha, "force": False},
-            )
-        except ApiError as exc:
-            lowered = exc.detail.lower()
-            if exc.status == 422 and ("fast forward" in lowered or "fast-forward" in lowered):
-                raise CoordinationRemoteError("COORDINATION_REF_DRIFT", "authority advanced after observation") from exc
-            raise CoordinationRemoteError("COORDINATION_REMOTE_WRITE_FAILED", exc.detail) from exc
 
     def _is_ancestor(self, ancestor_sha: str, head_sha: str) -> bool:
         if ancestor_sha == head_sha:
             return True
-        response = self.transport.request(
+        response = self._request_retryable(
             "GET",
             f"repos/{self.repository}/compare/{ancestor_sha}...{head_sha}",
         )
@@ -307,6 +367,61 @@ class GitHubCoordinationAuthority:
         merge_base = payload.get("merge_base_commit")
         merge_base_sha = merge_base.get("sha") if isinstance(merge_base, dict) else None
         return status in {"ahead", "identical"} and merge_base_sha == ancestor_sha
+
+    def _ref_position(self, commit_sha: str, expected_parent_sha: str) -> str:
+        current_sha, _ = self._read_ref()
+        if current_sha == commit_sha or self._is_ancestor(commit_sha, current_sha):
+            return "applied"
+        if current_sha == expected_parent_sha or self._is_ancestor(current_sha, commit_sha):
+            return "parent-or-stale"
+        return "diverged"
+
+    def _observe_ambiguous_ref_update(self, commit_sha: str, expected_parent_sha: str) -> str:
+        last_position = "unknown"
+        for attempt in range(self.readback_attempts):
+            last_position = self._ref_position(commit_sha, expected_parent_sha)
+            if last_position in {"applied", "diverged"}:
+                return last_position
+            if attempt + 1 < self.readback_attempts and self.readback_retry_seconds:
+                time.sleep(self.readback_retry_seconds)
+        return last_position
+
+    def _advance_ref(self, commit_sha: str, expected_parent_sha: str) -> None:
+        payload = {"sha": commit_sha, "force": False}
+        last_transient: Exception | None = None
+        for patch_attempt in range(self.ref_update_attempts):
+            try:
+                self.transport.request("PATCH", self._update_ref_endpoint, payload=payload)
+                return
+            except ApiError as exc:
+                lowered = exc.detail.lower()
+                if exc.status == 422 and ("fast forward" in lowered or "fast-forward" in lowered):
+                    position = self._observe_ambiguous_ref_update(commit_sha, expected_parent_sha)
+                    if position == "applied":
+                        return
+                    raise CoordinationRemoteError("COORDINATION_REF_DRIFT", "authority advanced to a competing history") from exc
+                if not self._is_transient_api_error(exc):
+                    raise CoordinationRemoteError("COORDINATION_REMOTE_WRITE_FAILED", exc.detail) from exc
+                last_transient = exc
+            except CoordinationRemoteError as exc:
+                if exc.code != "COORDINATION_REMOTE_TIMEOUT":
+                    raise
+                last_transient = exc
+
+            position = self._observe_ambiguous_ref_update(commit_sha, expected_parent_sha)
+            if position == "applied":
+                return
+            if position == "diverged":
+                raise CoordinationRemoteError("COORDINATION_REF_DRIFT", "authority diverged during ambiguous ref update") from last_transient
+            if patch_attempt + 1 < self.ref_update_attempts:
+                if self.transient_retry_seconds:
+                    time.sleep(self.transient_retry_seconds)
+                continue
+            detail = getattr(last_transient, "detail", str(last_transient))
+            raise CoordinationRemoteError(
+                "COORDINATION_REMOTE_WRITE_FAILED",
+                f"ambiguous ref update remained at observed parent after retries: {detail}",
+            ) from last_transient
 
     def _verify_published_transition(self, commit_sha: str, candidate: dict[str, Any]) -> None:
         try:
@@ -323,9 +438,6 @@ class GitHubCoordinationAuthority:
                 last_head = current.head_sha
                 if self._is_ancestor(commit_sha, current.head_sha):
                     return
-                # GitHub can acknowledge the ref update before a subsequent ref read
-                # sees it. If the observed head is still an ancestor of our published
-                # commit, this is bounded read-after-write staleness, not divergence.
                 if self._is_ancestor(current.head_sha, commit_sha):
                     if attempt + 1 < self.readback_attempts and self.readback_retry_seconds:
                         time.sleep(self.readback_retry_seconds)
@@ -365,8 +477,8 @@ class GitHubCoordinationAuthority:
         try:
             blob_sha = self._create_blob(encoded)
             tree_sha = self._create_tree(observed.tree_sha, blob_sha)
-            commit_sha = self._create_commit(observed.head_sha, tree_sha, message.strip())
-            self._advance_ref(commit_sha)
+            commit_sha = self._create_commit(observed.head_sha, tree_sha, message.strip(), observed.authority_now)
+            self._advance_ref(commit_sha, observed.head_sha)
         except CoordinationRemoteError:
             raise
         except ApiError as exc:
