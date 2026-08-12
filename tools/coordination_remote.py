@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -18,6 +19,8 @@ DEFAULT_REPOSITORY = "EAKerber/MobiliPresenter"
 DEFAULT_AUTHORITY_BRANCH = "coordination/leases"
 DEFAULT_STATE_PATH = "ops/coordination/leases.json"
 DEFAULT_GH_TIMEOUT_SECONDS = 30
+DEFAULT_READBACK_ATTEMPTS = 5
+DEFAULT_READBACK_RETRY_SECONDS = 0.25
 
 
 class CoordinationRemoteError(RuntimeError):
@@ -181,11 +184,19 @@ class GitHubCoordinationAuthority:
         repository: str = DEFAULT_REPOSITORY,
         authority_branch: str = DEFAULT_AUTHORITY_BRANCH,
         state_path: str = DEFAULT_STATE_PATH,
+        readback_attempts: int = DEFAULT_READBACK_ATTEMPTS,
+        readback_retry_seconds: float = DEFAULT_READBACK_RETRY_SECONDS,
     ) -> None:
+        if not isinstance(readback_attempts, int) or isinstance(readback_attempts, bool) or readback_attempts <= 0:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "readback_attempts must be positive integer")
+        if not isinstance(readback_retry_seconds, (int, float)) or isinstance(readback_retry_seconds, bool) or readback_retry_seconds < 0:
+            raise CoordinationRemoteError("COORDINATION_REMOTE_CONFIG_INVALID", "readback_retry_seconds must be non-negative")
         self.transport = transport
         self.repository = repository
         self.authority_branch = authority_branch
         self.state_path = state_path
+        self.readback_attempts = readback_attempts
+        self.readback_retry_seconds = float(readback_retry_seconds)
 
     @property
     def _ref_endpoint(self) -> str:
@@ -305,12 +316,29 @@ class GitHubCoordinationAuthority:
                     "COORDINATION_READBACK_MISMATCH",
                     f"state at published commit {commit_sha} differs from candidate",
                 )
-            current = self.observe()
-            if not self._is_ancestor(commit_sha, current.head_sha):
+
+            last_head: str | None = None
+            for attempt in range(self.readback_attempts):
+                current = self.observe()
+                last_head = current.head_sha
+                if self._is_ancestor(commit_sha, current.head_sha):
+                    return
+                # GitHub can acknowledge the ref update before a subsequent ref read
+                # sees it. If the observed head is still an ancestor of our published
+                # commit, this is bounded read-after-write staleness, not divergence.
+                if self._is_ancestor(current.head_sha, commit_sha):
+                    if attempt + 1 < self.readback_attempts and self.readback_retry_seconds:
+                        time.sleep(self.readback_retry_seconds)
+                    continue
                 raise CoordinationRemoteError(
                     "COORDINATION_READBACK_MISMATCH",
-                    f"published commit {commit_sha} is not ancestor of current head {current.head_sha}",
+                    f"published commit {commit_sha} diverges from current head {current.head_sha}",
                 )
+
+            raise CoordinationRemoteError(
+                "COORDINATION_READBACK_STALE",
+                f"published commit {commit_sha} not visible at ref after {self.readback_attempts} observations; last head {last_head}",
+            )
         except CoordinationRemoteError:
             raise
         except ApiError as exc:
