@@ -396,6 +396,14 @@ class GitHubCoordinationAuthority:
             except ApiError as exc:
                 lowered = exc.detail.lower()
                 if exc.status == 422 and ("fast forward" in lowered or "fast-forward" in lowered):
+                    # A clean first-attempt 422 is definitive CAS loss. A 422 only
+                    # becomes ambiguous after an earlier transient PATCH because that
+                    # earlier request may have applied while its response was lost.
+                    if patch_attempt == 0 and last_transient is None:
+                        raise CoordinationRemoteError(
+                            "COORDINATION_REF_DRIFT",
+                            "authority advanced after observation",
+                        ) from exc
                     position = self._observe_ambiguous_ref_update(commit_sha, expected_parent_sha)
                     if position == "applied":
                         return
