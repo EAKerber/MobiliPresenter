@@ -5,6 +5,7 @@ import argparse
 import copy
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,21 @@ from tools.coordination_remote import (  # noqa: E402
 )
 
 ERROR_EXIT = 2
+
+
+def _audit_time(now: datetime | str) -> str:
+    if isinstance(now, str):
+        try:
+            parsed = datetime.fromisoformat(now.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise coordination.CoordinationError("TIME_INVALID", "break-glass authority time is invalid") from exc
+    elif isinstance(now, datetime):
+        parsed = now
+    else:
+        raise coordination.CoordinationError("TIME_INVALID", "break-glass authority time is invalid")
+    if parsed.tzinfo is None:
+        raise coordination.CoordinationError("TIME_INVALID", "break-glass authority time must be timezone-aware")
+    return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def plan_break_glass(
@@ -41,8 +57,8 @@ def plan_break_glass(
         raise coordination.CoordinationError("REASON_INVALID", "break-glass requires a reason")
     if not isinstance(transition_id, str) or not transition_id.strip():
         raise coordination.CoordinationError("TRANSITION_ID_INVALID", "transition_id must be non-empty")
-    if not isinstance(expected_revision, str) or len(expected_revision) != 40:
-        raise coordination.CoordinationError("EXPECTED_REVISION_INVALID", "expected revision must be a commit SHA")
+    if not isinstance(expected_revision, str) or not expected_revision.strip() or len(expected_revision.strip()) != 40:
+        raise coordination.CoordinationError("EXPECTED_REVISION_INVALID", "expected revision must be a 40-character commit SHA")
 
     targets = coordination.normalize_resources(resources)
     if not targets:
@@ -63,8 +79,8 @@ def plan_break_glass(
     event = {
         "action": "break-glass",
         "transitionId": transition_id.strip(),
-        "at": coordination._format_utc(coordination._parse_utc(now)),
-        "expectedRevision": expected_revision,
+        "at": _audit_time(now),
+        "expectedRevision": expected_revision.strip(),
         "admin": admin,
         "reason": reason.strip(),
         "resources": targets,
