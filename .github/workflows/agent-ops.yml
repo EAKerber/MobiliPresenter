@@ -163,3 +163,91 @@ jobs:
             /tmp/coordination-cli-probe.json
             /tmp/coordination-break-probe.json
           if-no-files-found: error
+
+  coordination-parallel-contender:
+    if: github.event_name == 'pull_request' && github.head_ref == 'ops/git-ops-1.3-coordination-leases'
+    needs: coordination-authority-probe
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [ui, engine]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Contend for shared resource
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/coordination_contender.py --role ${{ matrix.role }} --output /tmp/coordination-contender-${{ matrix.role }}.json
+
+      - name: Validate contender evidence
+        run: python -m json.tool /tmp/coordination-contender-${{ matrix.role }}.json > /dev/null
+
+      - name: Upload contender evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: coordination-contender-${{ matrix.role }}
+          path: /tmp/coordination-contender-${{ matrix.role }}.json
+          if-no-files-found: error
+
+  coordination-parallel-reconcile:
+    if: github.event_name == 'pull_request' && github.head_ref == 'ops/git-ops-1.3-coordination-leases'
+    needs: coordination-parallel-contender
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download UI contender evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: coordination-contender-ui
+          path: /tmp/contenders/ui
+
+      - name: Download Engine contender evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: coordination-contender-engine
+          path: /tmp/contenders/engine
+
+      - name: Reconcile parallel contenders
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/coordination_parallel_reconcile.py \
+            --ui /tmp/contenders/ui/coordination-contender-ui.json \
+            --engine /tmp/contenders/engine/coordination-contender-engine.json \
+            --output /tmp/coordination-parallel-reconciliation.json
+
+      - name: Validate reconciliation evidence
+        run: python -m json.tool /tmp/coordination-parallel-reconciliation.json > /dev/null
+
+      - name: Upload reconciliation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: coordination-parallel-reconciliation
+          path: /tmp/coordination-parallel-reconciliation.json
+          if-no-files-found: error
