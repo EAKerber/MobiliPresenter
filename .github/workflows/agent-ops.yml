@@ -5,8 +5,7 @@ on:
     paths:
       - 'AGENTS.md'
       - 'ops/**'
-      - 'tools/agent.py'
-      - 'tools/tests/**'
+      - 'tools/**'
       - 'docs/plans/**'
       - '.github/workflows/agent-ops.yml'
   push:
@@ -17,8 +16,7 @@ on:
     paths:
       - 'AGENTS.md'
       - 'ops/**'
-      - 'tools/agent.py'
-      - 'tools/tests/**'
+      - 'tools/**'
       - 'docs/plans/**'
       - '.github/workflows/agent-ops.yml'
   workflow_dispatch:
@@ -56,6 +54,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python tools/agent.py verify --remote --json
+
+      - name: Generate integration reconcile evidence
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python tools/integration_reconcile.py reconcile-plan "$PR_NUMBER" --json > /tmp/integration-reconcile-plan.json
+          python -m json.tool /tmp/integration-reconcile-plan.json > /dev/null
+
+      - name: Upload integration reconcile evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-reconcile-plan
+          path: /tmp/integration-reconcile-plan.json
+          if-no-files-found: error
 
       - name: Generate handoff evidence
         env:
