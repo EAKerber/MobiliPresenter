@@ -1,23 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "c2bf11991682c802374b0eeaa709c81c04ff7918",
+  "revision": "df353e843be1aaeab90f0a4cb431d2297f2c8788",
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "independent-acquire:31563376899:1:0",
-      "resource": "file:ops/coordination/probes/independent-31563376899-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "ui",
-        "session": "gha-recovery:31563376899:1",
-        "branch": "ui/recovery-probe",
-        "pr": 910002
-      },
-      "reason": "prove independent resource remains available",
-      "acquiredAt": "2026-08-12T04:29:30Z",
-      "renewedAt": "2026-08-12T04:29:30Z",
-      "expiresAt": "2026-08-12T04:30:00Z",
-      "ttlSeconds": 30
-    }
-  ]
+  "leases": []
 }
