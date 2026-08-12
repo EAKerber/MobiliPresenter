@@ -1,6 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": null,
+  "revision": "5ff874a7c509f76c2ce34a36bb5a7c42be018374",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "cas-probe-ui:0",
+      "resource": "file:ops/coordination/probe.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "ui",
+        "session": "cas-probe-ui",
+        "branch": "ui/cas-probe",
+        "pr": null
+      },
+      "reason": "GL13-12 real CAS single-winner probe",
+      "acquiredAt": "2026-08-12T00:49:00Z",
+      "renewedAt": "2026-08-12T00:49:00Z",
+      "expiresAt": "2026-08-12T01:49:00Z",
+      "ttlSeconds": 3600
+    }
+  ]
 }
