@@ -370,9 +370,13 @@ class GitHubCoordinationAuthority:
 
     def _ref_position(self, commit_sha: str, expected_parent_sha: str) -> str:
         current_sha, _ = self._read_ref()
-        if current_sha == commit_sha or self._is_ancestor(commit_sha, current_sha):
+        if current_sha == commit_sha:
             return "applied"
-        if current_sha == expected_parent_sha or self._is_ancestor(current_sha, commit_sha):
+        if current_sha == expected_parent_sha:
+            return "parent-or-stale"
+        if self._is_ancestor(commit_sha, current_sha):
+            return "applied"
+        if self._is_ancestor(current_sha, commit_sha):
             return "parent-or-stale"
         return "diverged"
 
@@ -396,9 +400,6 @@ class GitHubCoordinationAuthority:
             except ApiError as exc:
                 lowered = exc.detail.lower()
                 if exc.status == 422 and ("fast forward" in lowered or "fast-forward" in lowered):
-                    # A clean first-attempt 422 is definitive CAS loss. A 422 only
-                    # becomes ambiguous after an earlier transient PATCH because that
-                    # earlier request may have applied while its response was lost.
                     if patch_attempt == 0 and last_transient is None:
                         raise CoordinationRemoteError(
                             "COORDINATION_REF_DRIFT",
