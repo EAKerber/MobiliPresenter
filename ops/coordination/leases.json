@@ -1,6 +1,23 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "6a531f646dd0077d094df51cd6a3514cc08ff683",
+  "revision": "3dd76cdaf7856b64de390a9c70ef43f520155400",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "gha-acquire:31563944402:1:0",
+      "resource": "file:ops/coordination/probes/gha-31563944402-1.shared",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "gitops",
+        "session": "gha:31563944402:1",
+        "branch": "ops/git-ops-1.3-coordination-leases",
+        "pr": 32
+      },
+      "reason": "GitHub Actions live adapter probe",
+      "acquiredAt": "2026-08-12T04:39:29Z",
+      "renewedAt": "2026-08-12T04:39:29Z",
+      "expiresAt": "2026-08-12T04:44:29Z",
+      "ttlSeconds": 300
+    }
+  ]
 }
