@@ -6,6 +6,7 @@ on:
       - 'AGENTS.md'
       - 'ops/**'
       - 'tools/agent.py'
+      - 'tools/coordination*.py'
       - 'tools/tests/**'
       - 'docs/plans/**'
       - '.github/workflows/agent-ops.yml'
@@ -18,6 +19,7 @@ on:
       - 'AGENTS.md'
       - 'ops/**'
       - 'tools/agent.py'
+      - 'tools/coordination*.py'
       - 'tools/tests/**'
       - 'docs/plans/**'
       - '.github/workflows/agent-ops.yml'
@@ -69,4 +71,43 @@ jobs:
         with:
           name: agent-ops-handoff
           path: /tmp/agent-handoff.json
+          if-no-files-found: error
+
+  coordination-authority-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'ops/git-ops-1.3-coordination-leases'
+    needs: verify
+    runs-on: ubuntu-latest
+    concurrency:
+      group: mobilipresenter-coordination-authority-probe
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Live authority adapter probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COORDINATION_PROBE_OUTPUT: /tmp/coordination-live-probe.json
+        run: python tools/coordination_probe.py
+
+      - name: Validate probe evidence
+        run: python -m json.tool /tmp/coordination-live-probe.json > /dev/null
+
+      - name: Upload coordination probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: coordination-live-probe
+          path: /tmp/coordination-live-probe.json
           if-no-files-found: error
