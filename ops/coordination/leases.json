@@ -1,6 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "f14ab91994aef3d52ea49848c31d27ddde9057d5",
+  "revision": "a17d6540da8396e040238ac802ef019de0b6d71b",
   "intents": [],
   "leases": [
     {
@@ -17,22 +17,6 @@
       "acquiredAt": "2026-08-12T05:06:24Z",
       "renewedAt": "2026-08-12T05:06:24Z",
       "expiresAt": "2026-08-12T05:08:24Z",
-      "ttlSeconds": 120
-    },
-    {
-      "leaseId": "peer-acquire:31565370985:1:0",
-      "resource": "file:ops/coordination/probes/independent-31565370985-1.shared",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "ui",
-        "session": "gha-peer:31565370985:1",
-        "branch": "ui/independent-probe",
-        "pr": 910002
-      },
-      "reason": "prove independent resource remains available",
-      "acquiredAt": "2026-08-12T05:06:27Z",
-      "renewedAt": "2026-08-12T05:06:27Z",
-      "expiresAt": "2026-08-12T05:08:27Z",
       "ttlSeconds": 120
     }
   ]
