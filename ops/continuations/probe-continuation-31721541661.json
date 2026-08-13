@@ -1,8 +1,8 @@
 {
   "schemaVersion": "ContinuationState 0.1",
   "id": "probe-continuation-31721541661",
-  "actor": "probe-ui",
-  "status": "HANDOFF",
+  "actor": "probe-engine",
+  "status": "IN_PROGRESS",
   "branch": null,
   "prNumber": null,
   "completed": [],
@@ -15,5 +15,5 @@
     "checkpoint": null
   },
   "blockedBy": [],
-  "handoffTo": "probe-engine"
+  "handoffTo": null
 }
