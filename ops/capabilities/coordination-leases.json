@@ -3,20 +3,8 @@
   "id": "coordination-leases",
   "policy": "experimental",
   "gates": {
-    "backlog": [
-      {
-        "id": "formal-rollback",
-        "test": "Demonstrate a formal rollback from experimental Coordination Leases to the canonical GitOps path without semantic product mutation."
-      },
-      {
-        "id": "official-cli-surface",
-        "test": "Decide and validate the supported CLI surface for Coordination Leases: keep tools/lock.py or route the capability through tools/agent.py lock."
-      }
-    ],
-    "next": [
-      "formal-rollback",
-      "official-cli-surface"
-    ]
+    "backlog": [],
+    "next": []
   },
   "roundsWithoutActiveGates": 0,
   "maxRoundsWithoutActiveGates": 3,
