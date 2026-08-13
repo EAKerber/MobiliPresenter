@@ -37,13 +37,27 @@ python3 tools/capability_lifecycle.py <transition> ... --json
 
 Essa superfície é plan-only por padrão. Aplicação exige `--expected-plan <planHash> --apply`; estado observado diferente invalida o plano. Evidências de transição em `ops/evidence/capability-gates/**` são append-only e a CI deve conseguir reproduzir a mudança de estado a partir delas.
 
-Antes de uma decisão supervisora, agendada ou de reconciliação global, produzir uma inspeção derivada read-only:
+Estado de continuação vivo, destinado a sobreviver à perda de chat/sessão, é observado na authority Git dedicada:
+
+```bash
+python3 tools/continuation_live.py list --json
+```
+
+A authority canônica é `coordination/continuations`. `tools/continuation.py` fornece o modelo/planner local e não substitui a authority viva. Mutações remotas via `tools/continuation_live.py` são plan-only por padrão e aplicação exige `--expected-plan <planHash> --apply`. Cada continuation representa uma frente de trabalho persistente; não é fila global, scheduler ou mecanismo de prioridade.
+
+Antes de uma decisão supervisora agendada ou de reconciliação global que precise enxergar continuations vivas, usar:
+
+```bash
+python3 tools/maintenance_live.py --json
+```
+
+Para inspeção base/rollback sem depender da authority de continuations, permanece disponível:
 
 ```bash
 python3 tools/maintenance_inspect.py --remote --json
 ```
 
-`MaintenanceInspection` cruza ProjectState, verificação, capabilities/Gates, PR/CI e Coordination Leases quando observáveis. Sua `recommendation` é estritamente operacional (`CONTINUE`, `RECONCILE`, `HANDOFF`, `PAUSE`, `NEEDS_HUMAN`), não concede autoridade semântica sobre produto. `HANDOFF` só pode ser recomendado quando existir estado de continuação/tarefa suficiente para justificá-lo; ausência dessa evidência não deve ser inferida.
+`MaintenanceInspection` cruza ProjectState, verificação, capabilities/Gates, PR/CI, Coordination Leases e, na superfície live, Continuation State. Sua `recommendation` é estritamente operacional (`CONTINUE`, `RECONCILE`, `HANDOFF`, `PAUSE`, `NEEDS_HUMAN`) e não concede autoridade semântica sobre produto. `HANDOFF` só pode ser recomendado a partir de estado de continuação explícito e observável; não deve ser inferido da ausência de atividade em um chat.
 
 Antes de uma transição significativa ou quando houver suspeita de divergência:
 
@@ -84,6 +98,8 @@ Autoridades:
 - estado operacional corrente: `ops/state/project.json`;
 - policy e Gates de capabilities operacionais: `ops/capabilities/*.json`;
 - evidência de transições de lifecycle: `ops/evidence/capability-gates/**` + histórico Git;
+- ownership temporário de escrita: `coordination/leases`;
+- estado vivo de continuidade entre sessões/chats: `coordination/continuations`;
 - autoridades específicas de uma capability: contratos/ADRs aceitos e a autoridade indicada pela própria capability/tooling observável;
 - artefato/publicação corrente: manifesto apontado por `published.artifactManifest` no estado operacional;
 - regras permanentes: este arquivo;
@@ -119,7 +135,8 @@ Regras:
 10. disponibilidade de uma capability não equivale a policy canônica nem amplia autoridade semântica do agente;
 11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido;
 12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente;
-13. uma decisão supervisora deve ser derivada de sensores observáveis. `CONTINUE` significa apenas ausência de impedimento operacional conhecido; não equivale a aprovação semântica da próxima mudança.
+13. uma decisão supervisora deve ser derivada de sensores observáveis. `CONTINUE` significa apenas ausência de impedimento operacional conhecido; não equivale a aprovação semântica da próxima mudança;
+14. continuidade entre chats depende de estado persistente na authority `coordination/continuations`, não da memória de um chat, de arquivos não publicados no checkout local ou da mera existência de uma branch de trabalho.
 
 ## 4. Protocolo Git determinístico
 
