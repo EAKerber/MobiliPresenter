@@ -54,6 +54,20 @@ jobs:
           name: maintenance-inspection
           path: /tmp/maintenance-inspection.json
           if-no-files-found: error
+      - name: Generate live supervisor inspection
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/maintenance_live.py --json > /tmp/live-supervisor-inspection.json
+          python -m json.tool /tmp/live-supervisor-inspection.json > /dev/null
+      - name: Upload live supervisor inspection
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-supervisor-inspection
+          path: /tmp/live-supervisor-inspection.json
+          if-no-files-found: error
       - name: Generate integration reconcile evidence
         if: github.event_name == 'pull_request'
         env:
@@ -80,39 +94,4 @@ jobs:
         with:
           name: agent-ops-handoff
           path: /tmp/agent-handoff.json
-          if-no-files-found: error
-
-  continuation-authority-probe:
-    if: github.event_name == 'pull_request' && github.head_ref == 'ops/git-ops-continuation-state-0.1'
-    needs: verify
-    runs-on: ubuntu-latest
-    concurrency:
-      group: mobilipresenter-continuation-authority-probe
-      cancel-in-progress: false
-    permissions:
-      actions: read
-      contents: write
-      pull-requests: read
-    steps:
-      - name: Checkout PR head
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Live continuation authority probe
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CONTINUATION_PROBE_OUTPUT: /tmp/continuation-authority-probe.json
-        run: python tools/continuation_probe.py
-      - name: Validate continuation probe evidence
-        run: python -m json.tool /tmp/continuation-authority-probe.json > /dev/null
-      - name: Upload continuation probe evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: continuation-authority-probe
-          path: /tmp/continuation-authority-probe.json
           if-no-files-found: error
