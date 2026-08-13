@@ -21,6 +21,14 @@ Quando a capacidade do ambiente for relevante:
 python3 tools/agent.py doctor
 ```
 
+Antes de inferir capacidades operacionais pelo histórico, por nome de versão ou pela mera existência de arquivos, observar o discovery corrente:
+
+```bash
+python3 tools/capability_gates.py list --json
+```
+
+A existência de uma capability não implica uso obrigatório. Sua `policy`, Gates e autoridades observáveis determinam se ela é canônica, experimental, desabilitada ou sujeita a revisão.
+
 Antes de uma transição significativa ou quando houver suspeita de divergência:
 
 ```bash
@@ -51,13 +59,15 @@ Antes de qualquer sanitização de branches, gerar primeiro um plano read-only:
 python3 tools/agent.py git prune-plan --json
 ```
 
-`git prune-plan` nunca apaga refs no Git Ops 1.2. O plano contém um `planHash`; qualquer drift de branch invalida o plano. Se PRs abertas não puderem ser observadas, `applyEligible` deve permanecer `false`.
+No estado canônico atual, `git prune-plan` é somente leitura. O plano contém um `planHash`; qualquer drift de branch invalida o plano. Se PRs abertas não puderem ser observadas, `applyEligible` deve permanecer `false`. Capacidades futuras de aplicação destrutiva, se existirem, devem ser descobertas e validadas no estado corrente em vez de inferidas por número de versão.
 
 `status`, `verify` e `handoff` aceitam `--remote`; quando `gh` não estiver disponível, estado remoto desconhecido deve permanecer `unknown`, nunca ser inventado como green.
 
 Autoridades:
 
 - estado operacional corrente: `ops/state/project.json`;
+- policy e Gates de capabilities operacionais: `ops/capabilities/*.json`;
+- autoridades específicas de uma capability: contratos/ADRs aceitos e a autoridade indicada pela própria capability/tooling observável;
 - artefato/publicação corrente: manifesto apontado por `published.artifactManifest` no estado operacional;
 - regras permanentes: este arquivo;
 - decisões arquiteturais: ADRs e documentação explicativa;
@@ -86,7 +96,9 @@ Regras:
 6. checkpoint deve acompanhar transições reais para impedir drift entre `ops/state/project.json`, PR e execução;
 7. `handoff` é snapshot derivado e nunca substitui as autoridades acima;
 8. quando não existe recorte Developer ativo, `activeDevelopmentBranch` e `development.prNumber` devem permanecer `null`; branches paralelas preservadas não assumem implicitamente esse papel;
-9. sanitização destrutiva de branches exige plano previamente observado e aprovação humana; a ausência de observação de PRs abertas bloqueia aplicação.
+9. sanitização destrutiva de branches exige plano previamente observado e aprovação humana; a ausência de observação de PRs abertas bloqueia aplicação;
+10. disponibilidade de uma capability não equivale a policy canônica nem amplia autoridade semântica do agente;
+11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido.
 
 ## 4. Protocolo Git determinístico
 
@@ -99,7 +111,7 @@ Regras:
 7. Acknowledgement do conector não é prova suficiente de conclusão. Divergência implica interrupção; não presumir sucesso nem repetir cegamente a operação.
 8. `main` representa a versão publicada pelo Netlify. Mudanças devem preservar um estado implantável, identificável e reversível.
 9. A branch de desenvolvimento ativa e a próxima transição devem ser consultadas em `ops/state/project.json`, em vez de serem duplicadas aqui.
-10. Branches em `git.preserveBranches`, heads de PRs abertas, rollback e âncoras `archive/*` são protegidas de poda até mudança explícita do estado/política.
+10. Branches em `git.preserveBranches`, heads de PRs abertas, autoridades operacionais, rollback e âncoras `archive/*` são protegidas de poda até mudança explícita do estado/política.
 
 ## 5. Integridade de domínio
 
