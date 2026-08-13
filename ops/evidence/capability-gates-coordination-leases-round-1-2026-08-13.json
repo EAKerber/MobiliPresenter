@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "CapabilityGateRoundEvidence 0.1",
+  "id": "coordination-leases",
+  "round": 1,
+  "experimentalHead": "99d26f9ed3bc94225192877e218030f4fdc63ea5",
+  "agentOpsRun": 31703559933,
+  "gates": [
+    {
+      "id": "formal-rollback",
+      "result": "passed",
+      "evidence": [
+        "tools/tests/test_coordination_rollback.py::test_canonical_gitops_survives_coordination_removal",
+        "Agent Ops run 31703559933"
+      ]
+    },
+    {
+      "id": "official-cli-surface",
+      "result": "passed",
+      "decision": "tools/lock.py",
+      "evidence": [
+        "ops/evidence/git-ops-1.3-cli-surface-decision-2026-08-13.json on experimental head",
+        "tools/tests/test_coordination_rollback.py::test_cli_surface_decision_points_to_existing_dedicated_tool",
+        "tools/tests/test_lock_cli.py",
+        "tools/coordination_cli_probe.py"
+      ]
+    }
+  ],
+  "activeGatesWereTested": true,
+  "emptyRoundIncremented": false,
+  "result": "backlog-empty",
+  "next": "decide-promotion-or-record-valid-deferral"
+}
