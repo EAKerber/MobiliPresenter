@@ -1,25 +1,21 @@
 """Git-backed remote authority for live Continuation State."""
 from __future__ import annotations
-import base64, json
+import base64,json,time
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 from tools import continuation
-from tools.coordination_remote import ApiError, GhApiTransport
-
-DEFAULT_REPOSITORY="EAKerber/MobiliPresenter"; DEFAULT_BRANCH="coordination/continuations"; DEFAULT_DIR="ops/continuations"
-
+from tools.coordination_remote import ApiError,GhApiTransport
+DEFAULT_REPOSITORY="EAKerber/MobiliPresenter"; DEFAULT_BRANCH="coordination/continuations"; DEFAULT_DIR="ops/continuations"; DEFAULT_READBACK_ATTEMPTS=5; DEFAULT_READBACK_RETRY_SECONDS=0.25
 class ContinuationRemoteError(RuntimeError):
     def __init__(self,code,detail=""):
         self.code=code; self.detail=detail; super().__init__(f"{code}:{detail}" if detail else code)
-
 @dataclass(frozen=True)
 class Observation:
     head_sha:str; tree_sha:str; items:dict[str,dict[str,Any]]
-
 class GitHubContinuationAuthority:
-    def __init__(self,transport=None,repository=DEFAULT_REPOSITORY,authority_branch=DEFAULT_BRANCH,state_dir=DEFAULT_DIR):
-        self.transport=transport or GhApiTransport(); self.repository=repository; self.authority_branch=authority_branch; self.state_dir=state_dir
+    def __init__(self,transport=None,repository=DEFAULT_REPOSITORY,authority_branch=DEFAULT_BRANCH,state_dir=DEFAULT_DIR,readback_attempts=DEFAULT_READBACK_ATTEMPTS,readback_retry_seconds=DEFAULT_READBACK_RETRY_SECONDS):
+        self.transport=transport or GhApiTransport(); self.repository=repository; self.authority_branch=authority_branch; self.state_dir=state_dir; self.readback_attempts=readback_attempts; self.readback_retry_seconds=readback_retry_seconds
     @property
     def ref_endpoint(self): return f"repos/{self.repository}/git/ref/heads/{quote(self.authority_branch,safe='')}"
     @property
@@ -51,8 +47,7 @@ class GitHubContinuationAuthority:
         if errors: raise ContinuationRemoteError(errors[0],cid)
         return value
     def observe(self):
-        head=self._head(); tree=self._tree(head)
-        endpoint=f"repos/{self.repository}/contents/{quote(self.state_dir,safe='/')}?ref={quote(head,safe='')}"
+        head=self._head(); tree=self._tree(head); endpoint=f"repos/{self.repository}/contents/{quote(self.state_dir,safe='/')}?ref={quote(head,safe='')}"
         try: response=self.transport.request("GET",endpoint); listing=self._json(response,"list continuations")
         except ApiError as exc:
             if exc.status==404: return Observation(head,tree,{})
@@ -65,24 +60,23 @@ class GitHubContinuationAuthority:
                 cid=name[:-5]; value=self._read_task(cid,head)
                 if value is not None: items[cid]=value
         return Observation(head,tree,items)
-    def plan_for(self,cid,planner):
-        observed=self.observe(); before=observed.items.get(cid); planned=planner(before)
-        return observed,planned
     def apply(self,planned,expected_plan):
         if planned.get("planHash")!=expected_plan: raise ContinuationRemoteError("CONTINUATION_PLAN_HASH_MISMATCH")
         observed=self.observe(); current=observed.items.get(planned["id"])
         if continuation.state_hash(current)!=planned.get("beforeStateHash"): raise ContinuationRemoteError("CONTINUATION_PLAN_STALE")
         content=json.dumps(planned["after"],indent=2,ensure_ascii=False)+"\n"
         blob=self._sha(self._json(self.transport.request("POST",f"repos/{self.repository}/git/blobs",payload={"content":content,"encoding":"utf-8"}),"create blob").get("sha"),"blob")
-        path=f"{self.state_dir}/{planned['id']}.json"
-        tree_payload={"base_tree":observed.tree_sha,"tree":[{"path":path,"mode":"100644","type":"blob","sha":blob}]}
+        path=f"{self.state_dir}/{planned['id']}.json"; tree_payload={"base_tree":observed.tree_sha,"tree":[{"path":path,"mode":"100644","type":"blob","sha":blob}]}
         tree=self._sha(self._json(self.transport.request("POST",f"repos/{self.repository}/git/trees",payload=tree_payload),"create tree").get("sha"),"tree")
         commit_payload={"message":f"continuation: {planned['action']} {planned['id']}","tree":tree,"parents":[observed.head_sha]}
         commit=self._sha(self._json(self.transport.request("POST",f"repos/{self.repository}/git/commits",payload=commit_payload),"create commit").get("sha"),"commit")
         try: self.transport.request("PATCH",self.update_endpoint,payload={"sha":commit,"force":False})
         except ApiError as exc: raise ContinuationRemoteError("CONTINUATION_CAS_LOST",exc.detail) from exc
-        readback=self.observe()
-        if readback.head_sha!=commit: raise ContinuationRemoteError("CONTINUATION_READBACK_HEAD_MISMATCH")
-        value=readback.items.get(planned["id"])
-        if continuation.state_hash(value)!=planned.get("afterStateHash"): raise ContinuationRemoteError("CONTINUATION_READBACK_STATE_MISMATCH")
-        return {"ok":True,"applied":True,"authorityBranch":self.authority_branch,"beforeSha":observed.head_sha,"afterSha":commit,"id":planned["id"],"action":planned["action"],"planHash":planned["planHash"],"stateHash":planned["afterStateHash"]}
+        last=None
+        for attempt in range(self.readback_attempts):
+            readback=self.observe(); last=readback; value=readback.items.get(planned["id"])
+            if continuation.state_hash(value)==planned.get("afterStateHash"):
+                return {"ok":True,"applied":True,"authorityBranch":self.authority_branch,"beforeSha":observed.head_sha,"commitSha":commit,"readbackHead":readback.head_sha,"id":planned["id"],"action":planned["action"],"planHash":planned["planHash"],"stateHash":planned["afterStateHash"]}
+            if attempt+1<self.readback_attempts: time.sleep(self.readback_retry_seconds)
+        if last is not None and last.head_sha==observed.head_sha: raise ContinuationRemoteError("CONTINUATION_READBACK_HEAD_STALE")
+        raise ContinuationRemoteError("CONTINUATION_READBACK_STATE_MISMATCH")
