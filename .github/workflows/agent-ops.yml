@@ -95,3 +95,43 @@ jobs:
           name: agent-ops-handoff
           path: /tmp/agent-handoff.json
           if-no-files-found: error
+
+  scheduler-planner-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'ops/git-ops-scheduler-supervisor-0.1-planner'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build live Scheduler plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/scheduler_plan.py --live --json > /tmp/scheduler-plan.json
+          python -m json.tool /tmp/scheduler-plan.json > /dev/null
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/scheduler-plan.json'))
+          assert p['readOnly'] is True
+          assert p['transportSideEffects'] is False
+          assert p['semanticAuthority'] is False
+          assert p['dispatch']['channelClass'] in {'worker','supervisor','human','none'}
+          PY
+      - name: Upload Scheduler plan evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduler-plan-probe
+          path: /tmp/scheduler-plan.json
+          if-no-files-found: error
