@@ -37,6 +37,14 @@ python3 tools/capability_lifecycle.py <transition> ... --json
 
 Essa superfície é plan-only por padrão. Aplicação exige `--expected-plan <planHash> --apply`; estado observado diferente invalida o plano. Evidências de transição em `ops/evidence/capability-gates/**` são append-only e a CI deve conseguir reproduzir a mudança de estado a partir delas.
 
+Antes de uma decisão supervisora, agendada ou de reconciliação global, produzir uma inspeção derivada read-only:
+
+```bash
+python3 tools/maintenance_inspect.py --remote --json
+```
+
+`MaintenanceInspection` cruza ProjectState, verificação, capabilities/Gates, PR/CI e Coordination Leases quando observáveis. Sua `recommendation` é estritamente operacional (`CONTINUE`, `RECONCILE`, `HANDOFF`, `PAUSE`, `NEEDS_HUMAN`), não concede autoridade semântica sobre produto. `HANDOFF` só pode ser recomendado quando existir estado de continuação/tarefa suficiente para justificá-lo; ausência dessa evidência não deve ser inferida.
+
 Antes de uma transição significativa ou quando houver suspeita de divergência:
 
 ```bash
@@ -83,6 +91,8 @@ Autoridades:
 - histórico: Git;
 - PR/CI: GitHub observado, não duplicado em arquivo local.
 
+`MaintenanceInspection`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
+
 Não promover automaticamente permissões ou autorizações efêmeras de um chat para política permanente do repositório.
 
 ## 3. Contrato operacional
@@ -108,7 +118,8 @@ Regras:
 9. sanitização destrutiva de branches exige plano previamente observado e aprovação humana; a ausência de observação de PRs abertas bloqueia aplicação;
 10. disponibilidade de uma capability não equivale a policy canônica nem amplia autoridade semântica do agente;
 11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido;
-12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente.
+12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente;
+13. uma decisão supervisora deve ser derivada de sensores observáveis. `CONTINUE` significa apenas ausência de impedimento operacional conhecido; não equivale a aprovação semântica da próxima mudança.
 
 ## 4. Protocolo Git determinístico
 
