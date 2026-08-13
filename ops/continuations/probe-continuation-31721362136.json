@@ -5,14 +5,14 @@
   "status": "IN_PROGRESS",
   "branch": null,
   "prNumber": null,
-  "completed": [],
-  "remaining": [
+  "completed": [
     "probe"
   ],
-  "nextAction": "resume and finish probe",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "5f6df10c92b30bca0af7cf99210bc0d636544c2c",
+    "checkpoint": "probe-finished"
   },
   "blockedBy": [],
   "handoffTo": null
