@@ -43,6 +43,14 @@ jobs:
       - name: Toolbox unit tests
         run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
 
+      - name: Capability lifecycle guard
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/capability_gates_ci.py \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --json
+
       - name: Doctor
         run: python tools/agent.py doctor --json
 
