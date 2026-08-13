@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/capability-gates-0.1.json",
+  "title": "CapabilityGates 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "policy",
+    "gates",
+    "roundsWithoutActiveGates",
+    "maxRoundsWithoutActiveGates",
+    "deferReason"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "CapabilityGates 0.1"},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "policy": {
+      "type": "string",
+      "enum": ["experimental", "canonical", "deprecated", "disabled"]
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backlog", "next"],
+      "properties": {
+        "backlog": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "test"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+              "test": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "next": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "roundsWithoutActiveGates": {"type": "integer", "minimum": 0},
+    "maxRoundsWithoutActiveGates": {"type": "integer", "minimum": 1},
+    "deferReason": {
+      "type": ["string", "null"],
+      "minLength": 1
+    }
+  }
+}
