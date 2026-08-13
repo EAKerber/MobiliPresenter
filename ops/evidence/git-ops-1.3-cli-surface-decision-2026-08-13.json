@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "CoordinationCliSurfaceDecision 0.1",
+  "capability": "coordination-leases",
+  "decision": "keep-tools-lock-py",
+  "officialExperimentalEntrypoint": "tools/lock.py",
+  "agentPyWrapperRequired": false,
+  "rationale": [
+    "Capability discovery can expose a dedicated entrypoint without duplicating command parsing in tools/agent.py.",
+    "Keeping tools/agent.py focused on canonical GitOps avoids coupling the canonical bootstrap to an experimental capability.",
+    "Existing unit and live CLI probes already exercise tools/lock.py directly.",
+    "If the capability is promoted later, tools/agent.py may discover or route to it without making a wrapper a prerequisite for promotion."
+  ],
+  "validation": {
+    "unitSuite": "tools/tests/test_lock_cli.py",
+    "liveProbe": "tools/coordination_cli_probe.py",
+    "status": "validated-on-experimental-branch"
+  },
+  "supersedesProvisionalPlan": "Phase 3 target that required wiring lock commands into tools/agent.py before promotion."
+}
