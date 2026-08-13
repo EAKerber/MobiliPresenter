@@ -29,6 +29,14 @@ python3 tools/capability_gates.py list --json
 
 A existência de uma capability não implica uso obrigatório. Sua `policy`, Gates e autoridades observáveis determinam se ela é canônica, experimental, desabilitada ou sujeita a revisão.
 
+Mutações do lifecycle de capabilities experimentais usam a superfície transacional:
+
+```bash
+python3 tools/capability_lifecycle.py <transition> ... --json
+```
+
+Essa superfície é plan-only por padrão. Aplicação exige `--expected-plan <planHash> --apply`; estado observado diferente invalida o plano. Evidências de transição em `ops/evidence/capability-gates/**` são append-only e a CI deve conseguir reproduzir a mudança de estado a partir delas.
+
 Antes de uma transição significativa ou quando houver suspeita de divergência:
 
 ```bash
@@ -67,6 +75,7 @@ Autoridades:
 
 - estado operacional corrente: `ops/state/project.json`;
 - policy e Gates de capabilities operacionais: `ops/capabilities/*.json`;
+- evidência de transições de lifecycle: `ops/evidence/capability-gates/**` + histórico Git;
 - autoridades específicas de uma capability: contratos/ADRs aceitos e a autoridade indicada pela própria capability/tooling observável;
 - artefato/publicação corrente: manifesto apontado por `published.artifactManifest` no estado operacional;
 - regras permanentes: este arquivo;
@@ -98,7 +107,8 @@ Regras:
 8. quando não existe recorte Developer ativo, `activeDevelopmentBranch` e `development.prNumber` devem permanecer `null`; branches paralelas preservadas não assumem implicitamente esse papel;
 9. sanitização destrutiva de branches exige plano previamente observado e aprovação humana; a ausência de observação de PRs abertas bloqueia aplicação;
 10. disponibilidade de uma capability não equivale a policy canônica nem amplia autoridade semântica do agente;
-11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido.
+11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido;
+12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente.
 
 ## 4. Protocolo Git determinístico
 
