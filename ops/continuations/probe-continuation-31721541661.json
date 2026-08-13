@@ -2,18 +2,18 @@
   "schemaVersion": "ContinuationState 0.1",
   "id": "probe-continuation-31721541661",
   "actor": "probe-ui",
-  "status": "READY",
+  "status": "HANDOFF",
   "branch": null,
   "prNumber": null,
   "completed": [],
   "remaining": [
     "probe"
   ],
-  "nextAction": "handoff probe",
+  "nextAction": "resume and finish probe",
   "lastKnownGood": {
     "sha": null,
     "checkpoint": null
   },
   "blockedBy": [],
-  "handoffTo": null
+  "handoffTo": "probe-engine"
 }
