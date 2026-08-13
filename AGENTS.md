@@ -59,6 +59,14 @@ python3 tools/maintenance_inspect.py --remote --json
 
 `MaintenanceInspection` cruza ProjectState, verificação, capabilities/Gates, PR/CI, Coordination Leases e, na superfície live, Continuation State. Sua `recommendation` é estritamente operacional (`CONTINUE`, `RECONCILE`, `HANDOFF`, `PAUSE`, `NEEDS_HUMAN`) e não concede autoridade semântica sobre produto. `HANDOFF` só pode ser recomendado a partir de estado de continuação explícito e observável; não deve ser inferido da ausência de atividade em um chat.
 
+Para transformar a inspeção live em um plano determinístico de roteamento, usar:
+
+```bash
+python3 tools/scheduler_plan.py --live --json
+```
+
+`SchedulerPlan` é read-only e não envia mensagens, cria timers ou acorda chats por si só. `HANDOFF` só roteia para `handoffTo` explícito; `CONTINUE` com continuation explícita só roteia para seu `actor`; `CONTINUE` sem continuation volta ao `gitops-supervisor` para atribuição, sem inferir UI/Engine. `RECONCILE` vai ao supervisor, `PAUSE` não gera wake e `NEEDS_HUMAN` aponta somente para humano. A camada de transporte/wake é separada e deve validar o `SchedulerPlan` sem alterar sua decisão.
+
 Antes de uma transição significativa ou quando houver suspeita de divergência:
 
 ```bash
@@ -107,7 +115,7 @@ Autoridades:
 - histórico: Git;
 - PR/CI: GitHub observado, não duplicado em arquivo local.
 
-`MaintenanceInspection`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
+`MaintenanceInspection`, `SchedulerPlan`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
 
 Não promover automaticamente permissões ou autorizações efêmeras de um chat para política permanente do repositório.
 
@@ -136,7 +144,8 @@ Regras:
 11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido;
 12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente;
 13. uma decisão supervisora deve ser derivada de sensores observáveis. `CONTINUE` significa apenas ausência de impedimento operacional conhecido; não equivale a aprovação semântica da próxima mudança;
-14. continuidade entre chats depende de estado persistente na authority `coordination/continuations`, não da memória de um chat, de arquivos não publicados no checkout local ou da mera existência de uma branch de trabalho.
+14. continuidade entre chats depende de estado persistente na authority `coordination/continuations`, não da memória de um chat, de arquivos não publicados no checkout local ou da mera existência de uma branch de trabalho;
+15. o Scheduler planner somente deriva roteamento da inspeção validada; não cria autoridade semântica, não escolhe papel por conteúdo do produto e não realiza transporte como efeito colateral.
 
 ## 4. Protocolo Git determinístico
 
