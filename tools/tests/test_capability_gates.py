@@ -88,17 +88,16 @@ class CapabilityGates01Tests(unittest.TestCase):
         third = capability_gates.build_review_plan(changed)
         self.assertNotEqual(first["planHash"], third["planHash"])
 
-    def test_repository_pilot_is_discoverable_with_completed_round_one(self):
+    def test_repository_capability_is_canonical_after_promotion(self):
         discovered = {value["id"]: value for value in capability_gates.discover_capabilities()}
         self.assertIn("coordination-leases", discovered)
-        pilot = discovered["coordination-leases"]
-        self.assertEqual(capability_gates.validate_capability(pilot, expected_id="coordination-leases"), [])
-        plan = capability_gates.build_review_plan(pilot)
-        self.assertEqual(plan["action"], "REVIEW_EMPTY_ROUND")
+        capability = discovered["coordination-leases"]
+        self.assertEqual(capability_gates.validate_capability(capability, expected_id="coordination-leases"), [])
+        self.assertEqual(capability["policy"], "canonical")
+        plan = capability_gates.build_review_plan(capability)
+        self.assertEqual(plan["action"], "NO_EXPERIMENTAL_REVIEW")
         self.assertEqual(plan["backlog"], [])
         self.assertEqual(plan["nextGates"], [])
-        self.assertEqual(plan["roundsWithoutActiveGates"], 0)
-        self.assertIsNone(plan["deferReason"])
 
 
 if __name__ == "__main__":

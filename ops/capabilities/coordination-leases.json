@@ -1,7 +1,7 @@
 {
   "schemaVersion": "CapabilityGates 0.1",
   "id": "coordination-leases",
-  "policy": "experimental",
+  "policy": "canonical",
   "gates": {
     "backlog": [],
     "next": []
