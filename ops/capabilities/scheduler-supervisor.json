@@ -1,17 +1,13 @@
 {
-  "schemaVersion": "CapabilityGates 0.1",
-  "id": "scheduler-supervisor",
-  "policy": "experimental",
-  "gates": {
-    "backlog": [
-      {"id":"inspection-integrity","test":"prove scheduler rejects tampered or unsupported MaintenanceInspection and binds its plan to inspectionHash"},
-      {"id":"non-actionable-no-wake","test":"prove PAUSE produces no wake and NEEDS_HUMAN routes only to human while RECONCILE routes only to GitOps supervisor"},
-      {"id":"routing-contract","test":"prove HANDOFF routes only to explicit handoffTo and continuation CONTINUE routes only to explicit actor; generic CONTINUE stays with supervisor for assignment"},
-      {"id":"transport-boundary","test":"prove Scheduler v0 planner has no Gmail, Automation, timer or worker-send side effect and only emits a read-only deterministic plan"}
-    ],
-    "next": ["inspection-integrity","non-actionable-no-wake","routing-contract","transport-boundary"]
-  },
-  "roundsWithoutActiveGates": 0,
-  "maxRoundsWithoutActiveGates": 3,
-  "deferReason": null
+  "schemaVersion":"CapabilityGates 0.1",
+  "id":"scheduler-supervisor",
+  "policy":"experimental",
+  "gates":{"backlog":[
+    {"id":"inspection-integrity","test":"prove scheduler rejects tampered or unsupported MaintenanceInspection and binds its plan to inspectionHash"},
+    {"id":"non-actionable-no-wake","test":"prove PAUSE produces no wake and NEEDS_HUMAN routes only to human while RECONCILE routes only to GitOps supervisor"},
+    {"id":"rollback","test":"prove canonical GitOps, Maintenance Inspect and Continuation State remain operational when Scheduler planner modules are absent"},
+    {"id":"routing-contract","test":"prove HANDOFF routes only to explicit handoffTo and continuation CONTINUE routes only to explicit actor; generic CONTINUE stays with supervisor for assignment"},
+    {"id":"transport-boundary","test":"prove Scheduler v0 planner has no Gmail, Automation, timer or worker-send side effect and only emits a read-only deterministic plan"}
+  ],"next":["inspection-integrity","non-actionable-no-wake","rollback","routing-contract","transport-boundary"]},
+  "roundsWithoutActiveGates":0,"maxRoundsWithoutActiveGates":3,"deferReason":null
 }
