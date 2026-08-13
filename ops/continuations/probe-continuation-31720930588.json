@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.1",
   "id": "probe-continuation-31720930588",
   "actor": "probe-ui",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": null,
   "prNumber": null,
   "completed": [
