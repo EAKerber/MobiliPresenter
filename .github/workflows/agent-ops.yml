@@ -25,6 +25,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       pull-requests: read
       checks: read
@@ -62,6 +63,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python tools/agent.py verify --remote --json
+
+      - name: Generate maintenance inspection
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/maintenance_inspect.py --remote --json > /tmp/maintenance-inspection.json
+          python -m json.tool /tmp/maintenance-inspection.json > /dev/null
+
+      - name: Upload maintenance inspection
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-inspection
+          path: /tmp/maintenance-inspection.json
+          if-no-files-found: error
 
       - name: Generate integration reconcile evidence
         if: github.event_name == 'pull_request'
