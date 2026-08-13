@@ -88,6 +88,15 @@ class CapabilityGates01Tests(unittest.TestCase):
         third = capability_gates.build_review_plan(changed)
         self.assertNotEqual(first["planHash"], third["planHash"])
 
+    def test_repository_pilot_is_discoverable_and_points_to_next_gates(self):
+        discovered = {value["id"]: value for value in capability_gates.discover_capabilities()}
+        self.assertIn("coordination-leases", discovered)
+        pilot = discovered["coordination-leases"]
+        self.assertEqual(capability_gates.validate_capability(pilot, expected_id="coordination-leases"), [])
+        plan = capability_gates.build_review_plan(pilot)
+        self.assertEqual(plan["action"], "TEST_NEXT_GATES")
+        self.assertEqual(set(plan["nextGates"]), {"formal-rollback", "official-cli-surface"})
+
 
 if __name__ == "__main__":
     unittest.main()
