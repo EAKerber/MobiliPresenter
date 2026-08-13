@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mobilipresenter.local/schemas/scheduler-plan-0.1.json",
+  "title":"SchedulerPlan 0.1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schemaVersion","inspectionHash","action","reasonCode","focus","dispatch","decisionScope","semanticAuthority","transportSideEffects","readOnly","planHash"],
+  "properties":{
+    "schemaVersion":{"const":"SchedulerPlan 0.1"},
+    "inspectionHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+    "action":{"enum":["CONTINUE","RECONCILE","HANDOFF","PAUSE","NEEDS_HUMAN"]},
+    "reasonCode":{"type":"string","minLength":1},
+    "focus":{"type":["string","null"]},
+    "dispatch":{"type":"object","additionalProperties":false,"required":["shouldWake","channelClass","target","continuationId"],"properties":{"shouldWake":{"type":"boolean"},"channelClass":{"enum":["worker","supervisor","human","none"]},"target":{"type":["string","null"]},"continuationId":{"type":["string","null"]}}},
+    "decisionScope":{"const":"operational-only"},
+    "semanticAuthority":{"const":false},
+    "transportSideEffects":{"const":false},
+    "readOnly":{"const":true},
+    "planHash":{"type":"string","pattern":"^[a-f0-9]{64}$"}
+  }
+}
