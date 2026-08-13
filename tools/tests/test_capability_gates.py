@@ -85,18 +85,16 @@ class CapabilityGates01Tests(unittest.TestCase):
         self.assertEqual(first["planHash"], second["planHash"])
         changed = copy.deepcopy(value)
         changed["gates"]["next"] = ["second-agent"]
-        third = capability_gates.build_review_plan(changed)
-        self.assertNotEqual(first["planHash"], third["planHash"])
-
-    def test_repository_pilot_is_discoverable_and_points_to_next_gates(self):
-        discovered = {value["id"]: value for value in capability_gates.discover_capabilities()}
-        self.assertIn("coordination-leases", discovered)
-        pilot = discovered["coordination-leases"]
-        self.assertEqual(capability_gates.validate_capability(pilot, expected_id="coordination-leases"), [])
-        plan = capability_gates.build_review_plan(pilot)
-        self.assertEqual(plan["action"], "TEST_NEXT_GATES")
-        self.assertEqual(set(plan["nextGates"]), {"formal-rollback", "official-cli-surface"})
-
-
-if __name__ == "__main__":
-    unittest.main()
+        third = capability_gates.build_review_plan(Ú[™ÙY
+BˆÙ[‹˜\ÜÙ\›İ\]X[
+š\œİÈœ[’\Ú—K\™Èœ[’\Ú—JB‚ˆYˆ\İÜ™\ÜÚ]ÜWÜ[İÚ\×Ù\ØÛİ™\˜X›WİÚ]ØÛÛ\]YÜ›İ[™ÛÛ™JÙ[ŠN‚ˆ\ØÛİ™\™YHİ˜[YVÈšY—Nˆ˜[YH›Üˆ˜[YH[ˆØ\Xš[]WÙØ]\Ë™\ØÛİ™\—ØØ\Xš[]Y\Ê
+_BˆÙ[‹˜\ÜÙ\[Š˜ÛÛÜ™[˜][Û‹[X\Ù\È‹\ØÛİ™\™Y
+Bˆ[İH\ØÛİ™\™YÈ˜ÛÛÜ™[˜][Û‹[X\Ù\È—BˆÙ[‹˜\ÜÙ\\]X[
+Ø\Xš[]WÙØ]\Ë˜[Y]WØØ\Xš[]J[İ^XİYÚYH˜ÛÛÜ™[˜][Û‹[X\Ù\ÈŠK×JBˆ[ˆHØ\Xš[]WÙØ]\Ë˜Z[Ü™]šY]×Ü[Š[İ
+BˆÙ[‹˜\ÜÙ\\]X[
+[–È˜Xİ[Ûˆ—K”‘U’QU×ÑSTWÔ“ÕS‘ŠBˆÙ[‹˜\ÜÙ\\]X[
+[–È˜˜XÚÛÙÈ—K×JBˆÙ[‹˜\ÜÙ\\]X[
+[–È›™^Ø]\È—K×JBˆÙ[‹˜\ÜÙ\\]X[
+[–Èœ›İ[™ÕÚ]İ]Xİ]™QØ]\È—K
+BˆÙ[‹˜\ÜÙ\\Ó›Û™J[–È™Y™\”™X\ÛÛˆ—JB‚‚šYˆ×Û˜[YW×ÈOH—×ÛXZ[—×È‚ˆ[š]\İ›XZ[Š
+B
