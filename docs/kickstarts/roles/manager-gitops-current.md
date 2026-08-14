@@ -1,6 +1,6 @@
 # MobiliPresenter — Manager / GitOps current
 
-Current role document: [`manager-gitops-v0.2.md`](./manager-gitops-v0.2.md).
+Current role document: [`manager-gitops-v0.3.md`](./manager-gitops-v0.3.md).
 
 This pointer does not replace the versioned Kickstart. It records the current runtime bridge for environments where the canonical live supervisor commands cannot reach GitHub directly.
 
