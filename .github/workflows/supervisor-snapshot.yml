@@ -36,12 +36,12 @@ jobs:
       - name: Snapshot regression tests
         run: |
           python -m unittest tools.tests.test_maintenance_inspect tools.tests.test_maintenance_continuations tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot -v
-      - name: Generate live inspection and SchedulerPlan
+      - name: Generate one live inspection and its SchedulerPlan
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python tools/maintenance_live.py --json > /tmp/live-supervisor-inspection.json
-          python tools/scheduler_plan.py --live --json > /tmp/scheduler-plan.json
+          python tools/scheduler_plan.py --input /tmp/live-supervisor-inspection.json --json > /tmp/scheduler-plan.json
           python -m json.tool /tmp/live-supervisor-inspection.json > /dev/null
           python -m json.tool /tmp/scheduler-plan.json > /dev/null
       - name: Build immutable derived snapshot
