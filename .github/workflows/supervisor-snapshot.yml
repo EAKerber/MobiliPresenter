@@ -1,0 +1,106 @@
+name: Supervisor Snapshot
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - 'ops/**'
+      - 'tools/**'
+      - 'docs/kickstarts/roles/manager-gitops*.md'
+      - '.github/workflows/supervisor-snapshot.yml'
+  push:
+    branches: ['main']
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout canonical tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'main' }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Snapshot regression tests
+        run: |
+          python -m unittest tools.tests.test_maintenance_inspect tools.tests.test_maintenance_continuations tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot -v
+      - name: Generate one live inspection and its SchedulerPlan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/maintenance_live.py --json > /tmp/live-supervisor-inspection.json
+          python tools/scheduler_plan.py --input /tmp/live-supervisor-inspection.json --json > /tmp/scheduler-plan.json
+          python -m json.tool /tmp/live-supervisor-inspection.json > /dev/null
+          python -m json.tool /tmp/scheduler-plan.json > /dev/null
+      - name: Build immutable derived snapshot
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from tools.capability_gates import stable_hash
+
+          inspection = json.loads(Path('/tmp/live-supervisor-inspection.json').read_text(encoding='utf-8'))
+          plan = json.loads(Path('/tmp/scheduler-plan.json').read_text(encoding='utf-8'))
+          assert inspection['schemaVersion'] == 'MaintenanceInspection 0.2'
+          assert inspection['readOnly'] is True
+          assert plan['schemaVersion'] == 'SchedulerPlan 0.1'
+          assert plan['inspectionHash'] == inspection['inspectionHash']
+          assert plan['readOnly'] is True
+          assert plan['semanticAuthority'] is False
+          assert plan['transportSideEffects'] is False
+
+          heads = {
+              'control': (inspection.get('observedGit') or {}).get('head'),
+              'coordination': (inspection.get('coordination') or {}).get('authorityHead'),
+              'continuation': (inspection.get('continuationAuthority') or {}).get('authorityHead'),
+          }
+          for name, value in heads.items():
+              assert isinstance(value, str) and len(value) == 40, f'{name} head unavailable'
+
+          body = {
+              'schemaVersion': 'SchedulerSnapshot 0.1',
+              'repository': 'EAKerber/MobiliPresenter',
+              'sourceHeads': heads,
+              'inspection': inspection,
+              'plan': plan,
+              'readOnly': True,
+          }
+          snapshot = {**body, 'snapshotHash': stable_hash(body)}
+          Path('/tmp/scheduler-snapshot.json').write_text(
+              json.dumps(snapshot, indent=2, ensure_ascii=False) + '\n', encoding='utf-8'
+          )
+          PY
+      - name: Validate snapshot offline
+        run: |
+          CONTROL_HEAD=$(git rev-parse HEAD)
+          COORDINATION_HEAD=$(python -c "import json; print(json.load(open('/tmp/scheduler-snapshot.json'))['sourceHeads']['coordination'])")
+          CONTINUATION_HEAD=$(python -c "import json; print(json.load(open('/tmp/scheduler-snapshot.json'))['sourceHeads']['continuation'])")
+          python tools/scheduler_snapshot.py /tmp/scheduler-snapshot.json \
+            --expected-control-head "$CONTROL_HEAD" \
+            --expected-coordination-head "$COORDINATION_HEAD" \
+            --expected-continuation-head "$CONTINUATION_HEAD" \
+            --json > /tmp/scheduler-snapshot-validation.json
+          python -m json.tool /tmp/scheduler-snapshot-validation.json > /dev/null
+      - name: Upload Supervisor Snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: supervisor-snapshot
+          path: |
+            /tmp/live-supervisor-inspection.json
+            /tmp/scheduler-plan.json
+            /tmp/scheduler-snapshot.json
+            /tmp/scheduler-snapshot-validation.json
+          if-no-files-found: error
+          retention-days: 7
