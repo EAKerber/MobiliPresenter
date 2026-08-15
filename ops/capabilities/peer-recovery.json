@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "CapabilityGates 0.1",
+  "id": "peer-recovery",
+  "policy": "experimental",
+  "gates": {
+    "backlog": [
+      {
+        "id": "b-artifact-materialization",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_concrete_b_artifact_materialization_case -v"
+      },
+      {
+        "id": "deterministic-plan-hash",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_deterministic_plan_and_hash -v"
+      },
+      {
+        "id": "different-head-fail-closed",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_different_heads_fail_closed -v"
+      },
+      {
+        "id": "event-idempotence",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_repeated_event_is_idempotent -v"
+      },
+      {
+        "id": "read-only-reproduction",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_read_only_reproduction_success_is_runtime_asymmetry_and_self_retry -v"
+      },
+      {
+        "id": "same-head-classification",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_same_head_peer_failure_requires_reproduction -v"
+      }
+    ],
+    "next": [
+      "b-artifact-materialization",
+      "deterministic-plan-hash",
+      "different-head-fail-closed",
+      "event-idempotence",
+      "read-only-reproduction",
+      "same-head-classification"
+    ]
+  },
+  "roundsWithoutActiveGates": 0,
+  "maxRoundsWithoutActiveGates": 3,
+  "deferReason": null
+}
