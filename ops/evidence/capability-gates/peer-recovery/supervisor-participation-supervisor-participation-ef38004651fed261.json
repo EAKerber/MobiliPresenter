@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "supervisor-participation",
+  "planHash": "ef38004651fed261bf73d425c0ef877abd418361dec824c8f2c926d25667523e",
+  "beforeStateHash": "d848c14ae4c76223b95ca5eb696c77f3f8f56de89360d028d6e92220ebb3633a",
+  "afterStateHash": "75bd9656d71f01e278a47c56f990501c2cab93c63d516ad9f0271000c414218c",
+  "details": {
+    "mode": "isolated"
+  },
+  "evidence": [],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/supervisor-participation-supervisor-participation-ef38004651fed261.json"
+}
