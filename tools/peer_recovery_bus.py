@@ -64,6 +64,29 @@ def validate_health_event(value: Any) -> dict[str, Any]:
     return value
 
 
+def validate_recovery_event(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RuntimeError("PEER_RECOVERY_EVENT_INVALID")
+    expected = {
+        "schemaVersion", "type", "event_id", "source_worker", "target_worker", "role_id", "classification",
+        "action", "signal", "reason_code", "plan_hash", "inspection_hash", "recovery_key",
+        "recovery_correlation_id", "failure_fingerprint", "observed_authority_heads", "recommended_executor",
+        "task_control_allowed", "identity_takeover_allowed", "lease_takeover_allowed", "continuation_takeover_allowed",
+    }
+    if set(value) != expected or value.get("schemaVersion") != RECOVERY_SCHEMA or value.get("type") != "peer.recovery":
+        raise RuntimeError("PEER_RECOVERY_EVENT_SCHEMA_INVALID")
+    if not isinstance(value.get("event_id"), str) or not value["event_id"].startswith("peer.recovery:"):
+        raise RuntimeError("PEER_RECOVERY_EVENT_ID_INVALID")
+    for key in ("plan_hash", "inspection_hash", "recovery_key"):
+        raw = value.get(key)
+        if not isinstance(raw, str) or len(raw) != 64 or any(c not in "0123456789abcdef" for c in raw):
+            raise RuntimeError("PEER_RECOVERY_EVENT_HASH_INVALID")
+    for key in ("task_control_allowed", "identity_takeover_allowed", "lease_takeover_allowed", "continuation_takeover_allowed"):
+        if value.get(key) is not False:
+            raise RuntimeError("PEER_RECOVERY_EVENT_TAKEOVER_FORBIDDEN")
+    return value
+
+
 def build_health_event(raw_observation: dict[str, Any], previous_event: dict[str, Any] | None = None) -> dict[str, Any]:
     observation = peer_recovery.normalize_observation(raw_observation)
     previous = validate_health_event(previous_event) if previous_event is not None else None
@@ -151,6 +174,7 @@ def build_recovery_event(raw_input: dict[str, Any]) -> dict[str, Any]:
         "lease_takeover_allowed": False,
         "continuation_takeover_allowed": False,
     }
+    validate_recovery_event(event)
     return {"schemaVersion": "PeerRecoveryEmission 0.1", "shouldEmit": True, "event": event, "plan": plan}
 
 
@@ -164,12 +188,22 @@ def main(argv=None) -> int:
     recovery = sub.add_parser("recovery")
     recovery.add_argument("--input", required=True)
     recovery.add_argument("--json", action="store_true", dest="as_json")
+    validate_health = sub.add_parser("validate-health")
+    validate_health.add_argument("--input", required=True)
+    validate_health.add_argument("--json", action="store_true", dest="as_json")
+    validate_recovery = sub.add_parser("validate-recovery")
+    validate_recovery.add_argument("--input", required=True)
+    validate_recovery.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
     try:
         if args.command == "health":
             payload = build_health_event(_load(args.observation), _load(args.previous) if args.previous else None)
-        else:
+        elif args.command == "recovery":
             payload = build_recovery_event(_load(args.input))
+        elif args.command == "validate-health":
+            payload = {"ok": True, "event": validate_health_event(_load(args.input))}
+        else:
+            payload = {"ok": True, "event": validate_recovery_event(_load(args.input))}
         print(json.dumps(payload, indent=2 if args.as_json else None, ensure_ascii=False))
         return 0
     except RuntimeError as exc:
