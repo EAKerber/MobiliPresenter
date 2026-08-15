@@ -12,7 +12,7 @@ def verification(ok=True):
 
 
 def cap():
-    return {"id":"coordination-leases","policy":"canonical","reviewAction":"NO_EXPERIMENTAL_REVIEW","nextGates":[],"backlogCount":0,"roundsWithoutActiveGates":0,"maxRoundsWithoutActiveGates":3,"deferReason":None,"reviewPlanHash":"a"*64}
+    return {"id":"coordination-leases","policy":"canonical","supervisorParticipation":"active","reviewAction":"NO_EXPERIMENTAL_REVIEW","nextGates":[],"backlogCount":0,"roundsWithoutActiveGates":0,"maxRoundsWithoutActiveGates":3,"deferReason":None,"reviewPlanHash":"a"*64}
 
 
 class MaintenanceInspect01Tests(unittest.TestCase):
@@ -35,6 +35,13 @@ class MaintenanceInspect01Tests(unittest.TestCase):
     def test_active_gates_are_actionable(self):
         c=cap(); c.update({"id":"experiment","policy":"experimental","reviewAction":"TEST_NEXT_GATES","nextGates":["rollback"],"backlogCount":1})
         result=self.build(caps=[c]); self.assertEqual(result["recommendation"]["reasonCode"],"CAPABILITY_GATES_DUE"); self.assertFalse(result["recommendation"]["semanticAuthority"])
+
+    def test_isolated_experimental_capability_does_not_change_recommendation(self):
+        c=cap(); c.update({"id":"peer-recovery","policy":"experimental","supervisorParticipation":"isolated","reviewAction":"TEST_NEXT_GATES","nextGates":["runtime-shadow"],"backlogCount":1})
+        result=self.build(caps=[c])
+        self.assertEqual(result["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE")
+        self.assertEqual(result["recommendation"]["focus"],"development")
+        self.assertEqual(result["capabilities"][0]["supervisorParticipation"],"isolated")
 
     def test_remote_unavailable_requires_human(self):
         result=self.build(remote=True,prs={"available":False,"reason":"GH_NOT_FOUND","items":[]},coord={"available":False,"reason":"GH_NOT_FOUND","intents":[],"leases":[]}); self.assertEqual(result["recommendation"]["action"],"NEEDS_HUMAN")
