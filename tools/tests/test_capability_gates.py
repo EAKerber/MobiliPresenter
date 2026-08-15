@@ -31,6 +31,19 @@ class CapabilityGates01Tests(unittest.TestCase):
     def test_schema_accepts_active_gate(self):
         self.assertEqual(capability_gates.validate_capability(self.base_capability()), [])
 
+    def test_supervisor_participation_defaults_active(self):
+        value = self.base_capability()
+        self.assertEqual(capability_gates.supervisor_participation(value), "active")
+        self.assertEqual(capability_gates.validate_capability(value), [])
+
+    def test_supervisor_participation_accepts_isolated_and_rejects_unknown(self):
+        value = self.base_capability()
+        value["supervisorParticipation"] = "isolated"
+        self.assertEqual(capability_gates.validate_capability(value), [])
+        self.assertEqual(capability_gates.supervisor_participation(value), "isolated")
+        value["supervisorParticipation"] = "magic"
+        self.assertIn("CAPABILITY_SUPERVISOR_PARTICIPATION_INVALID", capability_gates.validate_capability(value))
+
     def test_empty_next_is_deliberately_valid(self):
         value = self.base_capability()
         value["gates"]["next"] = []

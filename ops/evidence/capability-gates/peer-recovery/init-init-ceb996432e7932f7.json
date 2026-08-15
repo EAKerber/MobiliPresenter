@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "init",
+  "planHash": "ceb996432e7932f70305b65e5f6017778fd6515417a3f93f39e3c58a203bc388",
+  "beforeStateHash": null,
+  "afterStateHash": "d848c14ae4c76223b95ca5eb696c77f3f8f56de89360d028d6e92220ebb3633a",
+  "details": {
+    "gates": [
+      {
+        "id": "b-artifact-materialization",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_concrete_b_artifact_materialization_case -v"
+      },
+      {
+        "id": "deterministic-plan-hash",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_deterministic_plan_and_hash -v"
+      },
+      {
+        "id": "different-head-fail-closed",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_different_heads_fail_closed -v"
+      },
+      {
+        "id": "event-idempotence",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_repeated_event_is_idempotent -v"
+      },
+      {
+        "id": "read-only-reproduction",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_read_only_reproduction_success_is_runtime_asymmetry_and_self_retry -v"
+      },
+      {
+        "id": "same-head-classification",
+        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_same_head_peer_failure_requires_reproduction -v"
+      }
+    ],
+    "maxRoundsWithoutActiveGates": 3,
+    "deferReason": null
+  },
+  "evidence": [],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/init-init-ceb996432e7932f7.json"
+}

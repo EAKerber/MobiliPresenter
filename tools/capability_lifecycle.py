@@ -27,6 +27,7 @@ def parser():
     p=sub.add_parser("init"); p.add_argument("capability_id"); p.add_argument("--gate",action="append",default=[]); p.add_argument("--max-empty-rounds",type=int,default=3); p.add_argument("--defer-reason"); flags(p)
     p=sub.add_parser("gate-add"); p.add_argument("capability_id"); p.add_argument("gate_id"); p.add_argument("--test",required=True); flags(p)
     p=sub.add_parser("next"); p.add_argument("capability_id"); p.add_argument("gate_ids",nargs="+"); flags(p)
+    p=sub.add_parser("supervisor-participation"); p.add_argument("capability_id"); p.add_argument("mode",choices=sorted(gates.SUPERVISOR_PARTICIPATION)); flags(p)
     for name in ("pass","fail"):
         p=sub.add_parser(name); p.add_argument("capability_id"); p.add_argument("gate_id"); flags(p,True)
     p=sub.add_parser("defer"); p.add_argument("capability_id"); p.add_argument("--reason",required=True); flags(p)
@@ -41,6 +42,7 @@ def make_plan(args):
     before=gates.load_capability(args.capability_id)
     if args.command=="gate-add": return tx.gate_add(before,args.gate_id,args.test)
     if args.command=="next": return tx.select_next(before,args.gate_ids)
+    if args.command=="supervisor-participation": return tx.set_supervisor_participation(before,args.mode)
     if args.command=="pass": return tx.passed(before,args.gate_id,args.evidence)
     if args.command=="fail": return tx.failed(before,args.gate_id,args.evidence)
     if args.command=="defer": return tx.defer(before,args.reason)

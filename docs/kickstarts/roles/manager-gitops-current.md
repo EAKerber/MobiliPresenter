@@ -1,6 +1,6 @@
 # MobiliPresenter — Manager / GitOps current
 
-Current role document: [`manager-gitops-v0.3.md`](./manager-gitops-v0.3.md).
+Current role document: [`manager-gitops-v0.4.md`](./manager-gitops-v0.4.md).
 
 This pointer does not replace the versioned Kickstart. It records the current runtime bridge for environments where the canonical live supervisor commands cannot reach GitHub directly.
 
@@ -24,10 +24,17 @@ Before accepting the embedded SchedulerPlan:
 1. observe the current `main` head through the GitHub connector;
 2. observe the current `coordination/leases` head;
 3. observe the current `coordination/continuations` head;
-4. obtain the latest successful `Supervisor Snapshot` run/artifact from `main`;
-5. validate `scheduler-snapshot.json` with the self-contained `tools/scheduler_snapshot.py`, passing those three observed heads as `--expected-*` arguments;
-6. use only the validated embedded `plan`; never recompute, reinterpret or retarget it in the transport layer.
+4. find the newest successful **Supervisor Snapshot** workflow run on `main` whose `head_sha` equals the observed current `main` head;
+5. list artifacts for that exact run and require an unexpired artifact named exactly `supervisor-snapshot`;
+6. download it through the dedicated workflow-artifact download operation rather than generic page/file materialization;
+7. materialize the ZIP read-only and obtain `scheduler-snapshot.json`;
+8. validate it with the self-contained `tools/scheduler_snapshot.py`, passing the three observed heads as `--expected-*` arguments;
+9. use only the validated embedded `plan`; never recompute, reinterpret or retarget it in the transport layer.
 
-A missing artifact, invalid hash, unavailable authority, or any head mismatch means the snapshot is stale/unknown and the worker must fail closed. No dispatch is allowed from an unvalidated snapshot.
+A missing artifact, expired artifact, failed dedicated download, invalid hash, unavailable authority, or any head mismatch means the snapshot is stale/unknown and the worker must fail closed. No dispatch is allowed from an unvalidated snapshot.
 
 The snapshot is **not an authority**. Git/ProjectState, capability policy, Coordination Leases and Continuation State remain authoritative exactly as defined in the versioned Kickstart and `AGENTS.md`.
+
+## Peer Recovery shadow
+
+The current versioned Kickstart defines the experimental `peer-recovery` shadow protocol. The capability is intentionally `supervisorParticipation=isolated`: it may be exercised by its explicit v0.4 shadow protocol without altering the canonical Maintenance recommendation or SchedulerPlan.

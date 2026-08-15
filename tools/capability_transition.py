@@ -85,6 +85,14 @@ def select_next(before, gate_ids):
     return build(after["id"],"next",before,after,details={"gateIds":chosen})
 
 
+def set_supervisor_participation(before, mode):
+    after=copy.deepcopy(valid(before)); mode=text(mode,"CAPABILITY_SUPERVISOR_PARTICIPATION_INVALID")
+    if mode not in gates.SUPERVISOR_PARTICIPATION: raise RuntimeError("CAPABILITY_SUPERVISOR_PARTICIPATION_INVALID")
+    if gates.supervisor_participation(after)==mode: raise RuntimeError("CAPABILITY_SUPERVISOR_PARTICIPATION_UNCHANGED")
+    after["supervisorParticipation"]=mode
+    return build(after["id"],"supervisor-participation",before,after,details={"mode":mode})
+
+
 def passed(before, gate_id, evidence):
     after=experimental(before); gate_id=ident(gate_id,"CAPABILITY_GATE_ID_INVALID"); evidence=refs(evidence)
     if not evidence: raise RuntimeError("CAPABILITY_PASS_REQUIRES_EVIDENCE")
