@@ -16,7 +16,7 @@ def capability_snapshot():
     out=[]
     for value in capability_gates.discover_capabilities():
         p=capability_gates.build_review_plan(value)
-        out.append({"id":value["id"],"policy":value["policy"],"reviewAction":p["action"],"nextGates":p["nextGates"],"backlogCount":len(p["backlog"]),"roundsWithoutActiveGates":p["roundsWithoutActiveGates"],"maxRoundsWithoutActiveGates":p["maxRoundsWithoutActiveGates"],"deferReason":p["deferReason"],"reviewPlanHash":p["planHash"]})
+        out.append({"id":value["id"],"policy":value["policy"],"supervisorParticipation":capability_gates.supervisor_participation(value),"reviewAction":p["action"],"nextGates":p["nextGates"],"backlogCount":len(p["backlog"]),"roundsWithoutActiveGates":p["roundsWithoutActiveGates"],"maxRoundsWithoutActiveGates":p["maxRoundsWithoutActiveGates"],"deferReason":p["deferReason"],"reviewPlanHash":p["planHash"]})
     return out
 
 def continuation_snapshot():
@@ -66,6 +66,7 @@ def decide(state,verification,capabilities,*,remote_requested,pull_requests,coor
         elif status in {"READY","IN_PROGRESS"}: fs.append(finding("CONTINUE","CONTINUATION_RUNNABLE",task["nextAction"] or "finish and mark done",subject))
     for item in capabilities:
         if item["policy"]!="experimental": continue
+        if item.get("supervisorParticipation","active")=="isolated": continue
         if item["reviewAction"]=="REVIEW_EMPTY_LIMIT": fs.append(finding("NEEDS_HUMAN","CAPABILITY_EMPTY_LIMIT","formal capability review reached its configured empty-round limit",item["id"]))
         elif item["reviewAction"]=="TEST_NEXT_GATES": fs.append(finding("CONTINUE","CAPABILITY_GATES_DUE",f"next Gates: {', '.join(item['nextGates'])}",item["id"]))
         elif item["reviewAction"]=="REVIEW_EMPTY_ROUND": fs.append(finding("CONTINUE","CAPABILITY_EMPTY_REVIEW_DUE","re-evaluate the recorded deferral reason",item["id"]))
