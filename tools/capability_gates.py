@@ -15,6 +15,7 @@ CAPABILITY_DIR = ROOT / "ops" / "capabilities"
 ERROR_EXIT = 2
 SUPPORTED_SCHEMA = "CapabilityGates 0.1"
 POLICIES = {"experimental", "canonical", "deprecated", "disabled"}
+SUPERVISOR_PARTICIPATION = {"active", "isolated"}
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -35,6 +36,10 @@ def load_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def supervisor_participation(value: dict[str, Any]) -> str:
+    return value.get("supervisorParticipation", "active")
+
+
 def validate_capability(value: dict[str, Any], expected_id: str | None = None) -> list[str]:
     errors: list[str] = []
     if value.get("schemaVersion") != SUPPORTED_SCHEMA:
@@ -48,6 +53,10 @@ def validate_capability(value: dict[str, Any], expected_id: str | None = None) -
 
     if value.get("policy") not in POLICIES:
         errors.append("CAPABILITY_POLICY_INVALID")
+
+    participation = value.get("supervisorParticipation")
+    if participation is not None and participation not in SUPERVISOR_PARTICIPATION:
+        errors.append("CAPABILITY_SUPERVISOR_PARTICIPATION_INVALID")
 
     gates = value.get("gates")
     if not isinstance(gates, dict):
@@ -108,7 +117,8 @@ def validate_capability(value: dict[str, Any], expected_id: str | None = None) -
         "maxRoundsWithoutActiveGates",
         "deferReason",
     }
-    if set(value) != expected_fields:
+    actual_fields = set(value)
+    if actual_fields not in (expected_fields, expected_fields | {"supervisorParticipation"}):
         errors.append("CAPABILITY_FIELDS_INVALID")
     if set(gates) != {"backlog", "next"}:
         errors.append("CAPABILITY_GATES_FIELDS_INVALID")
@@ -185,6 +195,7 @@ def command_list(as_json: bool) -> int:
             {
                 "id": value["id"],
                 "policy": value["policy"],
+                "supervisorParticipation": supervisor_participation(value),
                 "backlogCount": len(value["gates"]["backlog"]),
                 "nextGates": value["gates"]["next"],
                 "roundsWithoutActiveGates": value["roundsWithoutActiveGates"],
@@ -200,7 +211,7 @@ def command_list(as_json: bool) -> int:
             print("CAPABILITIES\n  none")
         for item in payload["capabilities"]:
             print(
-                f"{item['id']}: policy={item['policy']} "
+                f"{item['id']}: policy={item['policy']} supervisor={item['supervisorParticipation']} "
                 f"backlog={item['backlogCount']} next={len(item['nextGates'])} "
                 f"empty={item['roundsWithoutActiveGates']}/{item['maxRoundsWithoutActiveGates']}"
             )
