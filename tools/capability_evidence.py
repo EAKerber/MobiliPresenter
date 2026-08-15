@@ -32,6 +32,7 @@ def rebuild(before:dict[str,Any]|None, value):
     if action=="gate-add":
         gate=details.get("gate") or {}; return tx.gate_add(before,gate.get("id"),gate.get("test"))
     if action=="next": return tx.select_next(before,details.get("gateIds",[]))
+    if action=="supervisor-participation": return tx.set_supervisor_participation(before,details.get("mode"))
     if action=="pass": return tx.passed(before,details.get("gateId"),refs)
     if action=="fail": return tx.failed(before,details.get("gateId"),refs)
     if action=="defer": return tx.defer(before,details.get("reason"))
