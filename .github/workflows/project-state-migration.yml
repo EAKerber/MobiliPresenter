@@ -7,6 +7,7 @@ on:
     paths:
       - ops/migrations/project-state-2.0.plan-request.json
       - ops/migrations/project-state-2.0.apply-request.json
+      - ops/migrations/project-state-2.0.finalize-request.json
 
 permissions:
   contents: write
@@ -68,4 +69,13 @@ jobs:
           rm ops/migrations/project-state-2.0.apply-request.json
           git add ops/state/project.json ops/evidence/project-state/project-state-2.0-migration.json ops/migrations/project-state-2.0.apply-request.json
           git commit -m "M4B apply ProjectState 2.0 authority migration"
+          git push origin HEAD:work/operations/project-state-v2-migration
+
+      - name: Finalize V2-only contract
+        if: ${{ hashFiles('ops/migrations/project-state-2.0.finalize-request.json') != '' }}
+        run: |
+          python3 -m py_compile tools/project_state_finalize.py
+          python3 tools/project_state_finalize.py
+          git add -A
+          git commit -m "M4B finalize ProjectState 2.0 contract"
           git push origin HEAD:work/operations/project-state-v2-migration
