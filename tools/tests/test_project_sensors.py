@@ -6,12 +6,11 @@ from tools import project_sensors
 
 def state(active=None, pr=None):
     return {
-        "schemaVersion": "ProjectState 1.0",
-        "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter", "productInvariants": {}},
-        "git": {"activeDevelopmentBranch": active, "controlBranch": "main", "publishedBranch": "main", "preserveBranches": ["architecture/tpc"]},
-        "published": {"release": "R", "url": "x", "artifactManifest": "ops/published/viewer-next-current.json", "artifactSha256": "a" * 64},
-        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "prNumber": pr, "blockers": [], "constraints": [], "plan": "docs/plans/developer-continuation-2026-08.md"},
-        "operations": {"toolboxPhase": "phase-1.2-branch-hygiene", "canonicalState": "ops/state/project.json", "commands": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]},
+        "schemaVersion": "ProjectState 2.0",
+        "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
+        "git": {"activeDevelopmentBranch": active, "controlBranch": "main", "protectedBranches": ["architecture/tpc"]},
+        "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
+        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "prNumber": pr, "blockers": []},
     }
 
 
