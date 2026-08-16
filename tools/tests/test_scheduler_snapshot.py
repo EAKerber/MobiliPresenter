@@ -11,7 +11,7 @@ CONTINUATION = "3" * 40
 
 def fixture():
     inspection_body = {
-        "schemaVersion": "MaintenanceInspection 0.2",
+        "schemaVersion": "MaintenanceInspection 0.3",
         "repository": "EAKerber/MobiliPresenter",
         "observedGit": {"head": CONTROL},
         "coordination": {"available": True, "authorityHead": COORDINATION},
@@ -27,7 +27,7 @@ def fixture():
     }
     inspection = {**inspection_body, "inspectionHash": snapshot.stable_hash(inspection_body)}
     plan_body = {
-        "schemaVersion": "SchedulerPlan 0.1",
+        "schemaVersion": "SchedulerPlan 0.2",
         "inspectionHash": inspection["inspectionHash"],
         "action": "CONTINUE",
         "reasonCode": "TEST",
@@ -36,7 +36,7 @@ def fixture():
             "shouldWake": True,
             "channelClass": "supervisor",
             "target": "gitops-supervisor",
-            "continuationId": None,
+            "workId": None,
         },
         "decisionScope": "operational-only",
         "semanticAuthority": False,
@@ -84,44 +84,22 @@ class SchedulerSnapshotTests(unittest.TestCase):
     def test_stale_heads_fail_closed(self):
         value = fixture()
         with self.assertRaisesRegex(RuntimeError, "STALE_CONTROL"):
-            snapshot.validate_snapshot(
-                value,
-                expected_control_head="4" * 40,
-                expected_coordination_head=COORDINATION,
-                expected_continuation_head=CONTINUATION,
-            )
+            snapshot.validate_snapshot(value,expected_control_head="4"*40,expected_coordination_head=COORDINATION,expected_continuation_head=CONTINUATION)
         with self.assertRaisesRegex(RuntimeError, "STALE_COORDINATION"):
-            snapshot.validate_snapshot(
-                value,
-                expected_control_head=CONTROL,
-                expected_coordination_head="4" * 40,
-                expected_continuation_head=CONTINUATION,
-            )
+            snapshot.validate_snapshot(value,expected_control_head=CONTROL,expected_coordination_head="4"*40,expected_continuation_head=CONTINUATION)
         with self.assertRaisesRegex(RuntimeError, "STALE_CONTINUATION"):
-            snapshot.validate_snapshot(
-                value,
-                expected_control_head=CONTROL,
-                expected_coordination_head=COORDINATION,
-                expected_continuation_head="4" * 40,
-            )
+            snapshot.validate_snapshot(value,expected_control_head=CONTROL,expected_coordination_head=COORDINATION,expected_continuation_head="4"*40)
 
     def test_internal_source_head_mismatch_is_rejected(self):
-        value = fixture()
-        value["sourceHeads"]["coordination"] = "4" * 40
-        body = {k: v for k, v in value.items() if k != "snapshotHash"}
-        value["snapshotHash"] = snapshot.stable_hash(body)
-        with self.assertRaisesRegex(RuntimeError, "COORDINATION_INTERNAL_MISMATCH"):
-            validate(value)
+        value = fixture(); value["sourceHeads"]["coordination"] = "4" * 40
+        body = {k: v for k, v in value.items() if k != "snapshotHash"}; value["snapshotHash"] = snapshot.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "COORDINATION_INTERNAL_MISMATCH"): validate(value)
 
     def test_plan_boundary_and_hash_are_revalidated(self):
-        value = fixture()
-        value["plan"]["transportSideEffects"] = True
-        plan_body = {k: v for k, v in value["plan"].items() if k != "planHash"}
-        value["plan"]["planHash"] = snapshot.stable_hash(plan_body)
-        body = {k: v for k, v in value.items() if k != "snapshotHash"}
-        value["snapshotHash"] = snapshot.stable_hash(body)
-        with self.assertRaisesRegex(RuntimeError, "PLAN_BOUNDARY_INVALID"):
-            validate(value)
+        value = fixture(); value["plan"]["transportSideEffects"] = True
+        plan_body = {k: v for k, v in value["plan"].items() if k != "planHash"}; value["plan"]["planHash"] = snapshot.stable_hash(plan_body)
+        body = {k: v for k, v in value.items() if k != "snapshotHash"}; value["snapshotHash"] = snapshot.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "PLAN_BOUNDARY_INVALID"): validate(value)
 
 
 if __name__ == "__main__":
