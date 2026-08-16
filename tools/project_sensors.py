@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from tools import agent, capability_gates, continuation, coordination
+
 STATUSES = {"PASS", "UNKNOWN", "FAIL"}
 
 
@@ -122,6 +123,7 @@ def observe_continuations_local() -> dict[str, Any]:
 def observe_continuations_live() -> dict[str, Any]:
     try:
         from tools.continuation_remote import GitHubContinuationAuthority
+
         authority = GitHubContinuationAuthority()
         observed = authority.observe()
         items = [continuation_item(value) for _, value in sorted(observed.items.items())]
@@ -150,16 +152,6 @@ def observe_continuations_live() -> dict[str, Any]:
         )
 
 
-def classify_pr(state: dict[str, Any], head_ref: Any) -> str:
-    if head_ref == state["git"].get("activeDevelopmentBranch"):
-        return "active-development"
-    if isinstance(head_ref, str) and head_ref in set(state["git"].get("preserveBranches") or []):
-        return "preserved"
-    if isinstance(head_ref, str) and head_ref.startswith("ops/"):
-        return "operations"
-    return "unclassified"
-
-
 def observe_pull_requests(state: dict[str, Any], *, live: bool) -> dict[str, Any]:
     if not live:
         return sensor(
@@ -180,6 +172,9 @@ def observe_pull_requests(state: dict[str, Any], *, live: bool) -> dict[str, Any
             authority={"kind": "github", "resource": "pull-requests"},
         )
 
+    active_pr = state["development"].get("prNumber")
+    result_status = "PASS"
+    result_code = None
     items: list[dict[str, Any]] = []
     for raw in payload:
         if not isinstance(raw, dict):
@@ -189,6 +184,7 @@ def observe_pull_requests(state: dict[str, Any], *, live: bool) -> dict[str, Any
         head_sha = head.get("sha")
         runs: list[dict[str, Any]] = []
         ci = "unknown"
+        ci_observed = False
         if isinstance(head_sha, str):
             runs_ok, workflow_payload = agent.run_gh_json(
                 f"repos/{repo}/actions/runs?head_sha={head_sha}&per_page=100"
@@ -198,6 +194,7 @@ def observe_pull_requests(state: dict[str, Any], *, live: bool) -> dict[str, Any
                 and isinstance(workflow_payload, dict)
                 and isinstance(workflow_payload.get("workflow_runs"), list)
             ):
+                ci_observed = True
                 runs = [
                     {
                         "name": item.get("name"),
@@ -209,23 +206,27 @@ def observe_pull_requests(state: dict[str, Any], *, live: bool) -> dict[str, Any
                     if isinstance(item, dict)
                 ]
                 ci = agent.aggregate_ci(runs)
-        head_ref = head.get("ref")
+        number = raw.get("number")
+        if isinstance(active_pr, int) and number == active_pr and not ci_observed:
+            result_status = "UNKNOWN"
+            result_code = "ACTIVE_PR_CI_UNAVAILABLE"
         items.append(
             {
-                "number": raw.get("number"),
+                "number": number,
                 "draft": raw.get("draft"),
-                "headRef": head_ref,
+                "headRef": head.get("ref"),
                 "headSha": head_sha,
                 "baseRef": base.get("ref"),
-                "classification": classify_pr(state, head_ref),
                 "ci": ci,
+                "ciObserved": ci_observed,
                 "workflows": runs,
             }
         )
 
     items.sort(key=lambda item: int(item.get("number") or 0))
     return sensor(
-        "PASS",
+        result_status,
+        code=result_code,
         data={"available": True, "items": items},
         authority={"kind": "github", "resource": "pull-requests"},
     )
@@ -242,6 +243,7 @@ def observe_coordination(*, live: bool) -> dict[str, Any]:
         )
     try:
         from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
+
         authority = GitHubCoordinationAuthority(GhApiTransport())
         observed = authority.observe()
         current = coordination.compact_expired(observed.state, observed.authority_now)
@@ -362,58 +364,3 @@ def observe_local_core(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
             authority={"kind": "repository", "name": state["project"]["repository"]},
         ),
     }
-
-
-def observe_development(
-    state: dict[str, Any],
-    pull_requests: dict[str, Any],
-    *,
-    live: bool,
-) -> dict[str, Any]:
-    active = state["git"].get("activeDevelopmentBranch")
-    pr_number = state["development"].get("prNumber")
-    data = {
-        "activeDevelopmentBranch": active,
-        "developmentPrNumber": pr_number,
-        "phase": state["development"]["phase"],
-        "checkpoint": state["development"]["checkpoint"],
-        "nextTransition": state["development"]["nextTransition"],
-        "blockers": state["development"].get("blockers") or [],
-    }
-    if active is None and pr_number is None:
-        return sensor("PASS", code="NO_ACTIVE_DEVELOPMENT", data=data)
-    if (active is None) != (pr_number is None):
-        return sensor("FAIL", code="DEVELOPMENT_IDENTITY_INCOMPLETE", data=data)
-    if not live:
-        return sensor(
-            "UNKNOWN",
-            code="NOT_OBSERVED_IN_LOCAL_SCOPE",
-            data=data,
-            required=False,
-        )
-    pr_data = pull_requests.get("data") if isinstance(pull_requests.get("data"), dict) else {}
-    if not pr_data.get("available"):
-        return sensor("UNKNOWN", code="REMOTE_PR_INVENTORY_UNAVAILABLE", data=data)
-
-    matches = [
-        item for item in pr_data.get("items", []) if isinstance(item, dict) and item.get("number") == pr_number
-    ]
-    if not matches:
-        return sensor("FAIL", code="ACTIVE_PR_NOT_OPEN", data=data)
-
-    item = matches[0]
-    identity_ok = (
-        item.get("headRef") == active
-        and item.get("baseRef") == state["git"].get("controlBranch")
-    )
-    if not identity_ok:
-        return sensor("FAIL", code="REMOTE_PR_DIVERGENCE", data={**data, "pr": item})
-
-    ci = str(item.get("ci") or "unknown")
-    if ci == "failed":
-        return sensor("FAIL", code="REMOTE_CI_FAILED", data={**data, "pr": item})
-    if ci == "pending":
-        return sensor("UNKNOWN", code="REMOTE_CI_PENDING", data={**data, "pr": item})
-    if ci == "unknown":
-        return sensor("UNKNOWN", code="REMOTE_CI_UNKNOWN", data={**data, "pr": item})
-    return sensor("PASS", data={**data, "pr": item})
