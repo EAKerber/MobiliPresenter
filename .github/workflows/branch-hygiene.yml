@@ -1,0 +1,73 @@
+name: Branch Hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: branch-hygiene
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch remote refs
+        run: git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Generate fresh prune plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/agent.py git prune-plan --json > /tmp/git-prune-plan.json
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/git-prune-plan.json'))
+          assert p['schemaVersion']=='GitPrunePlan 0.2'
+          assert p['applyEligible'] is True
+          assert all(p['observations'].values())
+          PY
+
+      - name: Apply strong candidates with CAS readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MOBILIPRESENTER_PRUNE_AUTHORIZED: '1'
+        run: python tools/prune_apply.py --json > /tmp/git-prune-apply.json
+
+      - name: Validate apply result
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('/tmp/git-prune-apply.json'))
+          assert r['ok'] is True
+          assert r['readback']=='PASS'
+          PY
+
+      - name: Upload branch hygiene evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-hygiene
+          path: |
+            /tmp/git-prune-plan.json
+            /tmp/git-prune-apply.json
+          if-no-files-found: error
