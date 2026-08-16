@@ -1,83 +1,26 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/operational-semantics-0.1.json",
-  "title": "OperationalSemantics 0.1",
+  "$id": "https://mobilipresenter.local/schemas/operational-semantics-0.2.json",
+  "title": "OperationalSemantics 0.2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "owners", "concepts", "contracts", "branchGrammar"],
+  "required": ["schemaVersion", "owners", "concepts", "contracts", "branchGrammar", "managedAuthorities", "resources", "components"],
   "properties": {
-    "schemaVersion": {"const": "OperationalSemantics 0.1"},
-    "owners": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["description"],
-        "properties": {"description": {"type": "string", "minLength": 1}}
-      }
-    },
-    "concepts": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["term", "kind", "owner", "definition"],
-        "properties": {
-          "term": {"type": "string", "minLength": 1},
-          "kind": {"type": "string", "minLength": 1},
-          "owner": {"type": "string", "minLength": 1},
-          "definition": {"type": "string", "minLength": 1},
-          "related": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-          "aliases": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["term", "scope", "status"],
-              "properties": {
-                "term": {"type": "string", "minLength": 1},
-                "scope": {"type": "string", "minLength": 1},
-                "status": {"enum": ["legacy", "supported"]},
-                "retireBy": {"type": "string", "minLength": 1}
-              }
-            }
-          }
-        }
-      }
-    },
-    "contracts": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["owner", "semanticValidator", "structuralSchema"],
-        "properties": {
-          "owner": {"type": "string", "minLength": 1},
-          "semanticValidator": {"type": "string", "minLength": 1},
-          "structuralSchema": {"type": "string", "minLength": 1}
-        }
-      }
-    },
-    "branchGrammar": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["controlBranches", "canonical", "legacyNamespaces"],
-      "properties": {
-        "controlBranches": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-        "canonical": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["authority", "experiment", "work"],
-          "properties": {
-            "authority": {"type": "string", "minLength": 1},
-            "experiment": {"type": "string", "minLength": 1},
-            "work": {"type": "string", "minLength": 1}
-          }
-        },
-        "legacyNamespaces": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
-      }
-    }
+    "schemaVersion": {"const": "OperationalSemantics 0.2"},
+    "owners": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["description"], "properties": {"description": {"type": "string", "minLength": 1}}}},
+    "concepts": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["term", "kind", "owner", "definition"], "properties": {"term": {"type": "string", "minLength": 1}, "kind": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "definition": {"type": "string", "minLength": 1}, "related": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "aliases": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["term", "scope", "status"], "properties": {"term": {"type": "string", "minLength": 1}, "scope": {"type": "string", "minLength": 1}, "status": {"enum": ["legacy", "supported"]}, "retireBy": {"type": "string", "minLength": 1}}}}}}},
+    "contracts": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["owner", "semanticValidator", "structuralSchema"], "properties": {"owner": {"type": "string", "minLength": 1}, "semanticValidator": {"type": "string", "minLength": 1}, "structuralSchema": {"type": "string", "minLength": 1}}}},
+    "branchGrammar": {"type": "object", "additionalProperties": false, "required": ["controlBranches", "canonical", "legacyNamespaces"], "properties": {"controlBranches": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "canonical": {"type": "object", "additionalProperties": false, "required": ["authority", "experiment", "work"], "properties": {"authority": {"type": "string", "minLength": 1}, "experiment": {"type": "string", "minLength": 1}, "work": {"type": "string", "minLength": 1}}}, "legacyNamespaces": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+    "managedAuthorities": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["owner", "mutable", "locator", "requiresCanonicalWriter"], "properties": {"owner": {"type": "string", "minLength": 1}, "mutable": {"type": "boolean"}, "requiresCanonicalWriter": {"type": "boolean"}, "locator": {"$ref": "#/$defs/locator"}}}},
+    "resources": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["owner", "locator"], "properties": {"owner": {"type": "string", "minLength": 1}, "locator": {"$ref": "#/$defs/locator"}}}},
+    "components": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["module", "owner", "kind", "sideEffects", "readsAuthorities", "writesAuthorities", "readsResources", "writesResources", "produces", "canonicalWriterFor", "delegatesTo"], "properties": {"module": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "kind": {"enum": ["authority-executor", "cli-adapter", "inspection", "recommendation", "routing-planner", "sanitization-executor", "sanitization-planner"]}, "sideEffects": {"type": "boolean"}, "readsAuthorities": {"$ref": "#/$defs/idList"}, "writesAuthorities": {"$ref": "#/$defs/idList"}, "readsResources": {"$ref": "#/$defs/idList"}, "writesResources": {"$ref": "#/$defs/idList"}, "produces": {"$ref": "#/$defs/idList"}, "canonicalWriterFor": {"$ref": "#/$defs/idList"}, "delegatesTo": {"$ref": "#/$defs/idList"}}}}
+  },
+  "$defs": {
+    "idList": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "locator": {"oneOf": [
+      {"type": "object", "additionalProperties": false, "required": ["kind", "path"], "properties": {"kind": {"enum": ["repository-file", "repository-directory"]}, "path": {"type": "string", "minLength": 1}}},
+      {"type": "object", "additionalProperties": false, "required": ["kind", "branch", "path"], "properties": {"kind": {"const": "git-authority"}, "branch": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}}},
+      {"type": "object", "additionalProperties": false, "required": ["kind", "repository"], "properties": {"kind": {"const": "github-git-refs"}, "repository": {"type": "string", "minLength": 1}}}
+    ]}
   }
 }

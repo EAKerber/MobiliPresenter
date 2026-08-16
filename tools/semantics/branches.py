@@ -3,36 +3,41 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from tools.semantics.registry import load_registry, resolve_term, validate_registry
+from tools.semantics.registry import load_registry
 
 _SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
 
 
 def _registry_grammar() -> dict[str, Any]:
     registry = load_registry()
-    errors = validate_registry(registry)
-    if errors:
-        raise RuntimeError(errors[0])
-    return registry["branchGrammar"]
+    grammar = registry.get("branchGrammar")
+    if not isinstance(grammar, dict) or set(grammar) != {"controlBranches", "canonical", "legacyNamespaces"}:
+        raise RuntimeError("SEMANTIC_BRANCH_GRAMMAR_INVALID")
+    controls = grammar.get("controlBranches")
+    legacy = grammar.get("legacyNamespaces")
+    canonical = grammar.get("canonical")
+    if not isinstance(controls, list) or not controls or any(not isinstance(item, str) or not item for item in controls) or len(controls) != len(set(controls)):
+        raise RuntimeError("SEMANTIC_CONTROL_BRANCHES_INVALID")
+    if not isinstance(legacy, list) or any(not isinstance(item, str) or not item for item in legacy) or len(legacy) != len(set(legacy)):
+        raise RuntimeError("SEMANTIC_LEGACY_NAMESPACES_INVALID")
+    if not isinstance(canonical, dict) or set(canonical) != {"authority", "experiment", "work"}:
+        raise RuntimeError("SEMANTIC_CANONICAL_BRANCHES_INVALID")
+    return grammar
 
 
 def _semantic_domain(term: str, *, legacy: bool) -> tuple[str | None, bool]:
     if not term:
         return None, False
     registry = load_registry()
-    for semantic_id, item in registry["concepts"].items():
-        if item.get("kind") != "branch-domain":
+    for item in registry.get("concepts", {}).values():
+        if not isinstance(item, dict) or item.get("kind") != "branch-domain":
             continue
         if item.get("term") == term:
             return str(item["term"]), False
-    if legacy:
-        try:
-            resolved = resolve_term(term, scope="legacy-branch-namespace")
-        except RuntimeError:
-            return None, False
-        concept = registry["concepts"].get(resolved["semanticId"], {})
-        if concept.get("kind") == "branch-domain":
-            return str(concept.get("term")), bool(resolved.get("alias"))
+        if legacy:
+            for alias in item.get("aliases", []):
+                if isinstance(alias, dict) and alias.get("scope") == "legacy-branch-namespace" and alias.get("term") == term:
+                    return str(item.get("term")), True
     return None, False
 
 

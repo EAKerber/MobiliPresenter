@@ -5,7 +5,7 @@ import json
 
 from tools.semantics.branches import parse_branch_name
 from tools.semantics.contracts import check_contracts
-from tools.semantics.registry import aliases_for, concept, owner_of, validate_registry
+from tools.semantics.registry import aliases_for, component, concept, managed_authority, owner_of, validate_registry
 
 ERROR_EXIT = 2
 
@@ -29,7 +29,7 @@ def _check() -> dict:
     errors.extend(check_contracts())
     return {
         "ok": not errors,
-        "schemaVersion": "OperationalSemanticsCheck 0.1",
+        "schemaVersion": "OperationalSemanticsCheck 0.2",
         "errors": errors,
     }
 
@@ -41,6 +41,14 @@ def parser() -> argparse.ArgumentParser:
     explain = sub.add_parser("explain")
     explain.add_argument("semantic_id")
     explain.add_argument("--json", action="store_true", dest="as_json")
+
+    authority = sub.add_parser("authority")
+    authority.add_argument("authority_id")
+    authority.add_argument("--json", action="store_true", dest="as_json")
+
+    component_parser = sub.add_parser("component")
+    component_parser.add_argument("component_id")
+    component_parser.add_argument("--json", action="store_true", dest="as_json")
 
     check = sub.add_parser("check")
     check.add_argument("--json", action="store_true", dest="as_json")
@@ -56,11 +64,11 @@ def main(argv=None) -> int:
     try:
         if args.command == "explain":
             item = concept(args.semantic_id)
-            payload = {
-                **item,
-                "owner": owner_of(args.semantic_id),
-                "aliases": aliases_for(args.semantic_id),
-            }
+            payload = {**item, "owner": owner_of(args.semantic_id), "aliases": aliases_for(args.semantic_id)}
+        elif args.command == "authority":
+            payload = managed_authority(args.authority_id)
+        elif args.command == "component":
+            payload = component(args.component_id)
         elif args.command == "branch":
             payload = parse_branch_name(args.name)
         else:
