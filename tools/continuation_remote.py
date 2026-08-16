@@ -99,7 +99,7 @@ class GitHubContinuationAuthority:
             value = json.loads(base64.b64decode(encoded).decode("utf-8"))
         except Exception as exc:
             raise ContinuationRemoteError("CONTINUATION_REMOTE_INVALID_STATE", cid) from exc
-        errors = continuation.validate(value, cid)
+        errors = continuation.validate_current(value, cid)
         if errors:
             raise ContinuationRemoteError(errors[0], cid)
         return value
@@ -136,6 +136,7 @@ class GitHubContinuationAuthority:
                 state_dir=self.state_dir,
             )
             protocol.require_expected_plan(planned, expected_plan)
+            continuation.require_current(planned["candidate"], planned["subject"]["id"])
         except RuntimeError as exc:
             raise ContinuationRemoteError(str(exc).split(":", 1)[0]) from exc
 
