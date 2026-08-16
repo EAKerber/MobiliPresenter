@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import agent, project_sensors
+from tools import agent, project_coherence, project_sensors
 
-SCHEMA_VERSION = "ProjectMachineInspection 0.1"
+SCHEMA_VERSION = "ProjectMachineInspection 0.2"
 REPOSITORY = "EAKerber/MobiliPresenter"
 SCOPES = {"local", "base", "live"}
 STATUSES = {"PASS", "UNKNOWN", "FAIL"}
@@ -90,31 +90,23 @@ def observations(sensors: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     items = continuation_data.get("items", []) if isinstance(continuation_data, dict) else []
     terminal = [item for item in items if isinstance(item, dict) and item.get("status") == "DONE"]
     if terminal:
-        out.append({
-            "severity": "INFO",
-            "code": "TERMINAL_CONTINUATION_RESIDUE",
-            "subject": "coordination/continuations",
-            "count": len(terminal),
-            "ids": sorted(str(item.get("id")) for item in terminal),
-        })
-
-    pr_data = sensors.get("pullRequests", {}).get("data") or {}
-    prs = pr_data.get("items", []) if isinstance(pr_data, dict) else []
-    unclassified = [item for item in prs if isinstance(item, dict) and item.get("classification") == "unclassified"]
-    if unclassified:
-        out.append({
-            "severity": "WARN",
-            "code": "UNCLASSIFIED_OPEN_PR",
-            "subject": "github",
-            "count": len(unclassified),
-            "prNumbers": sorted(int(item["number"]) for item in unclassified if isinstance(item.get("number"), int)),
-        })
+        out.append(
+            {
+                "severity": "INFO",
+                "code": "TERMINAL_CONTINUATION_RESIDUE",
+                "subject": "coordination/continuations",
+                "count": len(terminal),
+                "ids": sorted(str(item.get("id")) for item in terminal),
+            }
+        )
     return out
 
 
 def project_summary(state: dict[str, Any]) -> dict[str, Any]:
     return {
         "stateHash": stable_hash(state),
+        "controlBranch": state["git"]["controlBranch"],
+        "preserveBranches": sorted(state["git"].get("preserveBranches") or []),
         "phase": state["development"]["phase"],
         "checkpoint": state["development"]["checkpoint"],
         "nextTransition": state["development"]["nextTransition"],
@@ -124,17 +116,25 @@ def project_summary(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_inspection(state: dict[str, Any], sensors: dict[str, dict[str, Any]], *, scope: str) -> dict[str, Any]:
+def build_inspection(
+    state: dict[str, Any],
+    sensors: dict[str, dict[str, Any]],
+    *,
+    scope: str,
+) -> dict[str, Any]:
     if scope not in SCOPES:
         raise RuntimeError("PROJECT_MACHINE_SCOPE_INVALID")
+    project = project_summary(state)
     body = {
         "schemaVersion": SCHEMA_VERSION,
         "repository": state["project"]["repository"],
         "scope": scope,
         "sourceHeads": source_heads(sensors),
-        "project": project_summary(state),
+        "project": project,
         "sensors": sensors,
+        "authorities": project_coherence.derive_authorities(sensors),
         "trust": aggregate_trust(sensors),
+        "coherence": project_coherence.evaluate_coherence(project, sensors, scope=scope),
         "observations": observations(sensors),
         "readOnly": True,
         "semanticAuthority": False,
@@ -150,40 +150,40 @@ def _load_state() -> dict[str, Any]:
     return state
 
 
+def _common_sensors(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    sensors = project_sensors.observe_local_core(state)
+    sensors["capabilities"] = project_sensors.observe_capabilities()
+    return sensors
+
+
 def inspect_local() -> dict[str, Any]:
     state = _load_state()
-    sensors = project_sensors.observe_local_core(state)
+    sensors = _common_sensors(state)
     sensors["control"] = project_sensors.observe_control_head(state, live=False)
-    sensors["capabilities"] = project_sensors.observe_capabilities()
     sensors["pullRequests"] = project_sensors.observe_pull_requests(state, live=False)
     sensors["coordination"] = project_sensors.observe_coordination(live=False)
     sensors["continuations"] = project_sensors.observe_continuations_local()
-    sensors["development"] = project_sensors.observe_development(state, sensors["pullRequests"], live=False)
     return build_inspection(state, sensors, scope="local")
 
 
 def inspect_base() -> dict[str, Any]:
     """Remote base inspection that deliberately does not depend on live continuations."""
     state = _load_state()
-    sensors = project_sensors.observe_local_core(state)
+    sensors = _common_sensors(state)
     sensors["control"] = project_sensors.observe_control_head(state, live=True)
-    sensors["capabilities"] = project_sensors.observe_capabilities()
     sensors["pullRequests"] = project_sensors.observe_pull_requests(state, live=True)
     sensors["coordination"] = project_sensors.observe_coordination(live=True)
     sensors["continuations"] = project_sensors.observe_continuations_local()
-    sensors["development"] = project_sensors.observe_development(state, sensors["pullRequests"], live=True)
     return build_inspection(state, sensors, scope="base")
 
 
 def inspect_live() -> dict[str, Any]:
     state = _load_state()
-    sensors = project_sensors.observe_local_core(state)
+    sensors = _common_sensors(state)
     sensors["control"] = project_sensors.observe_control_head(state, live=True)
-    sensors["capabilities"] = project_sensors.observe_capabilities()
     sensors["pullRequests"] = project_sensors.observe_pull_requests(state, live=True)
     sensors["coordination"] = project_sensors.observe_coordination(live=True)
     sensors["continuations"] = project_sensors.observe_continuations_live()
-    sensors["development"] = project_sensors.observe_development(state, sensors["pullRequests"], live=True)
     return build_inspection(state, sensors, scope="live")
 
 
@@ -208,6 +208,14 @@ def validate_inspection(value: dict[str, Any]) -> dict[str, Any]:
     if value.get("semanticAuthority") is not False:
         raise RuntimeError("PROJECT_MACHINE_SEMANTIC_AUTHORITY_INVALID")
 
+    project = value.get("project")
+    if not isinstance(project, dict):
+        raise RuntimeError("PROJECT_MACHINE_PROJECT_INVALID")
+    if not isinstance(project.get("controlBranch"), str):
+        raise RuntimeError("PROJECT_MACHINE_CONTROL_BRANCH_INVALID")
+    if not isinstance(project.get("preserveBranches"), list):
+        raise RuntimeError("PROJECT_MACHINE_PRESERVE_BRANCHES_INVALID")
+
     sensors = value.get("sensors")
     if not isinstance(sensors, dict) or not sensors:
         raise RuntimeError("PROJECT_MACHINE_SENSORS_INVALID")
@@ -220,10 +228,18 @@ def validate_inspection(value: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(item.get("required"), bool):
             raise RuntimeError("PROJECT_MACHINE_SENSOR_REQUIRED_INVALID")
 
+    expected_authorities = project_coherence.derive_authorities(sensors)
+    if value.get("authorities") != expected_authorities:
+        raise RuntimeError("PROJECT_MACHINE_AUTHORITIES_MISMATCH")
+
     trust = value.get("trust")
     expected_trust = aggregate_trust(sensors)
     if trust != expected_trust:
         raise RuntimeError("PROJECT_MACHINE_TRUST_MISMATCH")
+
+    expected_coherence = project_coherence.evaluate_coherence(project, sensors, scope=value["scope"])
+    if value.get("coherence") != expected_coherence:
+        raise RuntimeError("PROJECT_MACHINE_COHERENCE_MISMATCH")
 
     heads = value.get("sourceHeads")
     if not isinstance(heads, dict):
@@ -245,7 +261,14 @@ def validate_inspection(value: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(supplied_hash, str) or supplied_hash != expected_hash:
         raise RuntimeError("PROJECT_MACHINE_HASH_MISMATCH")
 
-    return {"ok": True, "inspectionHash": supplied_hash, "trust": trust, "scope": value["scope"], "sourceHeads": heads}
+    return {
+        "ok": True,
+        "inspectionHash": supplied_hash,
+        "trust": trust,
+        "coherence": value["coherence"],
+        "scope": value["scope"],
+        "sourceHeads": heads,
+    }
 
 
 def load_json(path: str) -> dict[str, Any]:
@@ -260,13 +283,16 @@ def load_json(path: str) -> dict[str, Any]:
 
 def _print_human(payload: dict[str, Any]) -> None:
     trust = payload["trust"]
+    coherence = payload["coherence"]
     project = payload["project"]
     print("PROJECT MACHINE INSPECTION")
     print(f"  scope: {payload['scope']}")
     print(f"  trust: {trust['status']}")
+    print(f"  coherence: {coherence['status']}")
     print(f"  phase: {project['phase']}")
     print(f"  checkpoint: {project['checkpoint']}")
     print(f"  next: {project['nextTransition']}")
+    print(f"  authorities: {len(payload['authorities'])}")
     print(f"  observations: {len(payload['observations'])}")
     print(f"  inspectionHash: {payload['inspectionHash']}")
 
@@ -300,13 +326,18 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _print_human(payload)
         status = payload["trust"]["status"]
-        if status == "PASS":
-            return 0
-        if status == "UNKNOWN":
+        coherence_status = payload["coherence"]["status"]
+        if status == "FAIL" or coherence_status == "FAIL":
+            return ERROR_EXIT
+        if status == "UNKNOWN" or coherence_status == "UNKNOWN":
             return UNKNOWN_EXIT
-        return ERROR_EXIT
+        return 0
     except RuntimeError as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False) if getattr(args, "as_json", False) else f"BLOCKED\n{exc}")
+        print(
+            json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+            if getattr(args, "as_json", False)
+            else f"BLOCKED\n{exc}"
+        )
         return ERROR_EXIT
 
 
