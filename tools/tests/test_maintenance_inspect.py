@@ -3,6 +3,8 @@ import unittest
 
 from tools import maintenance_inspect as maintenance
 
+SOURCE_HASH = "f" * 64
+
 
 def state():
     return {
@@ -65,12 +67,13 @@ class MaintenanceInspectTests(unittest.TestCase):
     def build(self,s=None,v=None,caps=None,remote=False,prs=None,coord=None,work_items=None,machine_trust=None,machine_coherence=None,machine_sensors=None):
         return maintenance.build_inspection(
             s or state(),v or verification(),{"worktree": True, "branch": "main", "head": "1" * 40, "dirty": False},caps if caps is not None else [cap()],
+            project_machine_inspection_hash=SOURCE_HASH,
             remote_requested=remote,pull_requests=prs or {"available": False, "reason": "NOT_REQUESTED", "items": []},coordination_state=coord or {"available": False, "reason": "NOT_REQUESTED", "intents": [], "leases": []},
             work_items=work_items or [],machine_trust=machine_trust,machine_coherence=machine_coherence,machine_sensors=machine_sensors,
         )
 
     def test_coherent_state_continues(self):
-        result=self.build();self.assertEqual(result["schemaVersion"],"MaintenanceInspection 0.3");self.assertEqual(result["recommendation"]["action"],"CONTINUE");self.assertEqual(result["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE");self.assertTrue(result["readOnly"])
+        result=self.build();self.assertEqual(result["schemaVersion"],"MaintenanceInspection 0.4");self.assertEqual(result["projectMachineInspectionHash"],SOURCE_HASH);self.assertEqual(result["recommendation"]["action"],"CONTINUE");self.assertEqual(result["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE");self.assertTrue(result["readOnly"]);self.assertTrue(maintenance.validate_inspection(result)["ok"])
     def test_verification_failure_reconciles(self):self.assertEqual(self.build(v=verification(False))["recommendation"]["action"],"RECONCILE")
     def test_blocker_pauses(self):
         current=state();current["development"]["blockers"]=["waiting-on-input"];self.assertEqual(self.build(s=current,work_items=[work("a")])["recommendation"]["action"],"PAUSE")
@@ -104,6 +107,9 @@ class MaintenanceInspectTests(unittest.TestCase):
         result=self.build(work_items=[work("z"),work("a")]);self.assertEqual(result["recommendation"]["focus"],"work:a")
     def test_hash_stable_sensitive_and_handoff_reserved(self):
         first=self.build();second=self.build();self.assertEqual(first["inspectionHash"],second["inspectionHash"]);self.assertIn("HANDOFF",first["recommendation"]["allowedActions"]);current=state();current["development"]["nextTransition"]="different";self.assertNotEqual(first["inspectionHash"],self.build(s=current)["inspectionHash"])
+    def test_work_graph_must_be_exact_projection_of_work_items(self):
+        value=self.build(work_items=[work("a")]);value["workGraph"]["runnable"]=[];body={k:v for k,v in value.items() if k!="inspectionHash"};value["inspectionHash"]=maintenance.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError,"MAINTENANCE_WORK_GRAPH_MISMATCH"):maintenance.validate_inspection(value)
 
 
 if __name__=="__main__":unittest.main()
