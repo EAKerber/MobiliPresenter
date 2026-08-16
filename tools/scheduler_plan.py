@@ -12,37 +12,37 @@ ACTIONS={item.value for item in OperationalAction}; ERROR_EXIT=2
 
 def validate_inspection(value:dict[str,Any])->None:
     if not isinstance(value,dict):raise RuntimeError("SCHEDULER_INSPECTION_INVALID")
-    if value.get("schemaVersion")!="MaintenanceInspection 0.2":raise RuntimeError("SCHEDULER_INSPECTION_SCHEMA_UNSUPPORTED")
+    if value.get("schemaVersion")!="MaintenanceInspection 0.3":raise RuntimeError("SCHEDULER_INSPECTION_SCHEMA_UNSUPPORTED")
     if value.get("readOnly") is not True:raise RuntimeError("SCHEDULER_INSPECTION_NOT_READ_ONLY")
     supplied=value.get("inspectionHash")
     if not isinstance(supplied,str) or supplied!=stable_hash({k:v for k,v in value.items() if k!="inspectionHash"}):raise RuntimeError("SCHEDULER_INSPECTION_HASH_MISMATCH")
     rec=value.get("recommendation")
     if not isinstance(rec,dict) or rec.get("action") not in ACTIONS:raise RuntimeError("SCHEDULER_RECOMMENDATION_INVALID")
     if rec.get("decisionScope")!="operational-only" or rec.get("semanticAuthority") is not False:raise RuntimeError("SCHEDULER_SEMANTIC_AUTHORITY_INVALID")
-def continuation_for(value,cid):
-    for item in value.get("continuations") or []:
-        if isinstance(item,dict) and item.get("id")==cid:return item
-    raise RuntimeError("SCHEDULER_CONTINUATION_NOT_FOUND")
-def continuation_focus(focus):return focus.split(":",1)[1] if isinstance(focus,str) and focus.startswith("continuation:") and len(focus.split(":",1)[1])>0 else None
+def work_for(value,work_id):
+    for item in value.get("workItems") or []:
+        if isinstance(item,dict) and item.get("id")==work_id:return item
+    raise RuntimeError("SCHEDULER_WORK_ITEM_NOT_FOUND")
+def work_focus(focus):return focus.split(":",1)[1] if isinstance(focus,str) and focus.startswith("work:") and len(focus.split(":",1)[1])>0 else None
 def route(value):
-    rec=value["recommendation"];action=OperationalAction.parse(rec["action"]).value;focus=rec.get("focus");cid=continuation_focus(focus)
+    rec=value["recommendation"];action=OperationalAction.parse(rec["action"]).value;focus=rec.get("focus");work_id=work_focus(focus)
     if action==OperationalAction.HANDOFF.value:
-        if cid is None:raise RuntimeError("SCHEDULER_HANDOFF_REQUIRES_CONTINUATION")
-        item=continuation_for(value,cid)
-        if item.get("status")!="HANDOFF" or not isinstance(item.get("handoffTo"),str) or not item["handoffTo"].strip():raise RuntimeError("SCHEDULER_HANDOFF_TARGET_INVALID")
-        return {"shouldWake":True,"channelClass":"worker","target":item["handoffTo"],"continuationId":cid}
+        if work_id is None:raise RuntimeError("SCHEDULER_HANDOFF_REQUIRES_WORK")
+        item=work_for(value,work_id);target=item.get("handoffToWorkerId")
+        if item.get("status")!="HANDOFF" or not isinstance(target,str) or not target.strip():raise RuntimeError("SCHEDULER_HANDOFF_TARGET_INVALID")
+        return {"shouldWake":True,"channelClass":"worker","target":target,"workId":work_id}
     if action==OperationalAction.CONTINUE.value:
-        if cid is not None:
-            item=continuation_for(value,cid)
-            if item.get("status") not in {"READY","IN_PROGRESS"} or not isinstance(item.get("actor"),str) or not item["actor"].strip():raise RuntimeError("SCHEDULER_CONTINUE_TARGET_INVALID")
-            return {"shouldWake":True,"channelClass":"worker","target":item["actor"],"continuationId":cid}
-        return {"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","continuationId":None}
-    if action==OperationalAction.RECONCILE.value:return {"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","continuationId":cid}
-    if action==OperationalAction.PAUSE.value:return {"shouldWake":False,"channelClass":"none","target":None,"continuationId":cid}
-    if action==OperationalAction.NEEDS_HUMAN.value:return {"shouldWake":True,"channelClass":"human","target":"human","continuationId":cid}
+        if work_id is not None:
+            item=work_for(value,work_id);target=item.get("workerId")
+            if item.get("status") not in {"READY","IN_PROGRESS"} or not isinstance(target,str) or not target.strip():raise RuntimeError("SCHEDULER_CONTINUE_TARGET_INVALID")
+            return {"shouldWake":True,"channelClass":"worker","target":target,"workId":work_id}
+        return {"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","workId":None}
+    if action==OperationalAction.RECONCILE.value:return {"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","workId":work_id}
+    if action==OperationalAction.PAUSE.value:return {"shouldWake":False,"channelClass":"none","target":None,"workId":work_id}
+    if action==OperationalAction.NEEDS_HUMAN.value:return {"shouldWake":True,"channelClass":"human","target":"human","workId":work_id}
     raise RuntimeError("SCHEDULER_ACTION_INVALID")
 def build_plan(value):
-    validate_inspection(value);rec=value["recommendation"];body={"schemaVersion":"SchedulerPlan 0.1","inspectionHash":value["inspectionHash"],"action":rec["action"],"reasonCode":str(rec.get("reasonCode") or "UNKNOWN"),"focus":rec.get("focus"),"dispatch":route(value),"decisionScope":"operational-only","semanticAuthority":False,"transportSideEffects":False,"readOnly":True};return {**body,"planHash":stable_hash(body)}
+    validate_inspection(value);rec=value["recommendation"];body={"schemaVersion":"SchedulerPlan 0.2","inspectionHash":value["inspectionHash"],"action":rec["action"],"reasonCode":str(rec.get("reasonCode") or "UNKNOWN"),"focus":rec.get("focus"),"dispatch":route(value),"decisionScope":"operational-only","semanticAuthority":False,"transportSideEffects":False,"readOnly":True};return {**body,"planHash":stable_hash(body)}
 def load_json(path):
     try:value=json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError,json.JSONDecodeError) as exc:raise RuntimeError("SCHEDULER_INPUT_INVALID") from exc

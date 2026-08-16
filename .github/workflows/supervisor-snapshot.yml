@@ -53,9 +53,9 @@ jobs:
 
           inspection = json.loads(Path('/tmp/live-supervisor-inspection.json').read_text(encoding='utf-8'))
           plan = json.loads(Path('/tmp/scheduler-plan.json').read_text(encoding='utf-8'))
-          assert inspection['schemaVersion'] == 'MaintenanceInspection 0.2'
+          assert inspection['schemaVersion'] == 'MaintenanceInspection 0.3'
           assert inspection['readOnly'] is True
-          assert plan['schemaVersion'] == 'SchedulerPlan 0.1'
+          assert plan['schemaVersion'] == 'SchedulerPlan 0.2'
           assert plan['inspectionHash'] == inspection['inspectionHash']
           assert plan['readOnly'] is True
           assert plan['semanticAuthority'] is False

@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
-from tools import project_coherence,project_sensors,project_state
+from tools import project_coherence,project_sensors,project_state,work_graph
 from tools.canonical import stable_hash
 from tools.semantics.observation import ObservationStatus
-SCHEMA_VERSION="ProjectMachineInspection 0.3";REPOSITORY="EAKerber/MobiliPresenter";SCOPES={"local","base","live"};ERROR_EXIT=2;UNKNOWN_EXIT=1
+SCHEMA_VERSION="ProjectMachineInspection 0.4";REPOSITORY="EAKerber/MobiliPresenter";SCOPES={"local","base","live"};ERROR_EXIT=2;UNKNOWN_EXIT=1
 
 def _sensor_status(value):
     if not isinstance(value,dict):return ObservationStatus.FAIL.value
@@ -30,6 +30,14 @@ def source_heads(sensors):
     git_data=sensors.get("git",{}).get("data") or {};observed=git_data.get("observed") if isinstance(git_data,dict) else {};control=sensors.get("control",{}).get("data") or {};coordination=sensors.get("coordination",{}).get("data") or {};continuations=sensors.get("continuations",{}).get("data") or {}
     return {"inspection":{"branch":observed.get("branch") if isinstance(observed,dict) else None,"sha":observed.get("head") if isinstance(observed,dict) else None},"control":{"branch":control.get("branch"),"sha":control.get("sha")},"coordination":{"branch":coordination.get("authorityBranch"),"sha":coordination.get("authorityHead")},"continuation":{"branch":continuations.get("authorityBranch"),"sha":continuations.get("authorityHead")}}
 
+def work_graph_projection(sensors):
+    continuation_data=sensors.get("continuations",{}).get("data") or {}
+    if not isinstance(continuation_data,dict):raise RuntimeError("PROJECT_MACHINE_WORK_DATA_INVALID")
+    raw_items=continuation_data.get("items")
+    if not isinstance(raw_items,list):raise RuntimeError("PROJECT_MACHINE_WORK_ITEMS_INVALID")
+    if any(not isinstance(item,dict) for item in raw_items):raise RuntimeError("PROJECT_MACHINE_WORK_ITEM_INVALID")
+    return work_graph.build(raw_items)
+
 def observations(sensors):
     out=[];continuation_data=sensors.get("continuations",{}).get("data") or {};items=continuation_data.get("items",[]) if isinstance(continuation_data,dict) else [];terminal=[item for item in items if isinstance(item,dict) and item.get("status")=="DONE"]
     if terminal:out.append({"severity":"INFO","code":"TERMINAL_CONTINUATION_RESIDUE","subject":"coordination/continuations","count":len(terminal),"ids":sorted(str(item.get("id")) for item in terminal)})
@@ -41,7 +49,7 @@ def project_summary(state):
 
 def build_inspection(state,sensors,*,scope):
     if scope not in SCOPES:raise RuntimeError("PROJECT_MACHINE_SCOPE_INVALID")
-    view=project_state.operational_view(state);project=project_summary(state);body={"schemaVersion":SCHEMA_VERSION,"repository":view["project"]["repository"],"scope":scope,"sourceHeads":source_heads(sensors),"project":project,"sensors":sensors,"authorities":project_coherence.derive_authorities(sensors),"trust":aggregate_trust(sensors),"coherence":project_coherence.evaluate_coherence(project,sensors,scope=scope),"observations":observations(sensors),"readOnly":True,"semanticAuthority":False};return {**body,"inspectionHash":stable_hash(body)}
+    view=project_state.operational_view(state);project=project_summary(state);graph=work_graph_projection(sensors);body={"schemaVersion":SCHEMA_VERSION,"repository":view["project"]["repository"],"scope":scope,"sourceHeads":source_heads(sensors),"project":project,"sensors":sensors,"workGraph":graph,"authorities":project_coherence.derive_authorities(sensors),"trust":aggregate_trust(sensors),"coherence":project_coherence.evaluate_coherence(project,sensors,scope=scope),"observations":observations(sensors),"readOnly":True,"semanticAuthority":False};return {**body,"inspectionHash":stable_hash(body)}
 
 def _load_state():
     state=project_state.load_state();errors=project_state.validate_current(state)
@@ -78,6 +86,8 @@ def validate_inspection(value):
         try:ObservationStatus.parse(str(item.get("status") or "").upper())
         except RuntimeError as exc:raise RuntimeError("PROJECT_MACHINE_SENSOR_STATUS_INVALID") from exc
         if not isinstance(item.get("required"),bool):raise RuntimeError("PROJECT_MACHINE_SENSOR_REQUIRED_INVALID")
+    expected_graph=work_graph_projection(sensors)
+    if value.get("workGraph")!=expected_graph:raise RuntimeError("PROJECT_MACHINE_WORK_GRAPH_MISMATCH")
     expected_authorities=project_coherence.derive_authorities(sensors)
     if value.get("authorities")!=expected_authorities:raise RuntimeError("PROJECT_MACHINE_AUTHORITIES_MISMATCH")
     trust=value.get("trust");expected_trust=aggregate_trust(sensors)
@@ -101,7 +111,7 @@ def load_json(path):
     if not isinstance(value,dict):raise RuntimeError("PROJECT_MACHINE_INPUT_INVALID")
     return value
 def _print_human(payload):
-    trust=payload["trust"];coherence=payload["coherence"];project=payload["project"];print("PROJECT MACHINE INSPECTION");print(f"  scope: {payload['scope']}");print(f"  trust: {trust['status']}");print(f"  coherence: {coherence['status']}");print(f"  phase: {project['phase']}");print(f"  checkpoint: {project['checkpoint']}");print(f"  next: {project['nextTransition']}");print(f"  authorities: {len(payload['authorities'])}");print(f"  observations: {len(payload['observations'])}");print(f"  inspectionHash: {payload['inspectionHash']}")
+    trust=payload["trust"];coherence=payload["coherence"];project=payload["project"];graph=payload["workGraph"];print("PROJECT MACHINE INSPECTION");print(f"  scope: {payload['scope']}");print(f"  trust: {trust['status']}");print(f"  coherence: {coherence['status']}");print(f"  phase: {project['phase']}");print(f"  checkpoint: {project['checkpoint']}");print(f"  next: {project['nextTransition']}");print(f"  runnable work: {len(graph['runnable'])}");print(f"  authorities: {len(payload['authorities'])}");print(f"  observations: {len(payload['observations'])}");print(f"  inspectionHash: {payload['inspectionHash']}")
 def main(argv=None):
     parser=argparse.ArgumentParser(prog="project-machine");sub=parser.add_subparsers(dest="command",required=True);inspect_parser=sub.add_parser("inspect");scope_group=inspect_parser.add_mutually_exclusive_group(required=True);scope_group.add_argument("--live",action="store_true");scope_group.add_argument("--base",action="store_true");scope_group.add_argument("--local",action="store_true");inspect_parser.add_argument("--json",action="store_true",dest="as_json");validate_parser=sub.add_parser("validate");validate_parser.add_argument("path");validate_parser.add_argument("--json",action="store_true",dest="as_json");args=parser.parse_args(argv)
     try:

@@ -6,16 +6,16 @@ V={"ok":True,"checks":[],"remote":None}; G={"worktree":True,"branch":"main","hea
 C={"id":"coordination-leases","policy":"canonical","reviewAction":"NO_EXPERIMENTAL_REVIEW","nextGates":[],"backlogCount":0,"roundsWithoutActiveGates":0,"maxRoundsWithoutActiveGates":3,"deferReason":None,"reviewPlanHash":"a"*64}
 
 def task(status):
-    return {"id":"task-one","actor":"developer-ui","status":status,"branch":None,"prNumber":None,"completed":[],"remaining":["a"],"nextAction":"do a","lastKnownGood":{"sha":None,"checkpoint":None},"blockedBy":[],"handoffTo":None,"stateHash":"b"*64}
+    return {"id":"task-one","workerId":"developer-ui","status":status,"branch":None,"prNumber":None,"dependsOn":[],"completed":[],"remaining":["a"],"nextAction":"do a","lastKnownGood":{"sha":None,"checkpoint":None},"blockers":[],"handoffToWorkerId":None,"sourceSchemaVersion":"ContinuationState 0.1","stateHash":"b"*64}
 def inspect(items):
-    return m.build_inspection(S,V,G,[C],remote_requested=False,pull_requests={"available":False,"reason":"NOT_REQUESTED","items":[]},coordination_state={"available":False,"reason":"NOT_REQUESTED","intents":[],"leases":[]},continuations=items)
+    return m.build_inspection(S,V,G,[C],remote_requested=False,pull_requests={"available":False,"reason":"NOT_REQUESTED","items":[]},coordination_state={"available":False,"reason":"NOT_REQUESTED","intents":[],"leases":[]},work_items=items)
 
 class Tests(unittest.TestCase):
     def test_handoff(self):
-        t=task("HANDOFF"); t["handoffTo"]="developer-engine"; self.assertEqual(inspect([t])["recommendation"]["action"],"HANDOFF")
+        t=task("HANDOFF"); t["handoffToWorkerId"]="developer-engine"; self.assertEqual(inspect([t])["recommendation"]["action"],"HANDOFF")
     def test_wait(self):
-        t=task("WAITING"); t["blockedBy"]=["input"]; self.assertEqual(inspect([t])["recommendation"]["action"],"PAUSE")
-    def test_runnable(self): self.assertEqual(inspect([task("IN_PROGRESS")])["recommendation"]["reasonCode"],"CONTINUATION_RUNNABLE")
+        t=task("WAITING"); t["blockers"]=["input"]; self.assertEqual(inspect([t])["recommendation"]["action"],"PAUSE")
+    def test_runnable(self): self.assertEqual(inspect([task("IN_PROGRESS")])["recommendation"]["reasonCode"],"WORK_RUNNABLE")
     def test_done(self):
         t=task("DONE"); t["remaining"]=[]; t["nextAction"]=None; self.assertEqual(inspect([t])["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE")
 

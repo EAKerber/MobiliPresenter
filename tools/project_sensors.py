@@ -42,7 +42,8 @@ def observe_capabilities():
 
 
 def continuation_item(value):
-    return {"id":value["id"],"actor":value["actor"],"status":value["status"],"branch":value["branch"],"prNumber":value["prNumber"],"completed":value["completed"],"remaining":value["remaining"],"nextAction":value["nextAction"],"lastKnownGood":value["lastKnownGood"],"blockedBy":value["blockedBy"],"handoffTo":value["handoffTo"],"stateHash":continuation.state_hash(value)}
+    view=continuation.operational_view(value)
+    return {**view,"sourceSchemaVersion":value["schemaVersion"],"stateHash":continuation.state_hash(value)}
 
 
 def observe_continuations_local():

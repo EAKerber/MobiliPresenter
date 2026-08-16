@@ -13,6 +13,25 @@ def state(active=None, pr=None):
     }
 
 
+def work_item(work_id="probe-one", status="DONE"):
+    return {
+        "id": work_id,
+        "workerId": "developer-ui",
+        "status": status,
+        "branch": "ops/old" if status == "DONE" else None,
+        "prNumber": 7 if status == "DONE" else None,
+        "dependsOn": [],
+        "completed": ["probe"] if status == "DONE" else [],
+        "remaining": [] if status == "DONE" else ["probe"],
+        "nextAction": None if status == "DONE" else "probe",
+        "lastKnownGood": {"sha": None, "checkpoint": None},
+        "blockers": [],
+        "handoffToWorkerId": None,
+        "sourceSchemaVersion": "ContinuationState 0.1",
+        "stateHash": "a" * 64,
+    }
+
+
 def base_sensors():
     verification = {"status": "PASS", "ok": True, "complete": True, "checks": [], "remote": None}
     capability = {"id": "coordination-leases", "policy": "canonical", "supervisorParticipation": "active", "reviewAction": "NO_EXPERIMENTAL_REVIEW", "nextGates": [], "backlogCount": 0, "roundsWithoutActiveGates": 0, "maxRoundsWithoutActiveGates": 3, "deferReason": None, "reviewPlanHash": "a" * 64}
@@ -30,11 +49,13 @@ def base_sensors():
 
 
 class ProjectMachineTests(unittest.TestCase):
-    def test_complete_live_inspection_has_pass_trust_and_coherence(self):
+    def test_complete_live_inspection_has_pass_trust_coherence_and_graph(self):
         value = project_machine.build_inspection(state(), base_sensors(), scope="live")
-        self.assertEqual(value["schemaVersion"], "ProjectMachineInspection 0.3")
+        self.assertEqual(value["schemaVersion"], "ProjectMachineInspection 0.4")
         self.assertEqual(value["project"]["protectedBranches"], ["architecture/tpc"])
         self.assertNotIn("preserveBranches", value["project"])
+        self.assertEqual(value["workGraph"]["schemaVersion"], "WorkGraph 0.1")
+        self.assertEqual(value["workGraph"]["nodes"], [])
         self.assertEqual(value["trust"]["status"], "PASS")
         self.assertEqual(value["coherence"]["status"], "PASS")
         self.assertTrue(project_machine.validate_inspection(value)["ok"])
@@ -92,6 +113,10 @@ class ProjectMachineTests(unittest.TestCase):
         value = project_machine.build_inspection(state(), base_sensors(), scope="live"); value["authorities"] = []; body = {k:v for k,v in value.items() if k != "inspectionHash"}; value["inspectionHash"] = project_machine.stable_hash(body)
         with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_AUTHORITIES_MISMATCH"): project_machine.validate_inspection(value)
 
+    def test_work_graph_tampering_is_rejected_even_if_rehashed(self):
+        value = project_machine.build_inspection(state(), base_sensors(), scope="live"); value["workGraph"]["terminal"] = ["fake"]; body = {k:v for k,v in value.items() if k != "inspectionHash"}; value["inspectionHash"] = project_machine.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_WORK_GRAPH_MISMATCH"): project_machine.validate_inspection(value)
+
     def test_coherence_tampering_is_rejected_even_if_rehashed(self):
         value = project_machine.build_inspection(state(), base_sensors(), scope="live"); value["coherence"]["status"] = "FAIL"; body = {k:v for k,v in value.items() if k != "inspectionHash"}; value["inspectionHash"] = project_machine.stable_hash(body)
         with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_COHERENCE_MISMATCH"): project_machine.validate_inspection(value)
@@ -100,15 +125,15 @@ class ProjectMachineTests(unittest.TestCase):
         value = project_machine.build_inspection(state(), base_sensors(), scope="live"); value["sourceHeads"]["control"]["sha"] = "9" * 40; body = {k:v for k,v in value.items() if k != "inspectionHash"}; value["inspectionHash"] = project_machine.stable_hash(body)
         with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_SOURCE_HEADS_MISMATCH"): project_machine.validate_inspection(value)
 
-    def test_done_continuation_is_observation_not_failure(self):
-        sensors = base_sensors(); sensors["continuations"]["data"]["items"] = [{"id": "probe-one", "status": "DONE", "branch": "ops/old", "prNumber": 7}]
+    def test_done_continuation_is_terminal_work_observation_not_failure(self):
+        sensors = base_sensors(); sensors["continuations"]["data"]["items"] = [work_item()]
         value = project_machine.build_inspection(state(), sensors, scope="live")
-        self.assertEqual(value["trust"]["status"], "PASS"); self.assertEqual(value["coherence"]["status"], "PASS"); self.assertEqual(value["observations"][0]["code"], "TERMINAL_CONTINUATION_RESIDUE")
+        self.assertEqual(value["trust"]["status"], "PASS"); self.assertEqual(value["coherence"]["status"], "PASS"); self.assertEqual(value["workGraph"]["terminal"], ["probe-one"]); self.assertEqual(value["observations"][0]["code"], "TERMINAL_CONTINUATION_RESIDUE")
 
     def test_maintenance_parity_from_project_machine(self):
         sensors = base_sensors(); machine = project_machine.build_inspection(state(), sensors, scope="live"); from_machine = maintenance_inspect.from_project_inspection(machine)
         view_state = {"project":{"repository":"EAKerber/MobiliPresenter"},"git":{"activeDevelopmentBranch":None,"controlBranch":"main"},"development":{"phase":"between-increments","checkpoint":"C","nextTransition":"next","prNumber":None,"blockers":[]}}
-        direct = maintenance_inspect.build_inspection(view_state, sensors["projectState"]["data"]["verification"], sensors["git"]["data"]["observed"], sensors["capabilities"]["data"]["items"], remote_requested=True, pull_requests=sensors["pullRequests"]["data"], coordination_state=sensors["coordination"]["data"], continuations=sensors["continuations"]["data"]["items"], machine_trust=machine["trust"], machine_coherence=machine["coherence"], machine_sensors=machine["sensors"])
+        direct = maintenance_inspect.build_inspection(view_state, sensors["projectState"]["data"]["verification"], sensors["git"]["data"]["observed"], sensors["capabilities"]["data"]["items"], remote_requested=True, pull_requests=sensors["pullRequests"]["data"], coordination_state=sensors["coordination"]["data"], work_items=sensors["continuations"]["data"]["items"], work_graph=machine["workGraph"], machine_trust=machine["trust"], machine_coherence=machine["coherence"], machine_sensors=machine["sensors"])
         self.assertEqual(from_machine["recommendation"], direct["recommendation"]); self.assertEqual(from_machine["findings"], direct["findings"])
 
     def test_project_machine_has_no_apply_surface(self):
