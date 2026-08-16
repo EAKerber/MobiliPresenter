@@ -19,6 +19,11 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+try:
+    import prune_plan as git_prune_plan
+except ModuleNotFoundError:
+    from tools import prune_plan as git_prune_plan
+
 ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / "ops" / "state" / "project.json"
 SCHEMA_PATH = ROOT / "ops" / "schemas" / "project-state.schema.json"
@@ -551,31 +556,7 @@ def build_prune_plan(state: dict[str, Any], refs: dict[str, str], open_pr_heads:
 
 
 def command_git_prune_plan(as_json: bool) -> int:
-    state = load_json(STATE_PATH)
-    errors = validate_state_shape(state)
-    if errors:
-        raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
-    refs = branch_refs()
-    remote_ok, open_pr_heads, remote_error = observe_open_pr_heads(state)
-    plan = build_prune_plan(state, refs, open_pr_heads if remote_ok else None)
-    if not remote_ok:
-        plan["remoteObservationError"] = remote_error
-    if as_json:
-        print(json.dumps(plan, indent=2, ensure_ascii=False))
-    else:
-        counts: dict[str, int] = {}
-        for entry in plan["entries"]:
-            counts[entry["action"]] = counts.get(entry["action"], 0) + 1
-        print("GIT PRUNE PLAN")
-        print(f"  branches: {plan['branchCount']}")
-        print(f"  keep: {counts.get('keep', 0)}")
-        print(f"  candidate: {counts.get('candidate', 0)}")
-        print(f"  archive-first: {counts.get('archive-first', 0)}")
-        print(f"  review: {counts.get('review', 0)}")
-        print(f"  open-pr protection: {plan['remoteOpenPrProtection']}")
-        print(f"  apply eligible: {plan['applyEligible']}")
-        print(f"  planHash: {plan['planHash']}")
-    return 0
+    return git_prune_plan.command(as_json)
 
 
 def main() -> int:
