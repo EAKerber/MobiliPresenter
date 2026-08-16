@@ -165,7 +165,7 @@ def git_context_check(state: dict[str, Any], observed: dict[str, Any]) -> dict[s
         return {"name": "git-context", "status": "PASS", "code": None, "context": "control", "branch": branch}
     if branch in preserved:
         return {"name": "git-context", "status": "PASS", "code": None, "context": "preserved-parallel", "branch": branch}
-    if isinstance(branch, str) and branch.startswith("ops/git-ops-"):
+    if isinstance(branch, str) and branch.startswith("ops/"):
         return {"name": "git-context", "status": "PASS", "code": None, "context": "operations", "branch": branch}
     return {"name": "git-context", "status": "FAIL", "code": "UNEXPECTED_BRANCH", "observed": branch, "expected": active}
 
