@@ -79,15 +79,19 @@ class ContinuationCompatibilityTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "RESTART_REQUIRES_V02"):
             transition.restart(transition.advance(v01(), ["a", "b"])["candidate"], ["again"], "repeat")
 
-    def test_dependencies_block_advance_until_done(self):
+    def test_dependencies_block_advance_until_done_and_rebuild_with_inventory(self):
         dependency = v02("dep", "developer-engine")
         dependent = v02("child", depends=["dep"])
         with self.assertRaisesRegex(RuntimeError, "DEPENDENCY_NOT_DONE"):
             transition.advance(dependent, ["a"], "do b", inventory=[dependent, dependency])
         dep_empty = transition.advance(dependency, ["a", "b"])["candidate"]
         dep_done = transition.done(dep_empty)["candidate"]
-        plan = transition.advance(dependent, ["a"], "do b", inventory=[dependent, dep_done])
+        inventory = [dependent, dep_done]
+        plan = transition.advance(dependent, ["a"], "do b", inventory=inventory)
         self.assertEqual(plan["candidate"]["completed"], ["a"])
+        self.assertEqual(transition.validate_plan(plan, dependent, bind_before=True, inventory=inventory), plan)
+        with self.assertRaisesRegex(RuntimeError, "WORK_GRAPH_INVENTORY_REQUIRED"):
+            transition.validate_plan(plan, dependent, bind_before=True)
 
     def test_live_executor_rejects_v02_before_observation(self):
         plan = transition.create(
