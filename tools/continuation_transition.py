@@ -261,7 +261,12 @@ def restart(before: dict[str, Any], remaining: list[str], next_action: str) -> d
     return _build("restart", before, after, {"remaining": remaining, "nextAction": next_action})
 
 
-def rebuild(plan: dict[str, Any], before: dict[str, Any] | None) -> dict[str, Any]:
+def rebuild(
+    plan: dict[str, Any],
+    before: dict[str, Any] | None,
+    *,
+    inventory: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     protocol.validate_plan(plan)
     action = plan["action"]
     intent = plan["intent"]
@@ -280,7 +285,7 @@ def rebuild(plan: dict[str, Any], before: dict[str, Any] | None) -> dict[str, An
         raise RuntimeError("CONTINUATION_FILE_MISSING")
     continuation.valid_compatible(before, cid)
     if action == "advance":
-        return advance(before, intent.get("completed"), intent.get("nextAction"), intent.get("lastGoodSha"), intent.get("checkpoint"))
+        return advance(before, intent.get("completed"), intent.get("nextAction"), intent.get("lastGoodSha"), intent.get("checkpoint"), inventory=inventory)
     if action == "wait":
         return wait(before, intent.get("blockers") if before.get("schemaVersion") == continuation.CANDIDATE_SCHEMA_VERSION else intent.get("blockedBy"))
     if action == "handoff":
@@ -288,7 +293,7 @@ def rebuild(plan: dict[str, Any], before: dict[str, Any] | None) -> dict[str, An
     if action == "resume":
         return resume(before, intent.get("workerId") if before.get("schemaVersion") == continuation.CANDIDATE_SCHEMA_VERSION else intent.get("actor"))
     if action == "done":
-        return done(before)
+        return done(before, inventory=inventory)
     if action == "bind-execution":
         return bind_execution(before, intent.get("branch"), intent.get("prNumber"))
     if action == "restart":
@@ -304,6 +309,7 @@ def validate_plan(
     authority_branch: str = DEFAULT_BRANCH,
     state_dir: str = DEFAULT_DIR,
     bind_before: bool = False,
+    inventory: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     protocol.validate_plan(plan)
     if plan["domain"] != "continuation":
@@ -318,7 +324,7 @@ def validate_plan(
     if bind_before:
         if continuation.state_hash(before) != plan["beforeStateHash"]:
             raise RuntimeError("CONTINUATION_PLAN_STALE")
-        rebuilt = rebuild(plan, before)
+        rebuilt = rebuild(plan, before, inventory=inventory)
         if rebuilt != plan:
             raise RuntimeError("CONTINUATION_PLAN_SEMANTICS_MISMATCH")
     return plan
