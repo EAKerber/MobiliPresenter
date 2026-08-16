@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "OperationalSemantics 0.1",
+  "schemaVersion": "OperationalSemantics 0.2",
   "owners": {
     "capability": {"description": "Capability lifecycle and gate semantics."},
     "coordination": {"description": "Coordination lease semantics."},
@@ -50,5 +50,212 @@
       "work": "work/<domain>/<slug>"
     },
     "legacyNamespaces": ["agent", "architecture", "archive", "backup", "coordination", "deploy", "engine", "ops", "planning", "renderer", "tmp", "ui", "variant"]
+  },
+  "managedAuthorities": {
+    "capability-gates": {
+      "owner": "capability",
+      "mutable": true,
+      "locator": {"kind": "repository-directory", "path": "ops/capabilities"},
+      "requiresCanonicalWriter": true
+    },
+    "continuations": {
+      "owner": "work",
+      "mutable": true,
+      "locator": {"kind": "git-authority", "branch": "coordination/continuations", "path": "ops/continuations"},
+      "requiresCanonicalWriter": true
+    },
+    "coordination-leases": {
+      "owner": "coordination",
+      "mutable": true,
+      "locator": {"kind": "git-authority", "branch": "coordination/leases", "path": "ops/coordination/leases.json"},
+      "requiresCanonicalWriter": true
+    },
+    "project-state": {
+      "owner": "operations-core",
+      "mutable": true,
+      "locator": {"kind": "repository-file", "path": "ops/state/project.json"},
+      "requiresCanonicalWriter": true
+    }
+  },
+  "resources": {
+    "capability-transition-evidence": {
+      "owner": "capability",
+      "locator": {"kind": "repository-directory", "path": "ops/evidence/capability-gates"}
+    },
+    "git-branch-refs": {
+      "owner": "git-governance",
+      "locator": {"kind": "github-git-refs", "repository": "EAKerber/MobiliPresenter"}
+    }
+  },
+  "components": {
+    "agent-cli": {
+      "module": "tools.agent",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": ["project-state"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": ["project-state-executor"]
+    },
+    "capability-executor": {
+      "module": "tools.capability_apply",
+      "owner": "capability",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": ["capability-gates"],
+      "writesAuthorities": ["capability-gates"],
+      "readsResources": ["capability-transition-evidence"],
+      "writesResources": ["capability-transition-evidence"],
+      "produces": [],
+      "canonicalWriterFor": ["capability-gates"],
+      "delegatesTo": []
+    },
+    "capability-lifecycle-cli": {
+      "module": "tools.capability_lifecycle",
+      "owner": "capability",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": ["capability-gates"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": ["capability-executor"]
+    },
+    "continuation-executor": {
+      "module": "tools.continuation_remote",
+      "owner": "work",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": ["continuations"],
+      "writesAuthorities": ["continuations"],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": ["artifact.receipt"],
+      "canonicalWriterFor": ["continuations"],
+      "delegatesTo": []
+    },
+    "continuation-live-cli": {
+      "module": "tools.continuation_live",
+      "owner": "work",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": ["continuations"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": ["continuation-executor"]
+    },
+    "coordination-executor": {
+      "module": "tools.coordination_remote",
+      "owner": "coordination",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": ["coordination-leases"],
+      "writesAuthorities": ["coordination-leases"],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": ["coordination-leases"],
+      "delegatesTo": []
+    },
+    "coordination-lock-cli": {
+      "module": "tools.lock",
+      "owner": "coordination",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": ["coordination-leases"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": ["coordination-executor"]
+    },
+    "maintenance-inspection": {
+      "module": "tools.maintenance_inspect",
+      "owner": "operations-core",
+      "kind": "recommendation",
+      "sideEffects": false,
+      "readsAuthorities": ["capability-gates", "continuations", "coordination-leases", "project-state"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": ["artifact.inspection", "artifact.recommendation"],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "project-machine": {
+      "module": "tools.project_machine",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": ["capability-gates", "continuations", "coordination-leases", "project-state"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": ["artifact.inspection"],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "project-state-executor": {
+      "module": "tools.project_state_apply",
+      "owner": "operations-core",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": ["project-state"],
+      "writesAuthorities": ["project-state"],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": ["artifact.receipt"],
+      "canonicalWriterFor": ["project-state"],
+      "delegatesTo": []
+    },
+    "prune-apply": {
+      "module": "tools.prune_apply",
+      "owner": "git-governance",
+      "kind": "sanitization-executor",
+      "sideEffects": true,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": ["git-branch-refs"],
+      "writesResources": ["git-branch-refs"],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "prune-plan": {
+      "module": "tools.prune_plan",
+      "owner": "git-governance",
+      "kind": "sanitization-planner",
+      "sideEffects": false,
+      "readsAuthorities": ["project-state"],
+      "writesAuthorities": [],
+      "readsResources": ["git-branch-refs"],
+      "writesResources": [],
+      "produces": ["artifact.sanitization-plan"],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "scheduler-plan": {
+      "module": "tools.scheduler_plan",
+      "owner": "scheduler",
+      "kind": "routing-planner",
+      "sideEffects": false,
+      "readsAuthorities": ["capability-gates", "continuations", "coordination-leases", "project-state"],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": ["artifact.routing-plan"],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    }
   }
 }
