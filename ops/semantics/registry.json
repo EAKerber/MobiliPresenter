@@ -33,10 +33,15 @@
     "identity.session": {"term": "session", "kind": "identity", "owner": "operations-core", "definition": "Ephemeral execution instance of a worker.", "related": ["identity.worker"]},
     "identity.worker": {"term": "worker", "kind": "identity", "owner": "operations-core", "definition": "Persistent identifiable executor of a logical role.", "related": ["identity.role", "identity.session"]},
     "identity.worker-reference": {"term": "worker-reference", "kind": "identity-reference", "owner": "operations-core", "definition": "Reference to a worker identity from another operational contract.", "related": ["identity.worker"]},
-    "status.observation": {"term": "ObservationStatus", "kind": "status-vocabulary", "owner": "operations-core", "definition": "Epistemic observation status: PASS means required facts were observed and validated; UNKNOWN means they could not be determined; FAIL means required factual observation or contract validation failed."}
+    "status.observation": {"term": "ObservationStatus", "kind": "status-vocabulary", "owner": "operations-core", "definition": "Epistemic observation status: PASS means required facts were observed and validated; UNKNOWN means they could not be determined; FAIL means required factual observation or contract validation failed."},
+    "status.work": {"term": "WorkStatus", "kind": "status-vocabulary", "owner": "work", "definition": "Persistent work lifecycle vocabulary: READY, IN_PROGRESS, WAITING, HANDOFF, DONE."},
+    "work.dependency": {"term": "WorkDependency", "kind": "domain-concept", "owner": "work", "definition": "Directed dependsOn relation between persistent work items. Dependencies are resolved only when the referenced work item is DONE."},
+    "work.graph": {"term": "WorkGraph", "kind": "projection", "owner": "work", "definition": "Read-only deterministic graph derived from work items and their dependsOn relations; never an independent authority."},
+    "work.item": {"term": "WorkItem", "kind": "domain-concept", "owner": "work", "definition": "Persistent unit of executable work stored in the existing continuations authority."}
   },
   "contracts": {
     "capability-gates": {"owner": "capability", "semanticValidator": "tools.capability_gates.validate_capability", "structuralSchema": "ops/schemas/capability-gates.schema.json"},
+    "continuation-state": {"owner": "work", "semanticValidator": "tools.continuation.validate_current", "structuralSchema": "ops/schemas/continuation-state.schema.json"},
     "operational-semantics": {"owner": "operations-core", "semanticValidator": "tools.semantics.registry.validate_registry", "structuralSchema": "ops/schemas/operational-semantics.schema.json"},
     "project-state": {"owner": "operations-core", "semanticValidator": "tools.project_state.validate_current", "structuralSchema": "ops/schemas/project-state.schema.json"},
     "source-build": {"owner": "operations-core", "semanticValidator": "tools.publication.validate_manifest", "structuralSchema": "ops/schemas/source-build.schema.json"}
