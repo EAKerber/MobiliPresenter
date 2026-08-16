@@ -86,7 +86,7 @@ class SemanticTopologyTests(unittest.TestCase):
 
     def test_canonical_hash_direct_cli_entrypoints_bootstrap_root(self):
         tools_root = Path(__file__).resolve().parents[1]
-        for name in ("capability_gates.py", "peer_recovery.py", "scheduler_snapshot.py"):
+        for name in ("capability_gates.py", "maintenance_inspect.py", "peer_recovery.py", "scheduler_plan.py", "scheduler_snapshot.py"):
             result = subprocess.run(
                 [sys.executable, str(tools_root / name), "--help"],
                 cwd=tools_root.parent,
@@ -125,6 +125,13 @@ class SemanticTopologyTests(unittest.TestCase):
         self.assertEqual("cli-adapter", value["kind"])
         self.assertEqual([], value["writesAuthorities"])
         self.assertEqual(["coordination-executor"], value["delegatesTo"])
+
+    def test_artifact_transformers_do_not_claim_direct_authority_reads(self):
+        maintenance = registry.component("maintenance-inspection")
+        scheduler = registry.component("scheduler-plan")
+        self.assertEqual([], maintenance["readsAuthorities"])
+        self.assertEqual(["project-machine"], maintenance["delegatesTo"])
+        self.assertEqual([], scheduler["readsAuthorities"])
 
     def test_component_projection_reports_adapter_delegation(self):
         value = registry.component("continuation-live-cli")
