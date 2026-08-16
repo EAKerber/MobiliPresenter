@@ -67,7 +67,7 @@ class ProjectSensorsTests(unittest.TestCase):
                 True,
                 {
                     "workflow_runs": [
-                        {"name": "Agent Ops", "status": "in_progress", "conclusion": None, "id": 1}
+                        {"name": "Supervisor Snapshot", "status": "in_progress", "conclusion": None, "id": 1}
                     ]
                 },
             ),
