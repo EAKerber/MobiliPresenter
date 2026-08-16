@@ -1,3 +1,4 @@
+import copy
 import unittest
 
 from tools import maintenance_inspect, project_machine, project_sensors
@@ -62,6 +63,30 @@ class ProjectMachineTests(unittest.TestCase):
         value = project_machine.build_inspection(state(), base_sensors(), scope="live")
         value["project"]["checkpoint"] = "tampered"
         with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_HASH_MISMATCH"):
+            project_machine.validate_inspection(value)
+
+    def test_invalid_sensor_status_is_rejected_even_if_rehashed(self):
+        value = project_machine.build_inspection(state(), base_sensors(), scope="live")
+        value["sensors"]["coordination"]["status"] = "MAYBE"
+        body = {key: item for key, item in value.items() if key != "inspectionHash"}
+        value["inspectionHash"] = project_machine.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_SENSOR_STATUS_INVALID"):
+            project_machine.validate_inspection(value)
+
+    def test_source_head_mismatch_is_rejected_even_if_rehashed(self):
+        value = project_machine.build_inspection(state(), base_sensors(), scope="live")
+        value["sourceHeads"]["control"]["sha"] = "9" * 40
+        body = {key: item for key, item in value.items() if key != "inspectionHash"}
+        value["inspectionHash"] = project_machine.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_SOURCE_HEADS_MISMATCH"):
+            project_machine.validate_inspection(value)
+
+    def test_derived_observation_mismatch_is_rejected_even_if_rehashed(self):
+        value = project_machine.build_inspection(state(), base_sensors(), scope="live")
+        value["observations"] = [{"severity": "INFO", "code": "INVENTED"}]
+        body = {key: item for key, item in value.items() if key != "inspectionHash"}
+        value["inspectionHash"] = project_machine.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "PROJECT_MACHINE_OBSERVATIONS_MISMATCH"):
             project_machine.validate_inspection(value)
 
     def test_done_continuation_is_observation_not_failure(self):
