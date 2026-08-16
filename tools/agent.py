@@ -3,29 +3,29 @@
 
 Operational facts live in ProjectState and domain authorities. The toolbox
 provides read-only observation/verification plus bounded transition helpers.
-Branch pruning is planned separately and may be applied only by the guarded
-Branch Hygiene executor after exact-plan validation and readback.
+Mutations are plan-only by default and use domain executors with exact-plan
+validation and readback. Branch pruning remains a separately guarded flow.
 """
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
-try:
-    import prune_plan as git_prune_plan
-except ModuleNotFoundError:
-    from tools import prune_plan as git_prune_plan
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools import project_state_apply
+from tools import project_state_transition
+from tools import prune_plan as git_prune_plan
+
 STATE_PATH = ROOT / "ops" / "state" / "project.json"
 SCHEMA_PATH = ROOT / "ops" / "schemas" / "project-state.schema.json"
 ERROR_EXIT = 2
@@ -194,11 +194,7 @@ def verification_summary(checks: list[dict[str, Any]]) -> dict[str, Any]:
         status = "UNKNOWN"
     else:
         status = "PASS"
-    return {
-        "status": status,
-        "ok": status != "FAIL",
-        "complete": status == "PASS",
-    }
+    return {"status": status, "ok": status != "FAIL", "complete": status == "PASS"}
 
 
 def observe_remote(state: dict[str, Any], observed: dict[str, Any]) -> dict[str, Any]:
@@ -244,12 +240,7 @@ def remote_verification_checks(state: dict[str, Any], remote: dict[str, Any]) ->
     if remote.get("developmentActive") is False:
         return [{"name": "remote-development", "status": "PASS", "code": "NO_ACTIVE_DEVELOPMENT"}]
     if not remote.get("available"):
-        return [{
-            "name": "remote-observation",
-            "status": "UNKNOWN",
-            "code": "REMOTE_OBSERVATION_UNAVAILABLE",
-            "observed": remote.get("reason"),
-        }]
+        return [{"name": "remote-observation", "status": "UNKNOWN", "code": "REMOTE_OBSERVATION_UNAVAILABLE", "observed": remote.get("reason")}]
 
     pr = remote.get("pr", {})
     identity_ok = (
@@ -258,12 +249,7 @@ def remote_verification_checks(state: dict[str, Any], remote: dict[str, Any]) ->
         and pr.get("baseRef") == state["git"].get("controlBranch")
         and pr.get("state") == "open"
     )
-    checks = [{
-        "name": "remote-pr-identity",
-        "status": "PASS" if identity_ok else "FAIL",
-        "code": None if identity_ok else "REMOTE_PR_DIVERGENCE",
-    }]
-
+    checks = [{"name": "remote-pr-identity", "status": "PASS" if identity_ok else "FAIL", "code": None if identity_ok else "REMOTE_PR_DIVERGENCE"}]
     ci = str(remote.get("ci") or "unknown")
     if ci == "green":
         ci_status, ci_code = "PASS", None
@@ -287,12 +273,10 @@ def verify_state(include_remote: bool = False) -> dict[str, Any]:
     else:
         checks.append({"name": "project-state", "status": "PASS", "code": None})
 
-    checks.append({"name": "project-state-schema", "status": "PASS" if SCHEMA_PATH.is_file() else "FAIL",
-                   "code": None if SCHEMA_PATH.is_file() else "SCHEMA_FILE_MISSING"})
+    checks.append({"name": "project-state-schema", "status": "PASS" if SCHEMA_PATH.is_file() else "FAIL", "code": None if SCHEMA_PATH.is_file() else "SCHEMA_FILE_MISSING"})
     plan = state.get("development", {}).get("plan")
     plan_exists = isinstance(plan, str) and (ROOT / plan).is_file()
-    checks.append({"name": "development-plan", "status": "PASS" if plan_exists else "FAIL",
-                   "code": None if plan_exists else "DEVELOPMENT_PLAN_MISSING", "path": plan})
+    checks.append({"name": "development-plan", "status": "PASS" if plan_exists else "FAIL", "code": None if plan_exists else "DEVELOPMENT_PLAN_MISSING", "path": plan})
 
     manifest_rel = state.get("published", {}).get("artifactManifest") if isinstance(state.get("published"), dict) else None
     manifest_path = ROOT / manifest_rel if isinstance(manifest_rel, str) else None
@@ -301,16 +285,13 @@ def verify_state(include_remote: bool = False) -> dict[str, Any]:
         expected_release = state["published"].get("release")
         expected_hash = state["published"].get("artifactSha256")
         match = manifest.get("release") == expected_release and manifest.get("sha256") == expected_hash
-        checks.append({"name": "published-artifact-state", "status": "PASS" if match else "FAIL",
-                       "code": None if match else "STATE_DIVERGENCE",
-                       "observedRelease": manifest.get("release"), "observedSha256": manifest.get("sha256")})
+        checks.append({"name": "published-artifact-state", "status": "PASS" if match else "FAIL", "code": None if match else "STATE_DIVERGENCE", "observedRelease": manifest.get("release"), "observedSha256": manifest.get("sha256")})
     else:
         checks.append({"name": "published-artifact-state", "status": "FAIL", "code": "MANIFEST_MISSING"})
 
     for rel in ("AGENTS.md", "README.md", "deploy.py"):
         exists = (ROOT / rel).is_file()
-        checks.append({"name": f"required:{rel}", "status": "PASS" if exists else "FAIL",
-                       "code": None if exists else "REQUIRED_FILE_MISSING"})
+        checks.append({"name": f"required:{rel}", "status": "PASS" if exists else "FAIL", "code": None if exists else "REQUIRED_FILE_MISSING"})
 
     observed = observed_git()
     checks.append(git_context_check(state, observed))
@@ -318,28 +299,8 @@ def verify_state(include_remote: bool = False) -> dict[str, Any]:
     if include_remote:
         remote = observe_remote(state, observed)
         checks.extend(remote_verification_checks(state, remote))
-
     summary = verification_summary(checks)
     return {**summary, "checks": checks, "remote": remote}
-
-
-def checkpoint_candidate(state: dict[str, Any], checkpoint: str, next_transition: str, phase: str | None) -> dict[str, Any]:
-    candidate = copy.deepcopy(state)
-    candidate["development"]["checkpoint"] = checkpoint
-    candidate["development"]["nextTransition"] = next_transition
-    if phase:
-        candidate["development"]["phase"] = phase
-    return candidate
-
-
-def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-    encoded = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
-        handle.write(encoded)
-        temp_name = handle.name
-    os.replace(temp_name, path)
-    if path.read_text(encoding="utf-8") != encoded:
-        raise RuntimeError("STATE_READBACK_MISMATCH")
 
 
 def command_status(as_json: bool, include_remote: bool) -> int:
@@ -375,17 +336,13 @@ def command_status(as_json: bool, include_remote: bool) -> int:
 
 def command_doctor(as_json: bool) -> int:
     checks: list[dict[str, Any]] = []
-    checks.append({"name": "python", "status": "PASS" if sys.version_info >= (3, 10) else "FAIL",
-                   "observed": sys.version.split()[0], "code": None if sys.version_info >= (3, 10) else "PYTHON_TOO_OLD"})
-    checks.append({"name": "git-executable", "status": "PASS" if shutil.which("git") else "FAIL",
-                   "code": None if shutil.which("git") else "GIT_NOT_FOUND"})
-    checks.append({"name": "gh-executable", "status": "PASS" if shutil.which("gh") else "INFO",
-                   "code": None if shutil.which("gh") else "GH_NOT_FOUND"})
+    checks.append({"name": "python", "status": "PASS" if sys.version_info >= (3, 10) else "FAIL", "observed": sys.version.split()[0], "code": None if sys.version_info >= (3, 10) else "PYTHON_TOO_OLD"})
+    checks.append({"name": "git-executable", "status": "PASS" if shutil.which("git") else "FAIL", "code": None if shutil.which("git") else "GIT_NOT_FOUND"})
+    checks.append({"name": "gh-executable", "status": "PASS" if shutil.which("gh") else "INFO", "code": None if shutil.which("gh") else "GH_NOT_FOUND"})
     try:
         state = load_json(STATE_PATH)
         state_ok = not validate_state_shape(state)
-        checks.append({"name": "project-state", "status": "PASS" if state_ok else "FAIL",
-                       "code": None if state_ok else "STATE_SCHEMA_INVALID"})
+        checks.append({"name": "project-state", "status": "PASS" if state_ok else "FAIL", "code": None if state_ok else "STATE_SCHEMA_INVALID"})
     except RuntimeError as exc:
         checks.append({"name": "project-state", "status": "FAIL", "code": str(exc).split(":", 1)[0]})
 
@@ -394,8 +351,7 @@ def command_doctor(as_json: bool) -> int:
         expected_repo = "EAKerber/MobiliPresenter"
         origin = git.get("origin") or ""
         origin_ok = expected_repo.lower() in origin.lower()
-        checks.append({"name": "git-origin", "status": "PASS" if origin_ok else "FAIL",
-                       "observed": origin, "code": None if origin_ok else "WRONG_REPOSITORY"})
+        checks.append({"name": "git-origin", "status": "PASS" if origin_ok else "FAIL", "observed": origin, "code": None if origin_ok else "WRONG_REPOSITORY"})
     else:
         checks.append({"name": "git-worktree", "status": "FAIL", "code": "NOT_A_GIT_WORKTREE"})
 
@@ -427,50 +383,36 @@ def command_verify(as_json: bool, include_remote: bool) -> int:
 
 def command_checkpoint(as_json: bool, args: argparse.Namespace) -> int:
     state = load_json(STATE_PATH)
-    errors = validate_state_shape(state)
-    if errors:
-        raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
-    candidate = checkpoint_candidate(state, args.checkpoint, args.next_transition, args.phase)
-    candidate_errors = validate_state_shape(candidate)
-    if candidate_errors:
-        raise RuntimeError(f"CHECKPOINT_STATE_INVALID:{candidate_errors[0]['detail']}")
-    change = {
-        "from": {
-            "phase": state["development"]["phase"],
-            "checkpoint": state["development"]["checkpoint"],
-            "nextTransition": state["development"]["nextTransition"],
-        },
-        "to": {
-            "phase": candidate["development"]["phase"],
-            "checkpoint": candidate["development"]["checkpoint"],
-            "nextTransition": candidate["development"]["nextTransition"],
-        },
-        "applied": False,
-    }
+    plan = project_state_transition.checkpoint(
+        state,
+        args.checkpoint,
+        args.next_transition,
+        args.phase,
+        validator=validate_state_shape,
+    )
+    payload = plan
     if args.apply:
-        active = state["git"].get("activeDevelopmentBranch")
-        if active is None:
-            raise RuntimeError("CHECKPOINT_NO_ACTIVE_DEVELOPMENT")
-        git = observed_git()
-        if not git.get("worktree"):
-            raise RuntimeError("CHECKPOINT_NOT_A_WORKTREE")
-        if git.get("branch") != active:
-            raise RuntimeError(f"CHECKPOINT_WRONG_BRANCH:{git.get('branch')}")
-        if git.get("dirty"):
-            raise RuntimeError("CHECKPOINT_DIRTY_WORKTREE")
-        atomic_write_json(STATE_PATH, candidate)
-        readback = load_json(STATE_PATH)
-        if readback != candidate:
-            raise RuntimeError("STATE_READBACK_MISMATCH")
-        change["applied"] = True
+        payload = project_state_apply.apply(
+            plan,
+            args.expected_plan,
+            state_path=STATE_PATH,
+            load_state=lambda: load_json(STATE_PATH),
+            validator=validate_state_shape,
+            observe_git=observed_git,
+        )
     if as_json:
-        print(json.dumps(change, indent=2, ensure_ascii=False))
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    elif args.apply:
+        print("APPLIED")
+        print(f"  plan: {payload['planHash']}")
+        print(f"  receipt: {payload['receiptHash']}")
+        print(f"  verified: {payload['verified']}")
     else:
-        mode = "APPLIED" if change["applied"] else "DRY-RUN"
-        print(mode)
-        print(f"  checkpoint: {change['from']['checkpoint']} -> {change['to']['checkpoint']}")
-        print(f"  phase: {change['from']['phase']} -> {change['to']['phase']}")
-        print(f"  next: {change['from']['nextTransition']} -> {change['to']['nextTransition']}")
+        print("PLAN")
+        print(f"  plan: {payload['planHash']}")
+        print(f"  checkpoint: {state['development']['checkpoint']} -> {payload['candidate']['development']['checkpoint']}")
+        print(f"  phase: {state['development']['phase']} -> {payload['candidate']['development']['phase']}")
+        print(f"  next: {state['development']['nextTransition']} -> {payload['candidate']['development']['nextTransition']}")
     return 0
 
 
@@ -492,7 +434,7 @@ def command_handoff(as_json: bool, include_remote: bool) -> int:
         "verification": verify,
         "recentCommits": recent_commits(state["git"]["controlBranch"]) if observed.get("worktree") else {"available": False},
         "nextTransition": state["development"]["nextTransition"],
-        "note": "Derived snapshot; not a new source of truth."
+        "note": "Derived snapshot; not a new source of truth.",
     }
     if as_json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -586,7 +528,7 @@ def build_prune_plan(state: dict[str, Any], refs: dict[str, str], open_pr_heads:
         "openPrHeads": sorted(open_pr_heads or []),
         "entries": entries,
         "applyEligible": open_pr_heads is not None,
-        "note": "Legacy local planner retained for compatibility tests; the canonical command delegates to tools/prune_plan.py."
+        "note": "Legacy local planner retained for compatibility tests; the canonical command delegates to tools/prune_plan.py.",
     }
     return {**body, "planHash": stable_plan_hash(body)}
 
@@ -605,6 +547,7 @@ def main() -> int:
     parser.add_argument("--next", dest="next_transition")
     parser.add_argument("--phase")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--expected-plan")
     args = parser.parse_args()
     try:
         if args.command == "status":
