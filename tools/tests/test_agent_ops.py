@@ -79,6 +79,76 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(agent.aggregate_ci([{"status": "COMPLETED", "conclusion": "FAILURE"}]), "failed")
         self.assertEqual(agent.aggregate_ci([{"status": "COMPLETED", "conclusion": "SUCCESS"}]), "green")
 
+    def test_verification_summary_distinguishes_unknown_from_failure(self):
+        self.assertEqual(
+            agent.verification_summary([{"status": "PASS"}]),
+            {"status": "PASS", "ok": True, "complete": True},
+        )
+        self.assertEqual(
+            agent.verification_summary([{"status": "PASS"}, {"status": "UNKNOWN"}]),
+            {"status": "UNKNOWN", "ok": True, "complete": False},
+        )
+        self.assertEqual(
+            agent.verification_summary([{"status": "UNKNOWN"}, {"status": "FAIL"}]),
+            {"status": "FAIL", "ok": False, "complete": False},
+        )
+
+    def test_remote_unavailable_is_unknown_not_green(self):
+        checks = agent.remote_verification_checks(
+            self.base_state(), {"available": False, "reason": "GH_NOT_FOUND", "ci": "unknown"}
+        )
+        self.assertEqual(checks[0]["status"], "UNKNOWN")
+        self.assertEqual(checks[0]["code"], "REMOTE_OBSERVATION_UNAVAILABLE")
+
+    def test_remote_ci_pending_and_unknown_are_unknown(self):
+        state = self.base_state()
+        remote = {
+            "available": True,
+            "developmentActive": True,
+            "pr": {
+                "number": 6,
+                "headRef": "renderer/fixed-view-realistic-v1",
+                "baseRef": "main",
+                "state": "open",
+            },
+            "ci": "pending",
+        }
+        checks = agent.remote_verification_checks(state, remote)
+        self.assertEqual(checks[0]["status"], "PASS")
+        self.assertEqual(checks[1]["status"], "UNKNOWN")
+        self.assertEqual(checks[1]["code"], "REMOTE_CI_PENDING")
+        remote["ci"] = "unknown"
+        checks = agent.remote_verification_checks(state, remote)
+        self.assertEqual(checks[1]["status"], "UNKNOWN")
+        self.assertEqual(checks[1]["code"], "REMOTE_CI_UNKNOWN")
+
+    def test_remote_green_and_failed_remain_decisive(self):
+        state = self.base_state()
+        remote = {
+            "available": True,
+            "developmentActive": True,
+            "pr": {
+                "number": 6,
+                "headRef": "renderer/fixed-view-realistic-v1",
+                "baseRef": "main",
+                "state": "open",
+            },
+            "ci": "green",
+        }
+        checks = agent.remote_verification_checks(state, remote)
+        self.assertEqual(checks[1]["status"], "PASS")
+        remote["ci"] = "failed"
+        checks = agent.remote_verification_checks(state, remote)
+        self.assertEqual(checks[1]["status"], "FAIL")
+        self.assertEqual(checks[1]["code"], "REMOTE_CI_FAILED")
+
+    def test_no_active_development_is_known_pass(self):
+        checks = agent.remote_verification_checks(
+            self.between_increments_state(),
+            {"available": True, "developmentActive": False, "reason": "NO_ACTIVE_DEVELOPMENT", "ci": "unknown"},
+        )
+        self.assertEqual(checks, [{"name": "remote-development", "status": "PASS", "code": "NO_ACTIVE_DEVELOPMENT"}])
+
     def test_unexpected_branch_is_rejected(self):
         check = agent.git_context_check(self.base_state(), {"worktree": True, "branch": "random/branch"})
         self.assertEqual(check["status"], "FAIL")
@@ -96,6 +166,13 @@ class GitOps12Tests(unittest.TestCase):
 
     def test_git_ops_branch_is_valid_operational_context(self):
         check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "ops/git-ops-1.2"})
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["context"], "operations")
+
+    def test_project_machine_branch_is_valid_operational_context(self):
+        check = agent.git_context_check(
+            self.between_increments_state(), {"worktree": True, "branch": "ops/project-machine-m0-baseline"}
+        )
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["context"], "operations")
 
