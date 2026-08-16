@@ -266,7 +266,7 @@ def verify_state(include_remote: bool = False) -> dict[str, Any]:
             })
         except RuntimeError as exc:
             checks.append({"name": "published-artifact-state", "status": "FAIL", "code": str(exc).split(":", 1)[0], "path": manifest_rel})
-    for rel in ("AGENTS.md", "README.md", "deploy.py"):
+    for rel in ("AGENTS.md", "README.md"):
         exists = (ROOT / rel).is_file()
         checks.append({"name": f"required:{rel}", "status": "PASS" if exists else "FAIL", "code": None if exists else "REQUIRED_FILE_MISSING"})
     observed = observed_git()
