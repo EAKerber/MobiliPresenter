@@ -40,6 +40,28 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python tools/agent.py verify --remote --json
+      - name: Generate branch prune audit
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/prune_plan.py --json > /tmp/git-prune-plan.json
+          python -m json.tool /tmp/git-prune-plan.json > /dev/null
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/git-prune-plan.json'))
+          assert p['schemaVersion'] == 'GitPrunePlan 0.2'
+          assert p['destructiveApplySupported'] is False
+          assert all(e['autoDeleteEligible'] for e in p['entries'] if e['action'] == 'delete-candidate')
+          assert all(e['action'] == 'keep' for e in p['entries'] if e['protections'])
+          PY
+      - name: Upload branch prune audit
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-prune-plan
+          path: /tmp/git-prune-plan.json
+          if-no-files-found: error
       - name: Generate maintenance inspection
         if: github.event_name == 'pull_request'
         env:
