@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/transition-plan.schema.json",
+  "title": "TransitionPlan 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "domain",
+    "action",
+    "subject",
+    "authority",
+    "beforeStateHash",
+    "afterStateHash",
+    "intent",
+    "candidate",
+    "reversibility",
+    "planHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "TransitionPlan 0.1"},
+    "domain": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "action": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "locator": {"type": "object", "minProperties": 1}
+      }
+    },
+    "beforeStateHash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "afterStateHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "intent": {"type": "object"},
+    "candidate": {"type": "object"},
+    "reversibility": {"enum": ["revertible", "compensatable", "irreversible"]},
+    "planHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

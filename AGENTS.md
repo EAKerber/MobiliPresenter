@@ -84,14 +84,16 @@ python3 tools/agent.py verify
 Para preparar uma transição de checkpoint sem escrever:
 
 ```bash
-python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION>
+python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION> --json
 ```
 
-A escrita de checkpoint é deliberada e limitada ao estado operacional:
+O resultado é um `TransitionPlan 0.1`. A aplicação exige identidade exata desse plano e só produz `TransitionReceipt 0.1` depois de readback verificado:
 
 ```bash
-python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION> --apply
+python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION> --apply --expected-plan <PLAN_HASH> --json
 ```
+
+`TransitionPlan` e `TransitionReceipt` são envelopes determinísticos, não authorities. A semântica do candidate pertence ao domínio e a escrita pertence ao executor do domínio; o protocolo comum não é executor genérico.
 
 Para produzir um handoff derivado, sem criar uma nova fonte de verdade:
 
@@ -123,7 +125,7 @@ Autoridades:
 - histórico: Git;
 - PR/CI: GitHub observado, não duplicado em arquivo local.
 
-`ProjectMachineInspection`, `MaintenanceInspection`, `SchedulerPlan`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
+`ProjectMachineInspection`, `MaintenanceInspection`, `SchedulerPlan`, `TransitionPlan`, `TransitionReceipt`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
 
 Não promover automaticamente permissões ou autorizações efêmeras de um chat para política permanente do repositório.
 
@@ -153,7 +155,8 @@ Regras:
 12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente;
 13. uma decisão supervisora deve ser derivada de sensores observáveis. `CONTINUE` significa apenas ausência de impedimento operacional conhecido; não equivale a aprovação semântica da próxima mudança;
 14. continuidade entre chats depende de estado persistente na authority `coordination/continuations`, não da memória de um chat, de arquivos não publicados no checkout local ou da mera existência de uma branch de trabalho;
-15. o Scheduler planner somente deriva roteamento da inspeção validada; não cria autoridade semântica, não escolhe papel por conteúdo do produto e não realiza transporte como efeito colateral.
+15. o Scheduler planner somente deriva roteamento da inspeção validada; não cria autoridade semântica, não escolhe papel por conteúdo do produto e não realiza transporte como efeito colateral;
+16. mutações que usam `TransitionPlan 0.1` são plan-only por padrão, exigem `expected-plan` exato antes da escrita e só são consideradas concluídas após `TransitionReceipt 0.1` verificado por readback.
 
 ## 4. Protocolo Git determinístico
 
