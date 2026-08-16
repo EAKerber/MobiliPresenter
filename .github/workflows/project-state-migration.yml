@@ -1,0 +1,71 @@
+name: ProjectState Migration
+
+on:
+  push:
+    branches:
+      - work/operations/project-state-v2-migration
+    paths:
+      - ops/migrations/project-state-2.0.plan-request.json
+      - ops/migrations/project-state-2.0.apply-request.json
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: work/operations/project-state-v2-migration
+
+      - name: Refresh control head
+        run: git fetch origin main --no-tags
+
+      - name: Configure commit identity
+        run: |
+          git config user.name "MobiliPresenter Migration"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Materialize exact migration plan
+        if: ${{ hashFiles('ops/migrations/project-state-2.0.plan-request.json') != '' }}
+        run: |
+          python3 tools/project_state_migrate_live.py plan --json > ops/migrations/project-state-2.0.plan.json
+          rm ops/migrations/project-state-2.0.plan-request.json
+          git add ops/migrations/project-state-2.0.plan.json ops/migrations/project-state-2.0.plan-request.json
+          git commit -m "M4B materialize exact ProjectState migration plan"
+          git push origin HEAD:work/operations/project-state-v2-migration
+
+      - name: Apply exact reviewed migration plan
+        if: ${{ hashFiles('ops/migrations/project-state-2.0.apply-request.json') != '' }}
+        run: |
+          test -f ops/migrations/project-state-2.0.plan.json
+          EXPECTED_PLAN="$(python3 - <<'PY'
+          import json
+          request=json.load(open('ops/migrations/project-state-2.0.apply-request.json', encoding='utf-8'))
+          if request.get('schemaVersion') != 'ProjectStateMigrationApplyRequest 0.1':
+              raise SystemExit('APPLY_REQUEST_SCHEMA_INVALID')
+          value=request.get('expectedPlanHash')
+          if not isinstance(value,str) or len(value)!=64:
+              raise SystemExit('APPLY_REQUEST_PLAN_HASH_INVALID')
+          print(value)
+          PY
+          )"
+          PLAN_HASH="$(python3 - <<'PY'
+          import json
+          plan=json.load(open('ops/migrations/project-state-2.0.plan.json', encoding='utf-8'))
+          print(plan['planHash'])
+          PY
+          )"
+          test "$EXPECTED_PLAN" = "$PLAN_HASH"
+          python3 tools/project_state_migrate_live.py apply \
+            --plan ops/migrations/project-state-2.0.plan.json \
+            --expected-plan "$EXPECTED_PLAN" \
+            --authorize-schema-migration \
+            --json > /tmp/project-state-migration-result.json
+          rm ops/migrations/project-state-2.0.apply-request.json
+          git add ops/state/project.json ops/evidence/project-state/project-state-2.0-migration.json ops/migrations/project-state-2.0.apply-request.json
+          git commit -m "M4B apply ProjectState 2.0 authority migration"
+          git push origin HEAD:work/operations/project-state-v2-migration
