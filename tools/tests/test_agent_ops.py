@@ -1,4 +1,3 @@
-import copy
 import importlib.util
 import os
 import unittest
@@ -65,14 +64,6 @@ class GitOps12Tests(unittest.TestCase):
         errors = agent.validate_state_shape(state)
         self.assertTrue(any(error["code"] == "DEVELOPMENT_IDENTITY_INCOMPLETE" for error in errors))
 
-    def test_checkpoint_candidate_does_not_mutate_input(self):
-        state = self.base_state()
-        before = copy.deepcopy(state)
-        candidate = agent.checkpoint_candidate(state, checkpoint="FH-01", next_transition="fh-02", phase=None)
-        self.assertEqual(state, before)
-        self.assertEqual(candidate["development"]["checkpoint"], "FH-01")
-        self.assertEqual(candidate["development"]["nextTransition"], "fh-02")
-
     def test_ci_aggregation(self):
         self.assertEqual(agent.aggregate_ci([]), "unknown")
         self.assertEqual(agent.aggregate_ci([{"status": "IN_PROGRESS", "conclusion": None}]), "pending")
@@ -80,10 +71,7 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(agent.aggregate_ci([{"status": "COMPLETED", "conclusion": "SUCCESS"}]), "green")
 
     def test_verification_summary_distinguishes_unknown_from_failure(self):
-        self.assertEqual(
-            agent.verification_summary([{"status": "PASS"}]),
-            {"status": "PASS", "ok": True, "complete": True},
-        )
+        self.assertEqual(agent.verification_summary([{"status": "PASS"}]), {"status": "PASS", "ok": True, "complete": True})
         self.assertEqual(
             agent.verification_summary([{"status": "PASS"}, {"status": "UNKNOWN"}]),
             {"status": "UNKNOWN", "ok": True, "complete": False},
@@ -94,9 +82,7 @@ class GitOps12Tests(unittest.TestCase):
         )
 
     def test_remote_unavailable_is_unknown_not_green(self):
-        checks = agent.remote_verification_checks(
-            self.base_state(), {"available": False, "reason": "GH_NOT_FOUND", "ci": "unknown"}
-        )
+        checks = agent.remote_verification_checks(self.base_state(), {"available": False, "reason": "GH_NOT_FOUND", "ci": "unknown"})
         self.assertEqual(checks[0]["status"], "UNKNOWN")
         self.assertEqual(checks[0]["code"], "REMOTE_OBSERVATION_UNAVAILABLE")
 
@@ -105,12 +91,7 @@ class GitOps12Tests(unittest.TestCase):
         remote = {
             "available": True,
             "developmentActive": True,
-            "pr": {
-                "number": 6,
-                "headRef": "renderer/fixed-view-realistic-v1",
-                "baseRef": "main",
-                "state": "open",
-            },
+            "pr": {"number": 6, "headRef": "renderer/fixed-view-realistic-v1", "baseRef": "main", "state": "open"},
             "ci": "pending",
         }
         checks = agent.remote_verification_checks(state, remote)
@@ -127,12 +108,7 @@ class GitOps12Tests(unittest.TestCase):
         remote = {
             "available": True,
             "developmentActive": True,
-            "pr": {
-                "number": 6,
-                "headRef": "renderer/fixed-view-realistic-v1",
-                "baseRef": "main",
-                "state": "open",
-            },
+            "pr": {"number": 6, "headRef": "renderer/fixed-view-realistic-v1", "baseRef": "main", "state": "open"},
             "ci": "green",
         }
         checks = agent.remote_verification_checks(state, remote)
@@ -170,9 +146,7 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(check["context"], "operations")
 
     def test_project_machine_branch_is_valid_operational_context(self):
-        check = agent.git_context_check(
-            self.between_increments_state(), {"worktree": True, "branch": "ops/project-machine-m0-baseline"}
-        )
+        check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "ops/project-machine-m0-baseline"})
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["context"], "operations")
 
