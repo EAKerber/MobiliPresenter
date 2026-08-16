@@ -1,0 +1,155 @@
+name: C1A Consolidation Harness
+
+on:
+  push:
+    branches:
+      - 'work/operations/paved-road-consolidation-c1a'
+    paths:
+      - '.github/workflows/c1a-consolidation.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: work/operations/paved-road-consolidation-c1a
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Characterize duplicate primitives and write paths
+        run: |
+          echo '=== stable_hash definitions ==='
+          grep -RIn --include='*.py' '^def stable_hash' tools || true
+          echo '=== qualified stable_hash callers ==='
+          grep -RIn --include='*.py' -E '(gates|peer_recovery|snapshot|capability_gates|transition_protocol)\.stable_hash' tools || true
+          echo '=== coordination private writer calls outside executor ==='
+          grep -RIn --include='*.py' -E '\._(create_blob|create_tree|create_commit|advance_ref|verify_published_transition)\(' tools | grep -v 'tools/coordination_remote.py' || true
+      - name: Apply C1A writer and hash consolidation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=None):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              found = text.count(old)
+              expected = 1 if count is None else count
+              if found != expected:
+                  raise RuntimeError(f'{path}: expected {expected} matches, found {found}: {old[:80]!r}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          # Coordination: one public mutation road, optionally CAS-bound to an exact observed revision.
+          replace(
+              'tools/coordination_remote.py',
+              '''    def mutate(\n        self,\n        planner: Callable[[dict[str, Any], datetime], tuple[dict[str, Any], dict[str, Any]]],\n        *,\n        message: str,\n    ) -> AppliedTransition:\n''',
+              '''    def mutate(\n        self,\n        planner: Callable[[dict[str, Any], datetime], tuple[dict[str, Any], dict[str, Any]]],\n        *,\n        message: str,\n        expected_revision: str | None = None,\n    ) -> AppliedTransition:\n''',
+          )
+          replace(
+              'tools/coordination_remote.py',
+              '''        observed = self.observe()\n        candidate, event = planner(copy.deepcopy(observed.state), observed.authority_now)\n''',
+              '''        observed = self.observe()\n        if expected_revision is not None:\n            if not isinstance(expected_revision, str) or not re.fullmatch(r"[0-9a-f]{40}", expected_revision):\n                raise CoordinationRemoteError("COORDINATION_EXPECTED_REVISION_INVALID", "expected revision must be a 40-character commit SHA")\n            if observed.head_sha != expected_revision:\n                raise CoordinationRemoteError(\n                    "COORDINATION_EXPECTED_REVISION_MISMATCH",\n                    f"expected {expected_revision}, observed {observed.head_sha}",\n                )\n        candidate, event = planner(copy.deepcopy(observed.state), observed.authority_now)\n''',
+          )
+
+          admin = Path('tools/coordination_admin.py')
+          text = admin.read_text(encoding='utf-8')
+          start = text.index('def apply_break_glass(')
+          end = text.index('\ndef build_parser()', start)
+          replacement = '''def apply_break_glass(\n    authority: GitHubCoordinationAuthority,\n    *,\n    expected_revision: str,\n    admin_owner: dict[str, Any],\n    resources: list[str],\n    reason: str,\n    transition_id: str,\n) -> AppliedTransition:\n    def planner(state: dict[str, Any], authority_now: datetime) -> tuple[dict[str, Any], dict[str, Any]]:\n        return plan_break_glass(\n            state,\n            admin_owner=admin_owner,\n            resources=resources,\n            reason=reason,\n            now=authority_now,\n            transition_id=transition_id,\n            expected_revision=expected_revision,\n        )\n\n    try:\n        return authority.mutate(\n            planner,\n            message=f"coordination: break-glass {transition_id}",\n            expected_revision=expected_revision,\n        )\n    except CoordinationRemoteError as exc:\n        if exc.code == "COORDINATION_REF_DRIFT":\n            raise CoordinationRemoteError(\n                "COORDINATION_EXPECTED_REVISION_MISMATCH",\n                "authority changed during break-glass transaction",\n            ) from exc\n        raise\n\n'''
+          admin.write_text(text[:start] + replacement + text[end+1:], encoding='utf-8')
+
+          # Registry: declare the already-existing admin CLI as an adapter, never as a writer.
+          registry = Path('ops/semantics/registry.json')
+          text = registry.read_text(encoding='utf-8')
+          marker = '    "coordination-lock-cli": {"module": "tools.lock",'
+          if text.count(marker) != 1 or '"coordination-admin-cli"' in text:
+              raise RuntimeError('registry coordination adapter insertion point invalid')
+          entry = '    "coordination-admin-cli": {"module": "tools.coordination_admin", "owner": "coordination", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["coordination-leases"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["coordination-executor"]},\n'
+          registry.write_text(text.replace(marker, entry + marker), encoding='utf-8')
+
+          # Hashing: implementation lives only in tools.canonical; domains define only what gets hashed.
+          def canonicalize_hash_module(path):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              text = text.replace('import hashlib\n', '')
+              block = '''\ndef stable_hash(value: Any) -> str:\n    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")\n    return hashlib.sha256(encoded).hexdigest()\n'''
+              if block not in text:
+                  raise RuntimeError(f'{path}: stable_hash block not found')
+              text = text.replace(block, '')
+              anchor = 'from typing import Any\n'
+              if anchor not in text:
+                  raise RuntimeError(f'{path}: typing import anchor missing')
+              text = text.replace(anchor, anchor + 'from tools.canonical import stable_hash\n', 1)
+              p.write_text(text, encoding='utf-8')
+
+          canonicalize_hash_module('tools/transition_protocol.py')
+          canonicalize_hash_module('tools/peer_recovery.py')
+
+          # capability_gates has the same algorithm but a dict-typed signature.
+          p = Path('tools/capability_gates.py')
+          text = p.read_text(encoding='utf-8').replace('import hashlib\n', '')
+          block = '''\ndef stable_hash(payload: dict[str, Any]) -> str:\n    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")\n    return hashlib.sha256(encoded).hexdigest()\n'''
+          if block not in text: raise RuntimeError('capability_gates stable_hash block not found')
+          text = text.replace(block, '').replace('from typing import Any\n', 'from typing import Any\nfrom tools.canonical import stable_hash\n', 1)
+          p.write_text(text, encoding='utf-8')
+
+          # scheduler_snapshot keeps json for IO but delegates canonicalization.
+          p = Path('tools/scheduler_snapshot.py')
+          text = p.read_text(encoding='utf-8').replace('import hashlib\n', '')
+          block = '''\ndef stable_hash(value: dict[str, Any]) -> str:\n    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")\n    return hashlib.sha256(encoded).hexdigest()\n'''
+          if block not in text: raise RuntimeError('scheduler_snapshot stable_hash block not found')
+          text = text.replace(block, '').replace('from typing import Any\n', 'from typing import Any\nfrom tools.canonical import stable_hash\n', 1)
+          p.write_text(text, encoding='utf-8')
+
+          # Qualified callers move to the primitive directly; no compatibility aliases remain.
+          p = Path('tools/capability_transition.py')
+          text = p.read_text(encoding='utf-8')
+          if 'gates.stable_hash' not in text: raise RuntimeError('capability_transition caller missing')
+          text = text.replace('from tools import capability_gates as gates\n', 'from tools import capability_gates as gates\nfrom tools.canonical import stable_hash\n', 1).replace('gates.stable_hash', 'stable_hash')
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('tools/peer_recovery_bus.py')
+          text = p.read_text(encoding='utf-8')
+          if 'peer_recovery.stable_hash' not in text: raise RuntimeError('peer_recovery_bus caller missing')
+          text = text.replace('from tools import peer_recovery\n', 'from tools import peer_recovery\nfrom tools.canonical import stable_hash\n', 1).replace('peer_recovery.stable_hash', 'stable_hash')
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('.github/workflows/supervisor-snapshot.yml')
+          text = p.read_text(encoding='utf-8')
+          old = 'from tools.capability_gates import stable_hash'
+          if text.count(old) != 1: raise RuntimeError('supervisor hash import mismatch')
+          p.write_text(text.replace(old, 'from tools.canonical import stable_hash'), encoding='utf-8')
+
+          # Tests must use the canonical primitive rather than removed module-local implementations.
+          for p in Path('tools/tests').glob('test_*.py'):
+              text = p.read_text(encoding='utf-8')
+              changed = text.replace('snapshot.stable_hash', 'stable_hash')
+              if changed != text and 'from tools.canonical import stable_hash' not in changed:
+                  lines = changed.splitlines(True)
+                  insert = 0
+                  while insert < len(lines) and (lines[insert].startswith('from __future__') or lines[insert].strip() == ''):
+                      insert += 1
+                  lines.insert(insert, 'from tools.canonical import stable_hash\n')
+                  changed = ''.join(lines)
+              p.write_text(changed, encoding='utf-8')
+          PY
+      - name: Enforce paved roads
+        run: |
+          test "$(grep -RIl --include='*.py' '^def stable_hash' tools | sort)" = "tools/canonical.py"
+          if grep -RIn --include='*.py' -E '\._(create_blob|create_tree|create_commit|advance_ref|verify_published_transition)\(' tools | grep -v 'tools/coordination_remote.py'; then
+            echo 'private coordination writer primitive escaped canonical executor' >&2
+            exit 1
+          fi
+          python -m unittest tools.tests.test_coordination_admin tools.tests.test_coordination_remote tools.tests.test_transition_protocol tools.tests.test_capability_transition tools.tests.test_peer_recovery tools.tests.test_scheduler_snapshot -v
+          python -m tools.semantics check
+      - name: Commit consolidation
+        run: |
+          git config user.name 'MobiliPresenter Operations'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tools ops/semantics/registry.json .github/workflows/supervisor-snapshot.yml
+          git commit -m 'C1A consolidate coordination writer and canonical hashing'
+          git push origin HEAD:work/operations/paved-road-consolidation-c1a
