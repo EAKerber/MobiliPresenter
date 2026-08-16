@@ -5,9 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from tools import agent, capability_gates, continuation, coordination
-from tools.continuation_remote import ContinuationRemoteError, GitHubContinuationAuthority
-from tools.coordination_remote import CoordinationRemoteError, GhApiTransport, GitHubCoordinationAuthority
-
 STATUSES = {"PASS", "UNKNOWN", "FAIL"}
 
 
@@ -124,6 +121,7 @@ def observe_continuations_local() -> dict[str, Any]:
 
 def observe_continuations_live() -> dict[str, Any]:
     try:
+        from tools.continuation_remote import GitHubContinuationAuthority
         authority = GitHubContinuationAuthority()
         observed = authority.observe()
         items = [continuation_item(value) for _, value in sorted(observed.items.items())]
@@ -138,7 +136,7 @@ def observe_continuations_live() -> dict[str, Any]:
             },
             authority={"kind": "git-authority", "branch": authority.authority_branch},
         )
-    except (ContinuationRemoteError, OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, ImportError) as exc:
         return sensor(
             "UNKNOWN",
             code="CONTINUATION_AUTHORITY_UNAVAILABLE",
@@ -243,6 +241,7 @@ def observe_coordination(*, live: bool) -> dict[str, Any]:
             authority={"kind": "git-authority", "branch": "coordination/leases"},
         )
     try:
+        from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
         authority = GitHubCoordinationAuthority(GhApiTransport())
         observed = authority.observe()
         current = coordination.compact_expired(observed.state, observed.authority_now)
@@ -257,7 +256,7 @@ def observe_coordination(*, live: bool) -> dict[str, Any]:
             },
             authority={"kind": "git-authority", "branch": authority.authority_branch},
         )
-    except (CoordinationRemoteError, OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, ImportError) as exc:
         return sensor(
             "UNKNOWN",
             code="COORDINATION_AUTHORITY_UNAVAILABLE",
