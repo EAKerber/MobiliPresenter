@@ -6,13 +6,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_VERSION = "SourceBuild 1.0"
+SCHEMA_VERSION = "SourceBuild 1.1"
 FINGERPRINT_KIND = "sha256(sourceBase|sourcePaths|buildCommand|publishPath)"
 TOP_FIELDS = {
     "schemaVersion", "release", "sha256", "fingerprintKind", "sourceBranch", "sourceBase",
-    "sourcePaths", "buildCommand", "publishPath", "defaultUiMode", "uiPreviewQuery", "rollback",
+    "sourcePaths", "buildCommand", "publishPath", "defaultUiMode", "uiPreviewQuery",
 }
-ROLLBACK_FIELDS = {"branch", "mode", "manifest", "release", "sha256"}
 
 
 def _nonempty(value: Any) -> bool:
@@ -28,7 +27,7 @@ def validate_manifest(value: dict[str, Any]) -> list[dict[str, str]]:
     if not isinstance(value, dict):
         return [{"code": "SOURCE_BUILD_INVALID", "detail": "manifest must be an object"}]
     if set(value) != TOP_FIELDS:
-        errors.append({"code": "SOURCE_BUILD_FIELDS_INVALID", "detail": "SourceBuild fields do not match SourceBuild 1.0"})
+        errors.append({"code": "SOURCE_BUILD_FIELDS_INVALID", "detail": f"SourceBuild fields do not match {SCHEMA_VERSION}"})
     if value.get("schemaVersion") != SCHEMA_VERSION:
         errors.append({"code": "SOURCE_BUILD_SCHEMA_UNSUPPORTED", "detail": f"schemaVersion must be {SCHEMA_VERSION}"})
     for key in ("release", "sourceBranch", "buildCommand", "publishPath", "defaultUiMode"):
@@ -45,15 +44,6 @@ def validate_manifest(value: dict[str, Any]) -> list[dict[str, str]]:
     source_paths = value.get("sourcePaths")
     if not isinstance(source_paths, list) or not source_paths or any(not _nonempty(item) for item in source_paths) or len(source_paths) != len(set(source_paths)):
         errors.append({"code": "SOURCE_BUILD_SOURCE_PATHS_INVALID", "detail": "sourcePaths must contain unique non-empty strings"})
-    rollback = value.get("rollback")
-    if not isinstance(rollback, dict) or set(rollback) != ROLLBACK_FIELDS:
-        errors.append({"code": "SOURCE_BUILD_ROLLBACK_INVALID", "detail": "rollback fields are invalid"})
-    else:
-        for key in ("branch", "mode", "manifest", "release"):
-            if not _nonempty(rollback.get(key)):
-                errors.append({"code": "SOURCE_BUILD_ROLLBACK_INVALID", "detail": f"rollback.{key} must be non-empty"})
-        if not _hex(rollback.get("sha256"), 64):
-            errors.append({"code": "SOURCE_BUILD_ROLLBACK_INVALID", "detail": "rollback.sha256 must be lowercase sha256"})
     return errors
 
 
