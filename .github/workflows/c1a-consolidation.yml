@@ -29,6 +29,30 @@ jobs:
           grep -RIn --include='*.py' -E '(gates|peer_recovery|snapshot|capability_gates|transition_protocol)\.stable_hash' tools || true
           echo '=== coordination private writer calls outside executor runtime ==='
           grep -RIn --exclude-dir=tests --include='*.py' -E '\._(create_blob|create_tree|create_commit|advance_ref|verify_published_transition)\(' tools | grep -v 'tools/coordination_remote.py' || true
+      - name: Capture pre-consolidation hash parity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from tools import capability_gates, peer_recovery, scheduler_snapshot, transition_protocol
+          from tools.canonical import stable_hash as canonical_hash
+
+          fixture = {
+              'unicode': 'MobiliPresenter — C1A',
+              'nested': {'z': [3, 2, 1], 'a': {'enabled': True, 'value': None}},
+              'number': 42,
+          }
+          values = {
+              'canonical': canonical_hash(fixture),
+              'capability': capability_gates.stable_hash(fixture),
+              'peer': peer_recovery.stable_hash(fixture),
+              'schedulerSnapshot': scheduler_snapshot.stable_hash(fixture),
+              'transition': transition_protocol.stable_hash(fixture),
+          }
+          if len(set(values.values())) != 1:
+              raise RuntimeError(f'HASH_BASELINE_DIVERGED:{values}')
+          Path('/tmp/c1a-hash-baseline.txt').write_text(values['canonical'], encoding='utf-8')
+          print(values)
+          PY
       - name: Apply C1A writer and hash consolidation
         run: |
           python - <<'PY'
@@ -78,7 +102,7 @@ jobs:
           # Registry describes the existing admin entrypoint as an adapter, never a writer.
           registry = Path('ops/semantics/registry.json')
           text = registry.read_text(encoding='utf-8')
-          marker = '    "coordination-lock-cli": {"module": "tools.lock",'
+          marker = '    "coordination-executor": {"module": "tools.coordination_remote",'
           if text.count(marker) != 1 or '"coordination-admin-cli"' in text:
               raise RuntimeError('registry coordination adapter insertion point invalid')
           entry = '    "coordination-admin-cli": {"module": "tools.coordination_admin", "owner": "coordination", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["coordination-leases"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["coordination-executor"]},\n'
@@ -156,13 +180,26 @@ jobs:
           text = text[:drift_start] + drift_test + text[drift_end:]
           p.write_text(text, encoding='utf-8')
           PY
-      - name: Enforce paved roads
+      - name: Enforce paved roads and hash parity
         run: |
           test "$(grep -RIl --include='*.py' '^def stable_hash' tools | sort)" = "tools/canonical.py"
           if grep -RIn --exclude-dir=tests --include='*.py' -E '\._(create_blob|create_tree|create_commit|advance_ref|verify_published_transition)\(' tools | grep -v 'tools/coordination_remote.py'; then
             echo 'private coordination writer primitive escaped canonical executor' >&2
             exit 1
           fi
+          python - <<'PY'
+          from pathlib import Path
+          from tools.canonical import stable_hash
+          fixture = {
+              'unicode': 'MobiliPresenter — C1A',
+              'nested': {'z': [3, 2, 1], 'a': {'enabled': True, 'value': None}},
+              'number': 42,
+          }
+          before = Path('/tmp/c1a-hash-baseline.txt').read_text(encoding='utf-8')
+          after = stable_hash(fixture)
+          if before != after:
+              raise RuntimeError(f'HASH_PARITY_CHANGED:{before}:{after}')
+          PY
           python -m unittest discover -s tools/tests -p 'test_*.py'
           python -m tools.semantics check
       - name: Commit consolidation
