@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-"""Evidence-based branch prune planner for MobiliPresenter.
+"""Evidence-based branch sanitation planner for MobiliPresenter.
 
-GitPrunePlan 0.2 is read-only. It classifies branch refs from explicit
-ProjectState protection, complete PR history, and the current ref's ancestry
-to the control branch. Names/prefixes never make a branch deletable.
+GitPrunePlan 0.3 is read-only. It classifies branch refs from explicit
+protection and objective Git/PR evidence. Branch names are descriptive only:
+they never grant retention, protection, lifecycle state, or delete eligibility.
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.canonical import stable_hash
+from tools.semantics.branches import parse_branch_name
+
 STATE_PATH = ROOT / "ops" / "state" / "project.json"
 ERROR_EXIT = 2
-
-
-def stable_hash(payload: dict[str, Any]) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+SCHEMA_VERSION = "GitPrunePlan 0.3"
 
 
 def run_process(args: list[str]) -> tuple[bool, str]:
@@ -107,7 +108,6 @@ def _normalize_pr(item: dict[str, Any], repository: str) -> dict[str, Any] | Non
         full_name = head_repo.get("full_name")
         if isinstance(full_name, str) and full_name.casefold() != repository.casefold():
             return None
-    labels = item.get("labels") if isinstance(item.get("labels"), list) else []
     return {
         "number": item.get("number"),
         "state": item.get("state"),
@@ -117,9 +117,6 @@ def _normalize_pr(item: dict[str, Any], repository: str) -> dict[str, Any] | Non
         "headRef": ref,
         "headSha": sha,
         "baseRef": item.get("base", {}).get("ref") if isinstance(item.get("base"), dict) else None,
-        "title": item.get("title") if isinstance(item.get("title"), str) else "",
-        "body": item.get("body") if isinstance(item.get("body"), str) else "",
-        "labels": [label.get("name") for label in labels if isinstance(label, dict) and isinstance(label.get("name"), str)],
     }
 
 
@@ -163,30 +160,6 @@ def observe_ancestry(refs: dict[str, str], control_branch: str) -> tuple[dict[st
     return result, all(value != "unknown" for value in result.values())
 
 
-def _normalized_marker_text(value: str) -> str:
-    value = value.casefold().replace("—", " ").replace("–", " ").replace("-", " ")
-    value = re.sub(r"\s+", " ", value).strip()
-    return value
-
-
-def terminal_disposition(pr: dict[str, Any]) -> str | None:
-    if pr.get("state") != "closed" or pr.get("merged"):
-        return None
-    title = _normalized_marker_text(str(pr.get("title") or ""))
-    body = _normalized_marker_text(str(pr.get("body") or ""))
-    if title.startswith("superseded") or body.startswith("superseded by"):
-        return "superseded"
-    if title.startswith("rejected"):
-        return "rejected"
-    if title.startswith("validation only"):
-        return "validation-only"
-    if title.startswith("closed preview only") or title.startswith("preview only"):
-        return "preview-only"
-    if body.startswith("substituido por") or body.startswith("substituído por"):
-        return "superseded"
-    return None
-
-
 def _pr_index(pull_requests: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     by_branch: dict[str, list[dict[str, Any]]] = {}
     for pr in pull_requests:
@@ -222,6 +195,8 @@ def build_prune_plan(
     *,
     branch_inventory_complete: bool = True,
     ancestry_complete: bool = True,
+    branch_inventory_source: str = "fixture",
+    remote_observation_error: str | None = None,
 ) -> dict[str, Any]:
     git_state = state["git"]
     control_branch = git_state["controlBranch"]
@@ -239,49 +214,52 @@ def build_prune_plan(
         protections = _protection_reasons(state, branch, open_pr_heads)
         branch_prs = pr_index.get(branch, [])
         ancestry_status = ancestry.get(branch, "unknown") if ancestry is not None else "unknown"
-        pr_provenance = []
+        provenance: list[dict[str, Any]] = []
         strong: list[str] = []
         for pr in branch_prs:
             head_matches = pr.get("headSha") == sha
-            disposition = terminal_disposition(pr)
-            provenance = {
+            provenance.append({
                 "number": pr.get("number"),
                 "state": pr.get("state"),
                 "merged": bool(pr.get("merged")),
                 "headSha": pr.get("headSha"),
                 "headMatchesCurrent": head_matches,
-                "disposition": disposition,
-            }
-            pr_provenance.append(provenance)
+            })
             if head_matches and pr.get("merged"):
                 strong.append(f"merged-pr:{pr.get('number')}")
-            elif head_matches and disposition:
-                strong.append(f"terminal-pr:{disposition}:{pr.get('number')}")
-
         if ancestry_status in {"ancestor-of-control", "identical-to-control"}:
             strong.append(ancestry_status)
 
-        historical_anchor = branch.startswith(("archive/", "backup/"))
         if protections:
             action, reason, auto = "keep", "protected", False
-        elif historical_anchor:
-            action, reason, auto = "keep", "historical-or-rollback-anchor", False
-        elif branch.startswith("variant/"):
-            action, reason, auto = "archive-first", "legacy-variant-history", False
         elif strong:
             action, reason, auto = "delete-candidate", "strong-observed-evidence", True
         else:
             action, reason, auto = "review", "insufficient-delete-evidence", False
 
+        try:
+            identity = parse_branch_name(branch)
+        except RuntimeError:
+            identity = {
+                "name": branch,
+                "grammar": "invalid",
+                "namespace": None,
+                "declaredClass": None,
+                "domain": None,
+                "semanticDomain": None,
+                "legacyAlias": False,
+                "slug": None,
+            }
         entries.append({
             "branch": branch,
             "sha": sha,
+            "branchIdentity": identity,
             "action": action,
             "reason": reason,
             "autoDeleteEligible": auto,
             "protections": protections,
             "ancestryToControl": ancestry_status,
-            "prProvenance": pr_provenance,
+            "prProvenance": provenance,
             "evidence": sorted(set(strong)),
             "duplicateOf": [],
         })
@@ -305,23 +283,35 @@ def build_prune_plan(
                 entry["reason"] = "exact-duplicate-of-integrated-head"
                 entry["autoDeleteEligible"] = True
 
-    observations_complete = branch_inventory_complete and pr_history_complete and ancestry_complete and control_sha is not None
+    observations_complete = bool(
+        branch_inventory_complete
+        and pr_history_complete
+        and ancestry_complete
+        and control_sha is not None
+    )
     body = {
-        "schemaVersion": "GitPrunePlan 0.2",
+        "schemaVersion": SCHEMA_VERSION,
         "repository": state["project"]["repository"],
         "controlBranch": control_branch,
         "controlSha": control_sha,
         "branchCount": len(refs),
         "observations": {
-            "branchInventoryComplete": branch_inventory_complete,
+            "complete": observations_complete,
+            "branchInventoryComplete": bool(branch_inventory_complete),
+            "branchInventorySource": branch_inventory_source,
             "prHistoryComplete": pr_history_complete,
-            "ancestryComplete": ancestry_complete,
+            "prHistoryError": remote_observation_error,
+            "ancestryComplete": bool(ancestry_complete),
+        },
+        "execution": {
+            "executorAvailable": True,
+            "requiresPlanFile": True,
+            "requiresExpectedPlan": True,
+            "requiresExplicitAuthorization": True,
         },
         "openPrHeads": sorted(open_pr_heads),
         "entries": entries,
-        "applyEligible": observations_complete,
-        "destructiveApplySupported": False,
-        "note": "Read-only evidence plan. Prefixes never authorize deletion. Current CLI has no destructive apply command; future apply must revalidate planHash and exact branch SHA immediately before each delete.",
+        "note": "Evidence-only sanitation plan. Names never authorize retention or deletion; execution requires this exact materialized plan, explicit plan identity, authorization, drift checks, and readback.",
     }
     return {**body, "planHash": stable_hash(body)}
 
@@ -331,19 +321,16 @@ def build_live_plan() -> dict[str, Any]:
     refs, source = branch_refs_with_source()
     prs_ok, prs, prs_error = observe_pull_requests(state)
     ancestry, ancestry_complete = observe_ancestry(refs, state["git"]["controlBranch"])
-    branch_inventory_complete = source == "remote-git-refs"
-    plan = build_prune_plan(
+    return build_prune_plan(
         state,
         refs,
         prs if prs_ok else None,
         ancestry,
-        branch_inventory_complete=branch_inventory_complete,
+        branch_inventory_complete=source == "remote-git-refs",
         ancestry_complete=ancestry_complete,
+        branch_inventory_source=source,
+        remote_observation_error=None if prs_ok else prs_error,
     )
-    plan["branchInventorySource"] = source
-    if not prs_ok:
-        plan["remoteObservationError"] = prs_error
-    return plan
 
 
 def command(as_json: bool) -> int:
@@ -361,25 +348,20 @@ def command(as_json: bool) -> int:
         counts: dict[str, int] = {}
         for entry in plan["entries"]:
             counts[entry["action"]] = counts.get(entry["action"], 0) + 1
-        print("GIT PRUNE PLAN 0.2")
+        print("GIT PRUNE PLAN 0.3")
         print(f"  branches: {plan['branchCount']}")
         print(f"  keep: {counts.get('keep', 0)}")
         print(f"  delete-candidate: {counts.get('delete-candidate', 0)}")
-        print(f"  archive-first: {counts.get('archive-first', 0)}")
         print(f"  review: {counts.get('review', 0)}")
-        print(f"  apply eligible: {plan['applyEligible']}")
-        print(f"  destructive apply supported: {plan['destructiveApplySupported']}")
+        print(f"  observations complete: {plan['observations']['complete']}")
         print(f"  planHash: {plan['planHash']}")
     return 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="MobiliPresenter evidence-based branch prune planner")
+    parser = argparse.ArgumentParser(description="Read-only evidence-based Git branch sanitation planner")
     parser.add_argument("--json", action="store_true", dest="as_json")
-    parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
-    if args.apply:
-        raise SystemExit("UNSUPPORTED_TRANSITION: GitPrunePlan 0.2 is read-only")
     return command(args.as_json)
 
 

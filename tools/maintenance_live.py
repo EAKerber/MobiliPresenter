@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools import maintenance_inspect, project_machine
+from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 
@@ -27,7 +28,7 @@ def inspect():
         "count": len(continuation_data.get("items") or []),
     }
     body = {key: value for key, value in payload.items() if key != "inspectionHash"}
-    payload["inspectionHash"] = maintenance_inspect.capability_gates.stable_hash(body)
+    payload["inspectionHash"] = stable_hash(body)
     return payload
 
 

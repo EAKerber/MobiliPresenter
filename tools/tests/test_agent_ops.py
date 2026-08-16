@@ -59,8 +59,7 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(agent.validate_state_shape(self.between_increments_state()), [])
 
     def test_state_shape_rejects_partial_development_identity(self):
-        state = self.between_increments_state()
-        state["development"]["prNumber"] = 99
+        state = self.between_increments_state(); state["development"]["prNumber"] = 99
         errors = agent.validate_state_shape(state)
         self.assertTrue(any(error["code"] == "DEVELOPMENT_IDENTITY_INCOMPLETE" for error in errors))
 
@@ -72,14 +71,11 @@ class GitOps12Tests(unittest.TestCase):
 
     def test_verification_summary_distinguishes_unknown_from_failure(self):
         self.assertEqual(agent.verification_summary([{"status": "PASS"}]), {"status": "PASS", "ok": True, "complete": True})
-        self.assertEqual(
-            agent.verification_summary([{"status": "PASS"}, {"status": "UNKNOWN"}]),
-            {"status": "UNKNOWN", "ok": True, "complete": False},
-        )
-        self.assertEqual(
-            agent.verification_summary([{"status": "UNKNOWN"}, {"status": "FAIL"}]),
-            {"status": "FAIL", "ok": False, "complete": False},
-        )
+        self.assertEqual(agent.verification_summary([{"status": "PASS"}, {"status": "UNKNOWN"}]), {"status": "UNKNOWN", "ok": True, "complete": False})
+        self.assertEqual(agent.verification_summary([{"status": "UNKNOWN"}, {"status": "FAIL"}]), {"status": "FAIL", "ok": False, "complete": False})
+
+    def test_invalid_verification_status_fails_closed(self):
+        self.assertEqual(agent.verification_summary([{"status": "MAYBE"}]), {"status": "FAIL", "ok": False, "complete": False})
 
     def test_remote_unavailable_is_unknown_not_green(self):
         checks = agent.remote_verification_checks(self.base_state(), {"available": False, "reason": "GH_NOT_FOUND", "ci": "unknown"})
@@ -88,12 +84,7 @@ class GitOps12Tests(unittest.TestCase):
 
     def test_remote_ci_pending_and_unknown_are_unknown(self):
         state = self.base_state()
-        remote = {
-            "available": True,
-            "developmentActive": True,
-            "pr": {"number": 6, "headRef": "renderer/fixed-view-realistic-v1", "baseRef": "main", "state": "open"},
-            "ci": "pending",
-        }
+        remote = {"available": True, "developmentActive": True, "pr": {"number": 6, "headRef": "renderer/fixed-view-realistic-v1", "baseRef": "main", "state": "open"}, "ci": "pending"}
         checks = agent.remote_verification_checks(state, remote)
         self.assertEqual(checks[0]["status"], "PASS")
         self.assertEqual(checks[1]["status"], "UNKNOWN")
@@ -105,12 +96,7 @@ class GitOps12Tests(unittest.TestCase):
 
     def test_remote_green_and_failed_remain_decisive(self):
         state = self.base_state()
-        remote = {
-            "available": True,
-            "developmentActive": True,
-            "pr": {"number": 6, "headRef": "renderer/fixed-view-realistic-v1", "baseRef": "main", "state": "open"},
-            "ci": "green",
-        }
+        remote = {"available": True, "developmentActive": True, "pr": {"number": 6, "headRef": "renderer/fixed-view-realistic-v1", "baseRef": "main", "state": "open"}, "ci": "green"}
         checks = agent.remote_verification_checks(state, remote)
         self.assertEqual(checks[1]["status"], "PASS")
         remote["ci"] = "failed"
@@ -119,10 +105,7 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(checks[1]["code"], "REMOTE_CI_FAILED")
 
     def test_no_active_development_is_known_pass(self):
-        checks = agent.remote_verification_checks(
-            self.between_increments_state(),
-            {"available": True, "developmentActive": False, "reason": "NO_ACTIVE_DEVELOPMENT", "ci": "unknown"},
-        )
+        checks = agent.remote_verification_checks(self.between_increments_state(), {"available": True, "developmentActive": False, "reason": "NO_ACTIVE_DEVELOPMENT", "ci": "unknown"})
         self.assertEqual(checks, [{"name": "remote-development", "status": "PASS", "code": "NO_ACTIVE_DEVELOPMENT"}])
 
     def test_unexpected_branch_is_rejected(self):
@@ -140,62 +123,33 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["context"], "preserved-parallel")
 
-    def test_git_ops_branch_is_valid_operational_context(self):
-        check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "ops/git-ops-1.2"})
-        self.assertEqual(check["status"], "PASS")
-        self.assertEqual(check["context"], "operations")
-
-    def test_project_machine_branch_is_valid_operational_context(self):
+    def test_legacy_ops_branch_is_valid_operational_context(self):
         check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "ops/project-machine-m0-baseline"})
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["context"], "operations")
 
+    def test_canonical_work_operations_branch_is_valid_operational_context(self):
+        check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "work/operations/project-state-v2"})
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["context"], "operations")
+
+    def test_canonical_experiment_operations_branch_is_valid_operational_context(self):
+        check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "experiment/operations/peer-health"})
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["context"], "operations")
+
+    def test_authority_name_does_not_grant_operational_work_context(self):
+        check = agent.git_context_check(self.between_increments_state(), {"worktree": True, "branch": "authority/operations/control"})
+        self.assertEqual(check["status"], "FAIL")
+        self.assertEqual(check["code"], "UNEXPECTED_BRANCH")
+
+    def test_legacy_prune_classifier_is_removed(self):
+        self.assertFalse(hasattr(agent, "build_prune_plan"))
+        self.assertFalse(hasattr(agent, "stable_plan_hash"))
+
     def test_ci_branch_name_uses_pull_request_head_ref(self):
-        with mock.patch.dict(os.environ, {"GITHUB_HEAD_REF": "ops/git-ops-1.2", "GITHUB_REF_NAME": "31/merge"}, clear=False):
-            self.assertEqual(agent.ci_branch_name(), "ops/git-ops-1.2")
-
-    def test_branch_refs_prefers_origin_remote_inventory(self):
-        remote = "origin/main\t" + "a" * 40 + "\norigin/ui/live\t" + "b" * 40 + "\norigin/HEAD\t" + "c" * 40
-        with mock.patch.object(agent, "run_git", side_effect=[(True, remote)]):
-            self.assertEqual(agent.branch_refs(), {"main": "a" * 40, "ui/live": "b" * 40})
-
-    def test_prune_plan_protects_state_and_open_pr_heads(self):
-        state = self.between_increments_state()
-        refs = {
-            "main": "a" * 40,
-            "integration/viewer-parallel-v0.1": "b" * 40,
-            "ui/product-shell-v0.1": "c" * 40,
-            "ui/live-pr": "d" * 40,
-            "tmp/old-preview": "e" * 40,
-            "engine/old-slice": "f" * 40,
-            "variant/legacy": "1" * 40,
-            "docs/old": "2" * 40,
-        }
-        plan = agent.build_prune_plan(state, refs, {"ui/live-pr"})
-        by_branch = {entry["branch"]: entry for entry in plan["entries"]}
-        self.assertEqual(by_branch["main"]["action"], "keep")
-        self.assertEqual(by_branch["integration/viewer-parallel-v0.1"]["action"], "keep")
-        self.assertEqual(by_branch["ui/live-pr"]["action"], "keep")
-        self.assertEqual(by_branch["tmp/old-preview"]["action"], "candidate")
-        self.assertEqual(by_branch["engine/old-slice"]["action"], "candidate")
-        self.assertEqual(by_branch["variant/legacy"]["action"], "archive-first")
-        self.assertEqual(by_branch["docs/old"]["action"], "review")
-        self.assertTrue(plan["applyEligible"])
-
-    def test_prune_plan_hash_is_stable_and_ref_sensitive(self):
-        state = self.between_increments_state()
-        refs = {"main": "a" * 40, "tmp/old": "b" * 40}
-        first = agent.build_prune_plan(state, refs, set())
-        second = agent.build_prune_plan(state, dict(refs), set())
-        self.assertEqual(first["planHash"], second["planHash"])
-        refs["tmp/old"] = "c" * 40
-        third = agent.build_prune_plan(state, refs, set())
-        self.assertNotEqual(first["planHash"], third["planHash"])
-
-    def test_prune_plan_without_remote_pr_observation_is_not_apply_eligible(self):
-        plan = agent.build_prune_plan(self.between_increments_state(), {"main": "a" * 40}, None)
-        self.assertFalse(plan["applyEligible"])
-        self.assertFalse(plan["remoteOpenPrProtection"])
+        with mock.patch.dict(os.environ, {"GITHUB_HEAD_REF": "work/operations/test", "GITHUB_REF_NAME": "31/merge"}, clear=False):
+            self.assertEqual(agent.ci_branch_name(), "work/operations/test")
 
 
 if __name__ == "__main__":
