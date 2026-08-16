@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any,Iterable
 from urllib.parse import quote
 ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 STATE_PATH=ROOT/"ops"/"state"/"project.json";ERROR_EXIT=2;SCHEMA_VERSION="IntegrationReconcilePlan 0.1"
 SHARED=("viewer-next/src/api/","viewer-next/src/bootstrap.ts","viewer-next/index.html","viewer-next/package.json","viewer-next/tsconfig.json",".github/workflows/",)
 from tools.canonical import stable_hash
