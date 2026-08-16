@@ -6,7 +6,7 @@ from tools import project_coherence, project_sensors
 def project(active=None, pr=None):
     return {
         "controlBranch": "main",
-        "preserveBranches": ["architecture/tpc", "planning/scope"],
+        "protectedBranches": ["architecture/tpc", "planning/scope"],
         "phase": "between-increments",
         "checkpoint": "C",
         "nextTransition": "next",
@@ -18,22 +18,9 @@ def project(active=None, pr=None):
 
 def sensors(prs=None, leases=None, continuations=None, *, pr_available=True):
     return {
-        "pullRequests": project_sensors.sensor(
-            "PASS" if pr_available else "UNKNOWN",
-            code=None if pr_available else "REMOTE_PR_INVENTORY_UNAVAILABLE",
-            data={"available": pr_available, "items": prs or []},
-            authority={"kind": "github", "resource": "pull-requests"},
-        ),
-        "coordination": project_sensors.sensor(
-            "PASS",
-            data={"available": True, "leases": leases or [], "intents": []},
-            authority={"kind": "git-authority", "branch": "coordination/leases"},
-        ),
-        "continuations": project_sensors.sensor(
-            "PASS",
-            data={"available": True, "items": continuations or []},
-            authority={"kind": "git-authority", "branch": "coordination/continuations"},
-        ),
+        "pullRequests": project_sensors.sensor("PASS" if pr_available else "UNKNOWN", code=None if pr_available else "REMOTE_PR_INVENTORY_UNAVAILABLE", data={"available": pr_available, "items": prs or []}, authority={"kind": "github", "resource": "pull-requests"}),
+        "coordination": project_sensors.sensor("PASS", data={"available": True, "leases": leases or [], "intents": []}, authority={"kind": "git-authority", "branch": "coordination/leases"}),
+        "continuations": project_sensors.sensor("PASS", data={"available": True, "items": continuations or []}, authority={"kind": "git-authority", "branch": "coordination/continuations"}),
     }
 
 
@@ -63,20 +50,15 @@ class ProjectCoherenceTests(unittest.TestCase):
         self.assertEqual(check(result, "development.pr.head")["code"], "ACTIVE_PR_HEAD_MISMATCH")
         self.assertEqual(check(result, "development.pr.base")["code"], "ACTIVE_PR_BASE_MISMATCH")
 
-    def test_preserved_and_operations_prs_are_classified(self):
-        prs = [
-            {"number": 1, "headRef": "architecture/tpc", "baseRef": "main"},
-            {"number": 2, "headRef": "ops/tooling", "baseRef": "main"},
-        ]
+    def test_protected_and_operations_prs_are_classified(self):
+        prs = [{"number": 1, "headRef": "architecture/tpc", "baseRef": "main"}, {"number": 2, "headRef": "ops/tooling", "baseRef": "main"}]
         result = project_coherence.evaluate_coherence(project(), sensors(prs=prs), scope="live")
         classification = check(result, "pull-requests.classification")
         self.assertEqual(classification["status"], "PASS")
-        self.assertEqual([item["classification"] for item in classification["detail"]["items"]], ["preserved", "operations"])
+        self.assertEqual([item["classification"] for item in classification["detail"]["items"]], ["protected", "operations"])
 
     def test_unclassified_open_pr_fails(self):
-        result = project_coherence.evaluate_coherence(
-            project(), sensors(prs=[{"number": 9, "headRef": "feature/mystery", "baseRef": "main"}]), scope="live"
-        )
+        result = project_coherence.evaluate_coherence(project(), sensors(prs=[{"number": 9, "headRef": "feature/mystery", "baseRef": "main"}]), scope="live")
         classification = check(result, "pull-requests.classification")
         self.assertEqual(classification["status"], "FAIL")
         self.assertEqual(classification["code"], "UNCLASSIFIED_OPEN_PR")
@@ -118,18 +100,14 @@ class ProjectCoherenceTests(unittest.TestCase):
 
     def test_base_does_not_require_live_continuation_relation(self):
         broken = sensors()
-        broken["continuations"] = project_sensors.sensor(
-            "UNKNOWN", code="CONTINUATION_AUTHORITY_UNAVAILABLE", data={"available": False, "items": []}
-        )
+        broken["continuations"] = project_sensors.sensor("UNKNOWN", code="CONTINUATION_AUTHORITY_UNAVAILABLE", data={"available": False, "items": []})
         result = project_coherence.evaluate_coherence(project(), broken, scope="base")
         self.assertFalse(check(result, "continuations.pr")["required"])
         self.assertEqual(result["status"], "PASS")
 
     def test_authority_projection_is_derived_and_deduplicated(self):
         current = sensors()
-        current["otherPrView"] = project_sensors.sensor(
-            "PASS", data={}, authority={"kind": "github", "resource": "pull-requests"}
-        )
+        current["otherPrView"] = project_sensors.sensor("PASS", data={}, authority={"kind": "github", "resource": "pull-requests"})
         authorities = project_coherence.derive_authorities(current)
         github = next(item for item in authorities if item["id"] == "github-pull-requests")
         self.assertEqual(github["observedBy"], ["otherPrView", "pullRequests"])
