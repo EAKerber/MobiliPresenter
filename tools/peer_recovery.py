@@ -10,9 +10,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
-from tools.canonical import stable_hash
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.canonical import stable_hash  # noqa: E402
 
 OBS_SCHEMA = "WorkerObservation 0.1"
 REPRO_SCHEMA = "PeerReproduction 0.1"

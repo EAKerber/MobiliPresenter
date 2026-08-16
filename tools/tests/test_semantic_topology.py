@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 import copy
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -81,6 +83,18 @@ class SemanticTopologyTests(unittest.TestCase):
         self.assertEqual("project-state-executor", value["canonicalWriter"])
         self.assertEqual(["project-state-executor"], value["writers"])
         self.assertIn("project-machine", value["readers"])
+
+    def test_canonical_hash_direct_cli_entrypoints_bootstrap_root(self):
+        tools_root = Path(__file__).resolve().parents[1]
+        for name in ("capability_gates.py", "peer_recovery.py", "scheduler_snapshot.py"):
+            result = subprocess.run(
+                [sys.executable, str(tools_root / name), "--help"],
+                cwd=tools_root.parent,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, result.returncode, f"{name}: {result.stderr}")
 
     def test_stable_hash_has_one_runtime_definition(self):
         tools_root = Path(__file__).resolve().parents[1]
