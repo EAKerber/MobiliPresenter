@@ -4,9 +4,13 @@
 The planner remains the sole classifier. This executor may delete only entries
 already classified as delete-candidate + autoDeleteEligible by one exact,
 validated plan. It fails closed on repository-wide ref drift, control-head
-drift, open PRs, or per-ref SHA mismatch. Post-delete readback tolerates only
-the bounded eventual-consistency state where the just-deleted ref is still
-visible at its exact old SHA; any other drift fails immediately.
+drift, open PRs, or per-ref SHA mismatch.
+
+GitHub ref reads may be eventually consistent across replicas after DELETE.
+The executor therefore retries only a narrowly defined stale state: refs that
+were already deleted by this same execution may temporarily reappear at their
+exact planned SHA. New refs, changed SHAs, missing expected refs, or any other
+drift fail immediately.
 """
 from __future__ import annotations
 
@@ -145,26 +149,40 @@ def expected_inventory_from_plan(plan: dict[str, Any]) -> dict[str, str]:
     return result
 
 
-def wait_for_delete_readback(
+def is_allowed_stale_inventory(
+    observed: dict[str, str],
+    expected: dict[str, str],
+    deleted_this_run: dict[str, str],
+) -> bool:
+    for branch, sha in expected.items():
+        if observed.get(branch) != sha:
+            return False
+    extras = set(observed) - set(expected)
+    return bool(extras) and extras <= set(deleted_this_run) and all(
+        observed[branch] == deleted_this_run[branch] for branch in extras
+    )
+
+
+def wait_for_consistent_inventory(
     repository: str,
-    expected_after: dict[str, str],
-    deleted_branch: str,
-    deleted_sha: str,
+    expected: dict[str, str],
+    deleted_this_run: dict[str, str],
     *,
+    context: str,
     attempts: int = READBACK_ATTEMPTS,
     delay_seconds: float = READBACK_DELAY_SECONDS,
-) -> None:
-    stale_only = dict(expected_after)
-    stale_only[deleted_branch] = deleted_sha
+) -> int:
+    retries = 0
     for attempt in range(attempts):
         observed = observe_branch_inventory(repository)
-        if observed == expected_after:
-            return
-        if observed != stale_only:
-            raise RuntimeError(f"DELETE_READBACK_DRIFT:{deleted_branch}")
+        if observed == expected:
+            return retries
+        if not is_allowed_stale_inventory(observed, expected, deleted_this_run):
+            raise RuntimeError(f"REF_INVENTORY_DRIFT:{context}")
+        retries += 1
         if attempt + 1 < attempts:
             time.sleep(delay_seconds)
-    raise RuntimeError(f"DELETE_READBACK_TIMEOUT:{deleted_branch}")
+    raise RuntimeError(f"REF_READBACK_TIMEOUT:{context}")
 
 
 def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
@@ -179,33 +197,38 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
     candidates = select_candidates(plan)
     expected = expected_inventory_from_plan(plan)
     deleted: list[dict[str, str]] = []
+    deleted_this_run: dict[str, str] = {}
+    readback_retries = 0
 
-    live = observe_branch_inventory(repository)
-    if live != expected:
-        raise RuntimeError("STALE_PLAN:INITIAL_REF_INVENTORY_DRIFT")
+    readback_retries += wait_for_consistent_inventory(
+        repository, expected, deleted_this_run, context="initial", attempts=1, delay_seconds=0
+    )
 
     for entry in candidates:
         branch = str(entry["branch"])
         sha = str(entry["sha"])
 
-        live = observe_branch_inventory(repository)
-        if live != expected:
-            raise RuntimeError(f"STALE_PLAN:REF_INVENTORY_DRIFT:{branch}")
-        if live.get(control_branch) != control_sha:
+        readback_retries += wait_for_consistent_inventory(
+            repository, expected, deleted_this_run, context=f"before:{branch}"
+        )
+        if expected.get(control_branch) != control_sha:
             raise RuntimeError(f"STALE_PLAN:CONTROL_HEAD_DRIFT:{branch}")
-        if live.get(branch) != sha:
+        if expected.get(branch) != sha:
             raise RuntimeError(f"STALE_PLAN:BRANCH_HEAD_DRIFT:{branch}")
         if observe_open_prs_for_branch(repository, branch):
             raise RuntimeError(f"STALE_PLAN:OPEN_PR_APPEARED:{branch}")
 
         delete_remote_ref(repository, branch)
         expected.pop(branch)
-        wait_for_delete_readback(repository, expected, branch, sha)
+        deleted_this_run[branch] = sha
+        readback_retries += wait_for_consistent_inventory(
+            repository, expected, deleted_this_run, context=f"after:{branch}"
+        )
         deleted.append({"branch": branch, "sha": sha})
 
-    final = observe_branch_inventory(repository)
-    if final != expected:
-        raise RuntimeError("FINAL_READBACK_DRIFT")
+    readback_retries += wait_for_consistent_inventory(
+        repository, expected, deleted_this_run, context="final"
+    )
 
     return {
         "schemaVersion": "GitPruneApplyResult 0.1",
@@ -215,6 +238,7 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
         "deleted": deleted,
         "deletedCount": len(deleted),
         "remainingBranchCount": len(expected),
+        "readbackRetries": readback_retries,
         "readback": "PASS",
     }
 
@@ -235,6 +259,7 @@ def command(as_json: bool, plan_path: Path | None) -> int:
         print("GIT PRUNE APPLY 0.1")
         print(f"  deleted: {result['deletedCount']}")
         print(f"  remaining branches: {result['remainingBranchCount']}")
+        print(f"  readback retries: {result['readbackRetries']}")
         print(f"  planHash: {result['planHash']}")
         print("  readback: PASS")
     return 0

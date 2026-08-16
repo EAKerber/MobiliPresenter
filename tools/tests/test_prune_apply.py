@@ -21,24 +21,27 @@ APPLY_SPEC.loader.exec_module(apply_mod)
 
 
 class PruneApplyTests(unittest.TestCase):
-    def plan(self):
+    def plan(self, two_candidates=False):
+        entries = [
+            {"branch": "main", "sha": "a" * 40, "action": "keep", "autoDeleteEligible": False, "protections": ["control-branch"]},
+            {"branch": "old/a", "sha": "b" * 40, "action": "delete-candidate", "autoDeleteEligible": True, "protections": []},
+            {"branch": "review/x", "sha": "c" * 40, "action": "review", "autoDeleteEligible": False, "protections": []},
+        ]
+        if two_candidates:
+            entries.insert(2, {"branch": "old/b", "sha": "d" * 40, "action": "delete-candidate", "autoDeleteEligible": True, "protections": []})
         body = {
             "schemaVersion": "GitPrunePlan 0.2",
             "repository": "EAKerber/MobiliPresenter",
             "controlBranch": "main",
             "controlSha": "a" * 40,
-            "branchCount": 3,
+            "branchCount": len(entries),
             "observations": {
                 "branchInventoryComplete": True,
                 "prHistoryComplete": True,
                 "ancestryComplete": True,
             },
             "openPrHeads": [],
-            "entries": [
-                {"branch": "main", "sha": "a" * 40, "action": "keep", "autoDeleteEligible": False, "protections": ["control-branch"]},
-                {"branch": "old/a", "sha": "b" * 40, "action": "delete-candidate", "autoDeleteEligible": True, "protections": []},
-                {"branch": "review/x", "sha": "c" * 40, "action": "review", "autoDeleteEligible": False, "protections": []},
-            ],
+            "entries": entries,
             "applyEligible": True,
             "destructiveApplySupported": False,
             "note": "fixture",
@@ -83,46 +86,56 @@ class PruneApplyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "DESTRUCTIVE_AUTHORIZATION_MISSING"):
                 apply_mod.apply_plan(self.plan())
 
-    def test_inventory_drift_blocks_before_delete(self):
+    def test_initial_inventory_drift_blocks_immediately(self):
         plan = self.plan()
         with mock.patch.dict(os.environ, {apply_mod.AUTH_ENV: "1"}, clear=False), \
              mock.patch.object(apply_mod, "observe_branch_inventory", return_value={"main": "a" * 40}):
-            with self.assertRaisesRegex(RuntimeError, "INITIAL_REF_INVENTORY_DRIFT"):
+            with self.assertRaisesRegex(RuntimeError, "REF_INVENTORY_DRIFT:initial"):
                 apply_mod.apply_plan(plan)
 
-    def test_eventual_consistency_readback_retries_only_old_exact_inventory(self):
+    def test_allowed_stale_inventory_is_only_deleted_refs_at_exact_sha(self):
         expected = {"main": "a" * 40}
-        stale = {"main": "a" * 40, "old/a": "b" * 40}
-        with mock.patch.object(apply_mod, "observe_branch_inventory", side_effect=[stale, expected]), \
-             mock.patch.object(apply_mod.time, "sleep") as sleep:
-            apply_mod.wait_for_delete_readback(
-                "EAKerber/MobiliPresenter", expected, "old/a", "b" * 40, attempts=2, delay_seconds=0
-            )
-        sleep.assert_called_once_with(0)
+        deleted = {"old/a": "b" * 40, "old/b": "d" * 40}
+        self.assertTrue(apply_mod.is_allowed_stale_inventory({**expected, "old/a": "b" * 40}, expected, deleted))
+        self.assertTrue(apply_mod.is_allowed_stale_inventory({**expected, **deleted}, expected, deleted))
+        self.assertFalse(apply_mod.is_allowed_stale_inventory({**expected, "old/a": "e" * 40}, expected, deleted))
+        self.assertFalse(apply_mod.is_allowed_stale_inventory({"main": "f" * 40, "old/a": "b" * 40}, expected, deleted))
+        self.assertFalse(apply_mod.is_allowed_stale_inventory({**expected, "new/ref": "1" * 40}, expected, deleted))
 
-    def test_eventual_consistency_rejects_unrelated_drift_immediately(self):
-        expected = {"main": "a" * 40}
-        drift = {"main": "d" * 40, "old/a": "b" * 40}
-        with mock.patch.object(apply_mod, "observe_branch_inventory", return_value=drift):
-            with self.assertRaisesRegex(RuntimeError, "DELETE_READBACK_DRIFT"):
-                apply_mod.wait_for_delete_readback(
-                    "EAKerber/MobiliPresenter", expected, "old/a", "b" * 40, attempts=2, delay_seconds=0
-                )
-
-    def test_apply_deletes_and_reads_back_exact_inventory(self):
-        plan = self.plan()
-        initial = {"main": "a" * 40, "old/a": "b" * 40, "review/x": "c" * 40}
-        stale = dict(initial)
-        after = {"main": "a" * 40, "review/x": "c" * 40}
+    def test_non_monotonic_replica_staleness_retries_across_deletes(self):
+        plan = self.plan(two_candidates=True)
+        initial = {"main": "a" * 40, "old/a": "b" * 40, "old/b": "d" * 40, "review/x": "c" * 40}
+        after_a = {"main": "a" * 40, "old/b": "d" * 40, "review/x": "c" * 40}
+        stale_a = dict(initial)
+        after_b = {"main": "a" * 40, "review/x": "c" * 40}
+        stale_both = dict(initial)
         with mock.patch.dict(os.environ, {apply_mod.AUTH_ENV: "1"}, clear=False), \
-             mock.patch.object(apply_mod, "observe_branch_inventory", side_effect=[initial, initial, stale, after, after]), \
+             mock.patch.object(apply_mod, "observe_branch_inventory", side_effect=[
+                 initial,          # initial
+                 initial,          # before old/a
+                 stale_a, after_a, # after old/a converges
+                 stale_a, after_a, # before old/b sees old/a stale again, then converges
+                 stale_both, after_b, # after old/b sees both stale, then converges
+                 after_b,          # final
+             ]), \
              mock.patch.object(apply_mod, "observe_open_prs_for_branch", return_value=[]), \
              mock.patch.object(apply_mod, "delete_remote_ref") as delete, \
              mock.patch.object(apply_mod.time, "sleep"):
             result = apply_mod.apply_plan(plan)
-        delete.assert_called_once_with("EAKerber/MobiliPresenter", "old/a")
-        self.assertEqual(result["deletedCount"], 1)
+        self.assertEqual(delete.call_count, 2)
+        self.assertEqual(result["deletedCount"], 2)
+        self.assertGreaterEqual(result["readbackRetries"], 3)
         self.assertEqual(result["readback"], "PASS")
+
+    def test_unrelated_drift_during_retry_fails_immediately(self):
+        expected = {"main": "a" * 40}
+        deleted = {"old/a": "b" * 40}
+        drift = {"main": "f" * 40, "old/a": "b" * 40}
+        with mock.patch.object(apply_mod, "observe_branch_inventory", return_value=drift):
+            with self.assertRaisesRegex(RuntimeError, "REF_INVENTORY_DRIFT:test"):
+                apply_mod.wait_for_consistent_inventory(
+                    "EAKerber/MobiliPresenter", expected, deleted, context="test", attempts=2, delay_seconds=0
+                )
 
 
 if __name__ == "__main__":

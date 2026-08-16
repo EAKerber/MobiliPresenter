@@ -39,6 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -o pipefail
           python tools/agent.py git prune-plan --json | tee /tmp/git-prune-plan.json
           python - <<'PY'
           import json
@@ -52,7 +53,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MOBILIPRESENTER_PRUNE_AUTHORIZED: '1'
-        run: python tools/prune_apply.py --plan /tmp/git-prune-plan.json --json | tee /tmp/git-prune-apply.json
+        run: |
+          set -o pipefail
+          python tools/prune_apply.py --plan /tmp/git-prune-plan.json --json | tee /tmp/git-prune-apply.json
 
       - name: Validate apply result
         run: |
