@@ -51,7 +51,7 @@ Estado de continuação vivo, destinado a sobreviver à perda de chat/sessão, �
 python3 tools/continuation_live.py list --json
 ```
 
-A authority canônica é `coordination/continuations`. `tools/continuation.py` fornece o modelo/planner local e não substitui a authority viva. Mutações remotas via `tools/continuation_live.py` são plan-only por padrão e aplicação exige `--expected-plan <planHash> --apply`. Cada continuation representa uma frente de trabalho persistente; não é fila global, scheduler ou mecanismo de prioridade.
+A authority canônica é `coordination/continuations`. `tools/continuation.py` contém apenas o modelo, validação e inspeção local read-only; planners puros vivem em `tools/continuation_transition.py` e não escrevem estado. Mutações operacionais usam exclusivamente `tools/continuation_live.py`, são plan-only por padrão, produzem `TransitionPlan 0.1`, exigem `--expected-plan <planHash> --apply` e só concluem com `TransitionReceipt 0.1` após CAS/readback da authority. Cada continuation representa uma frente de trabalho persistente; não é fila global, scheduler ou mecanismo de prioridade.
 
 Antes de uma decisão supervisora agendada ou de reconciliação global que precise enxergar continuations vivas, usar:
 
