@@ -200,7 +200,8 @@ def validate_inspection(value: dict[str, Any]) -> dict[str, Any]:
     for name, item in sensors.items():
         if not isinstance(name, str) or not isinstance(item, dict):
             raise RuntimeError("PROJECT_MACHINE_SENSOR_INVALID")
-        if _sensor_status(item) not in STATUSES:
+        raw_status = str(item.get("status") or "").upper()
+        if raw_status not in STATUSES:
             raise RuntimeError("PROJECT_MACHINE_SENSOR_STATUS_INVALID")
         if not isinstance(item.get("required"), bool):
             raise RuntimeError("PROJECT_MACHINE_SENSOR_REQUIRED_INVALID")
@@ -213,11 +214,16 @@ def validate_inspection(value: dict[str, Any]) -> dict[str, Any]:
     heads = value.get("sourceHeads")
     if not isinstance(heads, dict):
         raise RuntimeError("PROJECT_MACHINE_SOURCE_HEADS_INVALID")
+    if heads != source_heads(sensors):
+        raise RuntimeError("PROJECT_MACHINE_SOURCE_HEADS_MISMATCH")
     for name in ("inspection", "control", "coordination", "continuation"):
         head = heads.get(name)
         if not isinstance(head, dict):
             raise RuntimeError("PROJECT_MACHINE_SOURCE_HEAD_INVALID")
         _require_sha_or_none(head.get("sha"), f"PROJECT_MACHINE_{name.upper()}_HEAD_INVALID")
+
+    if value.get("observations") != observations(sensors):
+        raise RuntimeError("PROJECT_MACHINE_OBSERVATIONS_MISMATCH")
 
     supplied_hash = value.get("inspectionHash")
     body = {key: item for key, item in value.items() if key != "inspectionHash"}
