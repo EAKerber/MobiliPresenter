@@ -17,6 +17,7 @@ from tools import agent, project_sensors
 
 SCHEMA_VERSION = "ProjectMachineInspection 0.1"
 REPOSITORY = "EAKerber/MobiliPresenter"
+SCOPES = {"local", "base", "live"}
 STATUSES = {"PASS", "UNKNOWN", "FAIL"}
 ERROR_EXIT = 2
 UNKNOWN_EXIT = 1
@@ -124,7 +125,7 @@ def project_summary(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_inspection(state: dict[str, Any], sensors: dict[str, dict[str, Any]], *, scope: str) -> dict[str, Any]:
-    if scope not in {"local", "live"}:
+    if scope not in SCOPES:
         raise RuntimeError("PROJECT_MACHINE_SCOPE_INVALID")
     body = {
         "schemaVersion": SCHEMA_VERSION,
@@ -161,6 +162,19 @@ def inspect_local() -> dict[str, Any]:
     return build_inspection(state, sensors, scope="local")
 
 
+def inspect_base() -> dict[str, Any]:
+    """Remote base inspection that deliberately does not depend on live continuations."""
+    state = _load_state()
+    sensors = project_sensors.observe_local_core(state)
+    sensors["control"] = project_sensors.observe_control_head(state, live=True)
+    sensors["capabilities"] = project_sensors.observe_capabilities()
+    sensors["pullRequests"] = project_sensors.observe_pull_requests(state, live=True)
+    sensors["coordination"] = project_sensors.observe_coordination(live=True)
+    sensors["continuations"] = project_sensors.observe_continuations_local()
+    sensors["development"] = project_sensors.observe_development(state, sensors["pullRequests"], live=True)
+    return build_inspection(state, sensors, scope="base")
+
+
 def inspect_live() -> dict[str, Any]:
     state = _load_state()
     sensors = project_sensors.observe_local_core(state)
@@ -187,7 +201,7 @@ def validate_inspection(value: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("PROJECT_MACHINE_SCHEMA_UNSUPPORTED")
     if value.get("repository") != REPOSITORY:
         raise RuntimeError("PROJECT_MACHINE_REPOSITORY_MISMATCH")
-    if value.get("scope") not in {"local", "live"}:
+    if value.get("scope") not in SCOPES:
         raise RuntimeError("PROJECT_MACHINE_SCOPE_INVALID")
     if value.get("readOnly") is not True:
         raise RuntimeError("PROJECT_MACHINE_NOT_READ_ONLY")
@@ -263,6 +277,7 @@ def main(argv: list[str] | None = None) -> int:
     inspect_parser = sub.add_parser("inspect")
     scope_group = inspect_parser.add_mutually_exclusive_group(required=True)
     scope_group.add_argument("--live", action="store_true")
+    scope_group.add_argument("--base", action="store_true")
     scope_group.add_argument("--local", action="store_true")
     inspect_parser.add_argument("--json", action="store_true", dest="as_json")
     validate_parser = sub.add_parser("validate")
@@ -274,7 +289,12 @@ def main(argv: list[str] | None = None) -> int:
             result = validate_inspection(load_json(args.path))
             print(json.dumps(result, indent=2 if args.as_json else None, ensure_ascii=False))
             return 0
-        payload = inspect_live() if args.live else inspect_local()
+        if args.live:
+            payload = inspect_live()
+        elif args.base:
+            payload = inspect_base()
+        else:
+            payload = inspect_local()
         if args.as_json:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:
