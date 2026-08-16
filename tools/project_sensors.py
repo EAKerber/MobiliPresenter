@@ -5,362 +5,106 @@ from __future__ import annotations
 from typing import Any
 
 from tools import agent, capability_gates, continuation, coordination
+from tools.semantics.observation import ObservationStatus
 
-STATUSES = {"PASS", "UNKNOWN", "FAIL"}
 
-
-def sensor(
-    status: str,
-    *,
-    code: str | None = None,
-    data: Any = None,
-    required: bool = True,
-    authority: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    normalized = str(status).upper()
-    if normalized not in STATUSES:
-        raise RuntimeError("PROJECT_SENSOR_STATUS_INVALID")
-    return {
-        "status": normalized,
-        "required": bool(required),
-        "code": code,
-        "authority": authority,
-        "data": data,
-    }
+def sensor(status: str, *, code: str | None = None, data: Any = None, required: bool = True, authority: dict[str, Any] | None = None) -> dict[str, Any]:
+    try: normalized = ObservationStatus.parse(str(status).upper()).value
+    except RuntimeError as exc: raise RuntimeError("PROJECT_SENSOR_STATUS_INVALID") from exc
+    return {"status": normalized, "required": bool(required), "code": code, "authority": authority, "data": data}
 
 
 def summarize_checks(checks: list[dict[str, Any]]) -> tuple[str, str | None]:
-    statuses = [str(item.get("status") or "UNKNOWN").upper() for item in checks]
-    if any(value == "FAIL" for value in statuses):
-        first = next((item for item in checks if str(item.get("status")).upper() == "FAIL"), {})
-        return "FAIL", str(first.get("code") or "CHECK_FAILED")
-    if any(value == "UNKNOWN" for value in statuses):
-        first = next((item for item in checks if str(item.get("status")).upper() == "UNKNOWN"), {})
-        return "UNKNOWN", str(first.get("code") or "CHECK_UNKNOWN")
-    return "PASS", None
+    statuses: list[str] = []
+    for item in checks:
+        try: statuses.append(ObservationStatus.parse(str(item.get("status") or ObservationStatus.UNKNOWN.value).upper()).value)
+        except RuntimeError: statuses.append(ObservationStatus.FAIL.value)
+    if ObservationStatus.FAIL.value in statuses:
+        first = next((item for item in checks if str(item.get("status")).upper() == ObservationStatus.FAIL.value), {})
+        return ObservationStatus.FAIL.value, str(first.get("code") or "CHECK_FAILED")
+    if ObservationStatus.UNKNOWN.value in statuses:
+        first = next((item for item in checks if str(item.get("status")).upper() == ObservationStatus.UNKNOWN.value), {})
+        return ObservationStatus.UNKNOWN.value, str(first.get("code") or "CHECK_UNKNOWN")
+    return ObservationStatus.PASS.value, None
 
 
 def capability_items() -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
+    out=[]
     for value in capability_gates.discover_capabilities():
-        plan = capability_gates.build_review_plan(value)
-        out.append(
-            {
-                "id": value["id"],
-                "policy": value["policy"],
-                "supervisorParticipation": capability_gates.supervisor_participation(value),
-                "reviewAction": plan["action"],
-                "nextGates": plan["nextGates"],
-                "backlogCount": len(plan["backlog"]),
-                "roundsWithoutActiveGates": plan["roundsWithoutActiveGates"],
-                "maxRoundsWithoutActiveGates": plan["maxRoundsWithoutActiveGates"],
-                "deferReason": plan["deferReason"],
-                "reviewPlanHash": plan["planHash"],
-            }
-        )
+        plan=capability_gates.build_review_plan(value)
+        out.append({"id":value["id"],"policy":value["policy"],"supervisorParticipation":capability_gates.supervisor_participation(value),"reviewAction":plan["action"],"nextGates":plan["nextGates"],"backlogCount":len(plan["backlog"]),"roundsWithoutActiveGates":plan["roundsWithoutActiveGates"],"maxRoundsWithoutActiveGates":plan["maxRoundsWithoutActiveGates"],"deferReason":plan["deferReason"],"reviewPlanHash":plan["planHash"]})
     return out
 
 
-def observe_capabilities() -> dict[str, Any]:
+def observe_capabilities():
+    try:return sensor("PASS",data={"items":capability_items()},authority={"kind":"repository","path":"ops/capabilities"})
+    except (RuntimeError,OSError,ValueError,KeyError) as exc:return sensor("FAIL",code="CAPABILITY_OBSERVATION_FAILED",data={"items":[],"detail":str(exc)},authority={"kind":"repository","path":"ops/capabilities"})
+
+
+def continuation_item(value):
+    return {"id":value["id"],"actor":value["actor"],"status":value["status"],"branch":value["branch"],"prNumber":value["prNumber"],"completed":value["completed"],"remaining":value["remaining"],"nextAction":value["nextAction"],"lastKnownGood":value["lastKnownGood"],"blockedBy":value["blockedBy"],"handoffTo":value["handoffTo"],"stateHash":continuation.state_hash(value)}
+
+
+def observe_continuations_local():
     try:
-        items = capability_items()
-        return sensor(
-            "PASS",
-            data={"items": items},
-            authority={"kind": "repository", "path": "ops/capabilities"},
-        )
-    except (RuntimeError, OSError, ValueError, KeyError) as exc:
-        return sensor(
-            "FAIL",
-            code="CAPABILITY_OBSERVATION_FAILED",
-            data={"items": [], "detail": str(exc)},
-            authority={"kind": "repository", "path": "ops/capabilities"},
-        )
+        items=[continuation_item(v) for v in continuation.discover()]
+        return sensor("PASS",data={"available":True,"authorityBranch":None,"authorityHead":None,"items":items,"mode":"local-model"},required=True,authority={"kind":"local-model","path":"ops/continuations"})
+    except (RuntimeError,OSError,ValueError,KeyError) as exc:return sensor("FAIL",code="CONTINUATION_LOCAL_OBSERVATION_FAILED",data={"available":False,"reason":"LOCAL_READ_FAILED","detail":str(exc),"items":[]},required=True,authority={"kind":"local-model","path":"ops/continuations"})
 
 
-def continuation_item(value: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": value["id"],
-        "actor": value["actor"],
-        "status": value["status"],
-        "branch": value["branch"],
-        "prNumber": value["prNumber"],
-        "completed": value["completed"],
-        "remaining": value["remaining"],
-        "nextAction": value["nextAction"],
-        "lastKnownGood": value["lastKnownGood"],
-        "blockedBy": value["blockedBy"],
-        "handoffTo": value["handoffTo"],
-        "stateHash": continuation.state_hash(value),
-    }
-
-
-def observe_continuations_local() -> dict[str, Any]:
-    try:
-        items = [continuation_item(value) for value in continuation.discover()]
-        return sensor(
-            "PASS",
-            data={
-                "available": True,
-                "authorityBranch": None,
-                "authorityHead": None,
-                "items": items,
-                "mode": "local-model",
-            },
-            required=True,
-            authority={"kind": "local-model", "path": "ops/continuations"},
-        )
-    except (RuntimeError, OSError, ValueError, KeyError) as exc:
-        return sensor(
-            "FAIL",
-            code="CONTINUATION_LOCAL_OBSERVATION_FAILED",
-            data={"available": False, "reason": "LOCAL_READ_FAILED", "detail": str(exc), "items": []},
-            required=True,
-            authority={"kind": "local-model", "path": "ops/continuations"},
-        )
-
-
-def observe_continuations_live() -> dict[str, Any]:
+def observe_continuations_live():
     try:
         from tools.continuation_remote import GitHubContinuationAuthority
-
-        authority = GitHubContinuationAuthority()
-        observed = authority.observe()
-        items = [continuation_item(value) for _, value in sorted(observed.items.items())]
-        return sensor(
-            "PASS",
-            data={
-                "available": True,
-                "authorityBranch": authority.authority_branch,
-                "authorityHead": observed.head_sha,
-                "items": items,
-                "mode": "live-authority",
-            },
-            authority={"kind": "git-authority", "branch": authority.authority_branch},
-        )
-    except (OSError, RuntimeError, ImportError) as exc:
-        return sensor(
-            "UNKNOWN",
-            code="CONTINUATION_AUTHORITY_UNAVAILABLE",
-            data={
-                "available": False,
-                "reason": getattr(exc, "code", "CONTINUATION_UNAVAILABLE"),
-                "detail": getattr(exc, "detail", str(exc)),
-                "items": [],
-            },
-            authority={"kind": "git-authority", "branch": "coordination/continuations"},
-        )
+        authority=GitHubContinuationAuthority(); observed=authority.observe(); items=[continuation_item(v) for _,v in sorted(observed.items.items())]
+        return sensor("PASS",data={"available":True,"authorityBranch":authority.authority_branch,"authorityHead":observed.head_sha,"items":items,"mode":"live-authority"},authority={"kind":"git-authority","branch":authority.authority_branch})
+    except (OSError,RuntimeError,ImportError) as exc:return sensor("UNKNOWN",code="CONTINUATION_AUTHORITY_UNAVAILABLE",data={"available":False,"reason":getattr(exc,"code","CONTINUATION_UNAVAILABLE"),"detail":getattr(exc,"detail",str(exc)),"items":[]},authority={"kind":"git-authority","branch":"coordination/continuations"})
 
 
-def observe_pull_requests(state: dict[str, Any], *, live: bool) -> dict[str, Any]:
-    if not live:
-        return sensor(
-            "UNKNOWN",
-            code="NOT_OBSERVED_IN_LOCAL_SCOPE",
-            data={"available": False, "reason": "NOT_REQUESTED", "items": []},
-            required=False,
-            authority={"kind": "github", "resource": "pull-requests"},
-        )
-
-    repo = state["project"]["repository"]
-    ok, payload = agent.run_gh_json(f"repos/{repo}/pulls?state=open&per_page=100")
-    if not ok or not isinstance(payload, list):
-        return sensor(
-            "UNKNOWN",
-            code="REMOTE_PR_INVENTORY_UNAVAILABLE",
-            data={"available": False, "reason": "OPEN_PR_READ_FAILED", "detail": payload, "items": []},
-            authority={"kind": "github", "resource": "pull-requests"},
-        )
-
-    active_pr = state["development"].get("prNumber")
-    result_status = "PASS"
-    result_code = None
-    items: list[dict[str, Any]] = []
+def observe_pull_requests(state,*,live):
+    if not live:return sensor("UNKNOWN",code="NOT_OBSERVED_IN_LOCAL_SCOPE",data={"available":False,"reason":"NOT_REQUESTED","items":[]},required=False,authority={"kind":"github","resource":"pull-requests"})
+    repo=state["project"]["repository"]; ok,payload=agent.run_gh_json(f"repos/{repo}/pulls?state=open&per_page=100")
+    if not ok or not isinstance(payload,list):return sensor("UNKNOWN",code="REMOTE_PR_INVENTORY_UNAVAILABLE",data={"available":False,"reason":"OPEN_PR_READ_FAILED","detail":payload,"items":[]},authority={"kind":"github","resource":"pull-requests"})
+    active_pr=state["development"].get("prNumber"); result_status="PASS"; result_code=None; items=[]
     for raw in payload:
-        if not isinstance(raw, dict):
-            continue
-        head = raw.get("head") if isinstance(raw.get("head"), dict) else {}
-        base = raw.get("base") if isinstance(raw.get("base"), dict) else {}
-        head_sha = head.get("sha")
-        runs: list[dict[str, Any]] = []
-        ci = "unknown"
-        ci_observed = False
-        if isinstance(head_sha, str):
-            runs_ok, workflow_payload = agent.run_gh_json(
-                f"repos/{repo}/actions/runs?head_sha={head_sha}&per_page=100"
-            )
-            if (
-                runs_ok
-                and isinstance(workflow_payload, dict)
-                and isinstance(workflow_payload.get("workflow_runs"), list)
-            ):
-                ci_observed = True
-                runs = [
-                    {
-                        "name": item.get("name"),
-                        "status": item.get("status"),
-                        "conclusion": item.get("conclusion"),
-                        "id": item.get("id"),
-                    }
-                    for item in workflow_payload["workflow_runs"]
-                    if isinstance(item, dict)
-                ]
-                ci = agent.aggregate_ci(runs)
-        number = raw.get("number")
-        if isinstance(active_pr, int) and number == active_pr and not ci_observed:
-            result_status = "UNKNOWN"
-            result_code = "ACTIVE_PR_CI_UNAVAILABLE"
-        items.append(
-            {
-                "number": number,
-                "draft": raw.get("draft"),
-                "headRef": head.get("ref"),
-                "headSha": head_sha,
-                "baseRef": base.get("ref"),
-                "ci": ci,
-                "ciObserved": ci_observed,
-                "workflows": runs,
-            }
-        )
-
-    items.sort(key=lambda item: int(item.get("number") or 0))
-    return sensor(
-        result_status,
-        code=result_code,
-        data={"available": True, "items": items},
-        authority={"kind": "github", "resource": "pull-requests"},
-    )
+        if not isinstance(raw,dict):continue
+        head=raw.get("head") if isinstance(raw.get("head"),dict) else {}; base=raw.get("base") if isinstance(raw.get("base"),dict) else {}; head_sha=head.get("sha"); runs=[]; ci="unknown"; ci_observed=False
+        if isinstance(head_sha,str):
+            runs_ok,w=agent.run_gh_json(f"repos/{repo}/actions/runs?head_sha={head_sha}&per_page=100")
+            if runs_ok and isinstance(w,dict) and isinstance(w.get("workflow_runs"),list):
+                ci_observed=True; runs=[{"name":x.get("name"),"status":x.get("status"),"conclusion":x.get("conclusion"),"id":x.get("id")} for x in w["workflow_runs"] if isinstance(x,dict)]; ci=agent.aggregate_ci(runs)
+        number=raw.get("number")
+        if isinstance(active_pr,int) and number==active_pr and not ci_observed:result_status="UNKNOWN";result_code="ACTIVE_PR_CI_UNAVAILABLE"
+        items.append({"number":number,"draft":raw.get("draft"),"headRef":head.get("ref"),"headSha":head_sha,"baseRef":base.get("ref"),"ci":ci,"ciObserved":ci_observed,"workflows":runs})
+    items.sort(key=lambda item:int(item.get("number") or 0)); return sensor(result_status,code=result_code,data={"available":True,"items":items},authority={"kind":"github","resource":"pull-requests"})
 
 
-def observe_coordination(*, live: bool) -> dict[str, Any]:
-    if not live:
-        return sensor(
-            "UNKNOWN",
-            code="NOT_OBSERVED_IN_LOCAL_SCOPE",
-            data={"available": False, "reason": "NOT_REQUESTED", "intents": [], "leases": []},
-            required=False,
-            authority={"kind": "git-authority", "branch": "coordination/leases"},
-        )
+def observe_coordination(*,live):
+    if not live:return sensor("UNKNOWN",code="NOT_OBSERVED_IN_LOCAL_SCOPE",data={"available":False,"reason":"NOT_REQUESTED","intents":[],"leases":[]},required=False,authority={"kind":"git-authority","branch":"coordination/leases"})
     try:
-        from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
-
-        authority = GitHubCoordinationAuthority(GhApiTransport())
-        observed = authority.observe()
-        current = coordination.compact_expired(observed.state, observed.authority_now)
-        return sensor(
-            "PASS",
-            data={
-                "available": True,
-                "authorityBranch": authority.authority_branch,
-                "authorityHead": observed.head_sha,
-                "intents": current["intents"],
-                "leases": current["leases"],
-            },
-            authority={"kind": "git-authority", "branch": authority.authority_branch},
-        )
-    except (OSError, RuntimeError, ImportError) as exc:
-        return sensor(
-            "UNKNOWN",
-            code="COORDINATION_AUTHORITY_UNAVAILABLE",
-            data={
-                "available": False,
-                "reason": getattr(exc, "code", "COORDINATION_UNAVAILABLE"),
-                "detail": getattr(exc, "detail", str(exc)),
-                "intents": [],
-                "leases": [],
-            },
-            authority={"kind": "git-authority", "branch": "coordination/leases"},
-        )
+        from tools.coordination_remote import GhApiTransport,GitHubCoordinationAuthority
+        authority=GitHubCoordinationAuthority(GhApiTransport()); observed=authority.observe(); current=coordination.compact_expired(observed.state,observed.authority_now)
+        return sensor("PASS",data={"available":True,"authorityBranch":authority.authority_branch,"authorityHead":observed.head_sha,"intents":current["intents"],"leases":current["leases"]},authority={"kind":"git-authority","branch":authority.authority_branch})
+    except (OSError,RuntimeError,ImportError) as exc:return sensor("UNKNOWN",code="COORDINATION_AUTHORITY_UNAVAILABLE",data={"available":False,"reason":getattr(exc,"code","COORDINATION_UNAVAILABLE"),"detail":getattr(exc,"detail",str(exc)),"intents":[],"leases":[]},authority={"kind":"git-authority","branch":"coordination/leases"})
 
 
-def observe_control_head(state: dict[str, Any], *, live: bool) -> dict[str, Any]:
-    branch = state["git"]["controlBranch"]
+def observe_control_head(state,*,live):
+    branch=state["git"]["controlBranch"]
     if live:
-        repo = state["project"]["repository"]
-        ok, payload = agent.run_gh_json(f"repos/{repo}/git/ref/heads/{branch}")
-        sha = (
-            payload.get("object", {}).get("sha")
-            if ok and isinstance(payload, dict) and isinstance(payload.get("object"), dict)
-            else None
-        )
-        if isinstance(sha, str) and len(sha) == 40:
-            return sensor(
-                "PASS",
-                data={"branch": branch, "sha": sha, "mode": "remote"},
-                authority={"kind": "git-ref", "branch": branch},
-            )
-        return sensor(
-            "UNKNOWN",
-            code="CONTROL_HEAD_UNAVAILABLE",
-            data={"branch": branch, "sha": None, "detail": payload},
-            authority={"kind": "git-ref", "branch": branch},
-        )
-
-    ok, sha = agent.run_git("rev-parse", branch)
-    if ok and isinstance(sha, str) and len(sha) == 40:
-        return sensor(
-            "PASS",
-            data={"branch": branch, "sha": sha, "mode": "local"},
-            authority={"kind": "git-ref", "branch": branch},
-        )
-    return sensor(
-        "UNKNOWN",
-        code="CONTROL_HEAD_NOT_AVAILABLE_LOCALLY",
-        data={"branch": branch, "sha": None},
-        required=False,
-        authority={"kind": "git-ref", "branch": branch},
-    )
+        repo=state["project"]["repository"];ok,payload=agent.run_gh_json(f"repos/{repo}/git/ref/heads/{branch}");sha=payload.get("object",{}).get("sha") if ok and isinstance(payload,dict) and isinstance(payload.get("object"),dict) else None
+        if isinstance(sha,str) and len(sha)==40:return sensor("PASS",data={"branch":branch,"sha":sha,"mode":"remote"},authority={"kind":"git-ref","branch":branch})
+        return sensor("UNKNOWN",code="CONTROL_HEAD_UNAVAILABLE",data={"branch":branch,"sha":None,"detail":payload},authority={"kind":"git-ref","branch":branch})
+    ok,sha=agent.run_git("rev-parse",branch)
+    if ok and isinstance(sha,str) and len(sha)==40:return sensor("PASS",data={"branch":branch,"sha":sha,"mode":"local"},authority={"kind":"git-ref","branch":branch})
+    return sensor("UNKNOWN",code="CONTROL_HEAD_NOT_AVAILABLE_LOCALLY",data={"branch":branch,"sha":None},required=False,authority={"kind":"git-ref","branch":branch})
 
 
-def observe_local_core(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    verification = agent.verify_state(include_remote=False)
-    checks = list(verification.get("checks") or [])
-
-    project_checks = [
-        item
-        for item in checks
-        if item.get("name") in {"project-state", "project-state-schema", "development-plan"}
-    ]
-    publication_checks = [item for item in checks if item.get("name") == "published-artifact-state"]
-    git_checks = [item for item in checks if item.get("name") == "git-context"]
-    repository_checks = [
-        item for item in checks if isinstance(item.get("name"), str) and item["name"].startswith("required:")
-    ]
-
-    project_status, project_code = summarize_checks(project_checks)
-    publication_status, publication_code = summarize_checks(publication_checks)
-    git_status, git_code = summarize_checks(git_checks)
-    repository_status, repository_code = summarize_checks(repository_checks)
-
-    observed = agent.observed_git()
+def observe_local_core(state):
+    verification=agent.verify_state(include_remote=False);checks=list(verification.get("checks") or [])
+    project_checks=[i for i in checks if i.get("name") in {"project-state","project-state-schema","development-plan"}];publication_checks=[i for i in checks if i.get("name")=="published-artifact-state"];git_checks=[i for i in checks if i.get("name")=="git-context"];repository_checks=[i for i in checks if isinstance(i.get("name"),str) and i["name"].startswith("required:")]
+    project_status,project_code=summarize_checks(project_checks);publication_status,publication_code=summarize_checks(publication_checks);git_status,git_code=summarize_checks(git_checks);repository_status,repository_code=summarize_checks(repository_checks);observed=agent.observed_git()
     return {
-        "projectState": sensor(
-            project_status,
-            code=project_code,
-            data={"verification": verification, "checks": project_checks},
-            authority={"kind": "repository", "path": "ops/state/project.json"},
-        ),
-        "publication": sensor(
-            publication_status,
-            code=publication_code,
-            data={
-                "checks": publication_checks,
-                "release": state["published"].get("release"),
-                "manifest": state["published"].get("artifactManifest"),
-                "sha256": state["published"].get("artifactSha256"),
-            },
-            authority={"kind": "repository", "path": state["published"].get("artifactManifest")},
-        ),
-        "git": sensor(
-            git_status,
-            code=git_code,
-            data={"observed": observed, "checks": git_checks},
-            authority={"kind": "worktree"},
-        ),
-        "repository": sensor(
-            repository_status,
-            code=repository_code,
-            data={"checks": repository_checks},
-            authority={"kind": "repository", "name": state["project"]["repository"]},
-        ),
+        "projectState":sensor(project_status,code=project_code,data={"verification":verification,"checks":project_checks},authority={"kind":"repository","path":"ops/state/project.json"}),
+        "publication":sensor(publication_status,code=publication_code,data={"checks":publication_checks,"release":state["published"].get("release"),"manifest":state["published"].get("artifactManifest"),"sha256":state["published"].get("artifactSha256")},authority={"kind":"repository","path":state["published"].get("artifactManifest")}),
+        "git":sensor(git_status,code=git_code,data={"observed":observed,"checks":git_checks},authority={"kind":"worktree"}),
+        "repository":sensor(repository_status,code=repository_code,data={"checks":repository_checks},authority={"kind":"repository","name":state["project"]["repository"]}),
     }
