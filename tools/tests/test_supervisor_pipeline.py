@@ -19,6 +19,8 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
         self.assertIn("scheduler_plan.py --input /tmp/maintenance-inspection.json", agent)
         self.assertIn("scheduler_snapshot.py build", supervisor)
         self.assertIn("scheduler_snapshot.py validate", supervisor)
+        self.assertIn("/tmp/project-machine-source.json", supervisor)
+        self.assertIn("/tmp/project-machine-readback.json", supervisor)
 
     def test_supervisor_yaml_does_not_implement_artifact_contracts(self):
         supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
@@ -31,6 +33,17 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
             "sourceHeads =",
         ):
             self.assertNotIn(forbidden, supervisor)
+
+    def test_retired_maintenance_live_has_no_runtime_surface(self):
+        tools = ROOT / "tools"
+        self.assertFalse((tools / "maintenance_live.py").exists())
+        offenders = []
+        for path in tools.glob("*.py"):
+            if path.name == "maintenance_live.py":
+                continue
+            if "maintenance_live" in path.read_text(encoding="utf-8"):
+                offenders.append(path.name)
+        self.assertEqual([], offenders)
 
 
 if __name__ == "__main__":
