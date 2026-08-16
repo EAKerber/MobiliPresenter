@@ -16,6 +16,16 @@ CAPABILITY_BASE_FIELDS = {
     "maxRoundsWithoutActiveGates",
     "deferReason",
 }
+SEMANTIC_TOP_FIELDS = {
+    "schemaVersion",
+    "owners",
+    "concepts",
+    "contracts",
+    "branchGrammar",
+    "managedAuthorities",
+    "resources",
+    "components",
+}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -72,5 +82,39 @@ def check_capability_gates_contract() -> list[str]:
     return errors
 
 
+def check_operational_semantics_contract() -> list[str]:
+    registry = load_registry()
+    errors = validate_registry(registry)
+    contract = registry.get("contracts", {}).get("operational-semantics")
+    if not isinstance(contract, dict):
+        return errors + ["SEMANTIC_REGISTRY_CONTRACT_MISSING"]
+    if contract.get("semanticValidator") != "tools.semantics.registry.validate_registry":
+        errors.append("SEMANTIC_REGISTRY_VALIDATOR_MISMATCH")
+    schema_path = ROOT / str(contract.get("structuralSchema"))
+    schema = _load_json(schema_path)
+    if schema.get("title") != "OperationalSemantics 0.2":
+        errors.append("SEMANTIC_REGISTRY_SCHEMA_TITLE_MISMATCH")
+    properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    if set(properties) != SEMANTIC_TOP_FIELDS:
+        errors.append("SEMANTIC_REGISTRY_SCHEMA_FIELDS_MISMATCH")
+    if set(schema.get("required") or []) != SEMANTIC_TOP_FIELDS:
+        errors.append("SEMANTIC_REGISTRY_SCHEMA_REQUIRED_MISMATCH")
+    schema_version = properties.get("schemaVersion") if isinstance(properties.get("schemaVersion"), dict) else {}
+    if schema_version.get("const") != registry.get("schemaVersion"):
+        errors.append("SEMANTIC_REGISTRY_SCHEMA_VERSION_MISMATCH")
+    component_schema = properties.get("components") if isinstance(properties.get("components"), dict) else {}
+    component_item = component_schema.get("additionalProperties") if isinstance(component_schema.get("additionalProperties"), dict) else {}
+    required_component = set(component_item.get("required") or [])
+    expected_component = {
+        "module", "owner", "kind", "sideEffects", "readsAuthorities", "writesAuthorities",
+        "readsResources", "writesResources", "produces", "canonicalWriterFor", "delegatesTo",
+    }
+    if required_component != expected_component:
+        errors.append("SEMANTIC_COMPONENT_SCHEMA_REQUIRED_MISMATCH")
+    return errors
+
+
 def check_contracts() -> list[str]:
-    return check_capability_gates_contract()
+    errors = check_capability_gates_contract()
+    errors.extend(check_operational_semantics_contract())
+    return errors
