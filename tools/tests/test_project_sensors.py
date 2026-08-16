@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from tools import project_sensors
 
@@ -6,43 +7,101 @@ from tools import project_sensors
 def state(active=None, pr=None):
     return {
         "project": {"repository": "EAKerber/MobiliPresenter"},
-        "git": {"activeDevelopmentBranch": active, "controlBranch": "main", "preserveBranches": ["architecture/tpc"]},
-        "development": {"phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "prNumber": pr, "blockers": []},
+        "git": {
+            "activeDevelopmentBranch": active,
+            "controlBranch": "main",
+            "preserveBranches": ["architecture/tpc"],
+        },
+        "development": {
+            "phase": "between-increments",
+            "checkpoint": "C",
+            "nextTransition": "next",
+            "prNumber": pr,
+            "blockers": [],
+        },
     }
 
 
 class ProjectSensorsTests(unittest.TestCase):
-    def test_operations_namespace_is_classified_generically(self):
-        self.assertEqual(project_sensors.classify_pr(state(), "ops/project-machine-m1"), "operations")
-
-    def test_preserved_and_unclassified_pr_classes(self):
-        self.assertEqual(project_sensors.classify_pr(state(), "architecture/tpc"), "preserved")
-        self.assertEqual(project_sensors.classify_pr(state(), "feature/mystery"), "unclassified")
-
-    def test_no_active_development_is_known_pass(self):
-        result = project_sensors.observe_development(state(), project_sensors.sensor("PASS", data={"available": True, "items": []}), live=True)
-        self.assertEqual(result["status"], "PASS")
-        self.assertEqual(result["code"], "NO_ACTIVE_DEVELOPMENT")
-
-    def test_active_pr_pending_is_unknown(self):
-        current = state("engine/work", 7)
-        prs = project_sensors.sensor("PASS", data={"available": True, "items": [{"number": 7, "headRef": "engine/work", "baseRef": "main", "ci": "pending"}]})
-        result = project_sensors.observe_development(current, prs, live=True)
-        self.assertEqual(result["status"], "UNKNOWN")
-        self.assertEqual(result["code"], "REMOTE_CI_PENDING")
-
-    def test_active_pr_divergence_fails(self):
-        current = state("engine/work", 7)
-        prs = project_sensors.sensor("PASS", data={"available": True, "items": [{"number": 7, "headRef": "other/work", "baseRef": "main", "ci": "green"}]})
-        result = project_sensors.observe_development(current, prs, live=True)
-        self.assertEqual(result["status"], "FAIL")
-        self.assertEqual(result["code"], "REMOTE_PR_DIVERGENCE")
-
     def test_remote_sensors_are_optional_in_local_scope(self):
         result = project_sensors.observe_pull_requests(state(), live=False)
         self.assertEqual(result["status"], "UNKNOWN")
         self.assertFalse(result["required"])
         self.assertEqual(result["code"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
+
+    def test_pr_sensor_does_not_classify_prs(self):
+        payloads = [
+            (
+                True,
+                [
+                    {
+                        "number": 7,
+                        "draft": False,
+                        "head": {"ref": "ops/work", "sha": "1" * 40},
+                        "base": {"ref": "main"},
+                    }
+                ],
+            ),
+            (True, {"workflow_runs": []}),
+        ]
+        with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
+            result = project_sensors.observe_pull_requests(state(), live=True)
+        self.assertEqual(result["status"], "PASS")
+        self.assertNotIn("classification", result["data"]["items"][0])
+        self.assertTrue(result["data"]["items"][0]["ciObserved"])
+
+    def test_known_pending_active_ci_keeps_sensor_pass(self):
+        payloads = [
+            (
+                True,
+                [
+                    {
+                        "number": 7,
+                        "draft": False,
+                        "head": {"ref": "ops/work", "sha": "1" * 40},
+                        "base": {"ref": "main"},
+                    }
+                ],
+            ),
+            (
+                True,
+                {
+                    "workflow_runs": [
+                        {"name": "Supervisor Snapshot", "status": "in_progress", "conclusion": None, "id": 1}
+                    ]
+                },
+            ),
+        ]
+        with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
+            result = project_sensors.observe_pull_requests(state("ops/work", 7), live=True)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["data"]["items"][0]["ci"], "pending")
+
+    def test_unobservable_active_ci_marks_sensor_unknown(self):
+        payloads = [
+            (
+                True,
+                [
+                    {
+                        "number": 7,
+                        "draft": False,
+                        "head": {"ref": "ops/work", "sha": "1" * 40},
+                        "base": {"ref": "main"},
+                    }
+                ],
+            ),
+            (False, {"error": "unavailable"}),
+        ]
+        with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
+            result = project_sensors.observe_pull_requests(state("ops/work", 7), live=True)
+        self.assertEqual(result["status"], "UNKNOWN")
+        self.assertEqual(result["code"], "ACTIVE_PR_CI_UNAVAILABLE")
+        self.assertTrue(result["data"]["available"])
+        self.assertFalse(result["data"]["items"][0]["ciObserved"])
+
+    def test_removed_derived_helpers_are_not_present(self):
+        self.assertFalse(hasattr(project_sensors, "classify_pr"))
+        self.assertFalse(hasattr(project_sensors, "observe_development"))
 
 
 if __name__ == "__main__":
