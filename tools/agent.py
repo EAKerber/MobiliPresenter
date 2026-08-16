@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Deterministic operational toolbox for MobiliPresenter agents.
 
-Git Ops 1.2 keeps operational facts in ProjectState, supports an explicit
-between-increments state, and adds a read-only branch prune planner with a
-stable plan hash. Destructive prune application remains intentionally absent.
+Operational facts live in ProjectState and domain authorities. The toolbox
+provides read-only observation/verification plus bounded transition helpers.
+Branch pruning is planned separately and may be applied only by the guarded
+Branch Hygiene executor after exact-plan validation and readback.
 """
 from __future__ import annotations
 
@@ -185,6 +186,21 @@ def aggregate_ci(runs: list[dict[str, Any]]) -> str:
     return "unknown"
 
 
+def verification_summary(checks: list[dict[str, Any]]) -> dict[str, Any]:
+    statuses = [str(check.get("status") or "UNKNOWN").upper() for check in checks]
+    if any(status == "FAIL" for status in statuses):
+        status = "FAIL"
+    elif any(status == "UNKNOWN" for status in statuses):
+        status = "UNKNOWN"
+    else:
+        status = "PASS"
+    return {
+        "status": status,
+        "ok": status != "FAIL",
+        "complete": status == "PASS",
+    }
+
+
 def observe_remote(state: dict[str, Any], observed: dict[str, Any]) -> dict[str, Any]:
     active = state["git"].get("activeDevelopmentBranch")
     pr_number = state["development"].get("prNumber")
@@ -222,6 +238,43 @@ def observe_remote(state: dict[str, Any], observed: dict[str, Any]) -> dict[str,
         "ci": aggregate_ci(runs),
         "observedHeadMatchesPr": observed.get("head") == head_sha if observed.get("head") else None,
     }
+
+
+def remote_verification_checks(state: dict[str, Any], remote: dict[str, Any]) -> list[dict[str, Any]]:
+    if remote.get("developmentActive") is False:
+        return [{"name": "remote-development", "status": "PASS", "code": "NO_ACTIVE_DEVELOPMENT"}]
+    if not remote.get("available"):
+        return [{
+            "name": "remote-observation",
+            "status": "UNKNOWN",
+            "code": "REMOTE_OBSERVATION_UNAVAILABLE",
+            "observed": remote.get("reason"),
+        }]
+
+    pr = remote.get("pr", {})
+    identity_ok = (
+        pr.get("number") == state["development"].get("prNumber")
+        and pr.get("headRef") == state["git"].get("activeDevelopmentBranch")
+        and pr.get("baseRef") == state["git"].get("controlBranch")
+        and pr.get("state") == "open"
+    )
+    checks = [{
+        "name": "remote-pr-identity",
+        "status": "PASS" if identity_ok else "FAIL",
+        "code": None if identity_ok else "REMOTE_PR_DIVERGENCE",
+    }]
+
+    ci = str(remote.get("ci") or "unknown")
+    if ci == "green":
+        ci_status, ci_code = "PASS", None
+    elif ci == "failed":
+        ci_status, ci_code = "FAIL", "REMOTE_CI_FAILED"
+    elif ci == "pending":
+        ci_status, ci_code = "UNKNOWN", "REMOTE_CI_PENDING"
+    else:
+        ci_status, ci_code = "UNKNOWN", "REMOTE_CI_UNKNOWN"
+    checks.append({"name": "remote-ci", "status": ci_status, "code": ci_code, "observed": ci})
+    return checks
 
 
 def verify_state(include_remote: bool = False) -> dict[str, Any]:
@@ -264,27 +317,10 @@ def verify_state(include_remote: bool = False) -> dict[str, Any]:
     remote: dict[str, Any] | None = None
     if include_remote:
         remote = observe_remote(state, observed)
-        if remote.get("developmentActive") is False:
-            checks.append({"name": "remote-development", "status": "PASS", "code": "NO_ACTIVE_DEVELOPMENT"})
-        elif remote.get("available"):
-            pr = remote.get("pr", {})
-            identity_ok = (
-                pr.get("number") == state["development"].get("prNumber")
-                and pr.get("headRef") == state["git"].get("activeDevelopmentBranch")
-                and pr.get("baseRef") == state["git"].get("controlBranch")
-                and pr.get("state") == "open"
-            )
-            checks.append({"name": "remote-pr-identity", "status": "PASS" if identity_ok else "FAIL",
-                           "code": None if identity_ok else "REMOTE_PR_DIVERGENCE"})
-            ci = remote.get("ci", "unknown")
-            checks.append({"name": "remote-ci", "status": "FAIL" if ci == "failed" else "PASS",
-                           "code": "REMOTE_CI_FAILED" if ci == "failed" else None, "observed": ci})
-        else:
-            checks.append({"name": "remote-observation", "status": "PASS", "code": "REMOTE_UNKNOWN",
-                           "observed": remote.get("reason")})
+        checks.extend(remote_verification_checks(state, remote))
 
-    ok = all(check["status"] == "PASS" for check in checks)
-    return {"ok": ok, "checks": checks, "remote": remote}
+    summary = verification_summary(checks)
+    return {**summary, "checks": checks, "remote": remote}
 
 
 def checkpoint_candidate(state: dict[str, Any], checkpoint: str, next_transition: str, phase: str | None) -> dict[str, Any]:
@@ -384,9 +420,9 @@ def command_verify(as_json: bool, include_remote: bool) -> int:
         for check in payload["checks"]:
             code = f" [{check.get('code')}]" if check.get("code") else ""
             observed = f" ({check.get('observed')})" if check.get("observed") else ""
-            print(f"{check['status']:4} {check['name']}{observed}{code}")
-        print("\nPASS" if payload["ok"] else "\nBLOCKED")
-    return 0 if payload["ok"] else ERROR_EXIT
+            print(f"{check['status']:7} {check['name']}{observed}{code}")
+        print(f"\n{payload['status']}")
+    return 0 if payload["status"] == "PASS" else ERROR_EXIT
 
 
 def command_checkpoint(as_json: bool, args: argparse.Namespace) -> int:
@@ -466,9 +502,9 @@ def command_handoff(as_json: bool, include_remote: bool) -> int:
         print(f"  initiative: {state['development']['initiative']}")
         print(f"  checkpoint: {state['development']['checkpoint']}")
         print(f"  branch: {active}")
-        print(f"  verify: {'PASS' if verify['ok'] else 'BLOCKED'}")
+        print(f"  verify: {verify['status']}")
         print(f"  next: {payload['nextTransition']}")
-    return 0 if verify["ok"] else ERROR_EXIT
+    return 0 if verify["status"] == "PASS" else ERROR_EXIT
 
 
 def branch_refs() -> dict[str, str]:
@@ -550,7 +586,7 @@ def build_prune_plan(state: dict[str, Any], refs: dict[str, str], open_pr_heads:
         "openPrHeads": sorted(open_pr_heads or []),
         "entries": entries,
         "applyEligible": open_pr_heads is not None,
-        "note": "Read-only plan. Any ref drift invalidates this plan; Git Ops 1.2 has no destructive apply command."
+        "note": "Legacy local planner retained for compatibility tests; the canonical command delegates to tools/prune_plan.py."
     }
     return {**body, "planHash": stable_plan_hash(body)}
 
@@ -585,7 +621,7 @@ def main() -> int:
             if args.subcommand != "prune-plan":
                 raise RuntimeError("GIT_SUBCOMMAND_REQUIRED: prune-plan")
             if args.apply:
-                raise RuntimeError("UNSUPPORTED_TRANSITION: Git Ops 1.2 prune-plan is read-only")
+                raise RuntimeError("UNSUPPORTED_TRANSITION: prune planning is read-only; destructive apply is a separately guarded operation")
             return command_git_prune_plan(args.as_json)
         if args.subcommand is not None:
             raise RuntimeError(f"UNEXPECTED_SUBCOMMAND:{args.subcommand}")
