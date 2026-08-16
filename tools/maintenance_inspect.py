@@ -28,23 +28,85 @@ def finding(action, code, detail, subject=None):
     return value
 
 
-def decide(state, verification, capabilities, *, remote_requested, pull_requests, coordination_state, continuations=None, machine_trust=None):
-    findings = []
-    continuations = continuations or []
+def _sensor_focus(name: str) -> str:
+    return {
+        "pullRequests": "github",
+        "coordination": "coordination-leases",
+        "continuations": "continuations",
+        "projectState": "repository",
+        "publication": "publication",
+        "control": "main",
+    }.get(name, name)
+
+
+def _coherence_focus(check: dict[str, Any]) -> str | None:
+    code = check.get("code")
+    detail = check.get("detail") if isinstance(check.get("detail"), dict) else {}
+    if code == "UNCLASSIFIED_OPEN_PR":
+        items = detail.get("unclassified") if isinstance(detail.get("unclassified"), list) else []
+        if items and isinstance(items[0], dict) and isinstance(items[0].get("number"), int):
+            return f"pr:{items[0]['number']}"
+    if isinstance(code, str) and code.startswith("ACTIVE_PR_"):
+        return "development"
+    if isinstance(code, str) and code.startswith("LEASE_OWNER_"):
+        return "coordination-leases"
+    if isinstance(code, str) and code.startswith("CONTINUATION_"):
+        return "continuations"
+    subjects = check.get("subjects") if isinstance(check.get("subjects"), list) else []
+    return str(subjects[0]) if subjects else None
+
+
+def _machine_findings(machine_trust=None, machine_coherence=None, machine_sensors=None):
+    out = []
+    sensors = machine_sensors if isinstance(machine_sensors, dict) else {}
     if isinstance(machine_trust, dict):
-        trust_status = str(machine_trust.get("status") or "UNKNOWN").upper()
-        if trust_status == "FAIL":
-            failed = ", ".join(str(item) for item in machine_trust.get("failedSensors") or []) or "unknown"
-            findings.append(finding("RECONCILE", "PROJECT_MACHINE_FAILED", f"failed factual sensors: {failed}", "project-machine"))
-        elif trust_status == "UNKNOWN":
-            unknown = ", ".join(str(item) for item in machine_trust.get("unknownSensors") or []) or "unknown"
-            findings.append(finding("NEEDS_HUMAN", "PROJECT_MACHINE_INCOMPLETE", f"required factual sensors are unknown: {unknown}", "project-machine"))
+        status = str(machine_trust.get("status") or "UNKNOWN").upper()
+        names = machine_trust.get("failedSensors") if status == "FAIL" else machine_trust.get("unknownSensors")
+        action = "RECONCILE" if status == "FAIL" else ("NEEDS_HUMAN" if status == "UNKNOWN" else None)
+        if action:
+            for name in names or ["project-machine"]:
+                sensor = sensors.get(name) if isinstance(sensors.get(name), dict) else {}
+                code = sensor.get("code") or ("PROJECT_MACHINE_FAILED" if status == "FAIL" else "PROJECT_MACHINE_INCOMPLETE")
+                out.append(finding(action, str(code), f"factual sensor {name} status is {status}", _sensor_focus(str(name))))
+
+    if isinstance(machine_coherence, dict):
+        for check in machine_coherence.get("checks") or []:
+            if not isinstance(check, dict) or check.get("required") is not True:
+                continue
+            status = str(check.get("status") or "UNKNOWN").upper()
+            if status not in {"FAIL", "UNKNOWN"}:
+                continue
+            action = "RECONCILE" if status == "FAIL" else "NEEDS_HUMAN"
+            detail = check.get("detail")
+            rendered = json.dumps(detail, sort_keys=True, ensure_ascii=False) if detail is not None else str(check.get("id"))
+            out.append(finding(action, str(check.get("code") or "PROJECT_COHERENCE_UNKNOWN"), rendered, _coherence_focus(check)))
+    return out
+
+
+def decide(
+    state,
+    verification,
+    capabilities,
+    *,
+    remote_requested,
+    pull_requests,
+    coordination_state,
+    continuations=None,
+    machine_trust=None,
+    machine_coherence=None,
+    machine_sensors=None,
+):
+    findings = _machine_findings(machine_trust, machine_coherence, machine_sensors)
+    continuations = continuations or []
+
     if not verification.get("ok"):
         failed = [item.get("name") for item in verification.get("checks", []) if item.get("status") == "FAIL"]
         findings.append(finding("RECONCILE", "VERIFICATION_FAILED", f"failed checks: {', '.join(str(item) for item in failed)}", "repository"))
+
     blockers = state["development"].get("blockers") or []
     if blockers:
         findings.append(finding("PAUSE", "EXPLICIT_BLOCKERS", "; ".join(str(item) for item in blockers), "development"))
+
     for task in continuations:
         subject = f"continuation:{task['id']}"
         status = task["status"]
@@ -54,6 +116,7 @@ def decide(state, verification, capabilities, *, remote_requested, pull_requests
             findings.append(finding("PAUSE", "CONTINUATION_WAITING", "; ".join(task["blockedBy"]), subject))
         elif status in {"READY", "IN_PROGRESS"}:
             findings.append(finding("CONTINUE", "CONTINUATION_RUNNABLE", task["nextAction"] or "finish and mark done", subject))
+
     for item in capabilities:
         if item["policy"] != "experimental":
             continue
@@ -65,48 +128,87 @@ def decide(state, verification, capabilities, *, remote_requested, pull_requests
             findings.append(finding("CONTINUE", "CAPABILITY_GATES_DUE", f"next Gates: {', '.join(item['nextGates'])}", item["id"]))
         elif item["reviewAction"] == "REVIEW_EMPTY_ROUND":
             findings.append(finding("CONTINUE", "CAPABILITY_EMPTY_REVIEW_DUE", "re-evaluate the recorded deferral reason", item["id"]))
-    if remote_requested:
-        if not pull_requests.get("available"):
-            findings.append(finding("NEEDS_HUMAN", "REMOTE_PR_INVENTORY_UNAVAILABLE", str(pull_requests.get("reason") or "unknown"), "github"))
-        else:
-            for pr in pull_requests.get("items", []):
-                if pr.get("classification") == "unclassified":
-                    findings.append(finding("RECONCILE", "UNCLASSIFIED_OPEN_PR", f"open PR #{pr.get('number')} head {pr.get('headRef')} is not mapped to active/preserved/operations state", f"pr:{pr.get('number')}"))
-            active_pr = state["development"].get("prNumber")
-            if isinstance(active_pr, int):
-                matches = [item for item in pull_requests.get("items", []) if item.get("number") == active_pr]
-                if not matches:
-                    findings.append(finding("RECONCILE", "ACTIVE_PR_NOT_OPEN", f"ProjectState references PR #{active_pr}, but it is not open", "development"))
-                else:
-                    ci = matches[0].get("ci")
-                    if ci == "failed":
-                        findings.append(finding("RECONCILE", "ACTIVE_PR_CI_FAILED", f"PR #{active_pr} CI is failed", f"pr:{active_pr}"))
-                    elif ci == "pending":
-                        findings.append(finding("PAUSE", "ACTIVE_PR_CI_PENDING", f"PR #{active_pr} CI is pending", f"pr:{active_pr}"))
-                    elif ci == "unknown":
-                        findings.append(finding("NEEDS_HUMAN", "ACTIVE_PR_CI_UNKNOWN", f"PR #{active_pr} CI could not be established", f"pr:{active_pr}"))
-        canonical = any(item["id"] == "coordination-leases" and item["policy"] == "canonical" for item in capabilities)
-        if canonical and not coordination_state.get("available"):
-            findings.append(finding("NEEDS_HUMAN", "COORDINATION_AUTHORITY_UNAVAILABLE", str(coordination_state.get("reason") or "unknown"), "coordination-leases"))
-        elif coordination_state.get("available") and pull_requests.get("available"):
-            open_numbers = {item.get("number") for item in pull_requests.get("items", []) if isinstance(item.get("number"), int)}
-            for lease in coordination_state.get("leases", []):
-                owner = lease.get("owner") if isinstance(lease, dict) and isinstance(lease.get("owner"), dict) else {}
-                owner_pr = owner.get("pr")
-                if isinstance(owner_pr, int) and owner_pr not in open_numbers:
-                    findings.append(finding("RECONCILE", "LEASE_OWNER_PR_NOT_OPEN", f"lease {lease.get('leaseId')} references non-open PR #{owner_pr}", "coordination-leases"))
+
+    if remote_requested and pull_requests.get("available"):
+        active_pr = state["development"].get("prNumber")
+        if isinstance(active_pr, int):
+            matches = [item for item in pull_requests.get("items", []) if item.get("number") == active_pr]
+            if matches:
+                ci = str(matches[0].get("ci") or "unknown")
+                ci_observed = matches[0].get("ciObserved") is True
+                if ci == "failed":
+                    findings.append(finding("RECONCILE", "ACTIVE_PR_CI_FAILED", f"PR #{active_pr} CI is failed", f"pr:{active_pr}"))
+                elif ci == "pending":
+                    findings.append(finding("PAUSE", "ACTIVE_PR_CI_PENDING", f"PR #{active_pr} CI is pending", f"pr:{active_pr}"))
+                elif ci == "unknown" or not ci_observed:
+                    findings.append(finding("NEEDS_HUMAN", "ACTIVE_PR_CI_UNKNOWN", f"PR #{active_pr} CI could not be established", f"pr:{active_pr}"))
+
     if not findings:
         findings.append(finding("CONTINUE", "NEXT_TRANSITION_AVAILABLE", state["development"]["nextTransition"], "development"))
+
     indexed = list(enumerate(findings))
     _, best = max(indexed, key=lambda pair: (ACTION_PRIORITY[pair[1]["action"]], -pair[0]))
-    recommendation = {"action": best["action"], "reasonCode": best["code"], "focus": best.get("subject"), "detail": best["detail"], "decisionScope": "operational-only", "semanticAuthority": False, "allowedActions": list(ACTIONS)}
+    recommendation = {
+        "action": best["action"],
+        "reasonCode": best["code"],
+        "focus": best.get("subject"),
+        "detail": best["detail"],
+        "decisionScope": "operational-only",
+        "semanticAuthority": False,
+        "allowedActions": list(ACTIONS),
+    }
     return findings, recommendation
 
 
-def build_inspection(state, verification, observed_git, capabilities, *, remote_requested, pull_requests, coordination_state, continuations=None, machine_trust=None):
+def build_inspection(
+    state,
+    verification,
+    observed_git,
+    capabilities,
+    *,
+    remote_requested,
+    pull_requests,
+    coordination_state,
+    continuations=None,
+    machine_trust=None,
+    machine_coherence=None,
+    machine_sensors=None,
+):
     continuations = continuations or []
-    findings, recommendation = decide(state, verification, capabilities, remote_requested=remote_requested, pull_requests=pull_requests, coordination_state=coordination_state, continuations=continuations, machine_trust=machine_trust)
-    body = {"schemaVersion": "MaintenanceInspection 0.2", "repository": state["project"]["repository"], "projectState": {"phase": state["development"]["phase"], "checkpoint": state["development"]["checkpoint"], "nextTransition": state["development"]["nextTransition"], "activeDevelopmentBranch": state["git"].get("activeDevelopmentBranch"), "developmentPrNumber": state["development"].get("prNumber"), "blockers": state["development"].get("blockers") or []}, "verification": verification, "observedGit": observed_git, "capabilities": capabilities, "continuations": continuations, "remoteRequested": remote_requested, "pullRequests": pull_requests, "coordination": coordination_state, "findings": findings, "recommendation": recommendation, "readOnly": True}
+    findings, recommendation = decide(
+        state,
+        verification,
+        capabilities,
+        remote_requested=remote_requested,
+        pull_requests=pull_requests,
+        coordination_state=coordination_state,
+        continuations=continuations,
+        machine_trust=machine_trust,
+        machine_coherence=machine_coherence,
+        machine_sensors=machine_sensors,
+    )
+    body = {
+        "schemaVersion": "MaintenanceInspection 0.2",
+        "repository": state["project"]["repository"],
+        "projectState": {
+            "phase": state["development"]["phase"],
+            "checkpoint": state["development"]["checkpoint"],
+            "nextTransition": state["development"]["nextTransition"],
+            "activeDevelopmentBranch": state["git"].get("activeDevelopmentBranch"),
+            "developmentPrNumber": state["development"].get("prNumber"),
+            "blockers": state["development"].get("blockers") or [],
+        },
+        "verification": verification,
+        "observedGit": observed_git,
+        "capabilities": capabilities,
+        "continuations": continuations,
+        "remoteRequested": remote_requested,
+        "pullRequests": pull_requests,
+        "coordination": coordination_state,
+        "findings": findings,
+        "recommendation": recommendation,
+        "readOnly": True,
+    }
     return {**body, "inspectionHash": capability_gates.stable_hash(body)}
 
 
@@ -123,7 +225,20 @@ def _sensor_data(machine: dict[str, Any], name: str) -> dict[str, Any]:
 def from_project_inspection(machine: dict[str, Any]) -> dict[str, Any]:
     project_machine.validate_inspection(machine)
     project = machine["project"]
-    state = {"project": {"repository": machine["repository"]}, "git": {"activeDevelopmentBranch": project.get("activeDevelopmentBranch")}, "development": {"phase": project["phase"], "checkpoint": project["checkpoint"], "nextTransition": project["nextTransition"], "prNumber": project.get("developmentPrNumber"), "blockers": project.get("blockers") or []}}
+    state = {
+        "project": {"repository": machine["repository"]},
+        "git": {
+            "activeDevelopmentBranch": project.get("activeDevelopmentBranch"),
+            "controlBranch": project.get("controlBranch"),
+        },
+        "development": {
+            "phase": project["phase"],
+            "checkpoint": project["checkpoint"],
+            "nextTransition": project["nextTransition"],
+            "prNumber": project.get("developmentPrNumber"),
+            "blockers": project.get("blockers") or [],
+        },
+    }
     project_state = _sensor_data(machine, "projectState")
     git_data = _sensor_data(machine, "git")
     capability_data = _sensor_data(machine, "capabilities")
@@ -136,7 +251,19 @@ def from_project_inspection(machine: dict[str, Any]) -> dict[str, Any]:
     observed_git = git_data.get("observed")
     if not isinstance(observed_git, dict):
         raise RuntimeError("PROJECT_MACHINE_GIT_OBSERVATION_INVALID")
-    return build_inspection(state, verification, observed_git, capability_data.get("items") or [], remote_requested=machine["scope"] in {"base", "live"}, pull_requests=pull_request_data, coordination_state=coordination_data, continuations=continuation_data.get("items") or [], machine_trust=machine.get("trust"))
+    return build_inspection(
+        state,
+        verification,
+        observed_git,
+        capability_data.get("items") or [],
+        remote_requested=machine["scope"] in {"base", "live"},
+        pull_requests=pull_request_data,
+        coordination_state=coordination_data,
+        continuations=continuation_data.get("items") or [],
+        machine_trust=machine.get("trust"),
+        machine_coherence=machine.get("coherence"),
+        machine_sensors=machine.get("sensors"),
+    )
 
 
 def inspect(include_remote):
