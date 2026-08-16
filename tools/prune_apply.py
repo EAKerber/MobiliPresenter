@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""CAS-style destructive executor for GitPrunePlan 0.2.
+"""CAS-style destructive executor for one exact GitPrunePlan 0.3.
 
 The planner remains the sole classifier. This executor may delete only entries
-already classified as delete-candidate + autoDeleteEligible by one exact,
-validated plan. It fails closed on repository-wide ref drift, control-head
-drift, open PRs, or per-ref SHA mismatch.
+already classified as delete-candidate + autoDeleteEligible by one explicit,
+materialized plan whose hash is supplied separately as expected-plan.
 
-GitHub ref reads may be eventually consistent across replicas after DELETE.
-The executor therefore retries only a narrowly defined stale state: refs that
-were already deleted by this same execution may temporarily reappear at their
-exact planned SHA. New refs, changed SHAs, missing expected refs, or any other
-drift fail immediately.
+It fails closed on plan mismatch, incomplete observations, repository-wide ref
+drift, control-head drift, open PRs, per-ref SHA mismatch, or failed readback.
 """
 from __future__ import annotations
 
@@ -63,14 +59,18 @@ def verify_plan_hash(plan: dict[str, Any]) -> None:
     observed = plan.get("planHash")
     if not isinstance(observed, str):
         raise RuntimeError("PLAN_HASH_MISSING")
-    body = {
-        key: value
-        for key, value in plan.items()
-        if key not in {"planHash", "branchInventorySource", "remoteObservationError"}
-    }
+    body = {key: value for key, value in plan.items() if key != "planHash"}
     expected = prune_plan.stable_hash(body)
     if observed != expected:
         raise RuntimeError("PLAN_HASH_MISMATCH")
+
+
+def require_expected_plan(plan: dict[str, Any], expected_plan: str | None) -> None:
+    verify_plan_hash(plan)
+    if not expected_plan:
+        raise RuntimeError("EXPECTED_PLAN_REQUIRED")
+    if expected_plan != plan.get("planHash"):
+        raise RuntimeError("EXPECTED_PLAN_MISMATCH")
 
 
 def observe_branch_inventory(repository: str) -> dict[str, str]:
@@ -110,16 +110,22 @@ def delete_remote_ref(repository: str, branch: str) -> None:
 
 def select_candidates(plan: dict[str, Any]) -> list[dict[str, Any]]:
     verify_plan_hash(plan)
-    if plan.get("schemaVersion") != "GitPrunePlan 0.2":
+    if plan.get("schemaVersion") != "GitPrunePlan 0.3":
         raise RuntimeError("PLAN_SCHEMA_UNSUPPORTED")
-    if plan.get("applyEligible") is not True:
-        raise RuntimeError("PLAN_NOT_APPLY_ELIGIBLE")
     observations = plan.get("observations")
-    if not isinstance(observations, dict) or not all(
+    if not isinstance(observations, dict) or observations.get("complete") is not True:
+        raise RuntimeError("PLAN_OBSERVATION_INCOMPLETE")
+    if not all(
         observations.get(key) is True
         for key in ("branchInventoryComplete", "prHistoryComplete", "ancestryComplete")
     ):
         raise RuntimeError("PLAN_OBSERVATION_INCOMPLETE")
+    execution = plan.get("execution")
+    if not isinstance(execution, dict) or not all(
+        execution.get(key) is True
+        for key in ("executorAvailable", "requiresPlanFile", "requiresExpectedPlan", "requiresExplicitAuthorization")
+    ):
+        raise RuntimeError("PLAN_EXECUTION_CONTRACT_INVALID")
     entries = plan.get("entries")
     if not isinstance(entries, list):
         raise RuntimeError("PLAN_ENTRIES_INVALID")
@@ -185,7 +191,9 @@ def wait_for_consistent_inventory(
     raise RuntimeError(f"REF_READBACK_TIMEOUT:{context}")
 
 
-def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
+def apply_plan(plan: dict[str, Any], expected_plan: str | None) -> dict[str, Any]:
+    require_expected_plan(plan, expected_plan)
+    candidates = select_candidates(plan)
     if os.environ.get(AUTH_ENV) != "1":
         raise RuntimeError("DESTRUCTIVE_AUTHORIZATION_MISSING")
     repository = plan.get("repository")
@@ -194,7 +202,6 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
     if repository != "EAKerber/MobiliPresenter" or not isinstance(control_branch, str) or not isinstance(control_sha, str):
         raise RuntimeError("PLAN_IDENTITY_INVALID")
 
-    candidates = select_candidates(plan)
     expected = expected_inventory_from_plan(plan)
     deleted: list[dict[str, str]] = []
     deleted_this_run: dict[str, str] = {}
@@ -207,7 +214,6 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
     for entry in candidates:
         branch = str(entry["branch"])
         sha = str(entry["sha"])
-
         readback_retries += wait_for_consistent_inventory(
             repository, expected, deleted_this_run, context=f"before:{branch}"
         )
@@ -229,9 +235,8 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
     readback_retries += wait_for_consistent_inventory(
         repository, expected, deleted_this_run, context="final"
     )
-
     return {
-        "schemaVersion": "GitPruneApplyResult 0.1",
+        "schemaVersion": "GitPruneApplyResult 0.2",
         "repository": repository,
         "planHash": plan.get("planHash"),
         "controlSha": control_sha,
@@ -243,20 +248,19 @@ def apply_plan(plan: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def command(as_json: bool, plan_path: Path | None) -> int:
+def command(as_json: bool, plan_path: Path, expected_plan: str) -> int:
     try:
-        plan = load_plan(plan_path) if plan_path is not None else prune_plan.build_live_plan()
-        result = apply_plan(plan)
+        plan = load_plan(plan_path)
+        result = apply_plan(plan, expected_plan)
     except RuntimeError as exc:
         payload = {"ok": False, "error": str(exc)}
-        text = json.dumps(payload, ensure_ascii=False)
-        print(text if as_json else f"BLOCKED\n{exc}")
+        print(json.dumps(payload, ensure_ascii=False) if as_json else f"BLOCKED\n{exc}")
         return ERROR_EXIT
     payload = {"ok": True, **result}
     if as_json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
-        print("GIT PRUNE APPLY 0.1")
+        print("GIT PRUNE APPLY 0.2")
         print(f"  deleted: {result['deletedCount']}")
         print(f"  remaining branches: {result['remainingBranchCount']}")
         print(f"  readback retries: {result['readbackRetries']}")
@@ -266,11 +270,12 @@ def command(as_json: bool, plan_path: Path | None) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Apply one exact GitPrunePlan 0.2 with CAS-style readback")
+    parser = argparse.ArgumentParser(description="Apply one exact GitPrunePlan 0.3 with CAS-style readback")
     parser.add_argument("--json", action="store_true", dest="as_json")
-    parser.add_argument("--plan", type=Path, help="Exact planner output to validate and apply; defaults to one live plan")
+    parser.add_argument("--plan", type=Path, required=True, help="Exact materialized GitPrunePlan 0.3")
+    parser.add_argument("--expected-plan", required=True, help="Expected planHash observed before destructive execution")
     args = parser.parse_args()
-    return command(args.as_json, args.plan)
+    return command(args.as_json, args.plan, args.expected_plan)
 
 
 if __name__ == "__main__":
