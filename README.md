@@ -16,52 +16,29 @@ A autoridade de estado é `ops/state/project.json`. As decisões operacionais ad
 
 ## Estado publicado
 
-A publicação em `main` permanece a **V7.0-I5** enquanto a nova fundação Scene Core é desenvolvida isoladamente.
+A publicação corrente é identificada pelo manifesto apontado em `ops/state/project.json`. No baseline atual:
 
-- versão publicada: **V7.0-I5**
-- URL canônica: **https://mobilipresenter.netlify.app/**
-- finalidade da publicação atual: validação mobile do snapshot V7
-- composição de referência: gaveteiro de 399 mm à esquerda + balcão de 780 mm à direita
-- amplitude angular do snapshot publicado: yaw de -95° a +95°, passo de 5°, 39 poses
-- controles publicados: rotação, presets angulares e visibilidade independente das instâncias
-- camada fabril: resumo parcial; dados desconhecidos permanecem explícitos e não são inventados
+- release: **ViewerNext-Preview-2026-08-11**;
+- branch publicada: `main`;
+- URL canônica: **https://mobilipresenter.netlify.app/**;
+- manifesto: `ops/published/viewer-next-current.json`;
+- fonte do build: `scene-core` + `viewer-next`;
+- modo padrão de UI: `renderer-only`;
+- preview dos controles: `?controls=1`.
 
-O requisito de produto atual para a próxima fundação é **viewer em câmera fixa**, priorizando fidelidade contextual sobre liberdade de navegação 3D.
-
-## Páginas publicadas
-
-- `https://mobilipresenter.netlify.app/` — viewer mobile da composição V7
-- `https://mobilipresenter.netlify.app/manufacturing.html` — estado semântico e fabril da V7.0-I5
-
-O preview hospedado é um artefato leve para validação pelo celular. Ele usa dois spritesheets WebP alinhados e não substitui o snapshot técnico completo da iteração.
-
-## Integridade dos artefatos
-
-### Preview Netlify
-
-- artefato: `mobilipresenter-v7.0-i5-netlify-spritesheet.zip`
-- tamanho: 70.551 bytes
-- SHA-256: `38648499ff4483f35d023ba453c1f5d1c1c19f4e63153130b9ab14bd620a18ae`
-
-### Snapshot técnico completo
-
-- artefato: `mobilipresenter-v7.0-i5-preview.zip`
-- tamanho: 942.520 bytes
-- SHA-256: `c158d68afff547b9c3ef83e16b2963c692b10bba65f439cbf9da261a80dd1d83`
+O requisito de produto permanece **viewer em câmera fixa**, priorizando fidelidade contextual sobre liberdade de navegação 3D.
 
 ## Publicação determinística
 
-O Netlify usa a branch `main`, executa `python3 deploy.py` e publica a pasta `site`.
+O Netlify usa a branch `main`, instala as dependências de `scene-core` e `viewer-next`, executa o build de `viewer-next` e publica `viewer-next/dist`, conforme `netlify.toml` e o manifesto corrente.
 
-O preview é versionado em fragmentos Base64 acompanhados de manifesto. Durante o build, `deploy.py`:
+`ops/published/viewer-next-current.json` registra a identidade do SourceBuild, incluindo base, paths de fonte, comando de build e publish path. Divergências entre esse manifesto e `ops/state/project.json` devem ser tratadas como erro de coerência operacional.
 
-1. valida o tamanho e o SHA-256 de cada fragmento;
-2. reconstrói o ZIP;
-3. valida tamanho e SHA-256 do artefato integral;
-4. rejeita membros ZIP inseguros;
-5. extrai o site somente após todas as verificações.
+## Recuperação V7
 
-Uma divergência interrompe o deploy em vez de publicar conteúdo parcial ou silenciosamente diferente.
+A antiga publicação **V7.0-I5** não é mais a publicação corrente. Ela permanece apenas como caminho explícito de rollback/recuperação, referenciado pelo manifesto atual e pelas branches de backup/archive preservadas enquanto essa política estiver vigente.
+
+`deploy.py` e `snapshot/mobile/manifest.json` pertencem a esse caminho legado de recuperação; eles não descrevem o pipeline Netlify corrente.
 
 ## Governança Git
 
