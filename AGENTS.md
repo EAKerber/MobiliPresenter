@@ -15,6 +15,14 @@ Depois de confirmar o repositório, o onboarding operacional começa pelo estado
 python3 tools/agent.py status
 ```
 
+Para obter uma visão factual composta das autoridades operacionais observáveis, sem criar nova fonte de verdade ou recomendação semântica:
+
+```bash
+python3 tools/project_machine.py inspect --live --json
+```
+
+`ProjectMachineInspection` é uma projeção derivada, read-only e `semanticAuthority=false`. Ela separa fatos e grau de confiança (`PASS`, `UNKNOWN`, `FAIL`) da interpretação operacional de `MaintenanceInspection` e do roteamento de `SchedulerPlan`.
+
 Quando a capacidade do ambiente for relevante:
 
 ```bash
@@ -115,7 +123,7 @@ Autoridades:
 - histórico: Git;
 - PR/CI: GitHub observado, não duplicado em arquivo local.
 
-`MaintenanceInspection`, `SchedulerPlan`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
+`ProjectMachineInspection`, `MaintenanceInspection`, `SchedulerPlan`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
 
 Não promover automaticamente permissões ou autorizações efêmeras de um chat para política permanente do repositório.
 
