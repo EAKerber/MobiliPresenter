@@ -169,6 +169,13 @@ class GitOps12Tests(unittest.TestCase):
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["context"], "operations")
 
+    def test_project_machine_branch_is_valid_operational_context(self):
+        check = agent.git_context_check(
+            self.between_increments_state(), {"worktree": True, "branch": "ops/project-machine-m0-baseline"}
+        )
+        self.assertEqual(check["status"], "PASS")
+        self.assertEqual(check["context"], "operations")
+
     def test_ci_branch_name_uses_pull_request_head_ref(self):
         with mock.patch.dict(os.environ, {"GITHUB_HEAD_REF": "ops/git-ops-1.2", "GITHUB_REF_NAME": "31/merge"}, clear=False):
             self.assertEqual(agent.ci_branch_name(), "ops/git-ops-1.2")
