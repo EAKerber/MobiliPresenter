@@ -1,4 +1,3 @@
-import copy
 import unittest
 
 from tools import maintenance_inspect, project_machine, project_sensors
@@ -32,6 +31,11 @@ class ProjectMachineTests(unittest.TestCase):
         self.assertTrue(value["trust"]["complete"])
         self.assertTrue(project_machine.validate_inspection(value)["ok"])
 
+    def test_base_scope_is_explicit_and_valid(self):
+        value = project_machine.build_inspection(state(), base_sensors(), scope="base")
+        self.assertEqual(value["scope"], "base")
+        self.assertTrue(project_machine.validate_inspection(value)["ok"])
+
     def test_unknown_is_not_green(self):
         sensors = base_sensors()
         sensors["coordination"] = project_sensors.sensor("UNKNOWN", code="COORDINATION_AUTHORITY_UNAVAILABLE", data={"available": False, "intents": [], "leases": []})
@@ -40,6 +44,22 @@ class ProjectMachineTests(unittest.TestCase):
         self.assertTrue(value["trust"]["ok"])
         self.assertFalse(value["trust"]["complete"])
         self.assertIn("coordination", value["trust"]["unknownSensors"])
+
+    def test_unknown_machine_trust_fails_closed_in_maintenance(self):
+        sensors = base_sensors()
+        sensors["continuations"] = project_sensors.sensor("UNKNOWN", code="CONTINUATION_AUTHORITY_UNAVAILABLE", data={"available": False, "items": []})
+        machine = project_machine.build_inspection(state(), sensors, scope="live")
+        maintenance = maintenance_inspect.from_project_inspection(machine)
+        self.assertEqual(maintenance["recommendation"]["action"], "NEEDS_HUMAN")
+        self.assertEqual(maintenance["recommendation"]["reasonCode"], "PROJECT_MACHINE_INCOMPLETE")
+
+    def test_failed_machine_trust_reconciles(self):
+        sensors = base_sensors()
+        sensors["publication"] = project_sensors.sensor("FAIL", code="PUBLISHED_ARTIFACT_MISMATCH", data={})
+        machine = project_machine.build_inspection(state(), sensors, scope="live")
+        maintenance = maintenance_inspect.from_project_inspection(machine)
+        self.assertEqual(maintenance["recommendation"]["action"], "RECONCILE")
+        self.assertEqual(maintenance["recommendation"]["reasonCode"], "PROJECT_MACHINE_FAILED")
 
     def test_failure_dominates_unknown(self):
         sensors = base_sensors()
@@ -100,7 +120,7 @@ class ProjectMachineTests(unittest.TestCase):
         sensors = base_sensors()
         machine = project_machine.build_inspection(state(), sensors, scope="live")
         from_machine = maintenance_inspect.from_project_inspection(machine)
-        direct = maintenance_inspect.build_inspection(state(), sensors["projectState"]["data"]["verification"], sensors["git"]["data"]["observed"], sensors["capabilities"]["data"]["items"], remote_requested=True, pull_requests=sensors["pullRequests"]["data"], coordination_state=sensors["coordination"]["data"], continuations=sensors["continuations"]["data"]["items"])
+        direct = maintenance_inspect.build_inspection(state(), sensors["projectState"]["data"]["verification"], sensors["git"]["data"]["observed"], sensors["capabilities"]["data"]["items"], remote_requested=True, pull_requests=sensors["pullRequests"]["data"], coordination_state=sensors["coordination"]["data"], continuations=sensors["continuations"]["data"]["items"], machine_trust=machine["trust"])
         self.assertEqual(from_machine["recommendation"], direct["recommendation"])
         self.assertEqual(from_machine["findings"], direct["findings"])
 
