@@ -34,12 +34,6 @@ O Netlify usa a branch `main`, instala as dependências de `scene-core` e `viewe
 
 `ops/published/viewer-next-current.json` registra a identidade do SourceBuild, incluindo base, paths de fonte, comando de build e publish path. Divergências entre esse manifesto e `ops/state/project.json` devem ser tratadas como erro de coerência operacional.
 
-## Recuperação V7
-
-A antiga publicação **V7.0-I5** não é mais a publicação corrente. Ela permanece apenas como caminho explícito de rollback/recuperação, referenciado pelo manifesto atual e pelas branches de backup/archive preservadas enquanto essa política estiver vigente.
-
-`deploy.py` e `snapshot/mobile/manifest.json` pertencem a esse caminho legado de recuperação; eles não descrevem o pipeline Netlify corrente.
-
 ## Governança Git
 
 Este repositório é exclusivo do projeto MobiliPresenter. Operações em qualquer outro repositório exigem confirmação explícita no chat ativo. O protocolo completo para agentes está em `AGENTS.md`.
