@@ -1,0 +1,53 @@
+name: C1A Publish Validated Candidate
+
+on:
+  push:
+    branches:
+      - 'work/operations/paved-road-consolidation-c1a'
+    paths:
+      - '.github/workflows/c1a-publish.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: work/operations/paved-road-consolidation-c1a
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Extract validated transformation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/c1a-consolidation.yml').read_text(encoding='utf-8')
+          marker = "      - name: Apply C1A writer and hash consolidation\n        run: |\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("      - name: Enforce paved roads and hash parity", start)
+          lines = source[start:end].splitlines()
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+          Path('/tmp/c1a-apply.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/c1a-apply.sh
+      - name: Revalidate exact runtime candidate
+        run: |
+          test "$(grep -RIl --include='*.py' '^def stable_hash' tools | sort)" = "tools/canonical.py"
+          if grep -RIn --exclude-dir=tests --include='*.py' -E '\._(create_blob|create_tree|create_commit|advance_ref|verify_published_transition)\(' tools | grep -v 'tools/coordination_remote.py'; then
+            echo 'private coordination writer primitive escaped canonical executor' >&2
+            exit 1
+          fi
+          python -m unittest discover -s tools/tests -p 'test_*.py'
+          python -m tools.semantics check
+      - name: Publish runtime candidate only
+        run: |
+          git restore -- .github/workflows/supervisor-snapshot.yml
+          git config user.name 'MobiliPresenter Operations'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tools ops/semantics/registry.json
+          git commit -m 'C1A consolidate coordination writer and canonical hashing'
+          git push origin HEAD:work/operations/paved-road-consolidation-c1a
