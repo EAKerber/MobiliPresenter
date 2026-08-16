@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/source-build-1.0.json",
-  "title": "MobiliPresenter SourceBuild 1.0",
+  "$id": "https://mobilipresenter.local/schemas/source-build-1.1.json",
+  "title": "MobiliPresenter SourceBuild 1.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "release", "sha256", "fingerprintKind", "sourceBranch", "sourceBase", "sourcePaths", "buildCommand", "publishPath", "defaultUiMode", "uiPreviewQuery", "rollback"],
+  "required": ["schemaVersion", "release", "sha256", "fingerprintKind", "sourceBranch", "sourceBase", "sourcePaths", "buildCommand", "publishPath", "defaultUiMode", "uiPreviewQuery"],
   "properties": {
-    "schemaVersion": {"const": "SourceBuild 1.0"},
+    "schemaVersion": {"const": "SourceBuild 1.1"},
     "release": {"type": "string", "minLength": 1},
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "fingerprintKind": {"const": "sha256(sourceBase|sourcePaths|buildCommand|publishPath)"},
@@ -16,18 +16,6 @@
     "buildCommand": {"type": "string", "minLength": 1},
     "publishPath": {"type": "string", "minLength": 1},
     "defaultUiMode": {"type": "string", "minLength": 1},
-    "uiPreviewQuery": {"type": "string"},
-    "rollback": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["branch", "mode", "manifest", "release", "sha256"],
-      "properties": {
-        "branch": {"type": "string", "minLength": 1},
-        "mode": {"type": "string", "minLength": 1},
-        "manifest": {"type": "string", "minLength": 1},
-        "release": {"type": "string", "minLength": 1},
-        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
-      }
-    }
+    "uiPreviewQuery": {"type": "string"}
   }
 }
