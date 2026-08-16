@@ -228,10 +228,21 @@ def validate_inspection(value):
         raise RuntimeError("MAINTENANCE_RECOMMENDATION_INVALID")
     if rec.get("decisionScope") != "operational-only" or rec.get("semanticAuthority") is not False:
         raise RuntimeError("MAINTENANCE_SEMANTIC_AUTHORITY_INVALID")
+    work_items = value.get("workItems")
+    if not isinstance(work_items, list) or any(not isinstance(item, dict) for item in work_items):
+        raise RuntimeError("MAINTENANCE_WORK_ITEMS_INVALID")
     graph = value.get("workGraph")
     if not isinstance(graph, dict):
         raise RuntimeError("MAINTENANCE_WORK_GRAPH_INVALID")
+    expected_graph = work_graph_module.build(work_items)
+    if graph != expected_graph:
+        raise RuntimeError("MAINTENANCE_WORK_GRAPH_MISMATCH")
     work_graph_module.validate(graph)
+    for key, expected_type in (("projectState", dict), ("verification", dict), ("observedGit", dict), ("pullRequests", dict), ("coordination", dict), ("capabilities", list), ("findings", list)):
+        if not isinstance(value.get(key), expected_type):
+            raise RuntimeError(f"MAINTENANCE_{key.upper()}_INVALID")
+    if not isinstance(value.get("remoteRequested"), bool):
+        raise RuntimeError("MAINTENANCE_REMOTE_REQUESTED_INVALID")
     supplied = value.get("inspectionHash")
     body = {key: item for key, item in value.items() if key != "inspectionHash"}
     if not isinstance(supplied, str) or supplied != stable_hash(body):
@@ -269,7 +280,7 @@ def inspect_scope(scope):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="maintenance-inspect")
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--input")
     group.add_argument("--local", action="store_true")
     group.add_argument("--base", action="store_true")
