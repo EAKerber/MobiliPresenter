@@ -20,7 +20,7 @@
   "properties": {
     "schemaVersion": {"const": "ProjectMachineInspection 0.1"},
     "repository": {"const": "EAKerber/MobiliPresenter"},
-    "scope": {"enum": ["local", "live"]},
+    "scope": {"enum": ["local", "base", "live"]},
     "sourceHeads": {
       "type": "object",
       "additionalProperties": false,

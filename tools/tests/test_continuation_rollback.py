@@ -13,7 +13,12 @@ class ContinuationRollbackTests(unittest.TestCase):
             for path in REMOTE_FILES:
                 if path.exists():
                     target=path.with_suffix(path.suffix+".rollback-test"); path.rename(target); moved.append((path,target))
-            for command in ([sys.executable,"tools/agent.py","doctor","--json"],[sys.executable,"tools/agent.py","verify","--json"],[sys.executable,"tools/maintenance_inspect.py","--json"]):
+            for command in (
+                [sys.executable,"tools/agent.py","doctor","--json"],
+                [sys.executable,"tools/agent.py","verify","--json"],
+                [sys.executable,"tools/maintenance_inspect.py","--json"],
+                [sys.executable,"tools/maintenance_inspect.py","--remote","--json"],
+            ):
                 proc=subprocess.run(command,cwd=ROOT,text=True,capture_output=True,check=False)
                 self.assertEqual(proc.returncode,0,msg=f"{command}: {proc.stdout}\n{proc.stderr}")
         finally:
