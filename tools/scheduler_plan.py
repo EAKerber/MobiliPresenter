@@ -1,58 +1,129 @@
 #!/usr/bin/env python3
-"""Read-only deterministic Scheduler v0 routing plan."""
+"""Deterministic read-only routing plan derived from one MaintenanceInspection."""
 from __future__ import annotations
-import argparse,json,sys
+
+import argparse
+import json
+import sys
 from pathlib import Path
-from typing import Any
-ROOT=Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools import maintenance_inspect
 from tools.canonical import stable_hash
 from tools.semantics.actions import OperationalAction
-ACTIONS={item.value for item in OperationalAction}; ERROR_EXIT=2
 
-def validate_inspection(value:dict[str,Any])->None:
-    if not isinstance(value,dict):raise RuntimeError("SCHEDULER_INSPECTION_INVALID")
-    if value.get("schemaVersion")!="MaintenanceInspection 0.3":raise RuntimeError("SCHEDULER_INSPECTION_SCHEMA_UNSUPPORTED")
-    if value.get("readOnly") is not True:raise RuntimeError("SCHEDULER_INSPECTION_NOT_READ_ONLY")
-    supplied=value.get("inspectionHash")
-    if not isinstance(supplied,str) or supplied!=stable_hash({k:v for k,v in value.items() if k!="inspectionHash"}):raise RuntimeError("SCHEDULER_INSPECTION_HASH_MISMATCH")
-    rec=value.get("recommendation")
-    if not isinstance(rec,dict) or rec.get("action") not in ACTIONS:raise RuntimeError("SCHEDULER_RECOMMENDATION_INVALID")
-    if rec.get("decisionScope")!="operational-only" or rec.get("semanticAuthority") is not False:raise RuntimeError("SCHEDULER_SEMANTIC_AUTHORITY_INVALID")
-def work_for(value,work_id):
+ERROR_EXIT = 2
+SCHEMA_VERSION = "SchedulerPlan 0.2"
+ACTIONS = {item.value for item in OperationalAction}
+
+
+def work_for(value, work_id):
     for item in value.get("workItems") or []:
-        if isinstance(item,dict) and item.get("id")==work_id:return item
+        if isinstance(item, dict) and item.get("id") == work_id:
+            return item
     raise RuntimeError("SCHEDULER_WORK_ITEM_NOT_FOUND")
-def work_focus(focus):return focus.split(":",1)[1] if isinstance(focus,str) and focus.startswith("work:") and len(focus.split(":",1)[1])>0 else None
+
+
+def work_focus(focus):
+    if isinstance(focus, str) and focus.startswith("work:"):
+        value = focus.split(":", 1)[1]
+        return value if value else None
+    return None
+
+
 def route(value):
-    rec=value["recommendation"];action=OperationalAction.parse(rec["action"]).value;focus=rec.get("focus");work_id=work_focus(focus)
-    if action==OperationalAction.HANDOFF.value:
-        if work_id is None:raise RuntimeError("SCHEDULER_HANDOFF_REQUIRES_WORK")
-        item=work_for(value,work_id);target=item.get("handoffToWorkerId")
-        if item.get("status")!="HANDOFF" or not isinstance(target,str) or not target.strip():raise RuntimeError("SCHEDULER_HANDOFF_TARGET_INVALID")
-        return {"shouldWake":True,"channelClass":"worker","target":target,"workId":work_id}
-    if action==OperationalAction.CONTINUE.value:
+    rec = value["recommendation"]
+    action = OperationalAction.parse(rec["action"]).value
+    work_id = work_focus(rec.get("focus"))
+    if action == OperationalAction.HANDOFF.value:
+        if work_id is None:
+            raise RuntimeError("SCHEDULER_HANDOFF_REQUIRES_WORK")
+        item = work_for(value, work_id)
+        target = item.get("handoffToWorkerId")
+        if item.get("status") != "HANDOFF" or not isinstance(target, str) or not target.strip():
+            raise RuntimeError("SCHEDULER_HANDOFF_TARGET_INVALID")
+        return {"shouldWake": True, "channelClass": "worker", "target": target, "workId": work_id}
+    if action == OperationalAction.CONTINUE.value:
         if work_id is not None:
-            item=work_for(value,work_id);target=item.get("workerId")
-            if item.get("status") not in {"READY","IN_PROGRESS"} or not isinstance(target,str) or not target.strip():raise RuntimeError("SCHEDULER_CONTINUE_TARGET_INVALID")
-            return {"shouldWake":True,"channelClass":"worker","target":target,"workId":work_id}
-        return {"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","workId":None}
-    if action==OperationalAction.RECONCILE.value:return {"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","workId":work_id}
-    if action==OperationalAction.PAUSE.value:return {"shouldWake":False,"channelClass":"none","target":None,"workId":work_id}
-    if action==OperationalAction.NEEDS_HUMAN.value:return {"shouldWake":True,"channelClass":"human","target":"human","workId":work_id}
+            item = work_for(value, work_id)
+            target = item.get("workerId")
+            if item.get("status") not in {"READY", "IN_PROGRESS"} or not isinstance(target, str) or not target.strip():
+                raise RuntimeError("SCHEDULER_CONTINUE_TARGET_INVALID")
+            return {"shouldWake": True, "channelClass": "worker", "target": target, "workId": work_id}
+        return {"shouldWake": True, "channelClass": "supervisor", "target": "gitops-supervisor", "workId": None}
+    if action == OperationalAction.RECONCILE.value:
+        return {"shouldWake": True, "channelClass": "supervisor", "target": "gitops-supervisor", "workId": work_id}
+    if action == OperationalAction.PAUSE.value:
+        return {"shouldWake": False, "channelClass": "none", "target": None, "workId": work_id}
+    if action == OperationalAction.NEEDS_HUMAN.value:
+        return {"shouldWake": True, "channelClass": "human", "target": "human", "workId": work_id}
     raise RuntimeError("SCHEDULER_ACTION_INVALID")
+
+
 def build_plan(value):
-    validate_inspection(value);rec=value["recommendation"];body={"schemaVersion":"SchedulerPlan 0.2","inspectionHash":value["inspectionHash"],"action":rec["action"],"reasonCode":str(rec.get("reasonCode") or "UNKNOWN"),"focus":rec.get("focus"),"dispatch":route(value),"decisionScope":"operational-only","semanticAuthority":False,"transportSideEffects":False,"readOnly":True};return {**body,"planHash":stable_hash(body)}
+    maintenance_inspect.validate_inspection(value)
+    rec = value["recommendation"]
+    body = {"schemaVersion": SCHEMA_VERSION, "inspectionHash": value["inspectionHash"], "action": rec["action"], "reasonCode": str(rec.get("reasonCode") or "UNKNOWN"), "focus": rec.get("focus"), "dispatch": route(value), "decisionScope": "operational-only", "semanticAuthority": False, "transportSideEffects": False, "readOnly": True}
+    return {**body, "planHash": stable_hash(body)}
+
+
+def validate_plan(value):
+    if not isinstance(value, dict):
+        raise RuntimeError("SCHEDULER_PLAN_INVALID")
+    if value.get("schemaVersion") != SCHEMA_VERSION:
+        raise RuntimeError("SCHEDULER_PLAN_SCHEMA_UNSUPPORTED")
+    if value.get("readOnly") is not True or value.get("transportSideEffects") is not False:
+        raise RuntimeError("SCHEDULER_PLAN_BOUNDARY_INVALID")
+    if value.get("semanticAuthority") is not False or value.get("decisionScope") != "operational-only":
+        raise RuntimeError("SCHEDULER_PLAN_SEMANTIC_AUTHORITY_INVALID")
+    if value.get("action") not in ACTIONS:
+        raise RuntimeError("SCHEDULER_PLAN_ACTION_INVALID")
+    dispatch = value.get("dispatch")
+    if not isinstance(dispatch, dict) or dispatch.get("channelClass") not in {"worker", "supervisor", "human", "none"} or not isinstance(dispatch.get("shouldWake"), bool):
+        raise RuntimeError("SCHEDULER_PLAN_DISPATCH_INVALID")
+    supplied = value.get("planHash")
+    body = {k: v for k, v in value.items() if k != "planHash"}
+    if not isinstance(supplied, str) or supplied != stable_hash(body):
+        raise RuntimeError("SCHEDULER_PLAN_HASH_MISMATCH")
+    if not isinstance(value.get("inspectionHash"), str):
+        raise RuntimeError("SCHEDULER_PLAN_INSPECTION_HASH_INVALID")
+    return {"ok": True, "planHash": supplied, "inspectionHash": value["inspectionHash"]}
+
+
+def validate_derivation(value, inspection):
+    maintenance_inspect.validate_inspection(inspection)
+    validate_plan(value)
+    if value != build_plan(inspection):
+        raise RuntimeError("SCHEDULER_PLAN_DERIVATION_MISMATCH")
+    return {"ok": True, "planHash": value["planHash"], "inspectionHash": inspection["inspectionHash"]}
+
+
 def load_json(path):
-    try:value=json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError,json.JSONDecodeError) as exc:raise RuntimeError("SCHEDULER_INPUT_INVALID") from exc
-    if not isinstance(value,dict):raise RuntimeError("SCHEDULER_INPUT_INVALID")
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("SCHEDULER_INPUT_INVALID") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("SCHEDULER_INPUT_INVALID")
     return value
-def live_inspection():
-    from tools import maintenance_live
-    return maintenance_live.inspect()
+
+
 def main(argv=None):
-    p=argparse.ArgumentParser(prog="scheduler-plan",description="Read-only Scheduler v0 plan");group=p.add_mutually_exclusive_group(required=True);group.add_argument("--input");group.add_argument("--live",action="store_true");p.add_argument("--json",action="store_true",dest="as_json");args=p.parse_args(argv)
-    try:value=live_inspection() if args.live else load_json(args.input);payload=build_plan(value);print(json.dumps(payload,indent=2 if args.as_json else None,ensure_ascii=False));return 0
-    except RuntimeError as exc:print(json.dumps({"ok":False,"error":str(exc)},ensure_ascii=False));return ERROR_EXIT
-if __name__=="__main__":raise SystemExit(main())
+    parser = argparse.ArgumentParser(prog="scheduler-plan", description="Read-only Scheduler routing plan")
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args(argv)
+    try:
+        payload = build_plan(load_json(args.input))
+        print(json.dumps(payload, indent=2 if args.as_json else None, ensure_ascii=False))
+        return 0
+    except RuntimeError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+        return ERROR_EXIT
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
