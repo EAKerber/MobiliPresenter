@@ -28,9 +28,17 @@ def finding(action, code, detail, subject=None):
     return value
 
 
-def decide(state, verification, capabilities, *, remote_requested, pull_requests, coordination_state, continuations=None):
+def decide(state, verification, capabilities, *, remote_requested, pull_requests, coordination_state, continuations=None, machine_trust=None):
     findings = []
     continuations = continuations or []
+    if isinstance(machine_trust, dict):
+        trust_status = str(machine_trust.get("status") or "UNKNOWN").upper()
+        if trust_status == "FAIL":
+            failed = ", ".join(str(item) for item in machine_trust.get("failedSensors") or []) or "unknown"
+            findings.append(finding("RECONCILE", "PROJECT_MACHINE_FAILED", f"failed factual sensors: {failed}", "project-machine"))
+        elif trust_status == "UNKNOWN":
+            unknown = ", ".join(str(item) for item in machine_trust.get("unknownSensors") or []) or "unknown"
+            findings.append(finding("NEEDS_HUMAN", "PROJECT_MACHINE_INCOMPLETE", f"required factual sensors are unknown: {unknown}", "project-machine"))
     if not verification.get("ok"):
         failed = [item.get("name") for item in verification.get("checks", []) if item.get("status") == "FAIL"]
         findings.append(finding("RECONCILE", "VERIFICATION_FAILED", f"failed checks: {', '.join(str(item) for item in failed)}", "repository"))
@@ -95,9 +103,9 @@ def decide(state, verification, capabilities, *, remote_requested, pull_requests
     return findings, recommendation
 
 
-def build_inspection(state, verification, observed_git, capabilities, *, remote_requested, pull_requests, coordination_state, continuations=None):
+def build_inspection(state, verification, observed_git, capabilities, *, remote_requested, pull_requests, coordination_state, continuations=None, machine_trust=None):
     continuations = continuations or []
-    findings, recommendation = decide(state, verification, capabilities, remote_requested=remote_requested, pull_requests=pull_requests, coordination_state=coordination_state, continuations=continuations)
+    findings, recommendation = decide(state, verification, capabilities, remote_requested=remote_requested, pull_requests=pull_requests, coordination_state=coordination_state, continuations=continuations, machine_trust=machine_trust)
     body = {"schemaVersion": "MaintenanceInspection 0.2", "repository": state["project"]["repository"], "projectState": {"phase": state["development"]["phase"], "checkpoint": state["development"]["checkpoint"], "nextTransition": state["development"]["nextTransition"], "activeDevelopmentBranch": state["git"].get("activeDevelopmentBranch"), "developmentPrNumber": state["development"].get("prNumber"), "blockers": state["development"].get("blockers") or []}, "verification": verification, "observedGit": observed_git, "capabilities": capabilities, "continuations": continuations, "remoteRequested": remote_requested, "pullRequests": pull_requests, "coordination": coordination_state, "findings": findings, "recommendation": recommendation, "readOnly": True}
     return {**body, "inspectionHash": capability_gates.stable_hash(body)}
 
@@ -128,11 +136,11 @@ def from_project_inspection(machine: dict[str, Any]) -> dict[str, Any]:
     observed_git = git_data.get("observed")
     if not isinstance(observed_git, dict):
         raise RuntimeError("PROJECT_MACHINE_GIT_OBSERVATION_INVALID")
-    return build_inspection(state, verification, observed_git, capability_data.get("items") or [], remote_requested=machine["scope"] == "live", pull_requests=pull_request_data, coordination_state=coordination_data, continuations=continuation_data.get("items") or [])
+    return build_inspection(state, verification, observed_git, capability_data.get("items") or [], remote_requested=machine["scope"] in {"base", "live"}, pull_requests=pull_request_data, coordination_state=coordination_data, continuations=continuation_data.get("items") or [], machine_trust=machine.get("trust"))
 
 
 def inspect(include_remote):
-    machine = project_machine.inspect_live() if include_remote else project_machine.inspect_local()
+    machine = project_machine.inspect_base() if include_remote else project_machine.inspect_local()
     return from_project_inspection(machine)
 
 
