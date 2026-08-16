@@ -4,7 +4,7 @@ import json
 import unittest
 
 from tools import capability_gates
-from tools.semantics.contracts import check_capability_gates_contract, check_source_build_contract
+from tools.semantics.contracts import check_capability_gates_contract, check_project_state_contract, check_source_build_contract
 from tools.semantics.registry import ROOT
 
 
