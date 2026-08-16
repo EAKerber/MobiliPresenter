@@ -54,7 +54,7 @@ def validate_snapshot(
         raise RuntimeError("SCHEDULER_SNAPSHOT_HASH_MISMATCH")
 
     inspection = value.get("inspection")
-    if not isinstance(inspection, dict) or inspection.get("schemaVersion") != "MaintenanceInspection 0.2":
+    if not isinstance(inspection, dict) or inspection.get("schemaVersion") != "MaintenanceInspection 0.3":
         raise RuntimeError("SCHEDULER_SNAPSHOT_INSPECTION_INVALID")
     if inspection.get("readOnly") is not True:
         raise RuntimeError("SCHEDULER_SNAPSHOT_INSPECTION_NOT_READ_ONLY")
@@ -64,7 +64,7 @@ def validate_snapshot(
         raise RuntimeError("SCHEDULER_SNAPSHOT_INSPECTION_HASH_MISMATCH")
 
     plan = value.get("plan")
-    if not isinstance(plan, dict) or plan.get("schemaVersion") != "SchedulerPlan 0.1":
+    if not isinstance(plan, dict) or plan.get("schemaVersion") != "SchedulerPlan 0.2":
         raise RuntimeError("SCHEDULER_SNAPSHOT_PLAN_INVALID")
     if plan.get("readOnly") is not True or plan.get("transportSideEffects") is not False or plan.get("semanticAuthority") is not False:
         raise RuntimeError("SCHEDULER_SNAPSHOT_PLAN_BOUNDARY_INVALID")
