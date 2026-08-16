@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ast
 import copy
 import unittest
+from pathlib import Path
 
 from tools.semantics import registry
 
@@ -79,6 +81,36 @@ class SemanticTopologyTests(unittest.TestCase):
         self.assertEqual("project-state-executor", value["canonicalWriter"])
         self.assertEqual(["project-state-executor"], value["writers"])
         self.assertIn("project-machine", value["readers"])
+
+    def test_stable_hash_has_one_runtime_definition(self):
+        tools_root = Path(__file__).resolve().parents[1]
+        definitions = []
+        for path in tools_root.rglob("*.py"):
+            if "tests" in path.parts:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            if any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "stable_hash" for node in ast.walk(tree)):
+                definitions.append(path.relative_to(tools_root).as_posix())
+        self.assertEqual(["canonical.py"], sorted(definitions))
+
+    def test_coordination_private_write_primitives_stay_in_executor(self):
+        tools_root = Path(__file__).resolve().parents[1]
+        private = {"_create_blob", "_create_tree", "_create_commit", "_advance_ref", "_verify_published_transition"}
+        offenders = []
+        for path in tools_root.rglob("*.py"):
+            if "tests" in path.parts or path.name == "coordination_remote.py":
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Attribute) and node.attr in private:
+                    offenders.append(f"{path.relative_to(tools_root).as_posix()}:{node.lineno}:{node.attr}")
+        self.assertEqual([], offenders)
+
+    def test_coordination_admin_is_declared_as_adapter(self):
+        value = registry.component("coordination-admin-cli")
+        self.assertEqual("cli-adapter", value["kind"])
+        self.assertEqual([], value["writesAuthorities"])
+        self.assertEqual(["coordination-executor"], value["delegatesTo"])
 
     def test_component_projection_reports_adapter_delegation(self):
         value = registry.component("continuation-live-cli")
