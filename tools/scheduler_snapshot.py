@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
-"""Validate a canonical Scheduler snapshot without GitHub/network access."""
+"""Build and validate Scheduler snapshots with explicit source/readback lineage."""
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.canonical import stable_hash  # noqa: E402
+from tools import maintenance_inspect, project_machine, scheduler_plan
+from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 REPOSITORY = "EAKerber/MobiliPresenter"
-SNAPSHOT_SCHEMA = "SchedulerSnapshot 0.1"
+SNAPSHOT_SCHEMA = "SchedulerSnapshot 0.2"
+HEAD_KEYS = ("inspection", "control", "coordination", "continuation")
 
 
-
-def load_json(path: str) -> dict[str, Any]:
+def load_json(path):
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -30,107 +31,97 @@ def load_json(path: str) -> dict[str, Any]:
     return value
 
 
-def require_sha(value: Any, code: str) -> str:
-    if not isinstance(value, str) or len(value) != 40 or any(c not in "0123456789abcdef" for c in value):
-        raise RuntimeError(code)
-    return value
+def _validate_source_heads(heads):
+    if not isinstance(heads, dict):
+        raise RuntimeError("SCHEDULER_SNAPSHOT_SOURCE_HEADS_INVALID")
+    for name in HEAD_KEYS:
+        entry = heads.get(name)
+        if not isinstance(entry, dict):
+            raise RuntimeError(f"SCHEDULER_SNAPSHOT_{name.upper()}_SOURCE_INVALID")
+        sha = entry.get("sha")
+        if sha is not None and (not isinstance(sha, str) or len(sha) != 40 or any(c not in "0123456789abcdef" for c in sha)):
+            raise RuntimeError(f"SCHEDULER_SNAPSHOT_{name.upper()}_HEAD_INVALID")
+        branch = entry.get("branch")
+        if branch is not None and not isinstance(branch, str):
+            raise RuntimeError(f"SCHEDULER_SNAPSHOT_{name.upper()}_BRANCH_INVALID")
+    return heads
 
 
-def validate_snapshot(
-    value: dict[str, Any],
-    *,
-    expected_control_head: str,
-    expected_coordination_head: str,
-    expected_continuation_head: str,
-) -> dict[str, Any]:
+def build_snapshot(machine, inspection, plan):
+    project_machine.validate_inspection(machine)
+    maintenance_inspect.validate_derivation(inspection, machine)
+    scheduler_plan.validate_derivation(plan, inspection)
+    heads = copy.deepcopy(machine["sourceHeads"])
+    _validate_source_heads(heads)
+    body = {"schemaVersion": SNAPSHOT_SCHEMA, "repository": REPOSITORY, "projectMachineInspectionHash": machine["inspectionHash"], "sourceHeads": heads, "inspection": copy.deepcopy(inspection), "plan": copy.deepcopy(plan), "readOnly": True, "semanticAuthority": False, "transportSideEffects": False}
+    return {**body, "snapshotHash": stable_hash(body)}
+
+
+def _validate_snapshot_intrinsic(value):
+    if not isinstance(value, dict):
+        raise RuntimeError("SCHEDULER_SNAPSHOT_INPUT_INVALID")
     if value.get("schemaVersion") != SNAPSHOT_SCHEMA:
         raise RuntimeError("SCHEDULER_SNAPSHOT_SCHEMA_UNSUPPORTED")
     if value.get("repository") != REPOSITORY:
         raise RuntimeError("SCHEDULER_SNAPSHOT_REPOSITORY_MISMATCH")
-    if value.get("readOnly") is not True:
-        raise RuntimeError("SCHEDULER_SNAPSHOT_NOT_READ_ONLY")
-
-    supplied_snapshot_hash = value.get("snapshotHash")
-    body = {k: v for k, v in value.items() if k != "snapshotHash"}
-    if not isinstance(supplied_snapshot_hash, str) or supplied_snapshot_hash != stable_hash(body):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_HASH_MISMATCH")
-
+    if value.get("readOnly") is not True or value.get("transportSideEffects") is not False:
+        raise RuntimeError("SCHEDULER_SNAPSHOT_BOUNDARY_INVALID")
+    if value.get("semanticAuthority") is not False:
+        raise RuntimeError("SCHEDULER_SNAPSHOT_SEMANTIC_AUTHORITY_INVALID")
+    source_hash = value.get("projectMachineInspectionHash")
+    if not isinstance(source_hash, str) or len(source_hash) != 64 or any(c not in "0123456789abcdef" for c in source_hash):
+        raise RuntimeError("SCHEDULER_SNAPSHOT_PROJECT_MACHINE_HASH_INVALID")
+    _validate_source_heads(value.get("sourceHeads"))
     inspection = value.get("inspection")
-    if not isinstance(inspection, dict) or inspection.get("schemaVersion") != "MaintenanceInspection 0.3":
-        raise RuntimeError("SCHEDULER_SNAPSHOT_INSPECTION_INVALID")
-    if inspection.get("readOnly") is not True:
-        raise RuntimeError("SCHEDULER_SNAPSHOT_INSPECTION_NOT_READ_ONLY")
-    supplied_inspection_hash = inspection.get("inspectionHash")
-    inspection_body = {k: v for k, v in inspection.items() if k != "inspectionHash"}
-    if not isinstance(supplied_inspection_hash, str) or supplied_inspection_hash != stable_hash(inspection_body):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_INSPECTION_HASH_MISMATCH")
-
     plan = value.get("plan")
-    if not isinstance(plan, dict) or plan.get("schemaVersion") != "SchedulerPlan 0.2":
-        raise RuntimeError("SCHEDULER_SNAPSHOT_PLAN_INVALID")
-    if plan.get("readOnly") is not True or plan.get("transportSideEffects") is not False or plan.get("semanticAuthority") is not False:
-        raise RuntimeError("SCHEDULER_SNAPSHOT_PLAN_BOUNDARY_INVALID")
-    supplied_plan_hash = plan.get("planHash")
-    plan_body = {k: v for k, v in plan.items() if k != "planHash"}
-    if not isinstance(supplied_plan_hash, str) or supplied_plan_hash != stable_hash(plan_body):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_PLAN_HASH_MISMATCH")
-    if plan.get("inspectionHash") != supplied_inspection_hash:
+    maintenance_inspect.validate_inspection(inspection)
+    scheduler_plan.validate_plan(plan)
+    if plan.get("inspectionHash") != inspection.get("inspectionHash"):
         raise RuntimeError("SCHEDULER_SNAPSHOT_PLAN_INSPECTION_MISMATCH")
-
-    heads = value.get("sourceHeads")
-    if not isinstance(heads, dict):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_SOURCE_HEADS_INVALID")
-    control = require_sha(heads.get("control"), "SCHEDULER_SNAPSHOT_CONTROL_HEAD_INVALID")
-    coordination = require_sha(heads.get("coordination"), "SCHEDULER_SNAPSHOT_COORDINATION_HEAD_INVALID")
-    continuation = require_sha(heads.get("continuation"), "SCHEDULER_SNAPSHOT_CONTINUATION_HEAD_INVALID")
-
-    observed_git = inspection.get("observedGit") if isinstance(inspection.get("observedGit"), dict) else {}
-    observed_coordination = inspection.get("coordination") if isinstance(inspection.get("coordination"), dict) else {}
-    observed_continuation = inspection.get("continuationAuthority") if isinstance(inspection.get("continuationAuthority"), dict) else {}
-    if control != observed_git.get("head"):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_CONTROL_INTERNAL_MISMATCH")
-    if coordination != observed_coordination.get("authorityHead"):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_COORDINATION_INTERNAL_MISMATCH")
-    if continuation != observed_continuation.get("authorityHead"):
-        raise RuntimeError("SCHEDULER_SNAPSHOT_CONTINUATION_INTERNAL_MISMATCH")
-
-    expected_control = require_sha(expected_control_head, "SCHEDULER_SNAPSHOT_EXPECTED_CONTROL_HEAD_INVALID")
-    expected_coordination = require_sha(expected_coordination_head, "SCHEDULER_SNAPSHOT_EXPECTED_COORDINATION_HEAD_INVALID")
-    expected_continuation = require_sha(expected_continuation_head, "SCHEDULER_SNAPSHOT_EXPECTED_CONTINUATION_HEAD_INVALID")
-    if control != expected_control:
-        raise RuntimeError("SCHEDULER_SNAPSHOT_STALE_CONTROL")
-    if coordination != expected_coordination:
-        raise RuntimeError("SCHEDULER_SNAPSHOT_STALE_COORDINATION")
-    if continuation != expected_continuation:
-        raise RuntimeError("SCHEDULER_SNAPSHOT_STALE_CONTINUATION")
-
-    return {
-        "ok": True,
-        "snapshotHash": supplied_snapshot_hash,
-        "inspectionHash": supplied_inspection_hash,
-        "planHash": supplied_plan_hash,
-        "sourceHeads": heads,
-        "dispatch": plan.get("dispatch"),
-        "plan": plan,
-    }
+    supplied = value.get("snapshotHash")
+    body = {k: v for k, v in value.items() if k != "snapshotHash"}
+    if not isinstance(supplied, str) or supplied != stable_hash(body):
+        raise RuntimeError("SCHEDULER_SNAPSHOT_HASH_MISMATCH")
+    return supplied
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="scheduler-snapshot", description="Offline Scheduler snapshot validation")
-    parser.add_argument("snapshot")
-    parser.add_argument("--expected-control-head", required=True)
-    parser.add_argument("--expected-coordination-head", required=True)
-    parser.add_argument("--expected-continuation-head", required=True)
-    parser.add_argument("--json", action="store_true", dest="as_json")
+def validate_snapshot(value, *, source_machine, readback_machine):
+    supplied = _validate_snapshot_intrinsic(value)
+    project_machine.validate_inspection(source_machine)
+    project_machine.validate_inspection(readback_machine)
+    if value["projectMachineInspectionHash"] != source_machine["inspectionHash"]:
+        raise RuntimeError("SCHEDULER_SNAPSHOT_SOURCE_MACHINE_MISMATCH")
+    if value["sourceHeads"] != source_machine["sourceHeads"]:
+        raise RuntimeError("SCHEDULER_SNAPSHOT_SOURCE_HEADS_MISMATCH")
+    maintenance_inspect.validate_derivation(value["inspection"], source_machine)
+    scheduler_plan.validate_derivation(value["plan"], value["inspection"])
+    readback_heads = _validate_source_heads(readback_machine["sourceHeads"])
+    stale = [name for name in HEAD_KEYS if value["sourceHeads"][name] != readback_heads[name]]
+    if stale:
+        raise RuntimeError("SCHEDULER_SNAPSHOT_STALE_" + "_".join(name.upper() for name in stale))
+    return {"ok": True, "snapshotHash": supplied, "projectMachineInspectionHash": source_machine["inspectionHash"], "inspectionHash": value["inspection"]["inspectionHash"], "planHash": value["plan"]["planHash"], "sourceHeads": value["sourceHeads"], "dispatch": value["plan"].get("dispatch"), "plan": value["plan"]}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="scheduler-snapshot")
+    sub = parser.add_subparsers(dest="command", required=True)
+    build = sub.add_parser("build")
+    build.add_argument("--project-machine", required=True)
+    build.add_argument("--inspection", required=True)
+    build.add_argument("--plan", required=True)
+    build.add_argument("--json", action="store_true", dest="as_json")
+    validate = sub.add_parser("validate")
+    validate.add_argument("--snapshot", required=True)
+    validate.add_argument("--source-machine", required=True)
+    validate.add_argument("--readback-machine", required=True)
+    validate.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
     try:
-        result = validate_snapshot(
-            load_json(args.snapshot),
-            expected_control_head=args.expected_control_head,
-            expected_coordination_head=args.expected_coordination_head,
-            expected_continuation_head=args.expected_continuation_head,
-        )
-        print(json.dumps(result, indent=2 if args.as_json else None, ensure_ascii=False))
+        if args.command == "build":
+            payload = build_snapshot(load_json(args.project_machine), load_json(args.inspection), load_json(args.plan))
+        else:
+            payload = validate_snapshot(load_json(args.snapshot), source_machine=load_json(args.source_machine), readback_machine=load_json(args.readback_machine))
+        print(json.dumps(payload, indent=2 if args.as_json else None, ensure_ascii=False))
         return 0
     except RuntimeError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))

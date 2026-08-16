@@ -133,8 +133,9 @@ class ProjectMachineTests(unittest.TestCase):
     def test_maintenance_parity_from_project_machine(self):
         sensors = base_sensors(); machine = project_machine.build_inspection(state(), sensors, scope="live"); from_machine = maintenance_inspect.from_project_inspection(machine)
         view_state = {"project":{"repository":"EAKerber/MobiliPresenter"},"git":{"activeDevelopmentBranch":None,"controlBranch":"main"},"development":{"phase":"between-increments","checkpoint":"C","nextTransition":"next","prNumber":None,"blockers":[]}}
-        direct = maintenance_inspect.build_inspection(view_state, sensors["projectState"]["data"]["verification"], sensors["git"]["data"]["observed"], sensors["capabilities"]["data"]["items"], remote_requested=True, pull_requests=sensors["pullRequests"]["data"], coordination_state=sensors["coordination"]["data"], work_items=sensors["continuations"]["data"]["items"], work_graph=machine["workGraph"], machine_trust=machine["trust"], machine_coherence=machine["coherence"], machine_sensors=machine["sensors"])
-        self.assertEqual(from_machine["recommendation"], direct["recommendation"]); self.assertEqual(from_machine["findings"], direct["findings"])
+        direct = maintenance_inspect.build_inspection(view_state, sensors["projectState"]["data"]["verification"], sensors["git"]["data"]["observed"], sensors["capabilities"]["data"]["items"], project_machine_inspection_hash=machine["inspectionHash"], remote_requested=True, pull_requests=sensors["pullRequests"]["data"], coordination_state=sensors["coordination"]["data"], work_items=sensors["continuations"]["data"]["items"], work_graph=machine["workGraph"], machine_trust=machine["trust"], machine_coherence=machine["coherence"], machine_sensors=machine["sensors"])
+        self.assertEqual(from_machine, direct)
+        self.assertTrue(maintenance_inspect.validate_derivation(from_machine, machine)["ok"])
 
     def test_project_machine_has_no_apply_surface(self):
         forbidden = {"checkpoint_candidate", "prune_apply", "capability_apply", "update_ref", "atomic_write_json"}
