@@ -28,6 +28,9 @@ class SemanticContractTests(unittest.TestCase):
         self.assertNotIn("supervisorParticipation", schema["required"])
         self.assertEqual(set(capability_gates.SUPERVISOR_PARTICIPATION), set(schema["properties"]["supervisorParticipation"]["enum"]))
 
+    def test_project_state_contract_is_conformant(self):
+        self.assertEqual([], check_project_state_contract())
+
 
 if __name__ == "__main__":
     unittest.main()

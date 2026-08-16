@@ -45,9 +45,6 @@ def load_json(path: Path) -> dict[str, Any]:
     return value
 
 
-# Temporary compatibility alias for callers/tests. Internal consumers use tools.project_state directly.
-def validate_state_shape(state: dict[str, Any]) -> list[dict[str, str]]:
-    return project_state.validate_current(state)
 
 
 def run_process(args: list[str]) -> tuple[bool, str]:

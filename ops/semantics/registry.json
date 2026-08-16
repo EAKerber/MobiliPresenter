@@ -38,6 +38,7 @@
   "contracts": {
     "capability-gates": {"owner": "capability", "semanticValidator": "tools.capability_gates.validate_capability", "structuralSchema": "ops/schemas/capability-gates.schema.json"},
     "operational-semantics": {"owner": "operations-core", "semanticValidator": "tools.semantics.registry.validate_registry", "structuralSchema": "ops/schemas/operational-semantics.schema.json"},
+    "project-state": {"owner": "operations-core", "semanticValidator": "tools.project_state.validate_current", "structuralSchema": "ops/schemas/project-state.schema.json"},
     "source-build": {"owner": "operations-core", "semanticValidator": "tools.publication.validate_manifest", "structuralSchema": "ops/schemas/source-build.schema.json"}
   },
   "branchGrammar": {

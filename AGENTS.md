@@ -120,7 +120,7 @@ python3 tools/agent.py git prune-plan --json
 
 Autoridades:
 
-- estado operacional corrente: `ops/state/project.json`;
+- estado operacional corrente (somente fatos mutáveis/correntes; contratos, tooling discovery e metadata derivável não pertencem ao state): `ops/state/project.json`;
 - policy e Gates de capabilities operacionais: `ops/capabilities/*.json`;
 - evidência de transições de lifecycle: `ops/evidence/capability-gates/**` + histórico Git;
 - ownership temporário de escrita: `coordination/leases`;
@@ -176,7 +176,7 @@ Regras:
 7. Acknowledgement do conector não é prova suficiente de conclusão. Divergência implica interrupção; não presumir sucesso nem repetir cegamente a operação.
 8. `main` representa a versão publicada pelo Netlify. Mudanças devem preservar um estado implantável, identificável e reversível.
 9. A branch de desenvolvimento ativa e a próxima transição devem ser consultadas em `ops/state/project.json`, em vez de serem duplicadas aqui.
-10. Proteção de branch deriva de estado/política explícitos e observação corrente (por exemplo `git.preserveBranches`, heads de PRs abertas e authorities conhecidas), nunca apenas do prefixo do nome. Prefixos como `archive/*`, `backup/*`, `work/*` ou `authority/*` não concedem por si sós retenção, autoridade nem elegibilidade de poda.
+10. Proteção de branch deriva de estado/política explícitos e observação corrente (por exemplo `git.protectedBranches`, heads de PRs abertas e authorities conhecidas), nunca apenas do prefixo do nome. Prefixos como `archive/*`, `backup/*`, `work/*` ou `authority/*` não concedem por si sós retenção, autoridade nem elegibilidade de poda.
 
 ## 5. Integridade de domínio
 

@@ -1,6 +1,6 @@
 # ADR-0006 — ProjectState 2.0 slim
 
-- Status: proposed for authority migration in M4B; consumer preparation implemented in M4A
+- Status: accepted; ProjectState 2.0 integrated in M4B
 - Date: 2026-08-16
 
 ## Context
@@ -70,7 +70,7 @@ During M4A, `validate_current()` continues to accept only ProjectState 1.0.
 
 M4B will perform the actual state/schema transition using the existing ProjectState canonical writer and Transition Protocol semantics: exact before-state, deterministic candidate, expected plan identity, atomic apply, readback and rollback.
 
-M4B must remove temporary V1 compatibility and leave the canonical ProjectState schema accepting ProjectState 2.0 only.
+M4B completed the authority migration with a verified TransitionReceipt, removed temporary V1 runtime compatibility, and left the canonical ProjectState schema accepting ProjectState 2.0 only. The migration map remains recoverable at source control revision `031ce02039030078fdca3b40b282f1f789edca09`.
 
 ## Consequences
 
