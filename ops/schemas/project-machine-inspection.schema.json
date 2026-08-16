@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mobilipresenter.local/schemas/project-machine-inspection.schema.json",
-  "title": "ProjectMachineInspection 0.1",
+  "title": "ProjectMachineInspection 0.2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,14 +11,16 @@
     "sourceHeads",
     "project",
     "sensors",
+    "authorities",
     "trust",
+    "coherence",
     "observations",
     "readOnly",
     "semanticAuthority",
     "inspectionHash"
   ],
   "properties": {
-    "schemaVersion": {"const": "ProjectMachineInspection 0.1"},
+    "schemaVersion": {"const": "ProjectMachineInspection 0.2"},
     "repository": {"const": "EAKerber/MobiliPresenter"},
     "scope": {"enum": ["local", "base", "live"]},
     "sourceHeads": {
@@ -34,33 +36,51 @@
     },
     "project": {
       "type": "object",
-      "required": ["stateHash", "phase", "checkpoint", "nextTransition", "activeDevelopmentBranch", "developmentPrNumber", "blockers"],
+      "additionalProperties": false,
+      "required": [
+        "stateHash",
+        "controlBranch",
+        "preserveBranches",
+        "phase",
+        "checkpoint",
+        "nextTransition",
+        "activeDevelopmentBranch",
+        "developmentPrNumber",
+        "blockers"
+      ],
       "properties": {
         "stateHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "controlBranch": {"type": "string", "minLength": 1},
+        "preserveBranches": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "phase": {"type": "string", "minLength": 1},
         "checkpoint": {"type": "string", "minLength": 1},
         "nextTransition": {"type": "string", "minLength": 1},
         "activeDevelopmentBranch": {"type": ["string", "null"]},
         "developmentPrNumber": {"type": ["integer", "null"], "minimum": 1},
         "blockers": {"type": "array"}
-      },
-      "additionalProperties": false
+      }
     },
     "sensors": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {"$ref": "#/$defs/sensor"}
     },
-    "trust": {
+    "authorities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/authority"}
+    },
+    "trust": {"$ref": "#/$defs/aggregate"},
+    "coherence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "ok", "complete", "failedSensors", "unknownSensors"],
+      "required": ["status", "ok", "complete", "failedChecks", "unknownChecks", "checks"],
       "properties": {
         "status": {"enum": ["PASS", "UNKNOWN", "FAIL"]},
         "ok": {"type": "boolean"},
         "complete": {"type": "boolean"},
-        "failedSensors": {"type": "array", "items": {"type": "string"}},
-        "unknownSensors": {"type": "array", "items": {"type": "string"}}
+        "failedChecks": {"type": "array", "items": {"type": "string"}},
+        "unknownChecks": {"type": "array", "items": {"type": "string"}},
+        "checks": {"type": "array", "items": {"$ref": "#/$defs/coherenceCheck"}}
       }
     },
     "observations": {"type": "array", "items": {"type": "object"}},
@@ -88,6 +108,42 @@
         "code": {"type": ["string", "null"]},
         "authority": {"type": ["object", "null"]},
         "data": {}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "locator", "observedBy"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "kind": {"type": ["string", "null"]},
+        "locator": {"type": "object"},
+        "observedBy": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "ok", "complete", "failedSensors", "unknownSensors"],
+      "properties": {
+        "status": {"enum": ["PASS", "UNKNOWN", "FAIL"]},
+        "ok": {"type": "boolean"},
+        "complete": {"type": "boolean"},
+        "failedSensors": {"type": "array", "items": {"type": "string"}},
+        "unknownSensors": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "coherenceCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "required", "code", "subjects", "detail"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["PASS", "UNKNOWN", "FAIL"]},
+        "required": {"type": "boolean"},
+        "code": {"type": "string", "minLength": 1},
+        "subjects": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "detail": {}
       }
     }
   }
