@@ -1,9 +1,15 @@
-import copy,unittest
+import copy
+import unittest
 from tools import scheduler_plan as scheduler
 from tools.canonical import stable_hash
 
+SOURCE_HASH="f"*64
+
 def inspection(action="CONTINUE",focus="development",work_items=None):
-    value={"schemaVersion":"MaintenanceInspection 0.3","repository":"EAKerber/MobiliPresenter","workItems":work_items or [],"workGraph":{"schemaVersion":"WorkGraph 0.1","nodes":[],"edges":[],"runnable":[],"handoffRequired":[],"dependencyBlocked":[],"terminal":[]},"recommendation":{"action":action,"reasonCode":"TEST","focus":focus,"detail":"test","decisionScope":"operational-only","semanticAuthority":False,"allowedActions":["CONTINUE","RECONCILE","HANDOFF","PAUSE","NEEDS_HUMAN"]},"readOnly":True}
+    value={"schemaVersion":"MaintenanceInspection 0.4","repository":"EAKerber/MobiliPresenter","projectMachineInspectionHash":SOURCE_HASH,"projectState":{},"verification":{},"observedGit":{},"capabilities":[],"workItems":work_items or [],"workGraph":{"schemaVersion":"WorkGraph 0.1","nodes":[],"edges":[],"runnable":[],"handoffRequired":[],"dependencyBlocked":[],"terminal":[]},"remoteRequested":False,"pullRequests":{},"coordination":{},"findings":[],"recommendation":{"action":action,"reasonCode":"TEST","focus":focus,"detail":"test","decisionScope":"operational-only","semanticAuthority":False,"allowedActions":["CONTINUE","RECONCILE","HANDOFF","PAUSE","NEEDS_HUMAN"]},"readOnly":True}
+    if work_items:
+        from tools import work_graph
+        value["workGraph"]=work_graph.build(work_items)
     value["inspectionHash"]=stable_hash(value);return value
 
 def work(status="IN_PROGRESS",worker="developer-ui",target=None):
@@ -12,7 +18,7 @@ def work(status="IN_PROGRESS",worker="developer-ui",target=None):
 class SchedulerPlan02Tests(unittest.TestCase):
     def test_rejects_tampered_inspection(self):
         value=inspection();value["recommendation"]["focus"]="tampered"
-        with self.assertRaisesRegex(RuntimeError,"HASH_MISMATCH"):scheduler.build_plan(value)
+        with self.assertRaisesRegex(RuntimeError,"MAINTENANCE_HASH_MISMATCH"):scheduler.build_plan(value)
     def test_handoff_routes_only_explicit_worker_target(self):
         value=inspection("HANDOFF","work:task-one",[work("HANDOFF",target="developer-engine")]);plan=scheduler.build_plan(value);self.assertEqual(plan["schemaVersion"],"SchedulerPlan 0.2");self.assertEqual(plan["dispatch"]["target"],"developer-engine");self.assertEqual(plan["dispatch"]["channelClass"],"worker");self.assertEqual(plan["dispatch"]["workId"],"task-one")
         bad=inspection("HANDOFF","work:task-one",[work("HANDOFF",target=None)])
@@ -26,11 +32,14 @@ class SchedulerPlan02Tests(unittest.TestCase):
         self.assertEqual(scheduler.build_plan(inspection("RECONCILE"))["dispatch"]["channelClass"],"supervisor")
         self.assertEqual(scheduler.build_plan(inspection("NEEDS_HUMAN"))["dispatch"]["channelClass"],"human")
     def test_plan_is_deterministic_read_only_and_transport_free(self):
-        value=inspection();a=scheduler.build_plan(value);b=scheduler.build_plan(copy.deepcopy(value));self.assertEqual(a["planHash"],b["planHash"]);self.assertTrue(a["readOnly"]);self.assertFalse(a["transportSideEffects"]);self.assertFalse(a["semanticAuthority"])
-    def test_unsupported_or_semantic_inspection_is_rejected(self):
+        value=inspection();a=scheduler.build_plan(value);b=scheduler.build_plan(copy.deepcopy(value));self.assertEqual(a["planHash"],b["planHash"]);self.assertTrue(a["readOnly"]);self.assertFalse(a["transportSideEffects"]);self.assertFalse(a["semanticAuthority"]);self.assertTrue(scheduler.validate_plan(a)["ok"]);self.assertTrue(scheduler.validate_derivation(a,value)["ok"])
+    def test_unsupported_or_semantic_inspection_is_rejected_by_maintenance_contract(self):
         value=inspection();value["schemaVersion"]="MaintenanceInspection 99";value["inspectionHash"]=stable_hash({k:v for k,v in value.items() if k!="inspectionHash"})
-        with self.assertRaisesRegex(RuntimeError,"SCHEMA_UNSUPPORTED"):scheduler.build_plan(value)
+        with self.assertRaisesRegex(RuntimeError,"MAINTENANCE_SCHEMA_UNSUPPORTED"):scheduler.build_plan(value)
         value=inspection();value["recommendation"]["semanticAuthority"]=True;value["inspectionHash"]=stable_hash({k:v for k,v in value.items() if k!="inspectionHash"})
-        with self.assertRaisesRegex(RuntimeError,"SEMANTIC_AUTHORITY_INVALID"):scheduler.build_plan(value)
+        with self.assertRaisesRegex(RuntimeError,"MAINTENANCE_SEMANTIC_AUTHORITY_INVALID"):scheduler.build_plan(value)
+    def test_plan_derivation_rejects_rehashed_routing_drift(self):
+        source=inspection();plan=scheduler.build_plan(source);plan["dispatch"]["target"]="developer-ui";body={k:v for k,v in plan.items() if k!="planHash"};plan["planHash"]=stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError,"SCHEDULER_PLAN_DERIVATION_MISMATCH"):scheduler.validate_derivation(plan,source)
 
 if __name__=="__main__":unittest.main()
