@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
@@ -11,6 +10,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.canonical import stable_hash  # noqa: E402
+
 CAPABILITY_DIR = ROOT / "ops" / "capabilities"
 ERROR_EXIT = 2
 SUPPORTED_SCHEMA = "CapabilityGates 0.1"
@@ -18,10 +22,6 @@ POLICIES = {"experimental", "canonical", "deprecated", "disabled"}
 SUPERVISOR_PARTICIPATION = {"active", "isolated"}
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
-
-def stable_hash(payload: dict[str, Any]) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def load_json(path: Path) -> dict[str, Any]:

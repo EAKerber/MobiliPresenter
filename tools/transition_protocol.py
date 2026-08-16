@@ -2,20 +2,16 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 import re
 from typing import Any
+from tools.canonical import stable_hash
 
 PLAN_SCHEMA = "TransitionPlan 0.1"
 RECEIPT_SCHEMA = "TransitionReceipt 0.1"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 REVERSIBILITY = {"revertible", "compensatable", "irreversible"}
 
-
-def stable_hash(value: Any) -> str:
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def state_hash(value: dict[str, Any] | None) -> str | None:

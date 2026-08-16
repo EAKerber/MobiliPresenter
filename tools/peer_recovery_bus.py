@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 from tools import peer_recovery
+from tools.canonical import stable_hash
 
 HEALTH_SCHEMA = "WorkerHealthEvent 0.1"
 RECOVERY_SCHEMA = "PeerRecoveryEvent 0.1"
@@ -39,7 +40,7 @@ def _transition_key(observation: dict[str, Any]) -> str:
         "failureFingerprint": peer_recovery.failure_fingerprint(observation["failure"]),
         "failureBand": _failure_band(observation),
     }
-    return peer_recovery.stable_hash(core)
+    return stable_hash(core)
 
 
 def validate_health_event(value: Any) -> dict[str, Any]:
@@ -109,7 +110,7 @@ def build_health_event(raw_observation: dict[str, Any], previous_event: dict[str
         "transitionKey": transition_key,
         "previousEventId": previous_id,
     }
-    event_id = f"worker.health:{observation['workerId']}:{peer_recovery.stable_hash(identity)[:16]}"
+    event_id = f"worker.health:{observation['workerId']}:{stable_hash(identity)[:16]}"
     event = {
         "schemaVersion": HEALTH_SCHEMA,
         "type": "worker.health",
@@ -150,7 +151,7 @@ def build_recovery_event(raw_input: dict[str, Any]) -> dict[str, Any]:
         "planHash": plan["planHash"],
         "recoveryKey": plan["recoveryKey"],
     }
-    event_id = f"peer.recovery:{inspection['observerWorkerId']}:{peer_recovery.stable_hash(identity)[:16]}"
+    event_id = f"peer.recovery:{inspection['observerWorkerId']}:{stable_hash(identity)[:16]}"
     event = {
         "schemaVersion": RECOVERY_SCHEMA,
         "type": "peer.recovery",

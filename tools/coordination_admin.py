@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,79 +23,6 @@ from tools.coordination_remote import (  # noqa: E402
 ERROR_EXIT = 2
 
 
-def _audit_time(now: datetime | str) -> str:
-    if isinstance(now, str):
-        try:
-            parsed = datetime.fromisoformat(now.replace("Z", "+00:00"))
-        except ValueError as exc:
-            raise coordination.CoordinationError("TIME_INVALID", "break-glass authority time is invalid") from exc
-    elif isinstance(now, datetime):
-        parsed = now
-    else:
-        raise coordination.CoordinationError("TIME_INVALID", "break-glass authority time is invalid")
-    if parsed.tzinfo is None:
-        raise coordination.CoordinationError("TIME_INVALID", "break-glass authority time must be timezone-aware")
-    return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def plan_break_glass(
-    state: dict[str, Any],
-    *,
-    admin_owner: dict[str, Any],
-    resources: list[str],
-    reason: str,
-    now,
-    transition_id: str,
-    expected_revision: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    coordination.validate_state(state)
-    admin = coordination.validate_owner(admin_owner)
-    if admin["role"] != "gitops":
-        raise coordination.CoordinationError("BREAK_GLASS_FORBIDDEN", "break-glass requires role gitops")
-    if not isinstance(reason, str) or not reason.strip():
-        raise coordination.CoordinationError("REASON_INVALID", "break-glass requires a reason")
-    if not isinstance(transition_id, str) or not transition_id.strip():
-        raise coordination.CoordinationError("TRANSITION_ID_INVALID", "transition_id must be non-empty")
-    if not isinstance(expected_revision, str) or not expected_revision.strip() or len(expected_revision.strip()) != 40:
-        raise coordination.CoordinationError("EXPECTED_REVISION_INVALID", "expected revision must be a 40-character commit SHA")
-
-    targets = coordination.normalize_resources(resources)
-    if not targets:
-        raise coordination.CoordinationError("RESOURCE_INVALID", "break-glass requires at least one exact resource")
-    candidate = coordination.compact_expired(state, now)
-    target_set = set(targets)
-    removed: list[dict[str, Any]] = []
-    kept: list[dict[str, Any]] = []
-    for lease in candidate["leases"]:
-        if lease["resource"] in target_set:
-            removed.append(copy.deepcopy(lease))
-        else:
-            kept.append(lease)
-    if not removed:
-        raise coordination.CoordinationError("BREAK_GLASS_TARGET_NOT_FOUND", "no active lease matches the exact resource set")
-    candidate["leases"] = kept
-    coordination.validate_state(candidate)
-    event = {
-        "action": "break-glass",
-        "transitionId": transition_id.strip(),
-        "at": _audit_time(now),
-        "expectedRevision": expected_revision.strip(),
-        "admin": admin,
-        "reason": reason.strip(),
-        "resources": targets,
-        "removed": [
-            {
-                "leaseId": lease["leaseId"],
-                "resource": lease["resource"],
-                "owner": copy.deepcopy(lease["owner"]),
-                "expiresAt": lease["expiresAt"],
-            }
-            for lease in sorted(removed, key=lambda item: item["leaseId"])
-        ],
-    }
-    return candidate, event
-
-
 def apply_break_glass(
     authority: GitHubCoordinationAuthority,
     *,
@@ -106,35 +32,23 @@ def apply_break_glass(
     reason: str,
     transition_id: str,
 ) -> AppliedTransition:
-    observed = authority.observe()
-    if observed.head_sha != expected_revision:
-        raise CoordinationRemoteError(
-            "COORDINATION_EXPECTED_REVISION_MISMATCH",
-            f"expected {expected_revision}, observed {observed.head_sha}",
+    def planner(state: dict[str, Any], authority_now: datetime) -> tuple[dict[str, Any], dict[str, Any]]:
+        return coordination.plan_break_glass(
+            state,
+            admin_owner=admin_owner,
+            resources=resources,
+            reason=reason,
+            now=authority_now,
+            transition_id=transition_id,
+            expected_revision=expected_revision,
         )
 
-    candidate, event = plan_break_glass(
-        copy.deepcopy(observed.state),
-        admin_owner=admin_owner,
-        resources=resources,
-        reason=reason,
-        now=observed.authority_now,
-        transition_id=transition_id,
-        expected_revision=expected_revision,
-    )
-    candidate["revision"] = observed.head_sha
-    coordination.validate_state(candidate)
-    encoded = json.dumps(candidate, indent=2, ensure_ascii=False) + "\n"
-    blob_sha = authority._create_blob(encoded)
-    tree_sha = authority._create_tree(observed.tree_sha, blob_sha)
-    commit_sha = authority._create_commit(
-        observed.head_sha,
-        tree_sha,
-        f"coordination: break-glass {transition_id}",
-        observed.authority_now,
-    )
     try:
-        authority._advance_ref(commit_sha, observed.head_sha)
+        return authority.mutate(
+            planner,
+            message=f"coordination: break-glass {transition_id}",
+            expected_revision=expected_revision,
+        )
     except CoordinationRemoteError as exc:
         if exc.code == "COORDINATION_REF_DRIFT":
             raise CoordinationRemoteError(
@@ -142,15 +56,6 @@ def apply_break_glass(
                 "authority changed during break-glass transaction",
             ) from exc
         raise
-    authority._verify_published_transition(commit_sha, candidate)
-    return AppliedTransition(
-        before_sha=observed.head_sha,
-        after_sha=commit_sha,
-        authority_now=observed.authority_now,
-        state=copy.deepcopy(candidate),
-        event=copy.deepcopy(event),
-    )
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="coordination-admin", description="Experimental coordination break-glass")

@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timezone
 
 from tools import coordination
-from tools.coordination_admin import apply_break_glass, plan_break_glass
+from tools.coordination_admin import apply_break_glass
 from tools.coordination_remote import AuthorityObservation, CoordinationRemoteError
 
 NOW = datetime(2026, 8, 12, 5, 10, 0, tzinfo=timezone.utc)
@@ -14,49 +14,16 @@ TARGET = {"role": "engine", "session": "engine-1", "branch": "engine/live", "pr"
 FOREIGN = {"role": "ui", "session": "ui-1", "branch": "ui/live", "pr": 45}
 
 
-class ObserveOnlyAuthority:
-    def __init__(self, head):
-        self.head = head
+class DelegatingAuthority:
+    def __init__(self, error=None):
+        self.error = error
+        self.calls = []
 
-    def observe(self):
-        return AuthorityObservation(
-            head_sha=self.head,
-            tree_sha=TREE0,
-            state=coordination.empty_state(),
-            authority_now=NOW,
-        )
-
-
-class DriftAuthority:
-    def __init__(self, state):
-        self.state = copy.deepcopy(state)
-        self.created = []
-
-    def observe(self):
-        return AuthorityObservation(
-            head_sha=HEAD0,
-            tree_sha=TREE0,
-            state=copy.deepcopy(self.state),
-            authority_now=NOW,
-        )
-
-    def _create_blob(self, content):
-        self.created.append(("blob", content))
-        return "3" * 40
-
-    def _create_tree(self, base_tree, blob):
-        self.created.append(("tree", base_tree, blob))
-        return "4" * 40
-
-    def _create_commit(self, parent, tree, message, authority_now):
-        self.created.append(("commit", parent, tree, message, authority_now))
-        return "5" * 40
-
-    def _advance_ref(self, commit, parent):
-        raise CoordinationRemoteError("COORDINATION_REF_DRIFT", "race")
-
-    def _verify_published_transition(self, commit, candidate):
-        raise AssertionError("must not verify after drift")
+    def mutate(self, planner, *, message, expected_revision=None):
+        self.calls.append({"message": message, "expectedRevision": expected_revision})
+        if self.error is not None:
+            raise self.error
+        raise AssertionError("successful mutation not expected in this test")
 
 
 class CoordinationAdminTests(unittest.TestCase):
@@ -81,7 +48,7 @@ class CoordinationAdminTests(unittest.TestCase):
 
     def test_break_glass_requires_gitops_role(self):
         with self.assertRaises(coordination.CoordinationError) as caught:
-            plan_break_glass(
+            coordination.plan_break_glass(
                 self.state_with_leases(),
                 admin_owner={"role": "ui", "session": "not-admin", "branch": "ui/live", "pr": 45},
                 resources=["file:viewer-next/package.json"],
@@ -93,7 +60,7 @@ class CoordinationAdminTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "BREAK_GLASS_FORBIDDEN")
 
     def test_break_glass_removes_only_exact_target_and_audits_owner(self):
-        candidate, event = plan_break_glass(
+        candidate, event = coordination.plan_break_glass(
             self.state_with_leases(),
             admin_owner=ADMIN,
             resources=["file:viewer-next/package.json"],
@@ -120,7 +87,7 @@ class CoordinationAdminTests(unittest.TestCase):
             "api-acquire",
         )
         with self.assertRaises(coordination.CoordinationError) as caught:
-            plan_break_glass(
+            coordination.plan_break_glass(
                 state,
                 admin_owner=ADMIN,
                 resources=["file:viewer-next/src/api/ui-contract.ts"],
@@ -131,8 +98,10 @@ class CoordinationAdminTests(unittest.TestCase):
             )
         self.assertEqual(caught.exception.code, "BREAK_GLASS_TARGET_NOT_FOUND")
 
-    def test_stale_expected_revision_fails_before_object_creation(self):
-        authority = ObserveOnlyAuthority("9" * 40)
+    def test_stale_expected_revision_is_delegated_to_canonical_writer(self):
+        authority = DelegatingAuthority(
+            CoordinationRemoteError("COORDINATION_EXPECTED_REVISION_MISMATCH", "stale")
+        )
         with self.assertRaises(CoordinationRemoteError) as caught:
             apply_break_glass(
                 authority,
@@ -143,9 +112,10 @@ class CoordinationAdminTests(unittest.TestCase):
                 transition_id="stale-break",
             )
         self.assertEqual(caught.exception.code, "COORDINATION_EXPECTED_REVISION_MISMATCH")
+        self.assertEqual(authority.calls[0]["expectedRevision"], HEAD0)
 
-    def test_cas_drift_during_break_is_translated_to_expected_revision_mismatch(self):
-        authority = DriftAuthority(self.state_with_leases())
+    def test_cas_drift_from_canonical_writer_is_translated(self):
+        authority = DelegatingAuthority(CoordinationRemoteError("COORDINATION_REF_DRIFT", "race"))
         with self.assertRaises(CoordinationRemoteError) as caught:
             apply_break_glass(
                 authority,
@@ -156,7 +126,8 @@ class CoordinationAdminTests(unittest.TestCase):
                 transition_id="race-break",
             )
         self.assertEqual(caught.exception.code, "COORDINATION_EXPECTED_REVISION_MISMATCH")
-        self.assertTrue(any(item[0] == "commit" for item in authority.created))
+        self.assertEqual(authority.calls[0]["message"], "coordination: break-glass race-break")
+
 
 
 if __name__ == "__main__":

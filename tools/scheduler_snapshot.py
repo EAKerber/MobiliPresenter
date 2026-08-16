@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.canonical import stable_hash  # noqa: E402
 
 ERROR_EXIT = 2
 REPOSITORY = "EAKerber/MobiliPresenter"
 SNAPSHOT_SCHEMA = "SchedulerSnapshot 0.1"
 
-
-def stable_hash(value: dict[str, Any]) -> str:
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def load_json(path: str) -> dict[str, Any]:
