@@ -19,8 +19,12 @@ Conceitos operacionais transversais devem reutilizar o contrato semântico canô
 
 ```bash
 python3 -m tools.semantics explain <semantic-id>
+python3 -m tools.semantics authority <authority-id> --json
+python3 -m tools.semantics component <component-id> --json
 python3 -m tools.semantics check --json
 ```
+
+`OperationalSemantics` é contrato, não estado operacional. `managedAuthorities` descreve authorities sob escrita controlada pela toolbox; cada authority mutável marcada com `requiresCanonicalWriter=true` deve possuir exatamente um writer suportado e exatamente um canonical writer, sendo o mesmo componente. `resources` representam superfícies compartilhadas que podem sofrer side effects sem fingir single-writer authority. Adapters podem delegar para executors, mas não se declaram writers independentes.
 
 Para obter uma visão factual composta das autoridades operacionais observáveis, sem criar nova fonte de verdade ou recomendação semântica:
 
@@ -80,33 +84,7 @@ Para transformar a inspeção live em um plano determinístico de roteamento, us
 python3 tools/scheduler_plan.py --live --json
 ```
 
-`SchedulerPlan` é read-only e não envia mensagens, cria timers ou acorda chats por si só. `HANDOFF` só roteia para `handoffTo` explícito; `CONTINUE` com continuation explícita só roteia para seu `actor`; `CONTINUE` sem continuation volta ao `gitops-supervisor` para atribuição, sem inferir UI/Engine. `RECONCILE` vai ao supervisor, `PAUSE` não gera wake e `NEEDS_HUMAN` aponta somente para humano. A camada de transporte/wake é separada e deve validar o `SchedulerPlan` sem alterar sua decisão.
-
-Antes de uma transição significativa ou quando houver suspeita de divergência:
-
-```bash
-python3 tools/agent.py verify
-```
-
-Para preparar uma transição de checkpoint sem escrever:
-
-```bash
-python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION> --json
-```
-
-O resultado é um `TransitionPlan 0.1`. A aplicação exige identidade exata desse plano e só produz `TransitionReceipt 0.1` depois de readback verificado:
-
-```bash
-python3 tools/agent.py checkpoint --to <CHECKPOINT> --next <NEXT_TRANSITION> --apply --expected-plan <PLAN_HASH> --json
-```
-
-`TransitionPlan` e `TransitionReceipt` são envelopes determinísticos, não authorities. A semântica do candidate pertence ao domínio e a escrita pertence ao executor do domínio; o protocolo comum não é executor genérico.
-
-Para produzir um handoff derivado, sem criar uma nova fonte de verdade:
-
-```bash
-python3 tools/agent.py handoff --json
-```
+`SchedulerPlan` é read-only, `semanticAuthority=false` e `transportSideEffects=false`; roteia somente decisões já derivadas de authorities observáveis.
 
 Antes de qualquer sanitização de branches, gerar primeiro um plano read-only:
 
@@ -118,41 +96,13 @@ python3 tools/agent.py git prune-plan --json
 
 `status`, `verify` e `handoff` aceitam `--remote`; quando `gh` não estiver disponível, estado remoto desconhecido deve permanecer `unknown`, nunca ser inventado como green.
 
-Autoridades:
+## 3. Mudanças significativas
 
-- estado operacional corrente: `ops/state/project.json`;
-- policy e Gates de capabilities operacionais: `ops/capabilities/*.json`;
-- evidência de transições de lifecycle: `ops/evidence/capability-gates/**` + histórico Git;
-- ownership temporário de escrita: `coordination/leases`;
-- estado vivo de continuidade entre sessões/chats: `coordination/continuations`;
-- autoridades específicas de uma capability: contratos/ADRs aceitos e a autoridade indicada pela própria capability/tooling observável;
-- artefato/publicação corrente: manifesto apontado por `published.artifactManifest` no estado operacional;
-- regras permanentes: este arquivo;
-- decisões arquiteturais: ADRs e documentação explicativa;
-- histórico: Git;
-- PR/CI: GitHub observado, não duplicado em arquivo local.
-
-`ProjectMachineInspection`, `MaintenanceInspection`, `SchedulerPlan`, `TransitionPlan`, `TransitionReceipt`, `handoff` e outros snapshots derivados nunca se tornam nova fonte de verdade.
-
-Não promover automaticamente permissões ou autorizações efêmeras de um chat para política permanente do repositório.
-
-## 3. Contrato operacional
-
-Operações significativas devem seguir conceitualmente:
-
-```text
-observe -> plan -> validate -> apply -> readback
-```
-
-Quando aplicável, preparar rollback ou compensação antes da mutação.
-
-Regras:
-
-1. estado observado prevalece sobre narrativa antiga;
-2. uma API informar sucesso não substitui readback;
-3. divergência entre esperado e observado interrompe a operação;
-4. procedimentos recorrentes ou de alto risco devem migrar gradualmente para a toolbox, não crescer indefinidamente neste arquivo;
-5. a toolbox não cria estado paralelo quando Git, manifests ou contratos já são autoridade suficiente;
+1. Toda mudança significativa deve seguir `observe -> plan -> validate -> apply -> readback`.
+2. Estado observado prevalece sobre narrativa antiga.
+3. Acknowledgement de API não substitui readback.
+4. Drift invalida plano.
+5. Tooling transacional plan-only exige expected plan/hash quando seu contrato assim definir.
 6. checkpoint deve acompanhar transições reais para impedir drift entre `ops/state/project.json`, PR e execução;
 7. `handoff` é snapshot derivado e nunca substitui as autoridades acima;
 8. quando não existe recorte Developer ativo, `activeDevelopmentBranch` e `development.prNumber` devem permanecer `null`; branches paralelas preservadas não assumem implicitamente esse papel;
@@ -160,19 +110,17 @@ Regras:
 10. disponibilidade de uma capability não equivale a policy canônica nem amplia autoridade semântica do agente;
 11. capabilities experimentais seguem seus Gates. `next=[]` é válido, mas uma revisão formal deve reavaliar o motivo do adiamento e o contador correspondente; prioridade concorrente ou existência de outro trabalho não justificam, isoladamente, adiamento indefinido;
 12. mudança de Gate, contador ou `policy` deve ser explicável por uma transição determinística e evidência auditável; `pass` nunca promove automaticamente e o limite de rodadas vazias nunca aumenta automaticamente;
-13. uma decisão supervisora deve ser derivada de sensores observáveis. `CONTINUE` significa apenas ausência de impedimento operacional conhecido; não equivale a aprovação semântica da próxima mudança;
-14. continuidade entre chats depende de estado persistente na authority `coordination/continuations`, não da memória de um chat, de arquivos não publicados no checkout local ou da mera existência de uma branch de trabalho;
-15. o Scheduler planner somente deriva roteamento da inspeção validada; não cria autoridade semântica, não escolhe papel por conteúdo do produto e não realiza transporte como efeito colateral;
-16. mutações que usam `TransitionPlan 0.1` são plan-only por padrão, exigem `expected-plan` exato antes da escrita e só são consideradas concluídas após `TransitionReceipt 0.1` verificado por readback.
+13. Branch names e semantic classes são descritivos: não concedem autoridade, retenção, proteção ou direito de destruição;
+14. Nova source of truth exige decisão explícita; projeções, manifests e inspeções derivadas devem apontar para sua authority e não competir com ela.
 
-## 4. Protocolo Git determinístico
+## 4. Git e integração
 
-1. Não declarar uma operação Git impossível com base apenas em mensagens do ambiente, ausência de `git push`, descrição superficial de ferramenta ou primeira tentativa malsucedida.
-2. Confirmar por leitura independente a branch-base e o commit-base exatos antes de qualquer publicação.
-3. Quando o transporte Git convencional não estiver disponível, publicar diretamente os objetos Git necessários: blobs -> tree sobre a base autorizada -> commit com parent explícito -> ref.
-4. Para conteúdo binário, usar blobs Base64 verificáveis; quando o transporte integral não for confiável, usar fragmentação determinística acompanhada de manifesto, tamanho e SHA-256.
-5. Não mover uma ref antes de validar mecanicamente os blobs e a tree preparada.
-6. Após cada escrita, realizar readback independente e confirmar, conforme aplicável: SHA, parent, ancestralidade, paths, modos, blob SHAs, tamanho, hash de conteúdo e diff contra a base.
+1. `main` é a branch de controle/publicação.
+2. Uma branch de implementação deve representar um recorte reversível e verificável.
+3. PR e CI são observados no GitHub, não duplicados como fatos locais.
+4. Mudança grande não reversível deve ser esclarecida de forma sucinta antes da aplicação.
+5. Mudanças de framework/GitOps não devem incluir alterações de Engine/UI/produto sem autoridade explícita.
+6. Antes de merge, verificar diff, CI, identities e authorities relevantes.
 7. Acknowledgement do conector não é prova suficiente de conclusão. Divergência implica interrupção; não presumir sucesso nem repetir cegamente a operação.
 8. `main` representa a versão publicada pelo Netlify. Mudanças devem preservar um estado implantável, identificável e reversível.
 9. A branch de desenvolvimento ativa e a próxima transição devem ser consultadas em `ops/state/project.json`, em vez de serem duplicadas aqui.
