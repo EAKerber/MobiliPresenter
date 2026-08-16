@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tools import agent, capability_gates, continuation, coordination
+from tools import agent, capability_gates, continuation, coordination, project_state, publication
 from tools.semantics.observation import ObservationStatus
 
 
@@ -61,10 +61,11 @@ def observe_continuations_live():
 
 
 def observe_pull_requests(state,*,live):
+    view=project_state.operational_view(state)
     if not live:return sensor("UNKNOWN",code="NOT_OBSERVED_IN_LOCAL_SCOPE",data={"available":False,"reason":"NOT_REQUESTED","items":[]},required=False,authority={"kind":"github","resource":"pull-requests"})
-    repo=state["project"]["repository"]; ok,payload=agent.run_gh_json(f"repos/{repo}/pulls?state=open&per_page=100")
+    repo=view["project"]["repository"]; ok,payload=agent.run_gh_json(f"repos/{repo}/pulls?state=open&per_page=100")
     if not ok or not isinstance(payload,list):return sensor("UNKNOWN",code="REMOTE_PR_INVENTORY_UNAVAILABLE",data={"available":False,"reason":"OPEN_PR_READ_FAILED","detail":payload,"items":[]},authority={"kind":"github","resource":"pull-requests"})
-    active_pr=state["development"].get("prNumber"); result_status="PASS"; result_code=None; items=[]
+    active_pr=view["development"].get("prNumber"); result_status="PASS"; result_code=None; items=[]
     for raw in payload:
         if not isinstance(raw,dict):continue
         head=raw.get("head") if isinstance(raw.get("head"),dict) else {}; base=raw.get("base") if isinstance(raw.get("base"),dict) else {}; head_sha=head.get("sha"); runs=[]; ci="unknown"; ci_observed=False
@@ -88,9 +89,9 @@ def observe_coordination(*,live):
 
 
 def observe_control_head(state,*,live):
-    branch=state["git"]["controlBranch"]
+    view=project_state.operational_view(state); branch=view["git"]["controlBranch"]
     if live:
-        repo=state["project"]["repository"];ok,payload=agent.run_gh_json(f"repos/{repo}/git/ref/heads/{branch}");sha=payload.get("object",{}).get("sha") if ok and isinstance(payload,dict) and isinstance(payload.get("object"),dict) else None
+        repo=view["project"]["repository"];ok,payload=agent.run_gh_json(f"repos/{repo}/git/ref/heads/{branch}");sha=payload.get("object",{}).get("sha") if ok and isinstance(payload,dict) and isinstance(payload.get("object"),dict) else None
         if isinstance(sha,str) and len(sha)==40:return sensor("PASS",data={"branch":branch,"sha":sha,"mode":"remote"},authority={"kind":"git-ref","branch":branch})
         return sensor("UNKNOWN",code="CONTROL_HEAD_UNAVAILABLE",data={"branch":branch,"sha":None,"detail":payload},authority={"kind":"git-ref","branch":branch})
     ok,sha=agent.run_git("rev-parse",branch)
@@ -99,12 +100,19 @@ def observe_control_head(state,*,live):
 
 
 def observe_local_core(state):
+    view=project_state.operational_view(state)
     verification=agent.verify_state(include_remote=False);checks=list(verification.get("checks") or [])
-    project_checks=[i for i in checks if i.get("name") in {"project-state","project-state-schema","development-plan"}];publication_checks=[i for i in checks if i.get("name")=="published-artifact-state"];git_checks=[i for i in checks if i.get("name")=="git-context"];repository_checks=[i for i in checks if isinstance(i.get("name"),str) and i["name"].startswith("required:")]
+    project_checks=[i for i in checks if i.get("name") in {"project-state","project-state-schema"}];publication_checks=[i for i in checks if i.get("name")=="published-artifact-state"];git_checks=[i for i in checks if i.get("name")=="git-context"];repository_checks=[i for i in checks if isinstance(i.get("name"),str) and i["name"].startswith("required:")]
     project_status,project_code=summarize_checks(project_checks);publication_status,publication_code=summarize_checks(publication_checks);git_status,git_code=summarize_checks(git_checks);repository_status,repository_code=summarize_checks(repository_checks);observed=agent.observed_git()
+    publication_data={"checks":publication_checks}
+    if publication_status==ObservationStatus.PASS.value:
+        try:
+            manifest=publication.load_manifest(view["published"]["artifactManifest"]); publication_data.update(publication.publication_view(view,manifest))
+        except RuntimeError as exc:
+            publication_status=ObservationStatus.FAIL.value;publication_code=str(exc).split(":",1)[0];publication_data["detail"]=str(exc)
     return {
         "projectState":sensor(project_status,code=project_code,data={"verification":verification,"checks":project_checks},authority={"kind":"repository","path":"ops/state/project.json"}),
-        "publication":sensor(publication_status,code=publication_code,data={"checks":publication_checks,"release":state["published"].get("release"),"manifest":state["published"].get("artifactManifest"),"sha256":state["published"].get("artifactSha256")},authority={"kind":"repository","path":state["published"].get("artifactManifest")}),
+        "publication":sensor(publication_status,code=publication_code,data=publication_data,authority={"kind":"repository","path":view["published"]["artifactManifest"]}),
         "git":sensor(git_status,code=git_code,data={"observed":observed,"checks":git_checks},authority={"kind":"worktree"}),
-        "repository":sensor(repository_status,code=repository_code,data={"checks":repository_checks},authority={"kind":"repository","name":state["project"]["repository"]}),
+        "repository":sensor(repository_status,code=repository_code,data={"checks":repository_checks},authority={"kind":"repository","name":view["project"]["repository"]}),
     }

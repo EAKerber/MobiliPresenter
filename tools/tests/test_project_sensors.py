@@ -6,19 +6,12 @@ from tools import project_sensors
 
 def state(active=None, pr=None):
     return {
-        "project": {"repository": "EAKerber/MobiliPresenter"},
-        "git": {
-            "activeDevelopmentBranch": active,
-            "controlBranch": "main",
-            "preserveBranches": ["architecture/tpc"],
-        },
-        "development": {
-            "phase": "between-increments",
-            "checkpoint": "C",
-            "nextTransition": "next",
-            "prNumber": pr,
-            "blockers": [],
-        },
+        "schemaVersion": "ProjectState 1.0",
+        "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter", "productInvariants": {}},
+        "git": {"activeDevelopmentBranch": active, "controlBranch": "main", "publishedBranch": "main", "preserveBranches": ["architecture/tpc"]},
+        "published": {"release": "R", "url": "x", "artifactManifest": "ops/published/viewer-next-current.json", "artifactSha256": "a" * 64},
+        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "prNumber": pr, "blockers": [], "constraints": [], "plan": "docs/plans/developer-continuation-2026-08.md"},
+        "operations": {"toolboxPhase": "phase-1.2-branch-hygiene", "canonicalState": "ops/state/project.json", "commands": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]},
     }
 
 
@@ -30,20 +23,7 @@ class ProjectSensorsTests(unittest.TestCase):
         self.assertEqual(result["code"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
 
     def test_pr_sensor_does_not_classify_prs(self):
-        payloads = [
-            (
-                True,
-                [
-                    {
-                        "number": 7,
-                        "draft": False,
-                        "head": {"ref": "ops/work", "sha": "1" * 40},
-                        "base": {"ref": "main"},
-                    }
-                ],
-            ),
-            (True, {"workflow_runs": []}),
-        ]
+        payloads = [(True, [{"number": 7, "draft": False, "head": {"ref": "ops/work", "sha": "1" * 40}, "base": {"ref": "main"}}]), (True, {"workflow_runs": []})]
         with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
             result = project_sensors.observe_pull_requests(state(), live=True)
         self.assertEqual(result["status"], "PASS")
@@ -51,47 +31,14 @@ class ProjectSensorsTests(unittest.TestCase):
         self.assertTrue(result["data"]["items"][0]["ciObserved"])
 
     def test_known_pending_active_ci_keeps_sensor_pass(self):
-        payloads = [
-            (
-                True,
-                [
-                    {
-                        "number": 7,
-                        "draft": False,
-                        "head": {"ref": "ops/work", "sha": "1" * 40},
-                        "base": {"ref": "main"},
-                    }
-                ],
-            ),
-            (
-                True,
-                {
-                    "workflow_runs": [
-                        {"name": "Supervisor Snapshot", "status": "in_progress", "conclusion": None, "id": 1}
-                    ]
-                },
-            ),
-        ]
+        payloads = [(True, [{"number": 7, "draft": False, "head": {"ref": "ops/work", "sha": "1" * 40}, "base": {"ref": "main"}}]), (True, {"workflow_runs": [{"name": "Supervisor Snapshot", "status": "in_progress", "conclusion": None, "id": 1}]})]
         with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
             result = project_sensors.observe_pull_requests(state("ops/work", 7), live=True)
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["data"]["items"][0]["ci"], "pending")
 
     def test_unobservable_active_ci_marks_sensor_unknown(self):
-        payloads = [
-            (
-                True,
-                [
-                    {
-                        "number": 7,
-                        "draft": False,
-                        "head": {"ref": "ops/work", "sha": "1" * 40},
-                        "base": {"ref": "main"},
-                    }
-                ],
-            ),
-            (False, {"error": "unavailable"}),
-        ]
+        payloads = [(True, [{"number": 7, "draft": False, "head": {"ref": "ops/work", "sha": "1" * 40}, "base": {"ref": "main"}}]), (False, {"error": "unavailable"})]
         with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
             result = project_sensors.observe_pull_requests(state("ops/work", 7), live=True)
         self.assertEqual(result["status"], "UNKNOWN")
