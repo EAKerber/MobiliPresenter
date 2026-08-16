@@ -1,6 +1,6 @@
 # Desenvolvimento paralelo UI × Engine
 
-Status: contrato operacional 0.1
+Status: **contrato histórico de paralelização 0.1; fronteiras de ownership/import continuam aplicáveis, topologia de branches não é regra corrente automática**
 
 ## Objetivo
 
@@ -10,18 +10,26 @@ A fronteira é o diretório `viewer-next/src/api/**`.
 
 A UI consome contratos e snapshots. A engine implementa e adapta esses contratos.
 
+## Precedência operacional atual
+
+A branch `integration/viewer-parallel-v0.1` descrita abaixo foi uma base de coordenação válida para o ciclo histórico que originou este contrato. **Ela não deve ser escolhida automaticamente como base de uma nova slice.**
+
+A base corrente deve ser derivada do estado Git observado e, quando aplicável, de `ops/state/project.json`, continuation/handoff e coordenação vigente. `ProjectState.nextTransition` descreve uma transição, não constitui assignment para qualquer role.
+
+Nenhuma regra desta seção autoriza UI ou Engine a contornar leases/continuations ou a trabalhar sobre uma branch histórica apenas porque ela aparece neste documento.
+
 ## Superfície pública interna
 
-Contrato atual:
+Contrato de referência deste documento:
 
 - `viewer-next/src/api/ui-contract.ts`
-- versão: `ViewerUiContract 0.1.0`
+- versão original do contrato: `ViewerUiContract 0.1.0`
 
 Adapter da engine:
 
 - `viewer-next/src/api/ui-adapter.ts`
 
-A UI recebe:
+A UI recebe, conforme o contrato executável corrente:
 
 - catálogo de módulos e opções controladas;
 - snapshot corrente por alias, sem IDs internos obrigatórios;
@@ -41,7 +49,7 @@ Pode modificar normalmente:
 
 - `viewer-next/src/ui/**`
 - assets exclusivamente visuais da UI
-- testes exclusivamente da UI
+- testes comprovadamente exclusivos da UI
 
 Deve preservar o entry contract existente de montagem:
 
@@ -74,15 +82,15 @@ Não modifica durante trabalho normal:
 
 - `viewer-next/src/ui/**`
 
-### Arquivos de integração congelados
+### Arquivos de integração compartilhados
 
-Após o baseline paralelo ser criado, estes paths só mudam em PR explicitamente de integração:
+Estes paths exigem coordenação explícita quando a alteração afetar ambos os fluxos:
 
 - `viewer-next/src/bootstrap.ts`
 - `viewer-next/index.html`
 - `viewer-next/package.json`
 - `viewer-next/tsconfig.json`
-- `.github/workflows/**` quando a alteração afetar ambos os fluxos
+- `.github/workflows/**`
 
 Isso evita que duas frentes usem `bootstrap.ts` ou arquivos de build como ponto informal de coordenação.
 
@@ -100,45 +108,41 @@ O adapter em `src/api/**` funciona como anti-corruption layer: alterações inte
 
 ## Compatibilidade do contrato
 
-Durante `ViewerUiContract 0.1.x`:
+Durante uma mesma linha compatível do `ViewerUiContract`:
 
 - mudanças devem ser aditivas ou compatíveis;
 - IDs existentes não mudam silenciosamente;
-- remoções ou mudanças semânticas exigem nova minor contract version (`0.2.0`);
-- quando possível, o adapter mantém compatibilidade durante a transição para que a branch da UI não precise parar.
+- remoções ou mudanças semânticas exigem versionamento explícito de contrato;
+- quando possível, o adapter mantém compatibilidade durante a transição para que a UI não precise reconstruir autoridade de domínio.
 
 A UI não deve depender de propriedades internas não declaradas no contrato, mesmo que estejam acessíveis no objeto runtime bruto.
 
-## Fluxo Git para trabalho paralelo
+## Fluxo Git histórico de trabalho paralelo
 
-Depois de CI verde deste contrato, criar uma branch-base imutável de coordenação:
+No ciclo v0.1, após CI verde do contrato, foi criada a branch-base imutável de coordenação:
 
 `integration/viewer-parallel-v0.1`
 
-Essa branch nasce do SHA validado do contrato.
-
-A partir dela:
+Historicamente, a partir dela:
 
 - UI: `ui/<recorte>`;
 - engine: `engine/<recorte>`.
 
-As duas frentes devem abrir PR contra `integration/viewer-parallel-v0.1`, não uma contra a outra.
+As duas frentes abriam PR contra `integration/viewer-parallel-v0.1`, não uma contra a outra. Essa topologia cumpriu sua função de coordenação naquele ciclo e permanece documentada como evidência histórica.
 
-Como os ownerships são disjuntos, a ordem de integração deixa de ser requisito funcional. Quando uma PR for integrada primeiro, a outra deve apenas atualizar a base e repetir CI; conflitos em paths fora da lista de integração congelada são tratados como violação do contrato de ownership, não como ocorrência normal.
-
-Nenhuma dessas branches promove automaticamente conteúdo para `main`.
+**Regra corrente:** novas branches/slices não devem repetir essa topologia por padrão. Devem partir da base determinada pelo estado Git/ProjectState/continuation/handoff observado no momento da abertura. Nenhuma branch histórica promove automaticamente conteúdo para `main` nem se torna base atual por permanência no repositório.
 
 ## Mudança de contrato durante trabalho paralelo
 
-Quando a engine precisar de uma capacidade nova para a UI:
+Quando uma capacidade nova for necessária para a UI:
 
-1. engine adiciona ou versiona o contrato em `src/api/**`;
-2. adiciona teste do novo comportamento;
-3. CI fecha;
-4. a mudança entra primeiro em `integration/viewer-parallel-v0.1`;
-5. a UI atualiza sua base e passa a consumir a nova capacidade.
+1. a necessidade é registrada como dependência coordenada;
+2. a autoridade responsável adiciona/versiona o contrato em `src/api/**`;
+3. adiciona testes do novo comportamento;
+4. CI fecha;
+5. a UI atualiza sua base conforme a topologia Git corrente e passa a consumir a nova capacidade.
 
-A UI não implementa fallback de domínio para capacidades ausentes. Enquanto um controle estiver `declared-not-bound`, ele pode ser apresentado como indisponível ou omitido, mas não simulado com estado paralelo.
+A UI não implementa fallback de domínio para capacidades ausentes. Enquanto um controle estiver `declared-not-bound` ou indisponível, ele pode ser apresentado honestamente como indisponível ou omitido, mas não simulado com estado paralelo.
 
 ## Conteúdo técnico
 
@@ -151,16 +155,16 @@ A UI recebe a ficha técnica através do contrato, incluindo:
 - `TechnicalPresentationPackage`;
 - assets SVG técnicos derivados.
 
-A UI decide composição, responsividade, hierarquia, motion e linguagem visual. Não recalcula cotas e não gera componentes técnicos a partir do render.
+A UI decide composição, responsividade, hierarquia, motion e linguagem visual dentro de sua autoridade local. Não recalcula cotas e não gera componentes técnicos a partir do render.
 
 ## Gates
 
-O baseline paralelo só é considerado válido quando:
+A fronteira UI × Engine só é considerada preservada quando:
 
 1. Viewer Next TypeScript passa;
-2. testes TPC passam;
+2. testes TPC/contrato relevantes passam;
 3. testes `ui-contract` passam;
 4. `src/ui/**` não possui import proibido;
-5. smoke VRC-02 continua verde;
-6. fidelity/readability herdados não regridem;
-7. `main` permanece intocada.
+5. smoke/UI relevante continua verde;
+6. fidelity/readability herdados não regridem quando aplicáveis;
+7. integração em `main` ocorre deliberadamente após reobservação do estado corrente.

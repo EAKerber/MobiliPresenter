@@ -1,6 +1,10 @@
 # Guided Configurator UI 0.3
 
-Status: implementation slice / human UX gate pending
+Integration status: **integrated technical baseline**  
+UX validation status: **human UX validation pending**  
+Product authority status: **current integrated flow; not an immutable final visual language**
+
+These statuses are intentionally independent: the slice is integrated and is the current baseline for flow/navigation, while future UX refinement remains allowed inside the current product invariants and contracts.
 
 ## Objective
 

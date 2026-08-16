@@ -1,12 +1,13 @@
 # MobiliPresenter — UI/UX Decision Log 0.1
 
-Status: **ativo**  
-Branch de autoria: `ui/style-guide-v0.1`  
-Baseline: `integration/viewer-parallel-v0.1` @ `277b0fc088f5e32de236782b293f39feea6e163e`
+Status: **corrente, com decisões históricas explicitamente superseded**  
+Branch de autoria original: `ui/style-guide-v0.1`  
+Baseline histórico de autoria: `integration/viewer-parallel-v0.1` @ `277b0fc088f5e32de236782b293f39feea6e163e`  
+Baseline de fluxo corrente: `docs/ui/guided-configurator-v0.3.md`
 
-Este arquivo registra decisões de produto/UX que orientam a implementação visual. Ele evita que decisões já tomadas voltem a ser tratadas como questões em aberto por novos agentes.
+Este arquivo registra decisões de produto/UX que orientam a implementação visual. Decisões antigas permanecem para preservar racional e histórico, mas uma entrada `superseded` não é normativa para novas slices.
 
-Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam pertencendo aos ADRs e contratos próprios.
+Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam pertencendo aos ADRs e contratos próprios. Em conflito com este log, estado/invariantes correntes, contratos executáveis e slices posteriores explicitamente integradas prevalecem dentro de seu escopo.
 
 ## UI-D001 — Render permanece dominante
 
@@ -16,19 +17,19 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Racional:** o produto é uma apresentação contextual do mobiliário; controles devem servir ao render e não competir com ele.
 
-**Consequência:** a sidebar é a única superfície persistente de configuração no desktop.
+**Consequência:** a cena permanece a superfície visual dominante; sua alocação concreta segue o fluxo corrente do Guided Configurator.
 
 ---
 
 ## UI-D002 — Detalhe abre abaixo do render
 
-**Status:** accepted
+**Status:** superseded por `Guided Configurator UI 0.3`
 
-**Decisão:** selecionar um módulo revela a ficha técnica na parte inferior da coluna direita e reduz verticalmente o render.
+**Decisão histórica:** selecionar um módulo revelava a ficha técnica na parte inferior da coluna direita e reduzia verticalmente o render.
 
-**Racional:** manter contexto espacial e composição visíveis enquanto o usuário lê dados técnicos.
+**Substituição:** o detalhe continua contextual e sem abandonar a cena, porém o baseline corrente usa no desktop uma grande superfície editorial/produto que compartilha a tela com a cena; no mobile usa sheet contextual.
 
-**Não fazer:** navegar para uma página separada, substituir o render ou abrir modal de tela cheia como padrão desktop.
+**Preservado:** não navegar para uma página separada nem substituir a cena como padrão.
 
 ---
 
@@ -56,13 +57,13 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 ## UI-D005 — Sidebar possui três páginas
 
-**Status:** accepted
+**Status:** superseded por `Guided Configurator UI 0.3`
 
-**Decisão:** `Módulos`, `Cores` e `Acessórios` são páginas irmãs da mesma sidebar.
+**Decisão histórica:** `Módulos`, `Cores` e `Acessórios` eram páginas irmãs da mesma sidebar.
 
-**Racional:** manter a coluna lateral compacta e previsível em vez de empilhar listas grandes de configuração.
+**Substituição:** o fluxo corrente possui quatro etapas navegáveis: `Módulos`, `Acabamentos`, `Acessórios` e `Resumo`. A navegação de etapas é simultaneamente progresso e navegação global; `Voltar / Continuar` fornece o caminho linear.
 
-**Implementação preferida:** navegação fixa no rodapé da sidebar; no mobile, equivalente em navegação inferior do painel.
+**Nota terminológica:** `Cores` é termo histórico; o baseline corrente usa `Acabamentos`.
 
 ---
 
@@ -188,7 +189,7 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Status:** accepted
 
-**Decisão:** animações ficam concentradas em abertura/fechamento de ficha, troca de página lateral e feedback de controles, com duração curta e `prefers-reduced-motion`.
+**Decisão:** animações ficam concentradas em mudanças de layout, navegação de etapas e feedback de controles, com duração curta e `prefers-reduced-motion`.
 
 **Racional:** motion deve tornar a mudança de layout compreensível, não criar personalidade ornamental que dispute atenção com o render.
 
@@ -200,7 +201,7 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Decisão:** não consolidar neste incremento a linguagem final de highlight/outline/fill do módulo selecionado no render.
 
-**Racional:** o usuário pediu que a frente atual foque shell, paginação lateral e ficha técnica; a infraestrutura de interação pode evoluir separadamente.
+**Racional:** shell, navegação/configuração e apresentação técnica podem evoluir separadamente da linguagem final de highlight.
 
 ---
 
@@ -218,9 +219,9 @@ Decisões de domínio, geometria, arquitetura de renderer ou contrato continuam 
 
 **Status:** accepted
 
-**Decisão:** trabalho normal desta frente modifica `viewer-next/src/ui/**`, assets visuais exclusivos e testes de UI. Mudanças em `src/api/**`, runtime, renderer, presentation, fixtures ou Scene Core exigem transição coordenada.
+**Decisão:** trabalho normal desta frente modifica `viewer-next/src/ui/**`, assets visuais exclusivos e testes comprovadamente UI-only. Mudanças em `src/api/**`, runtime, renderer, presentation, fixtures ou Scene Core exigem transição coordenada.
 
-**Racional:** cumprir o contrato de desenvolvimento paralelo UI × Engine e reduzir conflitos.
+**Racional:** cumprir a fronteira UI × Engine e reduzir conflitos.
 
 ---
 
@@ -230,13 +231,14 @@ Uma decisão `accepted` só deve mudar quando:
 
 1. houver novo input explícito do usuário, ou
 2. um conflito mensurável de acessibilidade/usabilidade for demonstrado, ou
-3. o contrato/arquitetura tornar a decisão inviável.
+3. o contrato/arquitetura tornar a decisão inviável, ou
+4. uma slice posterior explicitamente integrada substituir seu escopo.
 
 A mudança deve:
 
 - manter o ID original;
 - alterar status para `superseded` quando substituída;
-- referenciar a nova decisão;
+- referenciar a decisão/slice substituta;
 - registrar o motivo e a evidência.
 
 Decisões visuais pequenas que não alteram comportamento, hierarquia ou contrato podem permanecer apenas no style guide/tokens, sem criar um novo ID.
