@@ -11,13 +11,17 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from tools.canonical import stable_hash
 from tools.semantics.branches import parse_branch_name
 
-ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / "ops" / "state" / "project.json"
 ERROR_EXIT = 2
 SCHEMA_VERSION = "GitPrunePlan 0.3"
@@ -236,7 +240,16 @@ def build_prune_plan(
         try:
             identity = parse_branch_name(branch)
         except RuntimeError:
-            identity = {"name": branch, "grammar": "invalid", "namespace": None, "declaredClass": None, "domain": None, "semanticDomain": None, "legacyAlias": False, "slug": None}
+            identity = {
+                "name": branch,
+                "grammar": "invalid",
+                "namespace": None,
+                "declaredClass": None,
+                "domain": None,
+                "semanticDomain": None,
+                "legacyAlias": False,
+                "slug": None,
+            }
         entries.append({
             "branch": branch,
             "sha": sha,
