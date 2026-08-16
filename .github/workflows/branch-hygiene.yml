@@ -44,9 +44,16 @@ jobs:
           python - <<'PY'
           import json
           p=json.load(open('/tmp/git-prune-plan.json'))
-          assert p['schemaVersion']=='GitPrunePlan 0.2'
-          assert p['applyEligible'] is True
-          assert all(p['observations'].values())
+          assert p['schemaVersion']=='GitPrunePlan 0.3'
+          assert p['observations']['complete'] is True
+          assert p['observations']['branchInventoryComplete'] is True
+          assert p['observations']['prHistoryComplete'] is True
+          assert p['observations']['ancestryComplete'] is True
+          assert p['execution']['executorAvailable'] is True
+          assert p['execution']['requiresPlanFile'] is True
+          assert p['execution']['requiresExpectedPlan'] is True
+          assert p['execution']['requiresExplicitAuthorization'] is True
+          open('/tmp/git-prune-plan-hash.txt','w').write(p['planHash'])
           PY
 
       - name: Apply exact plan with CAS readback
@@ -55,14 +62,17 @@ jobs:
           MOBILIPRESENTER_PRUNE_AUTHORIZED: '1'
         run: |
           set -o pipefail
-          python tools/prune_apply.py --plan /tmp/git-prune-plan.json --json | tee /tmp/git-prune-apply.json
+          PLAN_HASH="$(cat /tmp/git-prune-plan-hash.txt)"
+          python tools/prune_apply.py --plan /tmp/git-prune-plan.json --expected-plan "$PLAN_HASH" --json | tee /tmp/git-prune-apply.json
 
       - name: Validate apply result
         run: |
           python - <<'PY'
           import json
+          p=json.load(open('/tmp/git-prune-plan.json'))
           r=json.load(open('/tmp/git-prune-apply.json'))
           assert r['ok'] is True
+          assert r['planHash']==p['planHash']
           assert r['readback']=='PASS'
           PY
 
@@ -73,5 +83,6 @@ jobs:
           name: branch-hygiene
           path: |
             /tmp/git-prune-plan.json
+            /tmp/git-prune-plan-hash.txt
             /tmp/git-prune-apply.json
           if-no-files-found: warn
