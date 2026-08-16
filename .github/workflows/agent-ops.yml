@@ -26,6 +26,8 @@ jobs:
           python-version: '3.12'
       - name: Toolbox unit tests
         run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
+      - name: Semantic contracts
+        run: python -m tools.semantics check --json
       - name: Verify continuation state
         run: python tools/continuation.py verify --json
       - name: Capability lifecycle guard

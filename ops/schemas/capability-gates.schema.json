@@ -20,6 +20,10 @@
       "type": "string",
       "enum": ["experimental", "canonical", "deprecated", "disabled"]
     },
+    "supervisorParticipation": {
+      "type": "string",
+      "enum": ["active", "isolated"]
+    },
     "gates": {
       "type": "object",
       "additionalProperties": false,

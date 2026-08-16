@@ -15,6 +15,13 @@ Depois de confirmar o repositório, o onboarding operacional começa pelo estado
 python3 tools/agent.py status
 ```
 
+Conceitos operacionais transversais devem reutilizar o contrato semântico canônico em `ops/semantics/registry.json` e `tools/semantics/`; vocabulários específicos de domínio permanecem sob seu semantic owner. Para consultar ou validar esse contrato sem promover uma nova source of truth:
+
+```bash
+python3 -m tools.semantics explain <semantic-id>
+python3 -m tools.semantics check --json
+```
+
 Para obter uma visão factual composta das autoridades operacionais observáveis, sem criar nova fonte de verdade ou recomendação semântica:
 
 ```bash
