@@ -1,26 +1,26 @@
 import copy,unittest
 from tools import scheduler_plan as scheduler
-from tools.capability_gates import stable_hash
+from tools.canonical import stable_hash
 
-def inspection(action="CONTINUE",focus="development",continuations=None):
-    value={"schemaVersion":"MaintenanceInspection 0.2","repository":"EAKerber/MobiliPresenter","continuations":continuations or [],"recommendation":{"action":action,"reasonCode":"TEST","focus":focus,"detail":"test","decisionScope":"operational-only","semanticAuthority":False,"allowedActions":["CONTINUE","RECONCILE","HANDOFF","PAUSE","NEEDS_HUMAN"]},"readOnly":True}
+def inspection(action="CONTINUE",focus="development",work_items=None):
+    value={"schemaVersion":"MaintenanceInspection 0.3","repository":"EAKerber/MobiliPresenter","workItems":work_items or [],"workGraph":{"schemaVersion":"WorkGraph 0.1","nodes":[],"edges":[],"runnable":[],"handoffRequired":[],"dependencyBlocked":[],"terminal":[]},"recommendation":{"action":action,"reasonCode":"TEST","focus":focus,"detail":"test","decisionScope":"operational-only","semanticAuthority":False,"allowedActions":["CONTINUE","RECONCILE","HANDOFF","PAUSE","NEEDS_HUMAN"]},"readOnly":True}
     value["inspectionHash"]=stable_hash(value);return value
 
-def task(status="IN_PROGRESS",actor="developer-ui",target=None):
-    return {"id":"task-one","actor":actor,"status":status,"branch":None,"prNumber":None,"completed":[],"remaining":["a"],"nextAction":"do a","lastKnownGood":{"sha":None,"checkpoint":None},"blockedBy":[],"handoffTo":target,"stateHash":"a"*64}
+def work(status="IN_PROGRESS",worker="developer-ui",target=None):
+    return {"id":"task-one","workerId":worker,"status":status,"branch":None,"prNumber":None,"dependsOn":[],"completed":[],"remaining":["a"],"nextAction":"do a","lastKnownGood":{"sha":None,"checkpoint":None},"blockers":[],"handoffToWorkerId":target,"sourceSchemaVersion":"ContinuationState 0.1","stateHash":"a"*64}
 
-class SchedulerPlan01Tests(unittest.TestCase):
+class SchedulerPlan02Tests(unittest.TestCase):
     def test_rejects_tampered_inspection(self):
         value=inspection();value["recommendation"]["focus"]="tampered"
         with self.assertRaisesRegex(RuntimeError,"HASH_MISMATCH"):scheduler.build_plan(value)
-    def test_handoff_routes_only_explicit_target(self):
-        value=inspection("HANDOFF","continuation:task-one",[task("HANDOFF",target="developer-engine")]);plan=scheduler.build_plan(value);self.assertEqual(plan["dispatch"]["target"],"developer-engine");self.assertEqual(plan["dispatch"]["channelClass"],"worker")
-        bad=inspection("HANDOFF","continuation:task-one",[task("HANDOFF",target=None)])
+    def test_handoff_routes_only_explicit_worker_target(self):
+        value=inspection("HANDOFF","work:task-one",[work("HANDOFF",target="developer-engine")]);plan=scheduler.build_plan(value);self.assertEqual(plan["schemaVersion"],"SchedulerPlan 0.2");self.assertEqual(plan["dispatch"]["target"],"developer-engine");self.assertEqual(plan["dispatch"]["channelClass"],"worker");self.assertEqual(plan["dispatch"]["workId"],"task-one")
+        bad=inspection("HANDOFF","work:task-one",[work("HANDOFF",target=None)])
         with self.assertRaisesRegex(RuntimeError,"HANDOFF_TARGET_INVALID"):scheduler.build_plan(bad)
-    def test_continue_continuation_routes_actor(self):
-        plan=scheduler.build_plan(inspection("CONTINUE","continuation:task-one",[task()]));self.assertEqual(plan["dispatch"]["target"],"developer-ui")
+    def test_continue_work_routes_worker_id(self):
+        plan=scheduler.build_plan(inspection("CONTINUE","work:task-one",[work()]));self.assertEqual(plan["dispatch"]["target"],"developer-ui");self.assertEqual(plan["dispatch"]["workId"],"task-one")
     def test_generic_continue_stays_with_supervisor(self):
-        plan=scheduler.build_plan(inspection());self.assertEqual(plan["dispatch"],{"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","continuationId":None})
+        plan=scheduler.build_plan(inspection());self.assertEqual(plan["dispatch"],{"shouldWake":True,"channelClass":"supervisor","target":"gitops-supervisor","workId":None})
     def test_non_actionable_routing(self):
         self.assertFalse(scheduler.build_plan(inspection("PAUSE"))["dispatch"]["shouldWake"])
         self.assertEqual(scheduler.build_plan(inspection("RECONCILE"))["dispatch"]["channelClass"],"supervisor")
