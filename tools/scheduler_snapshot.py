@@ -3,19 +3,15 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
+from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 REPOSITORY = "EAKerber/MobiliPresenter"
 SNAPSHOT_SCHEMA = "SchedulerSnapshot 0.1"
 
-
-def stable_hash(value: dict[str, Any]) -> str:
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def load_json(path: str) -> dict[str, Any]:

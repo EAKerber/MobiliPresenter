@@ -2,6 +2,7 @@ import copy
 import unittest
 
 from tools import scheduler_snapshot as snapshot
+from tools.canonical import stable_hash
 
 
 CONTROL = "1" * 40
@@ -25,7 +26,7 @@ def fixture():
         },
         "readOnly": True,
     }
-    inspection = {**inspection_body, "inspectionHash": snapshot.stable_hash(inspection_body)}
+    inspection = {**inspection_body, "inspectionHash": stable_hash(inspection_body)}
     plan_body = {
         "schemaVersion": "SchedulerPlan 0.2",
         "inspectionHash": inspection["inspectionHash"],
@@ -43,7 +44,7 @@ def fixture():
         "transportSideEffects": False,
         "readOnly": True,
     }
-    plan = {**plan_body, "planHash": snapshot.stable_hash(plan_body)}
+    plan = {**plan_body, "planHash": stable_hash(plan_body)}
     body = {
         "schemaVersion": "SchedulerSnapshot 0.1",
         "repository": "EAKerber/MobiliPresenter",
@@ -56,7 +57,7 @@ def fixture():
         "plan": plan,
         "readOnly": True,
     }
-    return {**body, "snapshotHash": snapshot.stable_hash(body)}
+    return {**body, "snapshotHash": stable_hash(body)}
 
 
 def validate(value):
@@ -92,13 +93,13 @@ class SchedulerSnapshotTests(unittest.TestCase):
 
     def test_internal_source_head_mismatch_is_rejected(self):
         value = fixture(); value["sourceHeads"]["coordination"] = "4" * 40
-        body = {k: v for k, v in value.items() if k != "snapshotHash"}; value["snapshotHash"] = snapshot.stable_hash(body)
+        body = {k: v for k, v in value.items() if k != "snapshotHash"}; value["snapshotHash"] = stable_hash(body)
         with self.assertRaisesRegex(RuntimeError, "COORDINATION_INTERNAL_MISMATCH"): validate(value)
 
     def test_plan_boundary_and_hash_are_revalidated(self):
         value = fixture(); value["plan"]["transportSideEffects"] = True
-        plan_body = {k: v for k, v in value["plan"].items() if k != "planHash"}; value["plan"]["planHash"] = snapshot.stable_hash(plan_body)
-        body = {k: v for k, v in value.items() if k != "snapshotHash"}; value["snapshotHash"] = snapshot.stable_hash(body)
+        plan_body = {k: v for k, v in value["plan"].items() if k != "planHash"}; value["plan"]["planHash"] = stable_hash(plan_body)
+        body = {k: v for k, v in value.items() if k != "snapshotHash"}; value["snapshotHash"] = stable_hash(body)
         with self.assertRaisesRegex(RuntimeError, "PLAN_BOUNDARY_INVALID"): validate(value)
 
 

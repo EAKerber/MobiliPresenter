@@ -470,10 +470,19 @@ class GitHubCoordinationAuthority:
         planner: Callable[[dict[str, Any], datetime], tuple[dict[str, Any], dict[str, Any]]],
         *,
         message: str,
+        expected_revision: str | None = None,
     ) -> AppliedTransition:
         if not isinstance(message, str) or not message.strip():
             raise CoordinationRemoteError("COORDINATION_MESSAGE_INVALID", "commit message is required")
         observed = self.observe()
+        if expected_revision is not None:
+            if not isinstance(expected_revision, str) or not re.fullmatch(r"[0-9a-f]{40}", expected_revision):
+                raise CoordinationRemoteError("COORDINATION_EXPECTED_REVISION_INVALID", "expected revision must be a 40-character commit SHA")
+            if observed.head_sha != expected_revision:
+                raise CoordinationRemoteError(
+                    "COORDINATION_EXPECTED_REVISION_MISMATCH",
+                    f"expected {expected_revision}, observed {observed.head_sha}",
+                )
         candidate, event = planner(copy.deepcopy(observed.state), observed.authority_now)
         if not isinstance(candidate, dict) or not isinstance(event, dict):
             raise CoordinationRemoteError("COORDINATION_PLANNER_INVALID", "planner must return state and event objects")

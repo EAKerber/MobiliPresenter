@@ -8,11 +8,11 @@ observations and execute any later authorized action.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 from pathlib import Path
 from typing import Any
+from tools.canonical import stable_hash
 
 OBS_SCHEMA = "WorkerObservation 0.1"
 REPRO_SCHEMA = "PeerReproduction 0.1"
@@ -32,10 +32,6 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 TOKEN_RE = re.compile(r"^[A-Z0-9][A-Z0-9_.-]*$")
 WORKER_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
-
-def stable_hash(value: Any) -> str:
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def require(condition: bool, code: str) -> None:

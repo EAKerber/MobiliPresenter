@@ -500,3 +500,76 @@ def can_write(
                 return True, copy.deepcopy(lease)
             return False, copy.deepcopy(lease)
     return True, None
+
+
+def _audit_time(now: datetime | str) -> str:
+    if isinstance(now, str):
+        try:
+            parsed = datetime.fromisoformat(now.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise CoordinationError("TIME_INVALID", "break-glass authority time is invalid") from exc
+    elif isinstance(now, datetime):
+        parsed = now
+    else:
+        raise CoordinationError("TIME_INVALID", "break-glass authority time is invalid")
+    if parsed.tzinfo is None:
+        raise CoordinationError("TIME_INVALID", "break-glass authority time must be timezone-aware")
+    return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def plan_break_glass(
+    state: dict[str, Any],
+    *,
+    admin_owner: dict[str, Any],
+    resources: list[str],
+    reason: str,
+    now,
+    transition_id: str,
+    expected_revision: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    validate_state(state)
+    admin = validate_owner(admin_owner)
+    if admin["role"] != "gitops":
+        raise CoordinationError("BREAK_GLASS_FORBIDDEN", "break-glass requires role gitops")
+    if not isinstance(reason, str) or not reason.strip():
+        raise CoordinationError("REASON_INVALID", "break-glass requires a reason")
+    if not isinstance(transition_id, str) or not transition_id.strip():
+        raise CoordinationError("TRANSITION_ID_INVALID", "transition_id must be non-empty")
+    if not isinstance(expected_revision, str) or not expected_revision.strip() or len(expected_revision.strip()) != 40:
+        raise CoordinationError("EXPECTED_REVISION_INVALID", "expected revision must be a 40-character commit SHA")
+
+    targets = normalize_resources(resources)
+    if not targets:
+        raise CoordinationError("RESOURCE_INVALID", "break-glass requires at least one exact resource")
+    candidate = compact_expired(state, now)
+    target_set = set(targets)
+    removed: list[dict[str, Any]] = []
+    kept: list[dict[str, Any]] = []
+    for lease in candidate["leases"]:
+        if lease["resource"] in target_set:
+            removed.append(copy.deepcopy(lease))
+        else:
+            kept.append(lease)
+    if not removed:
+        raise CoordinationError("BREAK_GLASS_TARGET_NOT_FOUND", "no active lease matches the exact resource set")
+    candidate["leases"] = kept
+    validate_state(candidate)
+    event = {
+        "action": "break-glass",
+        "transitionId": transition_id.strip(),
+        "at": _audit_time(now),
+        "expectedRevision": expected_revision.strip(),
+        "admin": admin,
+        "reason": reason.strip(),
+        "resources": targets,
+        "removed": [
+            {
+                "leaseId": lease["leaseId"],
+                "resource": lease["resource"],
+                "owner": copy.deepcopy(lease["owner"]),
+                "expiresAt": lease["expiresAt"],
+            }
+            for lease in sorted(removed, key=lambda item: item["leaseId"])
+        ],
+    }
+    return candidate, event

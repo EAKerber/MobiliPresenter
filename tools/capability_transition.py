@@ -3,12 +3,13 @@ from __future__ import annotations
 import copy, re
 from typing import Any
 from tools import capability_gates as gates
+from tools.canonical import stable_hash
 
 PLAN_SCHEMA = "CapabilityTransitionPlan 0.1"
 
 
 def state_hash(value: dict[str, Any] | None) -> str | None:
-    return None if value is None else gates.stable_hash(value)
+    return None if value is None else stable_hash(value)
 
 
 def text(value, code):
@@ -47,7 +48,7 @@ def build(capability_id, action, before, after, *, details=None, evidence=None):
     valid(after, capability_id)
     details=copy.deepcopy(details or {}); evidence=refs(evidence)
     core={"schemaVersion":PLAN_SCHEMA,"capability":capability_id,"action":action,"beforeStateHash":state_hash(before),"afterStateHash":state_hash(after),"details":details,"evidence":evidence}
-    plan_hash=gates.stable_hash(core)
+    plan_hash=stable_hash(core)
     subject=details.get("gateId") or (details.get("gate") or {}).get("id") or action
     subject=re.sub(r"[^a-z0-9-]+","-",str(subject).lower()).strip("-") or action
     return {**core,"planHash":plan_hash,"evidencePath":f"ops/evidence/capability-gates/{capability_id}/{action}-{subject}-{plan_hash[:16]}.json","after":after}
