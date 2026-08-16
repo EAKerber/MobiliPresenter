@@ -49,7 +49,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          from tools.capability_gates import stable_hash
+          from tools.canonical import stable_hash
 
           inspection = json.loads(Path('/tmp/live-supervisor-inspection.json').read_text(encoding='utf-8'))
           plan = json.loads(Path('/tmp/scheduler-plan.json').read_text(encoding='utf-8'))
