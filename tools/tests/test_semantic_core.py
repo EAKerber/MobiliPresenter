@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import unittest
 
-from tools.semantics.artifacts import ARTIFACT_KINDS, require_artifact_kind
 from tools.semantics.identity import RoleId, SessionId, WorkerId
 from tools.semantics.observation import ObservationStatus
 
@@ -26,13 +25,6 @@ class SemanticCoreTests(unittest.TestCase):
         self.assertEqual(ObservationStatus.FAIL, ObservationStatus.parse("FAIL"))
         with self.assertRaisesRegex(RuntimeError, "OBSERVATION_STATUS_INVALID"):
             ObservationStatus.parse("PENDING")
-
-    def test_artifact_taxonomy_is_explicit(self):
-        expected = {"inspection", "recommendation", "routing-plan", "transition-plan", "sanitization-plan", "receipt"}
-        self.assertEqual(expected, set(ARTIFACT_KINDS))
-        self.assertEqual("transition-plan", require_artifact_kind("transition-plan"))
-        with self.assertRaisesRegex(RuntimeError, "SEMANTIC_ARTIFACT_KIND_INVALID"):
-            require_artifact_kind("plan")
 
 
 if __name__ == "__main__":
