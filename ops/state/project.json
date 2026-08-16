@@ -1,18 +1,13 @@
 {
-  "schemaVersion": "ProjectState 1.0",
+  "schemaVersion": "ProjectState 2.0",
   "project": {
     "id": "mobilipresenter",
-    "repository": "EAKerber/MobiliPresenter",
-    "productInvariants": {
-      "viewer": "fixed-camera",
-      "visualPriority": "contextual-fidelity-over-free-3d-navigation"
-    }
+    "repository": "EAKerber/MobiliPresenter"
   },
   "git": {
     "controlBranch": "main",
     "activeDevelopmentBranch": null,
-    "publishedBranch": "main",
-    "preserveBranches": [
+    "protectedBranches": [
       "coordination/leases",
       "coordination/continuations",
       "renderer/fixed-view-realistic-v1",
@@ -27,10 +22,8 @@
     ]
   },
   "published": {
-    "release": "ViewerNext-Preview-2026-08-11",
     "url": "https://mobilipresenter.netlify.app/",
-    "artifactManifest": "ops/published/viewer-next-current.json",
-    "artifactSha256": "84f8fcd8e925c13678d07c646d1c34dcd90e7be62e55ee50ee257cefb6807e19"
+    "artifactManifest": "ops/published/viewer-next-current.json"
   },
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
@@ -38,46 +31,6 @@
     "checkpoint": "POST-GUIDED-CONFIGURATOR-0.3-INTEGRATED",
     "nextTransition": "open-developer-slice-for-responsive-fixed-frame-v0.1",
     "blockers": [],
-    "constraints": [
-      "fixed-camera-is-product-invariant",
-      "scene-core-0.1-is-integrated-foundation",
-      "geometry-wins-for-assembly-preserve-nominal",
-      "runtime-rendering-must-be-deterministic",
-      "llm-is-authoring-or-enhancement-not-runtime-geometry-authority",
-      "mm-is-physical-authority-pixels-are-projection-evidence",
-      "supersampling-4x-is-targeted-crop-fidelity-profile",
-      "f0-through-f4-must-not-regress-during-visual-tuning",
-      "unaffected-readability-probes-remain-regression-compared-to-s8",
-      "s10-oven-probes-use-explicit-absolute-appearance-gate-after-mdf-material-migration",
-      "s10-drawer-probes-require-absolute-readability-and-median-contrast-spread-lte-0.02",
-      "sink-opening-four-probes-pass-absolute-s9-readability-gate",
-      "module02-oven-opening-is-600x600-with-95-95-80-80-mdf-fields",
-      "module02-and-module03-fronts-share-the-same-tuned-front-wood-material",
-      "module02-oven-physical-clearance-remains-2mm-on-all-four-sides",
-      "cooktop-render-contact-is-1mm-above-stone02-without-mutating-core-slot",
-      "contact-fidelity-hard-gate-measures-cooktop-stone-gap-as-1mm-plusminus-0.01mm",
-      "gtao-occlusion-profile-is-mm-scaled-radius72-blend0.38",
-      "module03-drawer-physical-gaps-remain-2mm",
-      "stone-is-two-independent-30mm-design-pieces-with-100x20-rear-upstands",
-      "sink-uses-true-rounded-stone-hole-and-continuous-undermount-bowl",
-      "faucet-is-core-anchored-high-arc-340mm-255mm-reach",
-      "full-wall-tile-covers-main-column-return-and-inferred-laundry-wall",
-      "under-cab-profile-is-rear-corner-18mm-45deg-3000k",
-      "technical-view-fidelity-must-be-traceable-to-geometry-authority",
-      "ui-must-not-reconstruct-domain-geometry-or-mask-tpc-unavailability",
-      "technical-presentation-availability-0.1.1-is-integrated",
-      "technical-front-views-02-03-are-geometry-derived-with-partial-coverage",
-      "guided-configurator-ui-0.3-is-integrated-baseline",
-      "responsive-fixed-frame-must-preserve-fixed-camera-and-forbid-heuristic-pan-zoom-focus",
-      "verified-user-artifact-source-is-77cd8adb7bdc1f15a58a2f5e55269a0b302b99ac",
-      "user-facing-artifacts-require-durable-temp-branch-readback"
-    ],
-    "plan": "docs/plans/developer-continuation-2026-08.md",
     "prNumber": null
-  },
-  "operations": {
-    "toolboxPhase": "phase-1.2-branch-hygiene",
-    "canonicalState": "ops/state/project.json",
-    "commands": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]
   }
 }

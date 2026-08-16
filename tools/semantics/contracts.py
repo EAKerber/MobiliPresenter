@@ -66,5 +66,25 @@ def check_source_build_contract()->list[str]:
     if runtime_errors:errors.append(f"SEMANTIC_SOURCE_BUILD_RUNTIME_INVALID:{runtime_errors[0]['code']}")
     if set(manifest)!=SOURCE_BUILD_FIELDS:errors.append("SEMANTIC_SOURCE_BUILD_SCHEMA_REJECTS_RUNTIME")
     return errors
+
+def check_project_state_contract()->list[str]:
+    registry=load_registry();errors=[];contract=registry.get("contracts",{}).get("project-state")
+    if not isinstance(contract,dict):return ["SEMANTIC_PROJECT_STATE_CONTRACT_MISSING"]
+    if contract.get("semanticValidator")!="tools.project_state.validate_current":errors.append("SEMANTIC_PROJECT_STATE_VALIDATOR_MISMATCH")
+    schema_path=ROOT/str(contract.get("structuralSchema"));schema=_load_json(schema_path);properties=schema.get("properties") if isinstance(schema.get("properties"),dict) else {}
+    expected={"schemaVersion","project","git","published","development"}
+    if set(properties)!=expected:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_FIELDS_MISMATCH")
+    if set(schema.get("required") or [])!=expected:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_REQUIRED_MISMATCH")
+    version=properties.get("schemaVersion") if isinstance(properties.get("schemaVersion"),dict) else {}
+    if version.get("const")!=project_state.CURRENT_SCHEMA_VERSION:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_VERSION_MISMATCH")
+    state=project_state.load_state();runtime_errors=project_state.validate_current(state)
+    if runtime_errors:errors.append(f"SEMANTIC_PROJECT_STATE_RUNTIME_INVALID:{runtime_errors[0]['code']}")
+    if set(state)!=expected:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_REJECTS_RUNTIME")
+    nested={"project":{"id","repository"},"git":{"controlBranch","activeDevelopmentBranch","protectedBranches"},"published":{"url","artifactManifest"},"development":{"initiative","phase","checkpoint","nextTransition","blockers","prNumber"}}
+    for name,fields in nested.items():
+        spec=properties.get(name) if isinstance(properties.get(name),dict) else {};required=set(spec.get("required") or []);value=state.get(name)
+        if required!=fields:errors.append(f"SEMANTIC_PROJECT_STATE_{name.upper()}_REQUIRED_MISMATCH")
+        if not isinstance(value,dict) or set(value)!=fields:errors.append(f"SEMANTIC_PROJECT_STATE_{name.upper()}_RUNTIME_FIELDS_MISMATCH")
+    return errors
 def check_contracts()->list[str]:
-    errors=check_capability_gates_contract();errors.extend(check_operational_semantics_contract());errors.extend(check_source_build_contract());return errors
+    errors=check_capability_gates_contract();errors.extend(check_operational_semantics_contract());errors.extend(check_source_build_contract());errors.extend(check_project_state_contract());return errors

@@ -5,16 +5,19 @@ from tools import project_state, publication
 
 
 class PublicationContractTests(unittest.TestCase):
-    def test_live_manifest_is_valid_and_derives_current_duplicates(self):
+    def test_live_manifest_is_valid_and_derives_current_publication(self):
         state = project_state.load_state()
         view = project_state.operational_view(state)
         manifest = publication.load_manifest(view["published"]["artifactManifest"])
         self.assertEqual(publication.validate_manifest(manifest), [])
         derived = publication.publication_view(view, manifest)
-        self.assertEqual(derived["release"], state["published"]["release"])
-        self.assertEqual(derived["sourceBranch"], state["git"]["publishedBranch"])
-        self.assertEqual(derived["sourceBuildFingerprint"], state["published"]["artifactSha256"])
+        self.assertEqual(derived["release"], manifest["release"])
+        self.assertEqual(derived["sourceBranch"], manifest["sourceBranch"])
+        self.assertEqual(derived["sourceBuildFingerprint"], manifest["sha256"])
         self.assertEqual(derived["fingerprintKind"], publication.FINGERPRINT_KIND)
+        self.assertNotIn("release", state["published"])
+        self.assertNotIn("artifactSha256", state["published"])
+        self.assertNotIn("publishedBranch", state["git"])
 
     def test_invalid_fingerprint_fails_closed(self):
         state = project_state.load_state()

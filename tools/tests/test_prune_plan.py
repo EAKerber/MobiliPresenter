@@ -10,18 +10,17 @@ spec.loader.exec_module(prune)
 
 
 class PrunePlan03Tests(unittest.TestCase):
-    def state(self, preserve=None):
+    def state(self, protected=None):
         return {
-            "schemaVersion": "ProjectState 1.0",
-            "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter", "productInvariants": {}},
-            "git": {"controlBranch": "main", "publishedBranch": "main", "activeDevelopmentBranch": None, "preserveBranches": list(preserve or [])},
-            "published": {"release": "R", "url": "x", "artifactManifest": "ops/published/viewer-next-current.json", "artifactSha256": "a" * 64},
-            "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "N", "blockers": [], "constraints": [], "plan": "docs/plans/developer-continuation-2026-08.md", "prNumber": None},
-            "operations": {"toolboxPhase": "phase-1.2-branch-hygiene", "canonicalState": "ops/state/project.json", "commands": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]},
+            "schemaVersion": "ProjectState 2.0",
+            "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
+            "git": {"controlBranch": "main", "activeDevelopmentBranch": None, "protectedBranches": list(protected or [])},
+            "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
+            "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "N", "blockers": [], "prNumber": None},
         }
 
     def build(self, refs, prs=None, ancestry=None, **kwargs):
-        return prune.build_prune_plan(self.state(kwargs.pop("preserve", None)), refs, [] if prs is None else prs, ancestry or {branch: "diverged" for branch in refs}, published_source_branch="main", **kwargs)
+        return prune.build_prune_plan(self.state(kwargs.pop("protected", None)), refs, [] if prs is None else prs, ancestry or {branch: "diverged" for branch in refs}, published_source_branch="main", **kwargs)
 
     def test_prefix_is_never_retention_or_delete_evidence(self):
         refs = {"main": "a" * 40, "archive/old": "b" * 40, "backup/old": "c" * 40, "variant/old": "d" * 40, "tmp/old": "e" * 40}
@@ -34,7 +33,7 @@ class PrunePlan03Tests(unittest.TestCase):
 
     def test_explicit_protection_wins_independent_of_name(self):
         refs = {"main": "a" * 40, "archive/old": "b" * 40}
-        plan = self.build(refs, ancestry={"main": "identical-to-control", "archive/old": "ancestor-of-control"}, preserve=["archive/old"])
+        plan = self.build(refs, ancestry={"main": "identical-to-control", "archive/old": "ancestor-of-control"}, protected=["archive/old"])
         entry = next(item for item in plan["entries"] if item["branch"] == "archive/old")
         self.assertEqual(entry["action"], "keep")
         self.assertIn("project-state-protected", entry["protections"])
@@ -63,7 +62,7 @@ class PrunePlan03Tests(unittest.TestCase):
     def test_open_and_protected_branches_override_evidence(self):
         refs = {"main": "a" * 40, "ops/live": "b" * 40, "other/protected": "c" * 40}
         prs = [{"number": 9, "state": "open", "merged": False, "headRef": "ops/live", "headSha": "b" * 40}]
-        plan = self.build(refs, prs=prs, ancestry={branch: "ancestor-of-control" for branch in refs}, preserve=["other/protected"])
+        plan = self.build(refs, prs=prs, ancestry={branch: "ancestor-of-control" for branch in refs}, protected=["other/protected"])
         by = {entry["branch"]: entry for entry in plan["entries"]}
         self.assertEqual(by["ops/live"]["action"], "keep")
         self.assertIn("open-pr-head", by["ops/live"]["protections"])

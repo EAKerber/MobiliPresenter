@@ -4,7 +4,7 @@ import json
 import unittest
 
 from tools import capability_gates
-from tools.semantics.contracts import check_capability_gates_contract, check_source_build_contract
+from tools.semantics.contracts import check_capability_gates_contract, check_project_state_contract, check_source_build_contract
 from tools.semantics.registry import ROOT
 
 
@@ -27,6 +27,9 @@ class SemanticContractTests(unittest.TestCase):
         self.assertIn("supervisorParticipation", schema["properties"])
         self.assertNotIn("supervisorParticipation", schema["required"])
         self.assertEqual(set(capability_gates.SUPERVISOR_PARTICIPATION), set(schema["properties"]["supervisorParticipation"]["enum"]))
+
+    def test_project_state_contract_is_conformant(self):
+        self.assertEqual([], check_project_state_contract())
 
 
 if __name__ == "__main__":

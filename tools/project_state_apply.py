@@ -1,4 +1,4 @@
-"""Fail-closed ProjectState executor for Transition Protocol 0.1 plans."""
+"""Fail-closed ProjectState checkpoint executor for Transition Protocol 0.1 plans."""
 from __future__ import annotations
 
 import json
@@ -27,24 +27,25 @@ def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
             temporary.unlink()
 
 
-def apply(
-    plan: dict[str, Any],
-    expected_plan: str | None,
-    *,
-    state_path: Path,
-    load_state: Loader,
-    validator: Validator,
-    observe_git: GitObserver,
-) -> dict[str, Any]:
+def _restore_bytes(path: Path, previous_bytes: bytes) -> None:
+    with tempfile.NamedTemporaryFile("wb", dir=path.parent, delete=False) as handle:
+        handle.write(previous_bytes)
+        restore_tmp = Path(handle.name)
+    try:
+        os.replace(restore_tmp, path)
+    finally:
+        if restore_tmp.exists():
+            restore_tmp.unlink()
+
+
+def apply(plan: dict[str, Any], expected_plan: str | None, *, state_path: Path, load_state: Loader, validator: Validator, observe_git: GitObserver) -> dict[str, Any]:
     transition.validate_checkpoint_plan(plan, validator=validator)
     protocol.require_expected_plan(plan, expected_plan)
-
     current = load_state()
     errors = validator(current)
     if errors:
         raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
     protocol.verify_before_state(plan, current)
-
     active = current["git"].get("activeDevelopmentBranch")
     if active is None:
         raise RuntimeError("CHECKPOINT_NO_ACTIVE_DEVELOPMENT")
@@ -55,7 +56,6 @@ def apply(
         raise RuntimeError(f"CHECKPOINT_WRONG_BRANCH:{git.get('branch')}")
     if git.get("dirty"):
         raise RuntimeError("CHECKPOINT_DIRTY_WORKTREE")
-
     previous_bytes = state_path.read_bytes()
     wrote = False
     try:
@@ -70,14 +70,7 @@ def apply(
         return receipt
     except Exception:
         if wrote:
-            with tempfile.NamedTemporaryFile("wb", dir=state_path.parent, delete=False) as handle:
-                handle.write(previous_bytes)
-                restore_tmp = Path(handle.name)
-            try:
-                os.replace(restore_tmp, state_path)
-            finally:
-                if restore_tmp.exists():
-                    restore_tmp.unlink()
+            _restore_bytes(state_path, previous_bytes)
             restored = load_state()
             if protocol.state_hash(restored) != plan["beforeStateHash"]:
                 raise RuntimeError("PROJECT_STATE_ROLLBACK_FAILED")

@@ -1,79 +1,132 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/project-state-1.0.json",
-  "title": "MobiliPresenter ProjectState 1.0",
+  "$id": "https://mobilipresenter.local/schemas/project-state-2.0.json",
+  "title": "MobiliPresenter ProjectState 2.0",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "project", "git", "published", "development", "operations"],
+  "required": [
+    "schemaVersion",
+    "project",
+    "git",
+    "published",
+    "development"
+  ],
   "properties": {
-    "schemaVersion": {"const": "ProjectState 1.0"},
+    "schemaVersion": {
+      "const": "ProjectState 2.0"
+    },
     "project": {
       "type": "object",
-      "required": ["id", "repository", "productInvariants"],
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "repository"
+      ],
       "properties": {
-        "id": {"const": "mobilipresenter"},
-        "repository": {"const": "EAKerber/MobiliPresenter"},
-        "productInvariants": {"type": "object"}
+        "id": {
+          "const": "mobilipresenter"
+        },
+        "repository": {
+          "const": "EAKerber/MobiliPresenter"
+        }
       }
     },
     "git": {
       "type": "object",
-      "required": ["controlBranch", "activeDevelopmentBranch", "publishedBranch", "preserveBranches"],
+      "additionalProperties": false,
+      "required": [
+        "controlBranch",
+        "activeDevelopmentBranch",
+        "protectedBranches"
+      ],
       "properties": {
-        "controlBranch": {"type": "string", "minLength": 1},
+        "controlBranch": {
+          "type": "string",
+          "minLength": 1
+        },
         "activeDevelopmentBranch": {
           "oneOf": [
-            {"type": "string", "minLength": 1},
-            {"type": "null"}
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "publishedBranch": {"type": "string", "minLength": 1},
-        "preserveBranches": {
+        "protectedBranches": {
           "type": "array",
-          "items": {"type": "string", "minLength": 1},
-          "uniqueItems": true
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
     "published": {
       "type": "object",
-      "required": ["release", "url", "artifactManifest", "artifactSha256"],
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "artifactManifest"
+      ],
       "properties": {
-        "release": {"type": "string", "minLength": 1},
-        "url": {"type": "string", "minLength": 1},
-        "artifactManifest": {"type": "string", "minLength": 1},
-        "artifactSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifactManifest": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "development": {
       "type": "object",
-      "required": ["initiative", "phase", "checkpoint", "nextTransition", "blockers", "constraints", "plan", "prNumber"],
+      "additionalProperties": false,
+      "required": [
+        "initiative",
+        "phase",
+        "checkpoint",
+        "nextTransition",
+        "blockers",
+        "prNumber"
+      ],
       "properties": {
-        "initiative": {"type": "string", "minLength": 1},
-        "phase": {"type": "string", "minLength": 1},
-        "checkpoint": {"type": "string", "minLength": 1},
-        "nextTransition": {"type": "string", "minLength": 1},
-        "blockers": {"type": "array", "items": {"type": "string"}},
-        "constraints": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-        "plan": {"type": "string", "minLength": 1},
+        "initiative": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nextTransition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "prNumber": {
           "oneOf": [
-            {"type": "integer", "minimum": 1},
-            {"type": "null"}
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
           ]
-        }
-      }
-    },
-    "operations": {
-      "type": "object",
-      "required": ["toolboxPhase", "canonicalState", "commands"],
-      "properties": {
-        "toolboxPhase": {"enum": ["phase-1.1-coherence", "phase-1.2-branch-hygiene"]},
-        "canonicalState": {"const": "ops/state/project.json"},
-        "commands": {
-          "type": "array",
-          "items": {"enum": ["status", "doctor", "verify", "checkpoint", "handoff", "git prune-plan"]},
-          "uniqueItems": true
         }
       }
     }
