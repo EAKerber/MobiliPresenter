@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/project-machine-inspection.schema.json",
+  "title": "ProjectMachineInspection 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "scope",
+    "sourceHeads",
+    "project",
+    "sensors",
+    "trust",
+    "observations",
+    "readOnly",
+    "semanticAuthority",
+    "inspectionHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "ProjectMachineInspection 0.1"},
+    "repository": {"const": "EAKerber/MobiliPresenter"},
+    "scope": {"enum": ["local", "live"]},
+    "sourceHeads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inspection", "control", "coordination", "continuation"],
+      "properties": {
+        "inspection": {"$ref": "#/$defs/sourceHead"},
+        "control": {"$ref": "#/$defs/sourceHead"},
+        "coordination": {"$ref": "#/$defs/sourceHead"},
+        "continuation": {"$ref": "#/$defs/sourceHead"}
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": ["stateHash", "phase", "checkpoint", "nextTransition", "activeDevelopmentBranch", "developmentPrNumber", "blockers"],
+      "properties": {
+        "stateHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "phase": {"type": "string", "minLength": 1},
+        "checkpoint": {"type": "string", "minLength": 1},
+        "nextTransition": {"type": "string", "minLength": 1},
+        "activeDevelopmentBranch": {"type": ["string", "null"]},
+        "developmentPrNumber": {"type": ["integer", "null"], "minimum": 1},
+        "blockers": {"type": "array"}
+      },
+      "additionalProperties": false
+    },
+    "sensors": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/sensor"}
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "ok", "complete", "failedSensors", "unknownSensors"],
+      "properties": {
+        "status": {"enum": ["PASS", "UNKNOWN", "FAIL"]},
+        "ok": {"type": "boolean"},
+        "complete": {"type": "boolean"},
+        "failedSensors": {"type": "array", "items": {"type": "string"}},
+        "unknownSensors": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "observations": {"type": "array", "items": {"type": "object"}},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "inspectionHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "sourceHead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "sha"],
+      "properties": {
+        "branch": {"type": ["string", "null"]},
+        "sha": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[0-9a-f]{40}$"}]}
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "required", "code", "authority", "data"],
+      "properties": {
+        "status": {"enum": ["PASS", "UNKNOWN", "FAIL"]},
+        "required": {"type": "boolean"},
+        "code": {"type": ["string", "null"]},
+        "authority": {"type": ["object", "null"]},
+        "data": {}
+      }
+    }
+  }
+}

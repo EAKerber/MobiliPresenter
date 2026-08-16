@@ -62,6 +62,21 @@ jobs:
           name: git-prune-plan
           path: /tmp/git-prune-plan.json
           if-no-files-found: error
+      - name: Generate Project Machine inspection
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/project_machine.py inspect --live --json > /tmp/project-machine-inspection.json
+          python -m json.tool /tmp/project-machine-inspection.json > /dev/null
+          python tools/project_machine.py validate /tmp/project-machine-inspection.json --json
+      - name: Upload Project Machine inspection
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-machine-inspection
+          path: /tmp/project-machine-inspection.json
+          if-no-files-found: error
       - name: Generate maintenance inspection
         if: github.event_name == 'pull_request'
         env:
