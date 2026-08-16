@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/operational-semantics-0.1.json",
+  "title": "OperationalSemantics 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "owners", "concepts", "contracts", "branchGrammar"],
+  "properties": {
+    "schemaVersion": {"const": "OperationalSemantics 0.1"},
+    "owners": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description"],
+        "properties": {"description": {"type": "string", "minLength": 1}}
+      }
+    },
+    "concepts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["term", "kind", "owner", "definition"],
+        "properties": {
+          "term": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1},
+          "definition": {"type": "string", "minLength": 1},
+          "related": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["term", "scope", "status"],
+              "properties": {
+                "term": {"type": "string", "minLength": 1},
+                "scope": {"type": "string", "minLength": 1},
+                "status": {"enum": ["legacy", "supported"]},
+                "retireBy": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owner", "semanticValidator", "structuralSchema"],
+        "properties": {
+          "owner": {"type": "string", "minLength": 1},
+          "semanticValidator": {"type": "string", "minLength": 1},
+          "structuralSchema": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "branchGrammar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["controlBranches", "canonical", "legacyNamespaces"],
+      "properties": {
+        "controlBranches": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "canonical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authority", "experiment", "work"],
+          "properties": {
+            "authority": {"type": "string", "minLength": 1},
+            "experiment": {"type": "string", "minLength": 1},
+            "work": {"type": "string", "minLength": 1}
+          }
+        },
+        "legacyNamespaces": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}
