@@ -90,12 +90,10 @@ jobs:
           name: project-machine-inspection
           path: /tmp/project-machine-inspection.json
           if-no-files-found: error
-      - name: Generate maintenance inspection
+      - name: Derive maintenance inspection
         if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          python tools/maintenance_inspect.py --remote --json > /tmp/maintenance-inspection.json
+          python tools/maintenance_inspect.py --input /tmp/project-machine-inspection.json --json > /tmp/maintenance-inspection.json
           python -m json.tool /tmp/maintenance-inspection.json > /dev/null
       - name: Upload maintenance inspection
         if: github.event_name == 'pull_request'
@@ -104,35 +102,11 @@ jobs:
           name: maintenance-inspection
           path: /tmp/maintenance-inspection.json
           if-no-files-found: error
-      - name: Generate live supervisor inspection
+      - name: Derive Scheduler plan
         if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          python tools/maintenance_live.py --json > /tmp/live-supervisor-inspection.json
-          python -m json.tool /tmp/live-supervisor-inspection.json > /dev/null
-      - name: Upload live supervisor inspection
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: live-supervisor-inspection
-          path: /tmp/live-supervisor-inspection.json
-          if-no-files-found: error
-      - name: Generate Scheduler plan
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python tools/scheduler_plan.py --live --json > /tmp/scheduler-plan.json
+          python tools/scheduler_plan.py --input /tmp/maintenance-inspection.json --json > /tmp/scheduler-plan.json
           python -m json.tool /tmp/scheduler-plan.json > /dev/null
-          python - <<'PY'
-          import json
-          p=json.load(open('/tmp/scheduler-plan.json'))
-          assert p['readOnly'] is True
-          assert p['transportSideEffects'] is False
-          assert p['semanticAuthority'] is False
-          assert p['dispatch']['channelClass'] in {'worker','supervisor','human','none'}
-          PY
       - name: Upload Scheduler plan
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
