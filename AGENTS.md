@@ -21,7 +21,7 @@ Para obter uma visão factual composta das autoridades operacionais observáveis
 python3 tools/project_machine.py inspect --live --json
 ```
 
-`ProjectMachineInspection` é uma projeção derivada, read-only e `semanticAuthority=false`. Ela separa fatos e grau de confiança (`PASS`, `UNKNOWN`, `FAIL`) da interpretação operacional de `MaintenanceInspection` e do roteamento de `SchedulerPlan`.
+`ProjectMachineInspection` é uma projeção derivada, read-only e `semanticAuthority=false`. Ela contém fatos, uma projeção de authorities derivada dos próprios sensores e duas dimensões distintas: `trust` indica se os fatos requeridos puderam ser observados; `coherence` indica se as authorities conhecidas concordam nas relações verificáveis. Ambas usam `PASS`, `UNKNOWN` e `FAIL`. A interpretação operacional permanece em `MaintenanceInspection` e o roteamento permanece em `SchedulerPlan`.
 
 Quando a capacidade do ambiente for relevante:
 
