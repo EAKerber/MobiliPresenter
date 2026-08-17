@@ -9,6 +9,10 @@ SCHEMA_VERSION = "CoordinationState 0.1"
 DEFAULT_TTL_SECONDS = 60 * 60
 MAX_TTL_SECONDS = 4 * 60 * 60
 DEFAULT_INTENT_TTL_SECONDS = 30 * 60
+STATE_FIELDS = {"schemaVersion", "revision", "intents", "leases"}
+OWNER_FIELDS = {"role", "session", "branch", "pr"}
+INTENT_FIELDS = {"intentId", "resource", "owner", "reason", "createdAt", "expiresAt"}
+LEASE_FIELDS = {"leaseId", "resource", "mode", "owner", "reason", "acquiredAt", "renewedAt", "expiresAt", "ttlSeconds"}
 
 _GLOB_META = {"*", "?"}
 _INVALID_BRANCH_CHARS = set(" ~^:?*[\\")
@@ -39,6 +43,8 @@ def _require_string(value: Any, field: str) -> str:
 def validate_owner(owner: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(owner, dict):
         raise CoordinationError("OWNER_INVALID", "owner must be an object")
+    if set(owner) != OWNER_FIELDS:
+        raise CoordinationError("OWNER_INVALID", "owner fields are invalid")
     role = _require_string(owner.get("role"), "owner.role").strip()
     session = _require_string(owner.get("session"), "owner.session").strip()
     branch = owner.get("branch")
@@ -54,10 +60,12 @@ def validate_owner(owner: dict[str, Any]) -> dict[str, Any]:
 def validate_state(state: dict[str, Any]) -> None:
     if not isinstance(state, dict):
         raise CoordinationError("COORDINATION_STATE_INVALID", "root must be an object")
+    if set(state) != STATE_FIELDS:
+        raise CoordinationError("COORDINATION_STATE_INVALID", "root fields are invalid")
     if state.get("schemaVersion") != SCHEMA_VERSION:
         raise CoordinationError("COORDINATION_STATE_INVALID", f"schemaVersion must be {SCHEMA_VERSION}")
-    if state.get("revision") is not None and not isinstance(state.get("revision"), str):
-        raise CoordinationError("COORDINATION_STATE_INVALID", "revision must be null or a string")
+    if state.get("revision") is not None and (not isinstance(state.get("revision"), str) or not state.get("revision")):
+        raise CoordinationError("COORDINATION_STATE_INVALID", "revision must be null or a non-empty string")
     for collection in ("intents", "leases"):
         if not isinstance(state.get(collection), list):
             raise CoordinationError("COORDINATION_STATE_INVALID", f"{collection} must be a list")
@@ -239,6 +247,8 @@ def _validate_ttl(ttl_seconds: int, *, maximum: int = MAX_TTL_SECONDS) -> int:
 def _validate_intent(intent: dict[str, Any]) -> None:
     if not isinstance(intent, dict):
         raise CoordinationError("COORDINATION_STATE_INVALID", "intent must be an object")
+    if set(intent) != INTENT_FIELDS:
+        raise CoordinationError("COORDINATION_STATE_INVALID", "intent fields are invalid")
     _require_string(intent.get("intentId"), "intent.intentId")
     normalize_resource(_require_string(intent.get("resource"), "intent.resource"))
     validate_owner(intent.get("owner"))
@@ -250,6 +260,8 @@ def _validate_intent(intent: dict[str, Any]) -> None:
 def _validate_lease(lease: dict[str, Any]) -> None:
     if not isinstance(lease, dict):
         raise CoordinationError("COORDINATION_STATE_INVALID", "lease must be an object")
+    if set(lease) != LEASE_FIELDS:
+        raise CoordinationError("COORDINATION_STATE_INVALID", "lease fields are invalid")
     _require_string(lease.get("leaseId"), "lease.leaseId")
     normalize_resource(_require_string(lease.get("resource"), "lease.resource"))
     if lease.get("mode") != "exclusive-write":

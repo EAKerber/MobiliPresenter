@@ -88,18 +88,19 @@ def _pr_index(pull_requests):
         if isinstance(ref,str):by_branch.setdefault(ref,[]).append(pr)
     for prs in by_branch.values():prs.sort(key=lambda pr:int(pr.get("number") or 0))
     return by_branch
-def _protection_reasons(view,branch,open_pr_heads,*,published_source_branch=None):
+def _protection_reasons(view,branch,open_pr_heads,open_pr_bases,*,published_source_branch=None):
     git_state=view["git"];reasons=[]
     if branch==git_state.get("controlBranch"):reasons.append("control-branch")
     if isinstance(published_source_branch,str) and branch==published_source_branch:reasons.append("published-branch")
     if branch==git_state.get("activeDevelopmentBranch"):reasons.append("active-development")
     if branch in set(git_state.get("protectedBranches") or []):reasons.append("project-state-protected")
     if branch in open_pr_heads:reasons.append("open-pr-head")
+    if branch in open_pr_bases:reasons.append("open-pr-base")
     return reasons
 def build_prune_plan(state,refs,pull_requests,ancestry,*,branch_inventory_complete=True,ancestry_complete=True,branch_inventory_source="fixture",remote_observation_error=None,published_source_branch=None):
-    view=project_state.operational_view(state);git_state=view["git"];control_branch=git_state["controlBranch"];control_sha=refs.get(control_branch);pr_history_complete=pull_requests is not None;pr_index=_pr_index(pull_requests or []);open_pr_heads={str(pr["headRef"]) for pr in (pull_requests or []) if pr.get("state")=="open" and isinstance(pr.get("headRef"),str)};entries=[]
+    view=project_state.operational_view(state);git_state=view["git"];control_branch=git_state["controlBranch"];control_sha=refs.get(control_branch);pr_history_complete=pull_requests is not None;pr_index=_pr_index(pull_requests or []);open_pr_heads={str(pr["headRef"]) for pr in (pull_requests or []) if pr.get("state")=="open" and isinstance(pr.get("headRef"),str)};open_pr_bases={str(pr["baseRef"]) for pr in (pull_requests or []) if pr.get("state")=="open" and isinstance(pr.get("baseRef"),str)};entries=[]
     for branch,sha in sorted(refs.items()):
-        protections=_protection_reasons(view,branch,open_pr_heads,published_source_branch=published_source_branch);branch_prs=pr_index.get(branch,[]);ancestry_status=ancestry.get(branch,"unknown") if ancestry is not None else "unknown";provenance=[];strong=[]
+        protections=_protection_reasons(view,branch,open_pr_heads,open_pr_bases,published_source_branch=published_source_branch);branch_prs=pr_index.get(branch,[]);ancestry_status=ancestry.get(branch,"unknown") if ancestry is not None else "unknown";provenance=[];strong=[]
         for pr in branch_prs:
             head_matches=pr.get("headSha")==sha;provenance.append({"number":pr.get("number"),"state":pr.get("state"),"merged":bool(pr.get("merged")),"headSha":pr.get("headSha"),"headMatchesCurrent":head_matches})
             if head_matches and pr.get("merged"):strong.append(f"merged-pr:{pr.get('number')}")
@@ -121,7 +122,7 @@ def build_prune_plan(state,refs,pull_requests,ancestry,*,branch_inventory_comple
             duplicates=[name for name in integrated_names if name!=entry["branch"]]
             if duplicates:entry["duplicateOf"]=duplicates;entry["evidence"].append(f"duplicate-of-integrated-head:{duplicates[0]}");entry["action"]="delete-candidate";entry["reason"]="exact-duplicate-of-integrated-head";entry["autoDeleteEligible"]=True
     observations_complete=bool(branch_inventory_complete and pr_history_complete and ancestry_complete and control_sha is not None)
-    body={"schemaVersion":SCHEMA_VERSION,"repository":view["project"]["repository"],"controlBranch":control_branch,"controlSha":control_sha,"branchCount":len(refs),"observations":{"complete":observations_complete,"branchInventoryComplete":bool(branch_inventory_complete),"branchInventorySource":branch_inventory_source,"prHistoryComplete":pr_history_complete,"prHistoryError":remote_observation_error,"ancestryComplete":bool(ancestry_complete)},"execution":{"executorAvailable":True,"requiresPlanFile":True,"requiresExpectedPlan":True,"requiresExplicitAuthorization":True},"openPrHeads":sorted(open_pr_heads),"entries":entries,"note":"Evidence-only sanitation plan. Names never authorize retention or deletion; execution requires this exact materialized plan, explicit plan identity, authorization, drift checks, and readback."}
+    body={"schemaVersion":SCHEMA_VERSION,"repository":view["project"]["repository"],"controlBranch":control_branch,"controlSha":control_sha,"branchCount":len(refs),"observations":{"complete":observations_complete,"branchInventoryComplete":bool(branch_inventory_complete),"branchInventorySource":branch_inventory_source,"prHistoryComplete":pr_history_complete,"prHistoryError":remote_observation_error,"ancestryComplete":bool(ancestry_complete)},"execution":{"executorAvailable":True,"requiresPlanFile":True,"requiresExpectedPlan":True,"requiresExplicitAuthorization":True},"openPrHeads":sorted(open_pr_heads),"openPrBases":sorted(open_pr_bases),"entries":entries,"note":"Evidence-only sanitation plan. Names never authorize retention or deletion; execution requires this exact materialized plan, explicit plan identity, authorization, drift checks, and readback."}
     return {**body,"planHash":stable_hash(body)}
 def build_live_plan():
     state=load_state();view=project_state.operational_view(state);manifest=publication.load_manifest(view["published"]["artifactManifest"]);published=publication.publication_view(view,manifest);refs,source=branch_refs_with_source();prs_ok,prs,prs_error=observe_pull_requests(state);ancestry,ancestry_complete=observe_ancestry(refs,view["git"]["controlBranch"])

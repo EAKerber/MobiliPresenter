@@ -124,11 +124,18 @@ class PruneApplyTests(unittest.TestCase):
         plan = self.plan(); inventory = {"main": "a" * 40, "old/a": "b" * 40, "review/x": "c" * 40}
         with mock.patch.dict(os.environ, {apply_mod.AUTH_ENV: "1"}, clear=False), \
              mock.patch.object(apply_mod, "observe_branch_inventory", return_value=inventory), \
-             mock.patch.object(apply_mod, "observe_open_prs_for_branch", return_value=[{"number": 99}]), \
+             mock.patch.object(apply_mod, "observe_open_prs_using_branch", return_value=[{"number": 99}]), \
              mock.patch.object(apply_mod, "delete_remote_ref") as delete:
-            with self.assertRaisesRegex(RuntimeError, "STALE_PLAN:OPEN_PR_APPEARED:old/a"):
+            with self.assertRaisesRegex(RuntimeError, "STALE_PLAN:OPEN_PR_RELATION_APPEARED:old/a"):
                 apply_mod.apply_plan(plan, plan["planHash"])
             delete.assert_not_called()
+
+    def test_open_pr_base_is_reobserved_before_delete(self):
+        with mock.patch.object(apply_mod, "observe_open_prs_for_branch", return_value=[]), \
+             mock.patch.object(apply_mod, "gh_json", return_value=(True, [{"number": 12}])) as gh:
+            observed = apply_mod.observe_open_prs_using_branch("EAKerber/MobiliPresenter", "feature/base")
+        self.assertEqual([item["number"] for item in observed], [12])
+        self.assertIn("base=feature%2Fbase", gh.call_args.args[0])
 
     def test_allowed_stale_inventory_is_only_deleted_refs_at_exact_sha(self):
         expected = {"main": "a" * 40}; deleted = {"old/a": "b" * 40, "old/b": "d" * 40}
@@ -144,7 +151,7 @@ class PruneApplyTests(unittest.TestCase):
         stale_a = dict(initial); after_b = {"main": "a" * 40, "review/x": "c" * 40}; stale_both = dict(initial)
         with mock.patch.dict(os.environ, {apply_mod.AUTH_ENV: "1"}, clear=False), \
              mock.patch.object(apply_mod, "observe_branch_inventory", side_effect=[initial, initial, stale_a, after_a, stale_a, after_a, stale_both, after_b, after_b]), \
-             mock.patch.object(apply_mod, "observe_open_prs_for_branch", return_value=[]), \
+             mock.patch.object(apply_mod, "observe_open_prs_using_branch", return_value=[]), \
              mock.patch.object(apply_mod, "delete_remote_ref") as delete, \
              mock.patch.object(apply_mod.time, "sleep"):
             result = apply_mod.apply_plan(plan, plan["planHash"])

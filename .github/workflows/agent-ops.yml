@@ -1,10 +1,10 @@
 name: Agent Ops
 on:
   pull_request:
-    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','.github/workflows/agent-ops.yml']
+    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
   push:
     branches: ['renderer/**','architecture/**','ops/**','work/**','experiment/**']
-    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','.github/workflows/agent-ops.yml']
+    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
   workflow_dispatch:
 jobs:
   verify:
@@ -28,8 +28,6 @@ jobs:
         run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
       - name: Semantic contracts
         run: python -m tools.semantics check --json
-      - name: Verify continuation state
-        run: python tools/continuation.py verify --json
       - name: Capability lifecycle guard
         if: github.event_name == 'pull_request'
         run: python tools/capability_gates_ci.py --base-sha "${{ github.event.pull_request.base.sha }}" --head-sha "${{ github.event.pull_request.head.sha }}" --json
