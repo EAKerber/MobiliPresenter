@@ -6,14 +6,14 @@
   "branch": null,
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "probe"
   ],
-  "nextAction": "resume and finish probe",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "466f7da92292bc7c907d7dc3fca868b4e2a5da27",
+    "checkpoint": "probe-finished"
   },
   "blockers": [],
   "handoffToWorkerId": null
