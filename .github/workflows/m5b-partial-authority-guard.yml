@@ -1,0 +1,65 @@
+name: M5B Partial Authority Guard
+
+on:
+  push:
+    branches: ['work/operations/work-authority-cutover-m5b-b']
+    paths: ['.github/workflows/m5b-partial-authority-guard.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Close partial-authority decision gap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+          path = root / 'tools/maintenance_inspect.py'
+          text = path.read_text(encoding='utf-8')
+          old = '''def _machine_findings(machine_trust=None, machine_coherence=None, machine_sensors=None):\n    out = []\n    sensors = machine_sensors if isinstance(machine_sensors, dict) else {}\n    if isinstance(machine_trust, dict):\n'''
+          new = '''def _machine_findings(machine_trust=None, machine_coherence=None, machine_sensors=None):\n    out = []\n    sensors = machine_sensors if isinstance(machine_sensors, dict) else {}\n    # A partial ProjectMachine scope may intentionally leave branch-backed\n    # authorities unobserved. That is useful for local diagnostics, but it is\n    # not evidence that the authority is empty. Maintenance must therefore\n    # fail closed instead of converting UNKNOWN into NEXT_TRANSITION_AVAILABLE.\n    for name in ("continuations", "coordination"):\n        sensor = sensors.get(name) if isinstance(sensors.get(name), dict) else None\n        if sensor is None or sensor.get("required") is True:\n            continue\n        status = str(sensor.get("status") or "UNKNOWN").upper()\n        if status == "PASS":\n            continue\n        out.append(\n            finding(\n                "PAUSE",\n                str(sensor.get("code") or "AUTHORITY_NOT_OBSERVED_IN_SCOPE"),\n                f"branch-backed authority {name} was not observed in this inspection scope",\n                _sensor_focus(name),\n            )\n        )\n    if isinstance(machine_trust, dict):\n'''
+          if text.count(old) != 1:
+              raise SystemExit('maintenance insertion anchor mismatch')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          path = root / 'tools/tests/test_project_machine.py'
+          text = path.read_text(encoding='utf-8')
+          anchor = '''    def test_failed_sensor_reconciles_with_sensor_reason(self):\n'''
+          addition = '''    def test_unobserved_work_in_base_scope_does_not_authorize_next_transition(self):\n        sensors = base_sensors()\n        sensors["continuations"] = project_sensors.observe_continuations_local()\n        machine = project_machine.build_inspection(state(), sensors, scope="base")\n        self.assertEqual(machine["trust"]["status"], "PASS")\n        maintenance = maintenance_inspect.from_project_inspection(machine)\n        self.assertEqual(maintenance["recommendation"]["action"], "PAUSE")\n        self.assertEqual(maintenance["recommendation"]["reasonCode"], "NOT_OBSERVED_IN_LOCAL_SCOPE")\n        self.assertEqual(maintenance["recommendation"]["focus"], "continuations")\n\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('project-machine test anchor mismatch')
+          path.write_text(text.replace(anchor, addition + anchor), encoding='utf-8')
+
+          path = root / 'tools/tests/test_project_sensors.py'
+          text = path.read_text(encoding='utf-8')
+          anchor = '''    def test_pr_sensor_does_not_classify_prs(self):\n'''
+          addition = '''    def test_branch_backed_authorities_do_not_fallback_to_checkout(self):\n        for result in (project_sensors.observe_continuations_local(), project_sensors.observe_coordination(live=False)):\n            self.assertEqual(result["status"], "UNKNOWN")\n            self.assertFalse(result["required"])\n            self.assertEqual(result["code"], "NOT_OBSERVED_IN_LOCAL_SCOPE")\n            self.assertFalse(result["data"]["available"])\n\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('project-sensors test anchor mismatch')
+          path.write_text(text.replace(anchor, addition + anchor), encoding='utf-8')
+          PY
+      - name: Focused regression tests
+        run: python -m unittest tools.tests.test_project_sensors tools.tests.test_project_machine tools.tests.test_maintenance_inspect tools.tests.test_scheduler_plan tools.tests.test_supervisor_pipeline -v
+      - name: Full operational suite
+        run: python -m unittest discover -s tools/tests -p 'test_*.py'
+      - name: Semantic contracts
+        run: python -m tools.semantics check --json
+      - name: Agent verify
+        run: python tools/agent.py verify --json
+      - name: Commit verified guard
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/maintenance_inspect.py tools/tests/test_project_machine.py tools/tests/test_project_sensors.py
+          git commit -m 'M5B-B: fail closed on unobserved branch authorities'
+          git push origin HEAD:work/operations/work-authority-cutover-m5b-b
