@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "work-lifecycle-probe",
   "workerId": "probe-engine",
-  "status": "HANDOFF",
+  "status": "IN_PROGRESS",
   "branch": null,
   "prNumber": null,
   "dependsOn": [],
@@ -16,5 +16,5 @@
     "checkpoint": null
   },
   "blockers": [],
-  "handoffToWorkerId": "probe-engine"
+  "handoffToWorkerId": null
 }
