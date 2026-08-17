@@ -64,6 +64,12 @@ class C1CBoundaryTests(unittest.TestCase):
         self.assertNotIn("manager-gitops-v0.4.md", v05)
         self.assertNotIn("manager-gitops-v0.3.md", v05)
 
+    def test_agent_ops_does_not_reintroduce_local_continuation_gate(self):
+        workflow = (ROOT / ".github/workflows/agent-ops.yml").read_text(encoding="utf-8")
+        self.assertNotIn("Verify continuation state", workflow)
+        self.assertNotIn("continuation.py verify", workflow)
+        self.assertIn("docs/kickstarts/**", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
