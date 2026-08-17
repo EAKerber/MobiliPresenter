@@ -47,10 +47,13 @@ def continuation_item(value):
 
 
 def observe_continuations_local():
-    try:
-        items=[continuation_item(v) for v in continuation.discover()]
-        return sensor("PASS",data={"available":True,"authorityBranch":None,"authorityHead":None,"items":items,"mode":"local-model"},required=True,authority={"kind":"local-model","path":"ops/continuations"})
-    except (RuntimeError,OSError,ValueError,KeyError) as exc:return sensor("FAIL",code="CONTINUATION_LOCAL_OBSERVATION_FAILED",data={"available":False,"reason":"LOCAL_READ_FAILED","detail":str(exc),"items":[]},required=True,authority={"kind":"local-model","path":"ops/continuations"})
+    return sensor(
+        "UNKNOWN",
+        code="NOT_OBSERVED_IN_LOCAL_SCOPE",
+        data={"available":False,"reason":"NOT_REQUESTED","authorityBranch":"coordination/continuations","authorityHead":None,"items":[],"mode":"not-observed"},
+        required=False,
+        authority={"kind":"git-authority","branch":"coordination/continuations"},
+    )
 
 
 def observe_continuations_live():

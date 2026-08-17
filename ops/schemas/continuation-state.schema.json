@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/continuation-state-0.1.json",
-  "title": "ContinuationState 0.1",
+  "$id": "https://mobilipresenter.local/schemas/continuation-state-0.2.json",
+  "title": "ContinuationState 0.2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "id", "actor", "status", "branch", "prNumber", "completed", "remaining", "nextAction", "lastKnownGood", "blockedBy", "handoffTo"],
+  "required": ["schemaVersion", "id", "workerId", "status", "branch", "prNumber", "dependsOn", "completed", "remaining", "nextAction", "lastKnownGood", "blockers", "handoffToWorkerId"],
   "properties": {
-    "schemaVersion": {"const": "ContinuationState 0.1"},
+    "schemaVersion": {"const": "ContinuationState 0.2"},
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
-    "actor": {"type": "string", "minLength": 1},
+    "workerId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
     "status": {"enum": ["READY", "IN_PROGRESS", "WAITING", "HANDOFF", "DONE"]},
     "branch": {"type": ["string", "null"], "minLength": 1},
     "prNumber": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+    "dependsOn": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}},
     "completed": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
     "remaining": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
     "nextAction": {"type": ["string", "null"], "minLength": 1},
@@ -24,7 +25,7 @@
         "checkpoint": {"type": ["string", "null"], "minLength": 1}
       }
     },
-    "blockedBy": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-    "handoffTo": {"type": ["string", "null"], "minLength": 1}
+    "blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "handoffToWorkerId": {"oneOf": [{"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}, {"type": "null"}]}
   }
 }
