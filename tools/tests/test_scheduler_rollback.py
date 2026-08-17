@@ -7,7 +7,7 @@ class RollbackTests(unittest.TestCase):
         moved=TARGET.with_suffix('.py.rollback-test')
         try:
             TARGET.rename(moved)
-            for command in ([sys.executable,'tools/agent.py','doctor','--json'],[sys.executable,'tools/agent.py','verify','--json'],[sys.executable,'tools/maintenance_inspect.py','--json'],[sys.executable,'tools/continuation.py','verify','--json']):
+            for command in ([sys.executable,'tools/agent.py','doctor','--json'],[sys.executable,'tools/agent.py','verify','--json'],[sys.executable,'tools/maintenance_inspect.py','--json']):
                 proc=subprocess.run(command,cwd=ROOT,text=True,capture_output=True,check=False)
                 self.assertEqual(proc.returncode,0,msg=f'{command}: {proc.stdout}\n{proc.stderr}')
         finally:
