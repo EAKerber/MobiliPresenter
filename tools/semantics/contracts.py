@@ -45,23 +45,14 @@ def check_continuation_state_contract()->list[str]:
     if not isinstance(contract,dict):return ["SEMANTIC_CONTINUATION_CONTRACT_MISSING"]
     if contract.get("semanticValidator")!="tools.continuation.validate_current":errors.append("SEMANTIC_CONTINUATION_VALIDATOR_MISMATCH")
     schema_path=ROOT/str(contract.get("structuralSchema"));schema=_load_json(schema_path);properties=schema.get("properties") if isinstance(schema.get("properties"),dict) else {}
-    if set(properties)!=continuation.V01_FIELDS:errors.append("SEMANTIC_CONTINUATION_SCHEMA_FIELDS_MISMATCH")
-    if set(schema.get("required") or [])!=continuation.V01_FIELDS:errors.append("SEMANTIC_CONTINUATION_SCHEMA_REQUIRED_MISMATCH")
+    if set(properties)!=continuation.FIELDS:errors.append("SEMANTIC_CONTINUATION_SCHEMA_FIELDS_MISMATCH")
+    if set(schema.get("required") or [])!=continuation.FIELDS:errors.append("SEMANTIC_CONTINUATION_SCHEMA_REQUIRED_MISMATCH")
     version=properties.get("schemaVersion") if isinstance(properties.get("schemaVersion"),dict) else {}
     if version.get("const")!=continuation.CURRENT_SCHEMA_VERSION:errors.append("SEMANTIC_CONTINUATION_SCHEMA_VERSION_MISMATCH")
     statuses=set((properties.get("status") or {}).get("enum") or []) if isinstance(properties.get("status"),dict) else set()
     if statuses!={item.value for item in WorkStatus}:errors.append("SEMANTIC_CONTINUATION_STATUS_ENUM_MISMATCH")
-    candidate_path=ROOT/"ops/schemas/continuation-state-0.2.schema.json";candidate=_load_json(candidate_path);candidate_properties=candidate.get("properties") if isinstance(candidate.get("properties"),dict) else {}
-    if set(candidate_properties)!=continuation.V02_FIELDS:errors.append("SEMANTIC_CONTINUATION_CANDIDATE_FIELDS_MISMATCH")
-    if set(candidate.get("required") or [])!=continuation.V02_FIELDS:errors.append("SEMANTIC_CONTINUATION_CANDIDATE_REQUIRED_MISMATCH")
-    candidate_version=candidate_properties.get("schemaVersion") if isinstance(candidate_properties.get("schemaVersion"),dict) else {}
-    if candidate_version.get("const")!=continuation.CANDIDATE_SCHEMA_VERSION:errors.append("SEMANTIC_CONTINUATION_CANDIDATE_VERSION_MISMATCH")
-    for value in continuation.discover():
-        runtime_errors=continuation.validate_current(value,value.get("id"))
-        if runtime_errors:errors.append(f"SEMANTIC_CONTINUATION_RUNTIME_INVALID:{value.get('id')}:{runtime_errors[0]}")
-        try:continuation.migrate_v01_to_v02(value)
-        except RuntimeError as exc:errors.append(f"SEMANTIC_CONTINUATION_MIGRATION_BLOCKED:{value.get('id')}:{exc}")
     return errors
+
 def check_operational_semantics_contract()->list[str]:
     registry=load_registry();errors=validate_registry(registry);contract=registry.get("contracts",{}).get("operational-semantics")
     if not isinstance(contract,dict):return errors+["SEMANTIC_REGISTRY_CONTRACT_MISSING"]

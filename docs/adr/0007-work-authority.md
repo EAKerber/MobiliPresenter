@@ -1,6 +1,6 @@
 # ADR-0007 — Work authority evolution
 
-- Status: proposed for M5A/M5B
+- Status: accepted — M5B promoted ContinuationState 0.2
 - Date: 2026-08-16
 
 ## Context
@@ -77,3 +77,8 @@ Costs:
 ## Non-decisions
 
 This ADR does not define branch retention, WorkItem priority, deadlines, fairness, subtasks, role manifests, persistent sessions, deletion of terminal work records, UI/Engine behavior, or renaming the `coordination/continuations` authority.
+
+
+## M5B promotion
+
+M5B migrated the existing `coordination/continuations` authority atomically from `ContinuationState 0.1` to `ContinuationState 0.2`. The authority branch/path and canonical writer did not change. The 0.1 compatibility bridge and candidate schema are retired after verified readback. All normal writes validate the complete candidate WorkGraph before CAS and the complete readback WorkGraph afterward. Historical terminal probe records remain sanitation debt for M6.
