@@ -2,18 +2,18 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "work-lifecycle-probe",
   "workerId": "probe-engine",
-  "status": "DONE",
+  "status": "READY",
   "branch": null,
   "prNumber": null,
   "dependsOn": [],
-  "completed": [
+  "completed": [],
+  "remaining": [
     "probe"
   ],
-  "remaining": [],
-  "nextAction": null,
+  "nextAction": "handoff probe",
   "lastKnownGood": {
-    "sha": "466f7da92292bc7c907d7dc3fca868b4e2a5da27",
-    "checkpoint": "probe-finished"
+    "sha": null,
+    "checkpoint": null
   },
   "blockers": [],
   "handoffToWorkerId": null
