@@ -46,32 +46,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python tools/prune_plan.py --json > /tmp/git-prune-plan.json
-          python -m json.tool /tmp/git-prune-plan.json > /dev/null
-          python - <<'PY'
-          import json
-          p=json.load(open('/tmp/git-prune-plan.json'))
-          assert p['schemaVersion'] == 'GitPrunePlan 0.3'
-          assert p['observations']['complete'] is True
-          assert p['observations']['branchInventoryComplete'] is True
-          assert p['observations']['prHistoryComplete'] is True
-          assert p['observations']['ancestryComplete'] is True
-          assert p['execution'] == {
-              'executorAvailable': True,
-              'requiresPlanFile': True,
-              'requiresExpectedPlan': True,
-              'requiresExplicitAuthorization': True,
-          }
-          assert 'applyEligible' not in p
-          assert 'destructiveApplySupported' not in p
-          assert all(e['autoDeleteEligible'] for e in p['entries'] if e['action'] == 'delete-candidate')
-          assert all(e['action'] == 'keep' for e in p['entries'] if e['protections'])
-          PY
+          python tools/prune_plan.py validate /tmp/git-prune-plan.json --json > /tmp/git-prune-plan-validation.json
       - name: Upload branch prune audit
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: git-prune-plan
-          path: /tmp/git-prune-plan.json
+          path: |
+            /tmp/git-prune-plan.json
+            /tmp/git-prune-plan-validation.json
           if-no-files-found: error
       - name: Generate Project Machine inspection
         if: github.event_name == 'pull_request'
