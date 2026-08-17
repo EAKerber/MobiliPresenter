@@ -35,25 +35,17 @@ jobs:
       - name: Fetch remote refs
         run: git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
 
-      - name: Generate fresh prune plan
+      - name: Generate and validate fresh prune plan
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           python tools/agent.py git prune-plan --json | tee /tmp/git-prune-plan.json
+          python tools/prune_plan.py validate /tmp/git-prune-plan.json --json | tee /tmp/git-prune-plan-validation.json
           python - <<'PY'
           import json
-          p=json.load(open('/tmp/git-prune-plan.json'))
-          assert p['schemaVersion']=='GitPrunePlan 0.3'
-          assert p['observations']['complete'] is True
-          assert p['observations']['branchInventoryComplete'] is True
-          assert p['observations']['prHistoryComplete'] is True
-          assert p['observations']['ancestryComplete'] is True
-          assert p['execution']['executorAvailable'] is True
-          assert p['execution']['requiresPlanFile'] is True
-          assert p['execution']['requiresExpectedPlan'] is True
-          assert p['execution']['requiresExplicitAuthorization'] is True
-          open('/tmp/git-prune-plan-hash.txt','w').write(p['planHash'])
+          result=json.load(open('/tmp/git-prune-plan-validation.json'))
+          open('/tmp/git-prune-plan-hash.txt','w').write(result['planHash'])
           PY
 
       - name: Apply exact plan with CAS readback
@@ -69,7 +61,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
-          p=json.load(open('/tmp/git-prune-plan.json'))
+          p=json.load(open('/tmp/git-prune-plan-validation.json'))
           r=json.load(open('/tmp/git-prune-apply.json'))
           assert r['ok'] is True
           assert r['planHash']==p['planHash']
@@ -83,6 +75,7 @@ jobs:
           name: branch-hygiene
           path: |
             /tmp/git-prune-plan.json
+            /tmp/git-prune-plan-validation.json
             /tmp/git-prune-plan-hash.txt
             /tmp/git-prune-apply.json
           if-no-files-found: warn
