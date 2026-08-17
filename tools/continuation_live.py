@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import continuation
+from tools import continuation, work_graph
 from tools import continuation_transition as transition
 from tools.continuation_remote import ContinuationRemoteError, GitHubContinuationAuthority
 
@@ -33,6 +33,8 @@ def parser() -> argparse.ArgumentParser:
     command = sub.add_parser("show")
     command.add_argument("id")
     command.add_argument("--json", action="store_true", dest="as_json")
+    command = sub.add_parser("migrate-schema")
+    flags(command)
     command = sub.add_parser("create")
     command.add_argument("id")
     command.add_argument("--actor", required=True)
@@ -89,6 +91,17 @@ def plan_for(authority: GitHubContinuationAuthority, args: argparse.Namespace) -
     raise RuntimeError("CONTINUATION_COMMAND_INVALID")
 
 
+def work_summary(value: dict) -> dict:
+    view = continuation.operational_view(value)
+    return {
+        "id": view["id"],
+        "workerId": view["workerId"],
+        "status": view["status"],
+        "nextAction": view["nextAction"],
+        "stateHash": continuation.state_hash(value),
+        "sourceSchemaVersion": value["schemaVersion"],
+    }
+
 def output(value, as_json: bool) -> None:
     print(json.dumps(value, indent=2 if as_json else None, ensure_ascii=False))
 
@@ -97,25 +110,30 @@ def main(argv=None) -> int:
     args = parser().parse_args(argv)
     authority = GitHubContinuationAuthority()
     try:
+        if args.command == "migrate-schema":
+            observation = authority.observe()
+            planned = transition.migrate_schema(observation.items, observation.head_sha)
+            payload = authority.apply_migration(planned, args.expected_plan) if args.apply else planned
+            output(payload, args.as_json)
+            return 0
         if args.command in {"list", "verify", "show"}:
             observation = authority.observe()
             if args.command == "list":
                 payload = {
-                    "schemaVersion": "ContinuationDiscovery 0.1",
+                    "schemaVersion": "WorkDiscovery 0.1",
                     "authorityBranch": authority.authority_branch,
                     "authorityHead": observation.head_sha,
-                    "items": [
-                        {"id": value["id"], "actor": value["actor"], "status": value["status"], "nextAction": value["nextAction"], "stateHash": continuation.state_hash(value)}
-                        for _, value in sorted(observation.items.items())
-                    ],
+                    "items": [work_summary(value) for _, value in sorted(observation.items.items())],
                 }
             elif args.command == "verify":
+                graph = work_graph.build([continuation.operational_view(value) for _, value in sorted(observation.items.items())])
                 payload = {
                     "ok": True,
                     "authorityBranch": authority.authority_branch,
                     "authorityHead": observation.head_sha,
                     "count": len(observation.items),
                     "ids": sorted(observation.items),
+                    "workGraph": graph,
                 }
             else:
                 value = observation.items.get(args.id)
