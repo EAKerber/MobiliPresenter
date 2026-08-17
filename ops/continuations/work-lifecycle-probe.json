@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "work-lifecycle-probe",
+  "workerId": "probe-ui",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "probe"
+  ],
+  "nextAction": "handoff probe",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
