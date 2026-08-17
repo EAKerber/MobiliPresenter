@@ -1,10 +1,11 @@
 {
-  "schemaVersion": "ContinuationState 0.1",
+  "schemaVersion": "ContinuationState 0.2",
   "id": "probe-continuation-31721252864",
-  "actor": "probe-engine",
+  "workerId": "probe-engine",
   "status": "DONE",
   "branch": null,
   "prNumber": null,
+  "dependsOn": [],
   "completed": [
     "probe"
   ],
@@ -14,6 +15,6 @@
     "sha": "8baca56324bebe6b6bddeeb5e406311d641d6d15",
     "checkpoint": "probe-finished"
   },
-  "blockedBy": [],
-  "handoffTo": null
+  "blockers": [],
+  "handoffToWorkerId": null
 }
