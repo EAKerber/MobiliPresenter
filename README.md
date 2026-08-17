@@ -12,7 +12,7 @@ python3 tools/agent.py doctor
 python3 tools/agent.py verify
 ```
 
-A autoridade de estado é `ops/state/project.json`. As decisões operacionais adotadas estão registradas em `docs/adr/0001-deterministic-agent-operations.md`.
+A authority de estado é `ops/state/project.json`. Regras permanentes e transversais para agentes ficam em `AGENTS.md`; regras específicas de papel são localizadas pelos ponteiros correntes em `docs/kickstarts/roles/*-current.md`. Tooling, authorities e contratos observados prevalecem sobre narrativa histórica.
 
 ## Estado publicado
 
@@ -36,4 +36,4 @@ O Netlify usa a branch `main`, instala as dependências de `scene-core` e `viewe
 
 ## Governança Git
 
-Este repositório é exclusivo do projeto MobiliPresenter. Operações em qualquer outro repositório exigem confirmação explícita no chat ativo. O protocolo completo para agentes está em `AGENTS.md`.
+Este repositório é exclusivo do projeto MobiliPresenter. Operações em qualquer outro repositório exigem confirmação explícita no chat ativo. `AGENTS.md` contém apenas regras permanentes transversais; procedimentos correntes devem ser descobertos pelo tooling e contratos do repositório, e comportamento específico de papel pelos Kickstarts correntes.
