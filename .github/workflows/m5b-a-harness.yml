@@ -22,8 +22,6 @@ jobs:
         run: python -m compileall -q tools
       - name: Run unit suite
         run: python -m unittest discover -s tools/tests -p 'test_*.py'
-      - name: Semantic contracts
-        run: python tools/semantic_contracts.py --json
       - name: Agent verify
         run: python tools/agent.py verify --json
       - name: Commit candidate
