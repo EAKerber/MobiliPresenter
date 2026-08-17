@@ -46,7 +46,6 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 
-
 def run_process(args: list[str]) -> tuple[bool, str]:
     proc = subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=False)
     if proc.returncode != 0:
@@ -375,7 +374,7 @@ def command_handoff(as_json: bool, include_remote: bool) -> int:
 
 
 def command_git_prune_plan(as_json: bool) -> int:
-    return git_prune_plan.command(as_json)
+    return git_prune_plan.command_generate(as_json)
 
 
 def main() -> int:
