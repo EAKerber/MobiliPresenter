@@ -1,0 +1,36 @@
+name: M5B-A Harness
+on:
+  push:
+    branches:
+      - work/operations/work-authority-migration-m5b-a
+permissions:
+  contents: write
+jobs:
+  materialize-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize candidate
+        run: python tools/_m5b_a_apply.py
+      - name: Compile tools
+        run: python -m compileall -q tools
+      - name: Run unit suite
+        run: python -m unittest discover -s tools/tests -p 'test_*.py'
+      - name: Semantic contracts
+        run: python tools/semantic_contracts.py --json
+      - name: Agent verify
+        run: python tools/agent.py verify --json
+      - name: Commit candidate
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tools/continuation.py tools/continuation_transition.py tools/continuation_remote.py tools/continuation_live.py tools/tests/test_m5b_work_authority_migration.py
+          git diff --cached --check
+          git commit -m 'M5B-A: add whole-authority migration bridge'
+          git push
