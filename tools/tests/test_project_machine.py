@@ -83,6 +83,16 @@ class ProjectMachineTests(unittest.TestCase):
         self.assertEqual(maintenance["recommendation"]["action"], "NEEDS_HUMAN")
         self.assertEqual(maintenance["recommendation"]["reasonCode"], "CONTINUATION_AUTHORITY_UNAVAILABLE")
 
+    def test_unobserved_work_in_base_scope_does_not_authorize_next_transition(self):
+        sensors = base_sensors()
+        sensors["continuations"] = project_sensors.observe_continuations_local()
+        machine = project_machine.build_inspection(state(), sensors, scope="base")
+        self.assertEqual(machine["trust"]["status"], "PASS")
+        maintenance = maintenance_inspect.from_project_inspection(machine)
+        self.assertEqual(maintenance["recommendation"]["action"], "PAUSE")
+        self.assertEqual(maintenance["recommendation"]["reasonCode"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
+        self.assertEqual(maintenance["recommendation"]["focus"], "continuations")
+
     def test_failed_sensor_reconciles_with_sensor_reason(self):
         sensors = base_sensors(); sensors["publication"] = project_sensors.sensor("FAIL", code="PUBLISHED_ARTIFACT_MISMATCH", data={}, authority={"kind": "repository", "path": "ops/published/current.json"})
         machine = project_machine.build_inspection(state(), sensors, scope="live"); maintenance = maintenance_inspect.from_project_inspection(machine)

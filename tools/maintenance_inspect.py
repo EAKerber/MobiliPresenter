@@ -56,6 +56,25 @@ def _coherence_focus(check):
 def _machine_findings(machine_trust=None, machine_coherence=None, machine_sensors=None):
     out = []
     sensors = machine_sensors if isinstance(machine_sensors, dict) else {}
+    # A partial ProjectMachine scope may intentionally leave branch-backed
+    # authorities unobserved. That is useful for local diagnostics, but it is
+    # not evidence that the authority is empty. Maintenance must therefore
+    # fail closed instead of converting UNKNOWN into NEXT_TRANSITION_AVAILABLE.
+    for name in ("continuations", "coordination"):
+        sensor = sensors.get(name) if isinstance(sensors.get(name), dict) else None
+        if sensor is None or sensor.get("required") is True:
+            continue
+        status = str(sensor.get("status") or "UNKNOWN").upper()
+        if status == "PASS":
+            continue
+        out.append(
+            finding(
+                "PAUSE",
+                str(sensor.get("code") or "AUTHORITY_NOT_OBSERVED_IN_SCOPE"),
+                f"branch-backed authority {name} was not observed in this inspection scope",
+                _sensor_focus(name),
+            )
+        )
     if isinstance(machine_trust, dict):
         status = str(machine_trust.get("status") or "UNKNOWN").upper()
         names = machine_trust.get("failedSensors") if status == "FAIL" else machine_trust.get("unknownSensors")

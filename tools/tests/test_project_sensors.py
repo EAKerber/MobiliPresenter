@@ -21,6 +21,13 @@ class ProjectSensorsTests(unittest.TestCase):
         self.assertFalse(result["required"])
         self.assertEqual(result["code"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
 
+    def test_branch_backed_authorities_do_not_fallback_to_checkout(self):
+        for result in (project_sensors.observe_continuations_local(), project_sensors.observe_coordination(live=False)):
+            self.assertEqual(result["status"], "UNKNOWN")
+            self.assertFalse(result["required"])
+            self.assertEqual(result["code"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
+            self.assertFalse(result["data"]["available"])
+
     def test_pr_sensor_does_not_classify_prs(self):
         payloads = [(True, [{"number": 7, "draft": False, "head": {"ref": "ops/work", "sha": "1" * 40}, "base": {"ref": "main"}}]), (True, {"workflow_runs": []})]
         with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):
