@@ -101,6 +101,24 @@ def observe_open_prs_for_branch(repository: str, branch: str) -> list[dict[str, 
     return [item for item in payload if isinstance(item, dict)]
 
 
+def observe_open_prs_using_branch(repository: str, branch: str) -> list[dict[str, Any]]:
+    by_number: dict[int, dict[str, Any]] = {}
+    for item in observe_open_prs_for_branch(repository, branch):
+        number = item.get("number")
+        if isinstance(number, int):
+            by_number[number] = item
+    base = quote(branch, safe="")
+    ok, payload = gh_json(f"repos/{repository}/pulls?state=open&base={base}&per_page=100")
+    if not ok or not isinstance(payload, list):
+        raise RuntimeError(f"OPEN_PR_BASE_READ_FAILED:{branch}")
+    for item in payload:
+        if isinstance(item, dict):
+            number = item.get("number")
+            if isinstance(number, int):
+                by_number[number] = item
+    return [by_number[key] for key in sorted(by_number)]
+
+
 def delete_remote_ref(repository: str, branch: str) -> None:
     endpoint = f"repos/{repository}/git/refs/heads/{quote(branch, safe='/')}"
     ok, output = run(["gh", "api", "--method", "DELETE", endpoint])
@@ -221,8 +239,8 @@ def apply_plan(plan: dict[str, Any], expected_plan: str | None) -> dict[str, Any
             raise RuntimeError(f"STALE_PLAN:CONTROL_HEAD_DRIFT:{branch}")
         if expected.get(branch) != sha:
             raise RuntimeError(f"STALE_PLAN:BRANCH_HEAD_DRIFT:{branch}")
-        if observe_open_prs_for_branch(repository, branch):
-            raise RuntimeError(f"STALE_PLAN:OPEN_PR_APPEARED:{branch}")
+        if observe_open_prs_using_branch(repository, branch):
+            raise RuntimeError(f"STALE_PLAN:OPEN_PR_RELATION_APPEARED:{branch}")
 
         delete_remote_ref(repository, branch)
         expected.pop(branch)

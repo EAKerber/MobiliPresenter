@@ -19,6 +19,7 @@ ERROR_EXIT = 2
 REPOSITORY = "EAKerber/MobiliPresenter"
 SNAPSHOT_SCHEMA = "SchedulerSnapshot 0.2"
 HEAD_KEYS = ("inspection", "control", "coordination", "continuation")
+CURRENT_HEAD_KEYS = ("control", "coordination", "continuation")
 
 
 def load_json(path):
@@ -45,6 +46,18 @@ def _validate_source_heads(heads):
         if branch is not None and not isinstance(branch, str):
             raise RuntimeError(f"SCHEDULER_SNAPSHOT_{name.upper()}_BRANCH_INVALID")
     return heads
+
+
+def _validate_expected_heads(expected_heads):
+    if not isinstance(expected_heads, dict) or set(expected_heads) != set(CURRENT_HEAD_KEYS):
+        raise RuntimeError("SCHEDULER_SNAPSHOT_EXPECTED_HEADS_INVALID")
+    normalized = {}
+    for name in CURRENT_HEAD_KEYS:
+        sha = expected_heads.get(name)
+        if not isinstance(sha, str) or len(sha) != 40 or any(c not in "0123456789abcdef" for c in sha):
+            raise RuntimeError(f"SCHEDULER_SNAPSHOT_EXPECTED_{name.upper()}_HEAD_INVALID")
+        normalized[name] = sha
+    return normalized
 
 
 def build_snapshot(machine, inspection, plan):
@@ -85,7 +98,7 @@ def _validate_snapshot_intrinsic(value):
     return supplied
 
 
-def validate_snapshot(value, *, source_machine, readback_machine):
+def validate_snapshot(value, *, source_machine, readback_machine, expected_heads=None):
     supplied = _validate_snapshot_intrinsic(value)
     project_machine.validate_inspection(source_machine)
     project_machine.validate_inspection(readback_machine)
@@ -99,6 +112,11 @@ def validate_snapshot(value, *, source_machine, readback_machine):
     stale = [name for name in HEAD_KEYS if value["sourceHeads"][name] != readback_heads[name]]
     if stale:
         raise RuntimeError("SCHEDULER_SNAPSHOT_STALE_" + "_".join(name.upper() for name in stale))
+    if expected_heads is not None:
+        current = _validate_expected_heads(expected_heads)
+        stale_current = [name for name in CURRENT_HEAD_KEYS if value["sourceHeads"][name].get("sha") != current[name]]
+        if stale_current:
+            raise RuntimeError("SCHEDULER_SNAPSHOT_STALE_CURRENT_" + "_".join(name.upper() for name in stale_current))
     return {"ok": True, "snapshotHash": supplied, "projectMachineInspectionHash": source_machine["inspectionHash"], "inspectionHash": value["inspection"]["inspectionHash"], "planHash": value["plan"]["planHash"], "sourceHeads": value["sourceHeads"], "dispatch": value["plan"].get("dispatch"), "plan": value["plan"]}
 
 
@@ -114,13 +132,29 @@ def main(argv=None):
     validate.add_argument("--snapshot", required=True)
     validate.add_argument("--source-machine", required=True)
     validate.add_argument("--readback-machine", required=True)
+    validate.add_argument("--expected-control-head")
+    validate.add_argument("--expected-coordination-head")
+    validate.add_argument("--expected-continuation-head")
     validate.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
     try:
         if args.command == "build":
             payload = build_snapshot(load_json(args.project_machine), load_json(args.inspection), load_json(args.plan))
         else:
-            payload = validate_snapshot(load_json(args.snapshot), source_machine=load_json(args.source_machine), readback_machine=load_json(args.readback_machine))
+            supplied_expected = [args.expected_control_head, args.expected_coordination_head, args.expected_continuation_head]
+            if any(item is not None for item in supplied_expected) and not all(item is not None for item in supplied_expected):
+                raise RuntimeError("SCHEDULER_SNAPSHOT_EXPECTED_HEADS_INCOMPLETE")
+            expected_heads = None if all(item is None for item in supplied_expected) else {
+                "control": args.expected_control_head,
+                "coordination": args.expected_coordination_head,
+                "continuation": args.expected_continuation_head,
+            }
+            payload = validate_snapshot(
+                load_json(args.snapshot),
+                source_machine=load_json(args.source_machine),
+                readback_machine=load_json(args.readback_machine),
+                expected_heads=expected_heads,
+            )
         print(json.dumps(payload, indent=2 if args.as_json else None, ensure_ascii=False))
         return 0
     except RuntimeError as exc:
