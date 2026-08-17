@@ -6,7 +6,7 @@ protection and objective Git/PR evidence. Branch names are descriptive only:
 they never grant retention, protection, lifecycle state, or delete eligibility.
 """
 from __future__ import annotations
-import argparse,json,shutil,subprocess,sys
+import argparse,json,re,shutil,subprocess,sys
 from pathlib import Path
 from typing import Any
 ROOT=Path(__file__).resolve().parents[1]
@@ -15,6 +15,15 @@ from tools import project_state,publication
 from tools.canonical import stable_hash
 from tools.semantics.branches import parse_branch_name
 STATE_PATH=project_state.STATE_PATH;ERROR_EXIT=2;SCHEMA_VERSION="GitPrunePlan 0.3"
+OBSERVATION_FLAGS=("branchInventoryComplete","prHistoryComplete","ancestryComplete")
+EXECUTION_FLAGS=("executorAvailable","requiresPlanFile","requiresExpectedPlan","requiresExplicitAuthorization")
+TOP_FIELDS={"schemaVersion","repository","controlBranch","controlSha","branchCount","observations","execution","openPrHeads","openPrBases","entries","note","planHash"}
+OBSERVATION_FIELDS={"complete","branchInventoryComplete","branchInventorySource","prHistoryComplete","prHistoryError","ancestryComplete"}
+EXECUTION_FIELDS=set(EXECUTION_FLAGS)
+ENTRY_FIELDS={"branch","sha","branchIdentity","action","reason","autoDeleteEligible","protections","ancestryToControl","prProvenance","evidence","duplicateOf"}
+ACTIONS={"keep","review","delete-candidate"}
+SHA_RE=re.compile(r"^[0-9a-f]{40}$")
+HASH_RE=re.compile(r"^[0-9a-f]{64}$")
 
 def run_process(args):
     proc=subprocess.run(args,cwd=ROOT,text=True,capture_output=True,check=False)
@@ -33,6 +42,49 @@ def load_state():
     state=project_state.load_state();errors=project_state.validate_current(state)
     if errors:raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
     return state
+def load_plan(path:Path):
+    try:value=json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:raise RuntimeError(f"PLAN_FILE_MISSING:{path}") from exc
+    except json.JSONDecodeError as exc:raise RuntimeError(f"PLAN_JSON_INVALID:{path}") from exc
+    if not isinstance(value,dict):raise RuntimeError("PLAN_ROOT_INVALID")
+    return value
+
+def validate_plan(plan:Any,*,require_complete:bool=True)->dict[str,Any]:
+    if not isinstance(plan,dict) or set(plan)!=TOP_FIELDS:raise RuntimeError("PLAN_FIELDS_INVALID")
+    if plan.get("schemaVersion")!=SCHEMA_VERSION:raise RuntimeError("PLAN_SCHEMA_UNSUPPORTED")
+    if not isinstance(plan.get("repository"),str) or not plan["repository"]:raise RuntimeError("PLAN_IDENTITY_INVALID")
+    if not isinstance(plan.get("controlBranch"),str) or not plan["controlBranch"]:raise RuntimeError("PLAN_IDENTITY_INVALID")
+    if not isinstance(plan.get("controlSha"),str) or not SHA_RE.fullmatch(plan["controlSha"]):raise RuntimeError("PLAN_IDENTITY_INVALID")
+    observations=plan.get("observations")
+    if not isinstance(observations,dict) or set(observations)!=OBSERVATION_FIELDS:raise RuntimeError("PLAN_OBSERVATIONS_INVALID")
+    if type(observations.get("complete")) is not bool or any(type(observations.get(k)) is not bool for k in OBSERVATION_FLAGS):raise RuntimeError("PLAN_OBSERVATIONS_INVALID")
+    if not isinstance(observations.get("branchInventorySource"),str) or not observations["branchInventorySource"]:raise RuntimeError("PLAN_OBSERVATIONS_INVALID")
+    if observations.get("prHistoryError") is not None and (not isinstance(observations.get("prHistoryError"),str) or not observations["prHistoryError"]):raise RuntimeError("PLAN_OBSERVATIONS_INVALID")
+    if require_complete and (observations.get("complete") is not True or not all(observations.get(k) is True for k in OBSERVATION_FLAGS)):raise RuntimeError("PLAN_OBSERVATION_INCOMPLETE")
+    execution=plan.get("execution")
+    if not isinstance(execution,dict) or set(execution)!=EXECUTION_FIELDS or not all(execution.get(k) is True for k in EXECUTION_FLAGS):raise RuntimeError("PLAN_EXECUTION_CONTRACT_INVALID")
+    entries=plan.get("entries")
+    if not isinstance(entries,list) or type(plan.get("branchCount")) is not int or plan["branchCount"]!=len(entries):raise RuntimeError("PLAN_ENTRIES_INVALID")
+    for field in ("openPrHeads","openPrBases"):
+        values=plan.get(field)
+        if not isinstance(values,list) or len(values)!=len(set(values)) or any(not isinstance(v,str) or not v for v in values):raise RuntimeError("PLAN_PR_RELATIONS_INVALID")
+    seen=set()
+    for entry in entries:
+        if not isinstance(entry,dict) or set(entry)!=ENTRY_FIELDS:raise RuntimeError("PLAN_ENTRY_INVALID")
+        branch,sha=entry.get("branch"),entry.get("sha")
+        if not isinstance(branch,str) or not branch or branch in seen or not isinstance(sha,str) or not SHA_RE.fullmatch(sha):raise RuntimeError("PLAN_REF_INVALID")
+        seen.add(branch)
+        if entry.get("action") not in ACTIONS or type(entry.get("autoDeleteEligible")) is not bool:raise RuntimeError("PLAN_ENTRY_INVALID")
+        for field in ("protections","prProvenance","evidence","duplicateOf"):
+            if not isinstance(entry.get(field),list):raise RuntimeError("PLAN_ENTRY_INVALID")
+        if entry["protections"] and entry["action"]!="keep":raise RuntimeError(f"PROTECTED_CANDIDATE:{branch}")
+        if entry["action"]=="delete-candidate" and entry["autoDeleteEligible"] is not True:raise RuntimeError("PLAN_ENTRY_INVALID")
+    plan_hash=plan.get("planHash")
+    if not isinstance(plan_hash,str) or not HASH_RE.fullmatch(plan_hash):raise RuntimeError("PLAN_HASH_MISSING")
+    body={key:value for key,value in plan.items() if key!="planHash"}
+    if stable_hash(body)!=plan_hash:raise RuntimeError("PLAN_HASH_MISMATCH")
+    return plan
+
 def branch_refs_with_source():
     ok,output=run_git("for-each-ref","--format=%(refname:short)\t%(objectname)","refs/remotes/origin");refs={}
     if ok:
@@ -127,8 +179,8 @@ def build_prune_plan(state,refs,pull_requests,ancestry,*,branch_inventory_comple
 def build_live_plan():
     state=load_state();view=project_state.operational_view(state);manifest=publication.load_manifest(view["published"]["artifactManifest"]);published=publication.publication_view(view,manifest);refs,source=branch_refs_with_source();prs_ok,prs,prs_error=observe_pull_requests(state);ancestry,ancestry_complete=observe_ancestry(refs,view["git"]["controlBranch"])
     return build_prune_plan(state,refs,prs if prs_ok else None,ancestry,branch_inventory_complete=source=="remote-git-refs",ancestry_complete=ancestry_complete,branch_inventory_source=source,remote_observation_error=None if prs_ok else prs_error,published_source_branch=published["sourceBranch"])
-def command(as_json):
-    try:plan=build_live_plan()
+def command_generate(as_json):
+    try:plan=build_live_plan();validate_plan(plan,require_complete=False)
     except RuntimeError as exc:
         print(json.dumps({"ok":False,"error":str(exc)},ensure_ascii=False) if as_json else f"BLOCKED\n{exc}");return ERROR_EXIT
     if as_json:print(json.dumps(plan,indent=2,ensure_ascii=False))
@@ -137,6 +189,16 @@ def command(as_json):
         for entry in plan["entries"]:counts[entry["action"]]=counts.get(entry["action"],0)+1
         print("GIT PRUNE PLAN 0.3");print(f"  branches: {plan['branchCount']}");print(f"  keep: {counts.get('keep',0)}");print(f"  delete-candidate: {counts.get('delete-candidate',0)}");print(f"  review: {counts.get('review',0)}");print(f"  observations complete: {plan['observations']['complete']}");print(f"  planHash: {plan['planHash']}")
     return 0
+def command_validate(path:Path,as_json:bool):
+    try:plan=validate_plan(load_plan(path),require_complete=True);payload={"ok":True,"planHash":plan["planHash"]}
+    except RuntimeError as exc:payload={"ok":False,"error":str(exc)};code=ERROR_EXIT
+    else:code=0
+    print(json.dumps(payload,indent=2 if as_json else None,ensure_ascii=False) if as_json else (f"GIT PRUNE PLAN VALID\n  planHash: {payload['planHash']}" if code==0 else f"BLOCKED\n{payload['error']}"));return code
 def main():
-    parser=argparse.ArgumentParser(description="Read-only evidence-based Git branch sanitation planner");parser.add_argument("--json",action="store_true",dest="as_json");args=parser.parse_args();return command(args.as_json)
+    parser=argparse.ArgumentParser(description="Read-only evidence-based Git branch sanitation planner");parser.add_argument("command",nargs="?",choices=("generate","validate"),default="generate");parser.add_argument("path",nargs="?",type=Path);parser.add_argument("--json",action="store_true",dest="as_json");args=parser.parse_args()
+    if args.command=="validate":
+        if args.path is None:parser.error("validate requires a plan path")
+        return command_validate(args.path,args.as_json)
+    if args.path is not None:parser.error("generate does not accept a plan path")
+    return command_generate(args.as_json)
 if __name__=="__main__":raise SystemExit(main())

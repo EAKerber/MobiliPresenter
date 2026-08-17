@@ -44,29 +44,15 @@ def gh_json(endpoint: str) -> tuple[bool, Any]:
 
 
 def load_plan(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise RuntimeError(f"PLAN_FILE_MISSING:{path}") from exc
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"PLAN_JSON_INVALID:{path}") from exc
-    if not isinstance(value, dict):
-        raise RuntimeError("PLAN_ROOT_INVALID")
-    return value
+    return prune_plan.load_plan(path)
 
 
 def verify_plan_hash(plan: dict[str, Any]) -> None:
-    observed = plan.get("planHash")
-    if not isinstance(observed, str):
-        raise RuntimeError("PLAN_HASH_MISSING")
-    body = {key: value for key, value in plan.items() if key != "planHash"}
-    expected = prune_plan.stable_hash(body)
-    if observed != expected:
-        raise RuntimeError("PLAN_HASH_MISMATCH")
+    prune_plan.validate_plan(plan, require_complete=False)
 
 
 def require_expected_plan(plan: dict[str, Any], expected_plan: str | None) -> None:
-    verify_plan_hash(plan)
+    prune_plan.validate_plan(plan, require_complete=True)
     if not expected_plan:
         raise RuntimeError("EXPECTED_PLAN_REQUIRED")
     if expected_plan != plan.get("planHash"):
@@ -127,50 +113,16 @@ def delete_remote_ref(repository: str, branch: str) -> None:
 
 
 def select_candidates(plan: dict[str, Any]) -> list[dict[str, Any]]:
-    verify_plan_hash(plan)
-    if plan.get("schemaVersion") != "GitPrunePlan 0.3":
-        raise RuntimeError("PLAN_SCHEMA_UNSUPPORTED")
-    observations = plan.get("observations")
-    if not isinstance(observations, dict) or observations.get("complete") is not True:
-        raise RuntimeError("PLAN_OBSERVATION_INCOMPLETE")
-    if not all(
-        observations.get(key) is True
-        for key in ("branchInventoryComplete", "prHistoryComplete", "ancestryComplete")
-    ):
-        raise RuntimeError("PLAN_OBSERVATION_INCOMPLETE")
-    execution = plan.get("execution")
-    if not isinstance(execution, dict) or not all(
-        execution.get(key) is True
-        for key in ("executorAvailable", "requiresPlanFile", "requiresExpectedPlan", "requiresExplicitAuthorization")
-    ):
-        raise RuntimeError("PLAN_EXECUTION_CONTRACT_INVALID")
-    entries = plan.get("entries")
-    if not isinstance(entries, list):
-        raise RuntimeError("PLAN_ENTRIES_INVALID")
-    result = []
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        if entry.get("action") == "delete-candidate" and entry.get("autoDeleteEligible") is True:
-            if entry.get("protections"):
-                raise RuntimeError(f"PROTECTED_CANDIDATE:{entry.get('branch')}")
-            result.append(entry)
-    return sorted(result, key=lambda item: str(item.get("branch")))
+    prune_plan.validate_plan(plan, require_complete=True)
+    return sorted(
+        [entry for entry in plan["entries"] if entry["action"] == "delete-candidate"],
+        key=lambda item: str(item.get("branch")),
+    )
 
 
 def expected_inventory_from_plan(plan: dict[str, Any]) -> dict[str, str]:
-    entries = plan.get("entries")
-    if not isinstance(entries, list):
-        raise RuntimeError("PLAN_ENTRIES_INVALID")
-    result: dict[str, str] = {}
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        branch, sha = entry.get("branch"), entry.get("sha")
-        if not isinstance(branch, str) or not isinstance(sha, str):
-            raise RuntimeError("PLAN_REF_INVALID")
-        result[branch] = sha
-    return result
+    prune_plan.validate_plan(plan, require_complete=True)
+    return {entry["branch"]: entry["sha"] for entry in plan["entries"]}
 
 
 def is_allowed_stale_inventory(

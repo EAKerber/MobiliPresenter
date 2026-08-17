@@ -18,7 +18,7 @@ on:
       - ".github/workflows/viewer-next.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: viewer-next-${{ github.ref }}
@@ -175,17 +175,6 @@ jobs:
           if [ -f /tmp/mobilipresenter-sink-readability-gate.json ]; then
             cp /tmp/mobilipresenter-sink-readability-gate.json viewer-next/fidelity-artifacts/sink-readability-gate.json
           fi
-
-      - name: Persist user-facing artifacts to temporary branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/renderer/fixed-view-realistic-v1'
-        env:
-          SOURCE_SHA: ${{ github.sha }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          python3 tools/persist-viewer-artifacts.py \
-            --artifact-dir viewer-next/artifacts \
-            --branch "artifact/viewer-next-${RUN_ID}" \
-            --source-sha "$SOURCE_SHA"
 
       - name: Upload visual baseline
         if: always()

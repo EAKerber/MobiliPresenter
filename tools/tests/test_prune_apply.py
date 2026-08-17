@@ -64,6 +64,7 @@ class PruneApplyTests(unittest.TestCase):
                 "requiresExplicitAuthorization": True,
             },
             "openPrHeads": [],
+            "openPrBases": [],
             "entries": entries,
             "note": "fixture",
         }
