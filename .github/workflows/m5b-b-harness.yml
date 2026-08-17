@@ -1,0 +1,36 @@
+name: M5B-B Harness
+on:
+  push:
+    branches:
+      - work/operations/work-authority-cutover-m5b-b
+permissions:
+  contents: write
+jobs:
+  finalize-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Finalize cutover candidate
+        run: python tools/_m5b_b_finalize.py
+      - name: Compile tools
+        run: python -m compileall -q tools
+      - name: Unit suite
+        run: python -m unittest discover -s tools/tests -p 'test_*.py'
+      - name: Semantic contracts
+        run: python -m tools.semantics check --json
+      - name: Agent verify
+        run: python tools/agent.py verify --json
+      - name: Commit verified cutover
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'M5B-B: promote Work authority contract to 0.2'
+          git push

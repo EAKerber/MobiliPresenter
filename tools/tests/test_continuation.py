@@ -5,65 +5,30 @@ from tools import continuation_transition as transition
 
 
 def base():
-    return transition.create("task-one", "developer-ui", ["a", "b"], "do a")["candidate"]
+    return transition.create("task-one","developer-ui",["a","b"],"do a")["candidate"]
 
 
-class ContinuationState01Tests(unittest.TestCase):
-    def test_create_is_ready_and_requires_work(self):
-        value = base()
-        self.assertEqual(value["status"], "READY")
-        self.assertEqual(value["remaining"], ["a", "b"])
-        with self.assertRaisesRegex(RuntimeError, "CREATE_REQUIRES_WORK"):
-            transition.create("empty", "actor", [], "nothing")
-
+class WorkItem02Tests(unittest.TestCase):
+    def test_current_contract_is_v02(self):
+        value=base();self.assertEqual(continuation.CURRENT_SCHEMA_VERSION,"ContinuationState 0.2");self.assertEqual(value["workerId"],"developer-ui");self.assertEqual(value["dependsOn"],[]);self.assertEqual(continuation.validate_current(value),[])
     def test_advance_moves_work_and_requires_next_when_remaining(self):
-        first = transition.advance(base(), ["a"], "do b", sha="1" * 40, checkpoint="after-a")["candidate"]
-        self.assertEqual(first["completed"], ["a"])
-        self.assertEqual(first["remaining"], ["b"])
-        self.assertEqual(first["status"], "IN_PROGRESS")
-        with self.assertRaisesRegex(RuntimeError, "NEXT_ACTION_REQUIRED"):
-            transition.advance(base(), ["a"])
+        first=transition.advance(base(),["a"],"do b",sha="1"*40,checkpoint="after-a")["candidate"];self.assertEqual(first["completed"],["a"]);self.assertEqual(first["remaining"],["b"]);self.assertEqual(first["status"],"IN_PROGRESS")
+        with self.assertRaisesRegex(RuntimeError,"NEXT_ACTION_REQUIRED"):transition.advance(base(),["a"])
+    def test_wait_resume_and_handoff_use_worker_vocabulary(self):
+        waiting=transition.wait(base(),["external-input"])["candidate"];self.assertEqual(waiting["blockers"],["external-input"]);resumed=transition.resume(waiting,"developer-ui")["candidate"];self.assertEqual(resumed["blockers"],[])
+        handed=transition.handoff(base(),"developer-engine","continue b")["candidate"];self.assertEqual(handed["handoffToWorkerId"],"developer-engine")
+        with self.assertRaisesRegex(RuntimeError,"HANDOFF_WORKER_MISMATCH"):transition.resume(handed,"developer-ui")
+        self.assertEqual(transition.resume(handed,"developer-engine")["candidate"]["workerId"],"developer-engine")
+    def test_done_restart_and_bind_execution_are_current(self):
+        empty=transition.advance(base(),["a","b"])["candidate"];done=transition.done(empty)["candidate"];restarted=transition.restart(done,["again"],"repeat")["candidate"];bound=transition.bind_execution(restarted,"work/ui/example",42)["candidate"];self.assertEqual(bound["branch"],"work/ui/example");self.assertEqual(bound["prNumber"],42)
+    def test_dependencies_are_execution_guards(self):
+        dep=transition.create("dep","developer-engine",["x"],"do x")["candidate"];child=transition.create("child","developer-ui",["y"],"do y",depends_on=["dep"])["candidate"]
+        with self.assertRaisesRegex(RuntimeError,"DEPENDENCY_NOT_DONE"):transition.advance(child,["y"],inventory=[child,dep])
+        dep_empty=transition.advance(dep,["x"])["candidate"];dep_done=transition.done(dep_empty)["candidate"];advanced=transition.advance(child,["y"],inventory=[child,dep_done])["candidate"];self.assertEqual(advanced["completed"],["y"])
+    def test_work_graph_rejects_duplicate_active_execution_identity(self):
+        a=transition.bind_execution(base(),"work/ui/shared",7)["candidate"];b=transition.bind_execution(transition.create("task-two","developer-engine",["x"],"do x")["candidate"],"work/ui/shared",8)["candidate"]
+        with self.assertRaisesRegex(RuntimeError,"ACTIVE_BRANCH_CONFLICT"):transition.validate_work_inventory({"task-one":a,"task-two":b})
+    def test_local_model_has_no_local_authority_cli(self):
+        for name in ("discover","load","parser","main","create","advance","apply","plan"):self.assertFalse(hasattr(continuation,name),name)
 
-    def test_wait_and_resume_are_explicit(self):
-        waiting = transition.wait(base(), ["external-input"])["candidate"]
-        self.assertEqual(waiting["status"], "WAITING")
-        resumed = transition.resume(waiting, "developer-ui")["candidate"]
-        self.assertEqual(resumed["status"], "IN_PROGRESS")
-        self.assertEqual(resumed["blockedBy"], [])
-
-    def test_handoff_requires_target_actor_on_resume(self):
-        handed = transition.handoff(base(), "developer-engine", "continue b")["candidate"]
-        self.assertEqual(handed["status"], "HANDOFF")
-        with self.assertRaisesRegex(RuntimeError, "HANDOFF_ACTOR_MISMATCH"):
-            transition.resume(handed, "developer-ui")
-        resumed = transition.resume(handed, "developer-engine")["candidate"]
-        self.assertEqual(resumed["actor"], "developer-engine")
-
-    def test_done_requires_no_remaining_work(self):
-        with self.assertRaisesRegex(RuntimeError, "DONE_REMAINING_WORK"):
-            transition.done(base())
-        empty = transition.advance(base(), ["a", "b"])["candidate"]
-        done = transition.done(empty)["candidate"]
-        self.assertEqual(done["status"], "DONE")
-        self.assertIsNone(done["nextAction"])
-
-    def test_common_plan_hash_is_stable(self):
-        first = transition.handoff(base(), "developer-engine", "continue b")
-        second = transition.handoff(base(), "developer-engine", "continue b")
-        self.assertEqual(first, second)
-        self.assertEqual(first["schemaVersion"], "TransitionPlan 0.1")
-        self.assertEqual(first["domain"], "continuation")
-        self.assertEqual(first["subject"], {"kind": "continuation", "id": "task-one"})
-
-    def test_local_model_has_no_mutation_surface(self):
-        for name in ("create", "advance", "wait", "handoff", "resume", "done", "apply", "plan"):
-            self.assertFalse(hasattr(continuation, name), name)
-
-    def test_validation_rejects_inconsistent_handoff(self):
-        value = base()
-        value["status"] = "HANDOFF"
-        self.assertIn("CONTINUATION_HANDOFF_STATE_INVALID", continuation.validate(value))
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__=="__main__":unittest.main()

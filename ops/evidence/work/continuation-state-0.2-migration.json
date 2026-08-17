@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "WorkAuthorityMigrationEvidence 0.1",
+  "authority": {
+    "repository": "EAKerber/MobiliPresenter",
+    "branch": "coordination/continuations",
+    "path": "ops/continuations"
+  },
+  "fromSchemaVersion": "ContinuationState 0.1",
+  "toSchemaVersion": "ContinuationState 0.2",
+  "sourceAuthorityHead": "68b440c706f4b26b9ed6f8710f309d4b5fc75c6b",
+  "finalAuthorityHead": "22c6c94a8c0665688d67ba35350a261529d056dd",
+  "itemCount": 5,
+  "beforeInventoryHash": "ace31cc126430f5f058bb01fa588d80ee72c9cfd12fd3f31c20ec214ce241e1d",
+  "afterInventoryHash": "d02b79e0766106822b06c9a7a615f22f6eccbe5d053701f2cb949130bd04fba4",
+  "planHash": "e2e5185b8f976e2d194b48339aecf8a83575c199c755880546967bf975df9ff9",
+  "receipt": {
+    "schemaVersion": "TransitionReceipt 0.1",
+    "planHash": "e2e5185b8f976e2d194b48339aecf8a83575c199c755880546967bf975df9ff9",
+    "domain": "work",
+    "action": "migrate-schema",
+    "subject": {"kind": "authority", "id": "continuations"},
+    "authority": {"kind": "git-authority", "locator": {"repository": "EAKerber/MobiliPresenter", "branch": "coordination/continuations", "path": "ops/continuations"}},
+    "beforeStateHash": "ace31cc126430f5f058bb01fa588d80ee72c9cfd12fd3f31c20ec214ce241e1d",
+    "afterStateHash": "d02b79e0766106822b06c9a7a615f22f6eccbe5d053701f2cb949130bd04fba4",
+    "readbackStateHash": "d02b79e0766106822b06c9a7a615f22f6eccbe5d053701f2cb949130bd04fba4",
+    "authorityRevision": "22c6c94a8c0665688d67ba35350a261529d056dd",
+    "verified": true,
+    "receiptHash": "ad055d3b6af4f2865ce740820e254d428dab7db65ec808aae2afc66330fd0e80"
+  },
+  "verified": true,
+  "rollbackWindow": {
+    "openAtMigration": true,
+    "condition": "Only while no persisted 0.2-only dependency semantics require non-empty dependsOn."
+  }
+}
