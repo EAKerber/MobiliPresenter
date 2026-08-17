@@ -99,7 +99,7 @@ class GitHubContinuationAuthority:
             value = json.loads(base64.b64decode(encoded).decode("utf-8"))
         except Exception as exc:
             raise ContinuationRemoteError("CONTINUATION_REMOTE_INVALID_STATE", cid) from exc
-        errors = continuation.validate_current(value, cid)
+        errors = continuation.validate_compatible(value, cid)
         if errors:
             raise ContinuationRemoteError(errors[0], cid)
         return value
@@ -127,6 +127,95 @@ class GitHubContinuationAuthority:
                     items[cid] = value
         return Observation(head, tree, items)
 
+    def _commit_inventory(self, observed: Observation, items: dict[str, dict[str, Any]], message: str) -> str:
+        tree_entries: list[dict[str, Any]] = []
+        for cid in sorted(items):
+            content = json.dumps(items[cid], indent=2, ensure_ascii=False) + "\n"
+            blob = self._sha(
+                self._json(
+                    self.transport.request(
+                        "POST",
+                        f"repos/{self.repository}/git/blobs",
+                        payload={"content": content, "encoding": "utf-8"},
+                    ),
+                    "create blob",
+                ).get("sha"),
+                "blob",
+            )
+            tree_entries.append({
+                "path": f"{self.state_dir}/{cid}.json",
+                "mode": "100644",
+                "type": "blob",
+                "sha": blob,
+            })
+        tree = self._sha(
+            self._json(
+                self.transport.request(
+                    "POST",
+                    f"repos/{self.repository}/git/trees",
+                    payload={"base_tree": observed.tree_sha, "tree": tree_entries},
+                ),
+                "create tree",
+            ).get("sha"),
+            "tree",
+        )
+        commit = self._sha(
+            self._json(
+                self.transport.request(
+                    "POST",
+                    f"repos/{self.repository}/git/commits",
+                    payload={"message": message, "tree": tree, "parents": [observed.head_sha]},
+                ),
+                "create commit",
+            ).get("sha"),
+            "commit",
+        )
+        try:
+            self.transport.request("PATCH", self.update_endpoint, payload={"sha": commit, "force": False})
+        except ApiError as exc:
+            raise ContinuationRemoteError("CONTINUATION_CAS_LOST", exc.detail) from exc
+        return commit
+
+    def apply_migration(self, planned: dict[str, Any], expected_plan: str | None) -> dict[str, Any]:
+        try:
+            protocol.require_expected_plan(planned, expected_plan)
+        except RuntimeError as exc:
+            raise ContinuationRemoteError(str(exc).split(":", 1)[0]) from exc
+        observed = self.observe()
+        try:
+            transition.validate_migration_plan(
+                planned,
+                observed.items,
+                observed.head_sha,
+                repository=self.repository,
+                authority_branch=self.authority_branch,
+                state_dir=self.state_dir,
+            )
+        except RuntimeError as exc:
+            raise ContinuationRemoteError(str(exc).split(":", 1)[0]) from exc
+        candidate_items = continuation.inventory_items(planned["candidate"])
+        self._commit_inventory(observed, candidate_items, "work: migrate continuation authority to 0.2")
+        last: Observation | None = None
+        for attempt in range(self.readback_attempts):
+            readback = self.observe()
+            last = readback
+            try:
+                transition.validate_work_inventory(readback.items)
+                state = continuation.inventory_state(readback.items)
+                if protocol.state_hash(state) == planned["afterStateHash"]:
+                    if any(value.get("schemaVersion") != continuation.CANDIDATE_SCHEMA_VERSION for value in readback.items.values()):
+                        raise ContinuationRemoteError("WORK_AUTHORITY_MIGRATION_READBACK_SCHEMA_MISMATCH")
+                    receipt = protocol.build_receipt(planned, state, authority_revision=readback.head_sha)
+                    protocol.validate_receipt(receipt, planned)
+                    return receipt
+            except RuntimeError as exc:
+                raise ContinuationRemoteError("WORK_AUTHORITY_MIGRATION_READBACK_INVALID", str(exc)) from exc
+            if attempt + 1 < self.readback_attempts:
+                time.sleep(self.readback_retry_seconds)
+        if last is not None and last.head_sha == observed.head_sha:
+            raise ContinuationRemoteError("CONTINUATION_READBACK_HEAD_STALE")
+        raise ContinuationRemoteError("WORK_AUTHORITY_MIGRATION_READBACK_MISMATCH")
+
     def apply(self, planned: dict[str, Any], expected_plan: str | None) -> dict[str, Any]:
         try:
             transition.validate_plan(
@@ -142,6 +231,8 @@ class GitHubContinuationAuthority:
 
         cid = planned["subject"]["id"]
         observed = self.observe()
+        if any(value.get("schemaVersion") != continuation.CURRENT_SCHEMA_VERSION for value in observed.items.values()):
+            raise ContinuationRemoteError("CONTINUATION_MIGRATION_WINDOW_READ_ONLY")
         current = observed.items.get(cid)
         if continuation.state_hash(current) != planned["beforeStateHash"]:
             raise ContinuationRemoteError("CONTINUATION_PLAN_STALE")

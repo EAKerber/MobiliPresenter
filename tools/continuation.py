@@ -26,6 +26,7 @@ from tools.semantics.work import WorkStatus
 DIR = ROOT / "ops" / "continuations"
 CURRENT_SCHEMA_VERSION = "ContinuationState 0.1"
 CANDIDATE_SCHEMA_VERSION = "ContinuationState 0.2"
+INVENTORY_SCHEMA_VERSION = "WorkAuthorityInventory 0.1"
 SCHEMA = CURRENT_SCHEMA_VERSION
 ERROR_EXIT = 2
 STATUSES = {item.value for item in WorkStatus}
@@ -281,6 +282,39 @@ def operational_view(value: dict[str, Any]) -> dict[str, Any]:
         "handoffToWorkerId": value["handoffToWorkerId"],
     }
 
+
+def inventory_state(items: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    if not isinstance(items, dict):
+        raise RuntimeError("WORK_AUTHORITY_INVENTORY_INVALID")
+    ordered: list[dict[str, Any]] = []
+    for cid in sorted(items):
+        if not ID_RE.fullmatch(str(cid)):
+            raise RuntimeError("WORK_AUTHORITY_INVENTORY_ID_INVALID")
+        value = items[cid]
+        valid_compatible(value, cid)
+        if value.get("id") != cid:
+            raise RuntimeError("WORK_AUTHORITY_INVENTORY_ID_MISMATCH")
+        ordered.append(copy.deepcopy(value))
+    return {"schemaVersion": INVENTORY_SCHEMA_VERSION, "items": ordered}
+
+
+def inventory_items(value: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, dict) or set(value) != {"schemaVersion", "items"}:
+        raise RuntimeError("WORK_AUTHORITY_INVENTORY_FIELDS_INVALID")
+    if value.get("schemaVersion") != INVENTORY_SCHEMA_VERSION or not isinstance(value.get("items"), list):
+        raise RuntimeError("WORK_AUTHORITY_INVENTORY_SCHEMA_INVALID")
+    out: dict[str, dict[str, Any]] = {}
+    for item in value["items"]:
+        if not isinstance(item, dict):
+            raise RuntimeError("WORK_AUTHORITY_INVENTORY_ITEM_INVALID")
+        cid = item.get("id")
+        if not isinstance(cid, str) or not ID_RE.fullmatch(cid) or cid in out:
+            raise RuntimeError("WORK_AUTHORITY_INVENTORY_ID_INVALID")
+        valid_compatible(item, cid)
+        out[cid] = copy.deepcopy(item)
+    if list(out) != sorted(out):
+        raise RuntimeError("WORK_AUTHORITY_INVENTORY_ORDER_INVALID")
+    return out
 
 def load(cid: str) -> dict[str, Any]:
     if not ID_RE.fullmatch(cid):

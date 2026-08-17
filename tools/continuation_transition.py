@@ -301,6 +301,72 @@ def rebuild(
     raise RuntimeError("CONTINUATION_COMMAND_INVALID")
 
 
+def validate_work_inventory(items: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    if not isinstance(items, dict):
+        raise RuntimeError("WORK_AUTHORITY_INVENTORY_INVALID")
+    views = [continuation.operational_view(items[cid]) for cid in sorted(items)]
+    return work_graph.build(views)
+
+
+def migrate_schema(items: dict[str, dict[str, Any]], authority_head: str) -> dict[str, Any]:
+    if not isinstance(authority_head, str) or not re.fullmatch(r"[0-9a-f]{40}", authority_head):
+        raise RuntimeError("WORK_AUTHORITY_HEAD_INVALID")
+    before = continuation.inventory_state(items)
+    candidate_items: dict[str, dict[str, Any]] = {}
+    for cid, value in sorted(items.items()):
+        continuation.valid(value, cid)
+        if value["status"] != WorkStatus.DONE.value:
+            raise RuntimeError("WORK_AUTHORITY_MIGRATION_REQUIRES_TERMINAL_INVENTORY")
+        candidate_items[cid] = continuation.migrate_v01_to_v02(value)
+    validate_work_inventory(candidate_items)
+    candidate = continuation.inventory_state(candidate_items)
+    return protocol.build_plan(
+        domain="work",
+        action="migrate-schema",
+        subject={"kind": "authority", "id": "continuations"},
+        authority=_authority(),
+        before=before,
+        candidate=candidate,
+        intent={
+            "authorityHead": authority_head,
+            "fromSchemaVersion": continuation.CURRENT_SCHEMA_VERSION,
+            "toSchemaVersion": continuation.CANDIDATE_SCHEMA_VERSION,
+            "itemCount": len(candidate_items),
+        },
+        reversibility="revertible",
+    )
+
+
+def validate_migration_plan(
+    plan: dict[str, Any],
+    items: dict[str, dict[str, Any]],
+    authority_head: str,
+    *,
+    repository: str = DEFAULT_REPOSITORY,
+    authority_branch: str = DEFAULT_BRANCH,
+    state_dir: str = DEFAULT_DIR,
+) -> dict[str, Any]:
+    protocol.validate_plan(plan)
+    if plan.get("domain") != "work" or plan.get("action") != "migrate-schema":
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_PLAN_INVALID")
+    if plan.get("subject") != {"kind": "authority", "id": "continuations"}:
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_SUBJECT_INVALID")
+    if plan.get("authority") != _authority(repository, authority_branch, state_dir):
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_AUTHORITY_INVALID")
+    intent = plan.get("intent")
+    if not isinstance(intent, dict) or set(intent) != {"authorityHead", "fromSchemaVersion", "toSchemaVersion", "itemCount"}:
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_INTENT_INVALID")
+    if intent.get("authorityHead") != authority_head:
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_HEAD_STALE")
+    rebuilt = migrate_schema(items, authority_head)
+    if rebuilt != plan:
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_PLAN_STALE")
+    candidate_items = continuation.inventory_items(plan["candidate"])
+    if any(item.get("schemaVersion") != continuation.CANDIDATE_SCHEMA_VERSION for item in candidate_items.values()):
+        raise RuntimeError("WORK_AUTHORITY_MIGRATION_CANDIDATE_INVALID")
+    validate_work_inventory(candidate_items)
+    return plan
+
 def validate_plan(
     plan: dict[str, Any],
     before: dict[str, Any] | None = None,
