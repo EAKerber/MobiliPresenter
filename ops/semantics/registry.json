@@ -42,9 +42,12 @@
   "contracts": {
     "capability-gates": {"owner": "capability", "semanticValidator": "tools.capability_gates.validate_capability", "structuralSchema": "ops/schemas/capability-gates.schema.json"},
     "continuation-state": {"owner": "work", "semanticValidator": "tools.continuation.validate_current", "structuralSchema": "ops/schemas/continuation-state.schema.json"},
+    "coordination-state": {"owner": "coordination", "semanticValidator": "tools.coordination.validate_state", "structuralSchema": "ops/schemas/coordination-state.schema.json"},
     "operational-semantics": {"owner": "operations-core", "semanticValidator": "tools.semantics.registry.validate_registry", "structuralSchema": "ops/schemas/operational-semantics.schema.json"},
     "project-state": {"owner": "operations-core", "semanticValidator": "tools.project_state.validate_current", "structuralSchema": "ops/schemas/project-state.schema.json"},
-    "source-build": {"owner": "operations-core", "semanticValidator": "tools.publication.validate_manifest", "structuralSchema": "ops/schemas/source-build.schema.json"}
+    "source-build": {"owner": "operations-core", "semanticValidator": "tools.publication.validate_manifest", "structuralSchema": "ops/schemas/source-build.schema.json"},
+    "transition-plan": {"owner": "transition-protocol", "semanticValidator": "tools.transition_protocol.validate_plan", "structuralSchema": "ops/schemas/transition-plan.schema.json"},
+    "transition-receipt": {"owner": "transition-protocol", "semanticValidator": "tools.transition_protocol.validate_receipt", "structuralSchema": "ops/schemas/transition-receipt.schema.json"}
   },
   "branchGrammar": {
     "controlBranches": ["main"],
