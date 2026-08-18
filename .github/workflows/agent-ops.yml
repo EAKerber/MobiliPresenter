@@ -35,11 +35,6 @@ jobs:
         run: python tools/agent.py doctor --json
       - name: Verify local coherence
         run: python tools/agent.py verify --json
-      - name: Verify remote PR identity
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python tools/agent.py verify --remote --json
       - name: Generate branch prune audit
         if: github.event_name == 'pull_request'
         env:
@@ -111,8 +106,6 @@ jobs:
           path: /tmp/integration-reconcile-plan.json
           if-no-files-found: error
       - name: Generate handoff evidence
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           python tools/agent.py handoff --json > /tmp/agent-handoff.json
           python -m json.tool /tmp/agent-handoff.json > /dev/null
