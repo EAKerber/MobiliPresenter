@@ -13,7 +13,7 @@ def inspection(action="CONTINUE",focus="development",work_items=None):
     value["inspectionHash"]=stable_hash(value);return value
 
 def work(status="IN_PROGRESS",worker="developer-ui",target=None):
-    return {"id":"task-one","workerId":worker,"status":status,"branch":None,"prNumber":None,"dependsOn":[],"completed":[],"remaining":["a"],"nextAction":"do a","lastKnownGood":{"sha":None,"checkpoint":None},"blockers":[],"handoffToWorkerId":target,"sourceSchemaVersion":"ContinuationState 0.1","stateHash":"a"*64}
+    return {"id":"task-one","workerId":worker,"status":status,"branch":None,"prNumber":None,"dependsOn":[],"completed":[],"remaining":["a"],"nextAction":"do a","lastKnownGood":{"sha":None,"checkpoint":None},"blockers":[],"handoffToWorkerId":target,"sourceSchemaVersion":"ContinuationState 0.2","stateHash":"a"*64}
 
 class SchedulerPlan02Tests(unittest.TestCase):
     def test_rejects_tampered_inspection(self):
