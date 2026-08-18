@@ -32,6 +32,9 @@ observe -> plan -> validate -> apply -> readback
 
 - `main` é o branch de controle/publicação corrente.
 - Toda mutação Git/GitHub deve nomear explicitamente o branch/ref alvo; default implícito de API nunca é autorização para escrever em `main`.
+- O paved path usa o planner transacional do domínio quando ele existe. Não empilhe um `GitMutationPlan` genérico sobre ProjectState, Work, Coordination, Prune ou outra operação que já possua plan/apply/readback canônico.
+- Para mutações diretas de conteúdo/topologia Git/GitHub sem planner de domínio — criação de branch, create/update/delete de arquivo, criação/merge de PR e movimentação direta de ref — materialize e valide `GitMutationPlan 0.1` por `python3 tools/agent.py git mutation-plan ...` antes da action mutável. O plano deve refletir o target e as preconditions observadas e a action/readback pretendidos.
+- `GitMutationPlan` é artifact read-only e declara `authorizesMutation=false`; ele torna a intenção analisável, mas nunca amplia autorização de papel/policy/authority.
 - Mudanças normais de conteúdo usam branch explícito + PR. Writers de authority operam somente nas refs que seus contratos declaram.
 - Branch names são descritivos; não concedem por si sós retenção, authority, proteção ou elegibilidade de deleção.
 - PR/CI são observados no GitHub, não duplicados como verdade local.
