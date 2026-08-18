@@ -34,6 +34,16 @@ class CoordinationCoreTests(unittest.TestCase):
         coord.validate_state(state)
         self.assertEqual(state["leases"], [])
 
+    def test_runtime_rejects_unknown_fields_and_empty_revision(self):
+        root = coord.empty_state()
+        with self.assertRaisesRegex(coord.CoordinationError, "root fields are invalid"):
+            coord.validate_state(dict(root, unexpected=True))
+        with self.assertRaisesRegex(coord.CoordinationError, "revision must be null or a non-empty string"):
+            coord.validate_state(coord.empty_state(""))
+        owner = {"role": "ui", "session": "s", "branch": None, "pr": None, "unexpected": True}
+        with self.assertRaisesRegex(coord.CoordinationError, "owner fields are invalid"):
+            coord.validate_owner(owner)
+
     def test_resource_normalization_and_order_are_deterministic(self):
         observed = coord.normalize_resources(
             ["file:viewer-next/index.html", "path:viewer-next/src/api/**", "file:viewer-next/index.html"]
