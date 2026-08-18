@@ -13,28 +13,22 @@ MODULE_PATH=Path(__file__).resolve().parents[1]/"agent.py";spec=importlib.util.s
 
 class GitOps12Tests(unittest.TestCase):
     def base_state(self):
-        return {"schemaVersion":"ProjectState 2.0","project":{"id":"mobilipresenter","repository":"EAKerber/MobiliPresenter"},"git":{"controlBranch":"main","activeDevelopmentBranch":"renderer/fixed-view-realistic-v1","protectedBranches":["integration/viewer-parallel-v0.1","ui/product-shell-v0.1"]},"published":{"url":"x","artifactManifest":"ops/published/viewer-next-current.json"},"development":{"initiative":"Renderer","phase":"fidelity-harness","checkpoint":"FH-00","nextTransition":"fh-01","blockers":[],"prNumber":6}}
-    def between_increments_state(self):
-        state=self.base_state();state["git"]["activeDevelopmentBranch"]=None;state["development"]["prNumber"]=None;state["development"]["phase"]="between-increments";return state
-    def test_state_shape_accepts_projectstate_20_until_cutover(self):
-        self.assertEqual(project_state.validate_current(self.base_state()),[]);self.assertEqual(project_state.validate_current(self.between_increments_state()),[])
-    def test_state_shape_rejects_partial_development_identity_until_cutover(self):
-        state=self.between_increments_state();state["development"]["prNumber"]=99;errors=project_state.validate_current(state);self.assertTrue(any(error["code"]=="DEVELOPMENT_IDENTITY_INCOMPLETE" for error in errors))
+        return {"schemaVersion":"ProjectState 2.1","project":{"id":"mobilipresenter","repository":"EAKerber/MobiliPresenter"},"git":{"controlBranch":"main","protectedBranches":["integration/viewer-parallel-v0.1","ui/product-shell-v0.1"]},"published":{"url":"x","artifactManifest":"ops/published/viewer-next-current.json"},"development":{"initiative":"Renderer","phase":"between-increments","checkpoint":"FH-00","nextTransition":"fh-01"}}
+    def test_state_shape_accepts_projectstate_21_only(self):
+        state=self.base_state();self.assertEqual(project_state.validate_current(state),[]);old=dict(state);old["schemaVersion"]="ProjectState 2.0";self.assertTrue(project_state.validate_current(old))
     def test_ci_aggregation_remains_factual_sensor_primitive(self):
         self.assertEqual(agent.aggregate_ci([]),"unknown");self.assertEqual(agent.aggregate_ci([{"status":"IN_PROGRESS","conclusion":None}]),"pending");self.assertEqual(agent.aggregate_ci([{"status":"COMPLETED","conclusion":"FAILURE"}]),"failed");self.assertEqual(agent.aggregate_ci([{"status":"COMPLETED","conclusion":"SUCCESS"}]),"green")
     def test_verification_summary_distinguishes_unknown_from_failure(self):
         self.assertEqual(agent.verification_summary([{"status":"PASS"}]),{"status":"PASS","ok":True,"complete":True});self.assertEqual(agent.verification_summary([{"status":"PASS"},{"status":"UNKNOWN"}]),{"status":"UNKNOWN","ok":True,"complete":False});self.assertEqual(agent.verification_summary([{"status":"UNKNOWN"},{"status":"FAIL"}]),{"status":"FAIL","ok":False,"complete":False})
     def test_agent_has_no_parallel_remote_execution_identity_surface(self):
         self.assertFalse(hasattr(agent,"observe_remote"));self.assertFalse(hasattr(agent,"remote_verification_checks"))
-    def test_active_development_branch_does_not_grant_git_context(self):
-        check=agent.git_context_check(self.base_state(),{"worktree":True,"branch":"renderer/fixed-view-realistic-v1"});self.assertEqual(check["status"],"FAIL");self.assertEqual(check["code"],"UNEXPECTED_BRANCH")
     def test_control_and_protected_branches_are_known_repository_contexts(self):
-        self.assertEqual(agent.git_context_check(self.base_state(),{"worktree":True,"branch":"main"})["context"],"control");self.assertEqual(agent.git_context_check(self.between_increments_state(),{"worktree":True,"branch":"ui/product-shell-v0.1"})["context"],"protected-parallel")
+        self.assertEqual(agent.git_context_check(self.base_state(),{"worktree":True,"branch":"main"})["context"],"control");self.assertEqual(agent.git_context_check(self.base_state(),{"worktree":True,"branch":"ui/product-shell-v0.1"})["context"],"protected-parallel")
     def test_operations_work_and_experiment_are_known_contexts(self):
         for branch in ("work/operations/project-state-v2","experiment/operations/peer-health"):
-            check=agent.git_context_check(self.between_increments_state(),{"worktree":True,"branch":branch});self.assertEqual(check["status"],"PASS");self.assertEqual(check["context"],"operations")
+            check=agent.git_context_check(self.base_state(),{"worktree":True,"branch":branch});self.assertEqual(check["status"],"PASS");self.assertEqual(check["context"],"operations")
     def test_authority_name_does_not_grant_operational_work_context(self):
-        check=agent.git_context_check(self.between_increments_state(),{"worktree":True,"branch":"authority/operations/control"});self.assertEqual(check["status"],"FAIL")
+        check=agent.git_context_check(self.base_state(),{"worktree":True,"branch":"authority/operations/control"});self.assertEqual(check["status"],"FAIL")
     def test_status_projection_does_not_copy_execution_state(self):
         summary=agent.project_summary(project_state.operational_view(self.base_state()));self.assertNotIn("activeDevelopmentBranch",summary);self.assertNotIn("prNumber",summary);self.assertNotIn("blockers",summary)
     def test_handoff_21_does_not_embed_full_projectstate(self):
