@@ -28,6 +28,16 @@ class ProjectSensorsTests(unittest.TestCase):
             self.assertEqual(result["code"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
             self.assertFalse(result["data"]["available"])
 
+    def test_local_sensor_import_does_not_materialize_live_authority_adapters(self):
+        for name in (
+            "continuation_remote",
+            "coordination_remote",
+            "GitHubContinuationAuthority",
+            "GitHubCoordinationAuthority",
+            "GhApiTransport",
+        ):
+            self.assertNotIn(name, project_sensors.__dict__)
+
     def test_pr_sensor_does_not_classify_prs(self):
         payloads = [(True, [{"number": 7, "draft": False, "head": {"ref": "ops/work", "sha": "1" * 40}, "base": {"ref": "main"}}]), (True, {"workflow_runs": []})]
         with patch("tools.project_sensors.agent.run_gh_json", side_effect=payloads):

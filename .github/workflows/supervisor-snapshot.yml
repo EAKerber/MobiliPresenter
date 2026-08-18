@@ -35,7 +35,7 @@ jobs:
           python-version: '3.12'
       - name: Snapshot regression tests
         run: |
-          python -m unittest tools.tests.test_maintenance_inspect tools.tests.test_maintenance_continuations tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot tools.tests.test_supervisor_pipeline -v
+          python -m unittest tools.tests.test_maintenance_inspect tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot tools.tests.test_supervisor_pipeline -v
       - name: Observe source Project Machine
         env:
           GH_TOKEN: ${{ github.token }}

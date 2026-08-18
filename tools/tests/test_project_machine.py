@@ -27,7 +27,7 @@ def work_item(work_id="probe-one", status="DONE"):
         "lastKnownGood": {"sha": None, "checkpoint": None},
         "blockers": [],
         "handoffToWorkerId": None,
-        "sourceSchemaVersion": "ContinuationState 0.1",
+        "sourceSchemaVersion": "ContinuationState 0.2",
         "stateHash": "a" * 64,
     }
 
@@ -111,7 +111,7 @@ class ProjectMachineTests(unittest.TestCase):
         self.assertEqual(machine["trust"]["status"], "PASS"); self.assertEqual(machine["coherence"]["status"], "PASS"); self.assertEqual(maintenance["recommendation"]["action"], "PAUSE")
 
     def test_known_failed_ci_is_policy_not_trust_failure(self):
-        current = state("work/operations/work", 7); sensors = base_sensors(); sensors["pullRequests"]["data"]["items"] = [{"number": 7, "headRef": "work/operations/work", "baseRef": "main", "ci": "failed", "ciObserved": True}]
+        current = state("work/operations/work", 7); sensors = base_sensors(); sensors["pullRequests"]["data"]["items"] = [{"number": 7,"headRef":"work/operations/work","baseRef":"main","ci":"failed","ciObserved":True}]
         machine = project_machine.build_inspection(current, sensors, scope="live"); maintenance = maintenance_inspect.from_project_inspection(machine)
         self.assertEqual(machine["trust"]["status"], "PASS"); self.assertEqual(machine["coherence"]["status"], "PASS"); self.assertEqual(maintenance["recommendation"]["action"], "RECONCILE")
 

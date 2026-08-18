@@ -1,7 +1,10 @@
 import unittest
+from pathlib import Path
 
 from tools import continuation
 from tools import continuation_transition as transition
+
+TEST_ROOT = Path(__file__).resolve().parent
 
 
 def base():
@@ -30,5 +33,15 @@ class WorkItem02Tests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,"ACTIVE_BRANCH_CONFLICT"):transition.validate_work_inventory({"task-one":a,"task-two":b})
     def test_local_model_has_no_local_authority_cli(self):
         for name in ("discover","load","parser","main","create","advance","apply","plan"):self.assertFalse(hasattr(continuation,name),name)
+    def test_current_test_fixtures_do_not_pin_v01_source_schema(self):
+        obsolete = "ContinuationState " + "0.1"
+        token = f'"sourceSchemaVersion": "{obsolete}"'
+        violations=[]
+        for path in sorted(TEST_ROOT.glob("test_*.py")):
+            if path == Path(__file__):
+                continue
+            if token in path.read_text(encoding="utf-8"):
+                violations.append(path.name)
+        self.assertEqual(violations,[])
 
 if __name__=="__main__":unittest.main()

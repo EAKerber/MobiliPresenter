@@ -19,6 +19,16 @@ class WorkflowBoundaryTests(unittest.TestCase):
                     missing.append(f"{workflow.name}:tools/{relative}")
         self.assertEqual(missing, [])
 
+    def test_unittest_modules_referenced_by_workflows_exist(self):
+        pattern = re.compile(r"\btools\.tests\.(test_[A-Za-z0-9_]+)\b")
+        missing=[]
+        for workflow in sorted(WORKFLOWS.glob("*.yml")):
+            text=workflow.read_text(encoding="utf-8")
+            for module in pattern.findall(text):
+                if not (ROOT / "tools" / "tests" / f"{module}.py").is_file():
+                    missing.append(f"{workflow.name}:tools.tests.{module}")
+        self.assertEqual(missing,[])
+
     def test_viewer_validation_has_no_repository_write_path(self):
         text = self.text("viewer-next.yml")
         self.assertIn("contents: read", text)
@@ -42,6 +52,12 @@ class WorkflowBoundaryTests(unittest.TestCase):
             for token in forbidden:
                 self.assertNotIn(token, text, f"{name} encodes prune-plan internals: {token}")
             self.assertIn("tools/prune_plan.py validate", text)
+
+    def test_agent_ops_does_not_reintroduce_local_work_authority_gate(self):
+        text = self.text("agent-ops.yml")
+        self.assertNotIn("Verify continuation state", text)
+        self.assertNotIn("continuation.py verify", text)
+        self.assertIn("docs/kickstarts/**", text)
 
     def test_operational_workflows_do_not_implement_domain_hashing_or_direct_ref_writes(self):
         for name in ("agent-ops.yml", "branch-hygiene.yml", "coordination-guard.yml", "supervisor-snapshot.yml"):
