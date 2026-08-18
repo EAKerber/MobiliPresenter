@@ -85,9 +85,9 @@ class GitMutationPlanTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_PLAN_SEMANTICS_INVALID"):
             plan.validate(value)
 
-    def test_plan_hash_detects_unrehashed_tampering(self):
-        value = plan.create_branch(branch=BRANCH, base_sha=SHA_A, control_branch=CONTROL)
-        value["target"]["branch"] = "work/operations/other"
+    def test_plan_hash_detects_unrehashed_but_semantically_valid_tampering(self):
+        value = plan.create_pr(head=BRANCH, base=CONTROL, head_sha=SHA_A, title="G0.1", body_sha256=BODY, control_branch=CONTROL)
+        value["mutation"]["title"] = "G0.1 changed"
         with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_PLAN_HASH_MISMATCH"):
             plan.validate(value)
 
