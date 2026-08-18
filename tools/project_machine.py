@@ -3,13 +3,13 @@
 from __future__ import annotations
 import argparse,json,sys
 from pathlib import Path
-from typing import Any
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 from tools import project_coherence,project_sensors,project_state,work_graph
 from tools.canonical import stable_hash
 from tools.semantics.observation import ObservationStatus
-SCHEMA_VERSION="ProjectMachineInspection 0.4";REPOSITORY="EAKerber/MobiliPresenter";SCOPES={"local","base","live"};ERROR_EXIT=2;UNKNOWN_EXIT=1
+SCHEMA_VERSION="ProjectMachineInspection 0.5";REPOSITORY="EAKerber/MobiliPresenter";SCOPES={"local","base","live"};ERROR_EXIT=2;UNKNOWN_EXIT=1
+PROJECT_FIELDS={"stateHash","controlBranch","protectedBranches","phase","checkpoint","nextTransition"}
 
 def _sensor_status(value):
     if not isinstance(value,dict):return ObservationStatus.FAIL.value
@@ -45,7 +45,7 @@ def observations(sensors):
 
 def project_summary(state):
     view=project_state.operational_view(state)
-    return {"stateHash":stable_hash(state),"controlBranch":view["git"]["controlBranch"],"protectedBranches":sorted(view["git"].get("protectedBranches") or []),"phase":view["development"]["phase"],"checkpoint":view["development"]["checkpoint"],"nextTransition":view["development"]["nextTransition"],"activeDevelopmentBranch":view["git"].get("activeDevelopmentBranch"),"developmentPrNumber":view["development"].get("prNumber"),"blockers":view["development"].get("blockers") or []}
+    return {"stateHash":stable_hash(state),"controlBranch":view["git"]["controlBranch"],"protectedBranches":sorted(view["git"].get("protectedBranches") or []),"phase":view["development"]["phase"],"checkpoint":view["development"]["checkpoint"],"nextTransition":view["development"]["nextTransition"]}
 
 def build_inspection(state,sensors,*,scope):
     if scope not in SCOPES:raise RuntimeError("PROJECT_MACHINE_SCOPE_INVALID")
@@ -76,7 +76,8 @@ def validate_inspection(value):
     if value.get("readOnly") is not True:raise RuntimeError("PROJECT_MACHINE_NOT_READ_ONLY")
     if value.get("semanticAuthority") is not False:raise RuntimeError("PROJECT_MACHINE_SEMANTIC_AUTHORITY_INVALID")
     project=value.get("project")
-    if not isinstance(project,dict):raise RuntimeError("PROJECT_MACHINE_PROJECT_INVALID")
+    if not isinstance(project,dict) or set(project)!=PROJECT_FIELDS:raise RuntimeError("PROJECT_MACHINE_PROJECT_INVALID")
+    if not isinstance(project.get("stateHash"),str) or len(project["stateHash"])!=64:raise RuntimeError("PROJECT_MACHINE_PROJECT_STATE_HASH_INVALID")
     if not isinstance(project.get("controlBranch"),str):raise RuntimeError("PROJECT_MACHINE_CONTROL_BRANCH_INVALID")
     if not isinstance(project.get("protectedBranches"),list):raise RuntimeError("PROJECT_MACHINE_PROTECTED_BRANCHES_INVALID")
     sensors=value.get("sensors")
