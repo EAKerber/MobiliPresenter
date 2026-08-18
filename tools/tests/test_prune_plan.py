@@ -13,17 +13,16 @@ spec.loader.exec_module(prune)
 class PrunePlan04Tests(unittest.TestCase):
     def state(self, protected=None):
         return {
-            "schemaVersion": "ProjectState 2.0",
+            "schemaVersion": "ProjectState 2.1",
             "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
             "git": {
                 "controlBranch": "main",
-                "activeDevelopmentBranch": None,
                 "protectedBranches": list(protected or []),
             },
             "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
             "development": {
                 "initiative": "I", "phase": "between-increments", "checkpoint": "C",
-                "nextTransition": "N", "blockers": [], "prNumber": None,
+                "nextTransition": "N",
             },
         }
 
@@ -88,20 +87,6 @@ class PrunePlan04Tests(unittest.TestCase):
         entry = next(item for item in plan["entries"] if item["branch"] == "work/operations/done")
         self.assertEqual(entry["action"], "delete-candidate")
         self.assertNotIn("active-work", entry["protections"])
-
-    def test_projectstate_active_development_no_longer_protects_branch(self):
-        state = self.state()
-        state["git"]["activeDevelopmentBranch"] = "work/operations/legacy"
-        state["development"]["prNumber"] = 99
-        refs = {"main": "a" * 40, "work/operations/legacy": "b" * 40}
-        plan = prune.build_prune_plan(
-            state, refs, [], {"main": "identical-to-control", "work/operations/legacy": "ancestor-of-control"},
-            work_items=[], work_authority_complete=True, work_authority_head="f" * 40,
-            published_source_branch="main",
-        )
-        entry = next(item for item in plan["entries"] if item["branch"] == "work/operations/legacy")
-        self.assertEqual(entry["action"], "delete-candidate")
-        self.assertNotIn("active-development", entry["protections"])
 
     def test_exact_merged_pr_head_is_delete_candidate(self):
         refs = {"main": "a" * 40, "work/operations/old": "b" * 40}
