@@ -9,14 +9,14 @@ from typing import Any
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 
-from tools import project_state,publication,project_state_apply,project_state_transition
+from tools import git_mutation_plan,project_state,publication,project_state_apply,project_state_transition
 from tools import prune_plan as git_prune_plan
 from tools.canonical import stable_hash
 from tools.semantics.branches import parse_branch_name
 from tools.semantics.observation import ObservationStatus
 
 STATE_PATH=project_state.STATE_PATH;SCHEMA_PATH=project_state.CURRENT_SCHEMA_PATH;ERROR_EXIT=2
-TOOLBOX_COMMANDS={"status","doctor","verify","checkpoint","handoff","git prune-plan"}
+TOOLBOX_COMMANDS={"status","doctor","verify","checkpoint","handoff","git prune-plan","git mutation-plan"}
 
 
 def run_process(args):
@@ -112,8 +112,24 @@ def recent_commits(control_branch):
 def command_handoff(as_json):
     state,view,published=_state_and_publication();observed=observed_git();verify=verify_state();project=project_summary(view);payload={"schemaVersion":"AgentHandoff 2.1","projectStateHash":stable_hash(state),"project":project,"publication":published,"observedGit":observed,"verification":verify,"recentCommits":recent_commits(project["controlBranch"]) if observed.get("worktree") else {"available":False},"nextTransition":project["nextTransition"],"note":"Derived snapshot; not a new source of truth."};print(json.dumps(payload,indent=2,ensure_ascii=False) if as_json else f"HANDOFF\n  verify: {verify['status']}\n  next: {payload['nextTransition']}");return 0 if verify["status"]=="PASS" else ERROR_EXIT
 def command_git_prune_plan(as_json):return git_prune_plan.command_generate(as_json)
+def _required(value,code):
+    if value is None or value=="":raise RuntimeError(code)
+    return value
+def command_git_mutation_plan(as_json,args):
+    state=project_state.load_state();errors=project_state.validate_current(state)
+    if errors:raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
+    control=project_state.operational_view(state)["git"]["controlBranch"];operation=_required(args.operation,"GIT_MUTATION_OPERATION_REQUIRED")
+    if operation=="create-branch":plan=git_mutation_plan.create_branch(branch=_required(args.branch,"GIT_MUTATION_BRANCH_REQUIRED"),base_sha=_required(args.base_sha,"GIT_MUTATION_BASE_SHA_REQUIRED"),control_branch=control)
+    elif operation=="create-file":plan=git_mutation_plan.create_file(branch=_required(args.branch,"GIT_MUTATION_BRANCH_REQUIRED"),path=_required(args.path,"GIT_MUTATION_PATH_REQUIRED"),branch_head=_required(args.branch_head,"GIT_MUTATION_BRANCH_HEAD_REQUIRED"),content_sha256=_required(args.content_sha256,"GIT_MUTATION_CONTENT_HASH_REQUIRED"),control_branch=control)
+    elif operation=="update-file":plan=git_mutation_plan.update_file(branch=_required(args.branch,"GIT_MUTATION_BRANCH_REQUIRED"),path=_required(args.path,"GIT_MUTATION_PATH_REQUIRED"),branch_head=_required(args.branch_head,"GIT_MUTATION_BRANCH_HEAD_REQUIRED"),blob_sha=_required(args.blob_sha,"GIT_MUTATION_BLOB_SHA_REQUIRED"),content_sha256=_required(args.content_sha256,"GIT_MUTATION_CONTENT_HASH_REQUIRED"),control_branch=control)
+    elif operation=="delete-file":plan=git_mutation_plan.delete_file(branch=_required(args.branch,"GIT_MUTATION_BRANCH_REQUIRED"),path=_required(args.path,"GIT_MUTATION_PATH_REQUIRED"),branch_head=_required(args.branch_head,"GIT_MUTATION_BRANCH_HEAD_REQUIRED"),blob_sha=_required(args.blob_sha,"GIT_MUTATION_BLOB_SHA_REQUIRED"),control_branch=control)
+    elif operation=="create-pr":plan=git_mutation_plan.create_pr(head=_required(args.head,"GIT_MUTATION_PR_HEAD_REQUIRED"),base=_required(args.base,"GIT_MUTATION_PR_BASE_REQUIRED"),head_sha=_required(args.head_sha,"GIT_MUTATION_PR_HEAD_SHA_REQUIRED"),title=_required(args.title,"GIT_MUTATION_PR_TITLE_REQUIRED"),body_sha256=_required(args.body_sha256,"GIT_MUTATION_PR_BODY_HASH_REQUIRED"),control_branch=control)
+    elif operation=="merge-pr":plan=git_mutation_plan.merge_pr(pr_number=_required(args.pr_number,"GIT_MUTATION_PR_NUMBER_REQUIRED"),head_sha=_required(args.head_sha,"GIT_MUTATION_PR_HEAD_SHA_REQUIRED"),merge_method=args.merge_method)
+    elif operation=="update-ref":plan=git_mutation_plan.update_ref(branch=_required(args.branch,"GIT_MUTATION_BRANCH_REQUIRED"),current_sha=_required(args.current_sha,"GIT_MUTATION_CURRENT_REF_SHA_REQUIRED"),new_sha=_required(args.new_sha,"GIT_MUTATION_NEW_REF_SHA_REQUIRED"),control_branch=control,force=args.force)
+    else:raise RuntimeError("GIT_MUTATION_OPERATION_UNSUPPORTED")
+    git_mutation_plan.validate(plan);print(json.dumps(plan,indent=2,ensure_ascii=False) if as_json else f"GIT MUTATION PLAN\n  operation: {plan['operation']}\n  connector: {plan['connectorAction']}\n  planHash: {plan['planHash']}\n  authorizesMutation: false");return 0
 def main():
-    parser=argparse.ArgumentParser(prog="agent",description="MobiliPresenter deterministic operational toolbox");parser.add_argument("command",choices=("status","doctor","verify","checkpoint","handoff","git"));parser.add_argument("subcommand",nargs="?");parser.add_argument("--json",action="store_true",dest="as_json");parser.add_argument("--to",dest="checkpoint");parser.add_argument("--next",dest="next_transition");parser.add_argument("--phase");parser.add_argument("--apply",action="store_true");parser.add_argument("--expected-plan");args=parser.parse_args()
+    parser=argparse.ArgumentParser(prog="agent",description="MobiliPresenter deterministic operational toolbox");parser.add_argument("command",choices=("status","doctor","verify","checkpoint","handoff","git"));parser.add_argument("subcommand",nargs="?");parser.add_argument("--json",action="store_true",dest="as_json");parser.add_argument("--to",dest="checkpoint");parser.add_argument("--next",dest="next_transition");parser.add_argument("--phase");parser.add_argument("--apply",action="store_true");parser.add_argument("--expected-plan");parser.add_argument("--operation");parser.add_argument("--branch");parser.add_argument("--base-sha");parser.add_argument("--branch-head");parser.add_argument("--path");parser.add_argument("--blob-sha");parser.add_argument("--content-sha256");parser.add_argument("--head");parser.add_argument("--base");parser.add_argument("--head-sha");parser.add_argument("--title");parser.add_argument("--body-sha256");parser.add_argument("--pr-number",type=int);parser.add_argument("--merge-method",default="squash");parser.add_argument("--current-sha");parser.add_argument("--new-sha");parser.add_argument("--force",action="store_true");args=parser.parse_args()
     try:
         if args.command=="status":return command_status(args.as_json)
         if args.command=="doctor":return command_doctor(args.as_json)
@@ -122,9 +138,10 @@ def main():
             if not args.checkpoint or not args.next_transition:raise RuntimeError("CHECKPOINT_ARGS_REQUIRED: --to and --next")
             return command_checkpoint(args.as_json,args)
         if args.command=="git":
-            if args.subcommand!="prune-plan":raise RuntimeError("GIT_SUBCOMMAND_REQUIRED: prune-plan")
-            if args.apply:raise RuntimeError("UNSUPPORTED_TRANSITION: prune planning is read-only; destructive apply is a separately guarded operation")
-            return command_git_prune_plan(args.as_json)
+            if args.apply:raise RuntimeError("UNSUPPORTED_TRANSITION: git planning is read-only; apply remains a separately guarded connector/domain operation")
+            if args.subcommand=="prune-plan":return command_git_prune_plan(args.as_json)
+            if args.subcommand=="mutation-plan":return command_git_mutation_plan(args.as_json,args)
+            raise RuntimeError("GIT_SUBCOMMAND_REQUIRED: prune-plan or mutation-plan")
         if args.subcommand is not None:raise RuntimeError(f"UNEXPECTED_SUBCOMMAND:{args.subcommand}")
         return command_handoff(args.as_json)
     except RuntimeError as exc:
