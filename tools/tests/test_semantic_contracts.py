@@ -4,7 +4,15 @@ import json
 import unittest
 
 from tools import capability_gates
-from tools.semantics.contracts import check_capability_gates_contract, check_project_state_contract, check_source_build_contract
+from tools.semantics.contracts import (
+    check_capability_gates_contract,
+    check_coordination_state_contract,
+    check_project_state_contract,
+    check_schema_registry_coverage,
+    check_source_build_contract,
+    check_transition_plan_contract,
+    check_transition_receipt_contract,
+)
 from tools.semantics.registry import ROOT
 
 
@@ -14,6 +22,16 @@ class SemanticContractTests(unittest.TestCase):
 
     def test_source_build_contract_is_conformant(self):
         self.assertEqual([], check_source_build_contract())
+
+    def test_coordination_contract_is_conformant(self):
+        self.assertEqual([], check_coordination_state_contract())
+
+    def test_transition_contracts_are_conformant(self):
+        self.assertEqual([], check_transition_plan_contract())
+        self.assertEqual([], check_transition_receipt_contract())
+
+    def test_every_operational_schema_is_registered(self):
+        self.assertEqual([], check_schema_registry_coverage())
 
     def test_real_peer_recovery_is_runtime_valid_and_uses_supervisor_participation(self):
         path = ROOT / "ops" / "capabilities" / "peer-recovery.json"
