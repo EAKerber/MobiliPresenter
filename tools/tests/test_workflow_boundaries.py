@@ -43,6 +43,12 @@ class WorkflowBoundaryTests(unittest.TestCase):
                 self.assertNotIn(token, text, f"{name} encodes prune-plan internals: {token}")
             self.assertIn("tools/prune_plan.py validate", text)
 
+    def test_agent_ops_does_not_reintroduce_local_work_authority_gate(self):
+        text = self.text("agent-ops.yml")
+        self.assertNotIn("Verify continuation state", text)
+        self.assertNotIn("continuation.py verify", text)
+        self.assertIn("docs/kickstarts/**", text)
+
     def test_operational_workflows_do_not_implement_domain_hashing_or_direct_ref_writes(self):
         for name in ("agent-ops.yml", "branch-hygiene.yml", "coordination-guard.yml", "supervisor-snapshot.yml"):
             text = self.text(name)
