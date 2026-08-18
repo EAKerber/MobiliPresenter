@@ -41,4 +41,15 @@ class WorkTransitionTests(unittest.TestCase):
         with mock.patch.object(authority,'observe') as observe:
             with self.assertRaises(ContinuationRemoteError) as caught:authority.apply(plan,None)
         self.assertEqual(caught.exception.code,'TRANSITION_EXPECTED_PLAN_REQUIRED');observe.assert_not_called()
+    def test_restart_clears_execution_binding_and_requires_explicit_rebind(self):
+        created=transition.create('task-restart','developer-ui',['a'],'do a','work/ui/old',41)['candidate']
+        advanced=transition.advance(created,['a'])['candidate'];finished=transition.done(advanced)['candidate']
+        restarted=transition.restart(finished,['b'],'do b')['candidate']
+        self.assertEqual(restarted['status'],'READY');self.assertIsNone(restarted['branch']);self.assertIsNone(restarted['prNumber'])
+        self.assertEqual(restarted['workerId'],'developer-ui');self.assertEqual(restarted['dependsOn'],[])
+        rebound=transition.bind_execution(restarted,'work/ui/new',42)['candidate']
+        self.assertEqual(rebound['branch'],'work/ui/new');self.assertEqual(rebound['prNumber'],42)
+    def test_restart_plan_rebuilds_with_cleared_binding(self):
+        created=transition.create('task-rebuild','developer-ui',['a'],'do a','work/ui/old',41)['candidate'];advanced=transition.advance(created,['a'])['candidate'];finished=transition.done(advanced)['candidate'];plan=transition.restart(finished,['b'],'do b')
+        self.assertEqual(transition.rebuild(plan,finished),plan);self.assertIsNone(plan['candidate']['branch']);self.assertIsNone(plan['candidate']['prNumber'])
 if __name__=='__main__':unittest.main()
