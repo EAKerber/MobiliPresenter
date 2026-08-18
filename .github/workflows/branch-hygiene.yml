@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   prune:
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == false
     runs-on: ubuntu-latest
     permissions:
       contents: write
