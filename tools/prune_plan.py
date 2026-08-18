@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
 from tools import continuation, project_state, publication, work_graph
 from tools.canonical import stable_hash
 from tools.continuation_remote import ContinuationRemoteError, GitHubContinuationAuthority
+from tools.semantics import registry as semantic_registry
 from tools.semantics.branches import parse_branch_name
 
 STATE_PATH = project_state.STATE_PATH
@@ -270,6 +271,26 @@ def observe_work(repository: str) -> tuple[bool, list[dict[str, Any]] | None, st
         return False, None, None, str(code)
 
 
+def managed_git_authority_branches() -> set[str]:
+    registry = semantic_registry.load_registry()
+    errors = semantic_registry.validate_registry(registry)
+    if errors:
+        raise RuntimeError(f"SEMANTIC_REGISTRY_INVALID:{errors[0]}")
+    result: set[str] = set()
+    authorities = registry.get("managedAuthorities")
+    if not isinstance(authorities, dict):
+        raise RuntimeError("SEMANTIC_REGISTRY_INVALID:SEMANTIC_AUTHORITIES_INVALID")
+    for authority in authorities.values():
+        locator = authority.get("locator") if isinstance(authority, dict) else None
+        if not isinstance(locator, dict) or locator.get("kind") != "git-authority":
+            continue
+        branch = locator.get("branch")
+        if not isinstance(branch, str) or not branch:
+            raise RuntimeError("SEMANTIC_REGISTRY_INVALID:SEMANTIC_LOCATOR_FIELDS_INVALID")
+        result.add(branch)
+    return result
+
+
 def ancestry_for_ref(sha: str, control_sha: str) -> str:
     if sha == control_sha:
         return "identical-to-control"
@@ -306,7 +327,8 @@ def _pr_index(pull_requests: list[dict[str, Any]]) -> dict[str, list[dict[str, A
 
 def _protection_reasons(
     view: dict[str, Any], branch: str, open_pr_heads: set[str], open_pr_bases: set[str],
-    active_work_branches: set[str], *, published_source_branch: str | None = None,
+    active_work_branches: set[str], managed_authority_branches: set[str], *,
+    published_source_branch: str | None = None,
 ) -> list[str]:
     git_state = view["git"]
     reasons: list[str] = []
@@ -316,6 +338,8 @@ def _protection_reasons(
         reasons.append("published-branch")
     if branch in active_work_branches:
         reasons.append("active-work")
+    if branch in managed_authority_branches:
+        reasons.append("managed-authority")
     if branch in set(git_state.get("protectedBranches") or []):
         reasons.append("project-state-protected")
     if branch in open_pr_heads:
@@ -352,12 +376,13 @@ def build_prune_plan(
         binding["branch"] for binding in bindings
         if isinstance(binding.get("branch"), str) and binding["branch"]
     }
+    managed_authority_branches = managed_git_authority_branches()
 
     entries: list[dict[str, Any]] = []
     for branch, sha in sorted(refs.items()):
         protections = _protection_reasons(
             view, branch, open_pr_heads, open_pr_bases, active_work_branches,
-            published_source_branch=published_source_branch,
+            managed_authority_branches, published_source_branch=published_source_branch,
         )
         branch_prs = pr_index.get(branch, [])
         ancestry_status = ancestry.get(branch, "unknown") if ancestry is not None else "unknown"
@@ -442,9 +467,10 @@ def build_prune_plan(
         "openPrBases": sorted(open_pr_bases),
         "entries": entries,
         "note": (
-            "Evidence-only sanitation plan. Names never authorize retention or deletion; active Work execution "
-            "branches are protected from the canonical Work authority; execution requires this exact materialized "
-            "plan, explicit plan identity, authorization, drift checks, and readback."
+            "Evidence-only sanitation plan. Names never authorize retention or deletion; managed Git authority "
+            "branches are derived from the Semantic Registry and active Work execution branches from the canonical "
+            "Work authority; execution requires this exact materialized plan, explicit plan identity, authorization, "
+            "drift checks, and readback."
         ),
     }
     return {**body, "planHash": stable_hash(body)}
