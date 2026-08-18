@@ -92,6 +92,7 @@ class PrunePlan04Tests(unittest.TestCase):
     def test_projectstate_active_development_no_longer_protects_branch(self):
         state = self.state()
         state["git"]["activeDevelopmentBranch"] = "work/operations/legacy"
+        state["development"]["prNumber"] = 99
         refs = {"main": "a" * 40, "work/operations/legacy": "b" * 40}
         plan = prune.build_prune_plan(
             state, refs, [], {"main": "identical-to-control", "work/operations/legacy": "ancestor-of-control"},
