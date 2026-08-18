@@ -7,13 +7,13 @@ from tools import project_sensors
 REPOSITORY = "EAKerber/MobiliPresenter"
 
 
-def state(active=None, pr=None):
+def state():
     return {
-        "schemaVersion": "ProjectState 2.0",
+        "schemaVersion": "ProjectState 2.1",
         "project": {"id": "mobilipresenter", "repository": REPOSITORY},
-        "git": {"activeDevelopmentBranch": active, "controlBranch": "main", "protectedBranches": ["architecture/tpc"]},
+        "git": {"controlBranch": "main", "protectedBranches": ["architecture/tpc"]},
         "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
-        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "prNumber": pr, "blockers": []},
+        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next"},
     }
 
 
