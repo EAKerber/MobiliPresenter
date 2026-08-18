@@ -2,6 +2,7 @@ import copy
 import unittest
 
 from tools import peer_recovery as pr
+from tools import test_lifecycle
 
 CONTROL = "9fe11b67c6b1fe4ec3b02d4901d79aedbad14e28"
 LEASES = "ce8ba0069578e7789a1492469ba67f61cd4daf53"
@@ -55,6 +56,11 @@ def payload(peer, reproduction=None, *, attempt_count=0):
     }
 
 
+@test_lifecycle.transitional_suite(
+    owner="capability",
+    reason="peer recovery remains an experimental capability whose tests require an explicit promote/redesign/delete decision when policy changes",
+    retire_when=test_lifecycle.capability_policy_changed("peer-recovery", "experimental"),
+)
 class PeerRecoveryTests(unittest.TestCase):
     def test_deterministic_plan_and_hash(self):
         peer = obs("manager-gitops-b", "DEGRADED", failure=FAILURE, failure_source="runtime-observed", count=2)
