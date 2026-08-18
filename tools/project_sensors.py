@@ -104,19 +104,38 @@ def observe_control_head(state,*,live):
 
 
 def observe_local_core(state):
-    view=project_state.operational_view(state)
-    verification=agent.verify_state(include_remote=False);checks=list(verification.get("checks") or [])
-    project_checks=[i for i in checks if i.get("name") in {"project-state","project-state-schema"}];publication_checks=[i for i in checks if i.get("name")=="published-artifact-state"];git_checks=[i for i in checks if i.get("name")=="git-context"];repository_checks=[i for i in checks if isinstance(i.get("name"),str) and i["name"].startswith("required:")]
-    project_status,project_code=summarize_checks(project_checks);publication_status,publication_code=summarize_checks(publication_checks);git_status,git_code=summarize_checks(git_checks);repository_status,repository_code=summarize_checks(repository_checks);observed=agent.observed_git()
-    publication_data={"checks":publication_checks}
-    if publication_status==ObservationStatus.PASS.value:
+    state_errors=project_state.validate_current(state)
+    project_checks=[]
+    if state_errors:
+        project_checks.extend({"name":"project-state","status":"FAIL",**error} for error in state_errors);view=None
+    else:
+        project_checks.append({"name":"project-state","status":"PASS","code":None});view=project_state.operational_view(state)
+    schema_ok=project_state.CURRENT_SCHEMA_PATH.is_file();project_checks.append({"name":"project-state-schema","status":"PASS" if schema_ok else "FAIL","code":None if schema_ok else "SCHEMA_FILE_MISSING"})
+
+    repository_checks=[]
+    for rel in ("AGENTS.md","README.md"):
+        exists=(agent.ROOT/rel).is_file();repository_checks.append({"name":f"required:{rel}","status":"PASS" if exists else "FAIL","code":None if exists else "REQUIRED_FILE_MISSING"})
+
+    publication_checks=[];publication_data={"checks":publication_checks};publication_path="ops/published/unknown";published_source=None
+    if view is None:
+        publication_checks.append({"name":"published-artifact-state","status":"FAIL","code":"PROJECT_STATE_INVALID"})
+    else:
+        publication_path=view["published"]["artifactManifest"]
         try:
-            manifest=publication.load_manifest(view["published"]["artifactManifest"]); publication_data.update(publication.publication_view(view,manifest))
+            manifest=publication.load_manifest(publication_path);projection=publication.publication_view(view,manifest);publication_data.update(projection);published_source=projection["sourceBranch"]
+            publication_checks.append({"name":"published-artifact-state","status":"PASS","code":None,"observedRelease":projection["release"],"observedSourceBranch":projection["sourceBranch"],"observedSourceBuildFingerprint":projection["sourceBuildFingerprint"],"fingerprintKind":projection["fingerprintKind"]})
         except RuntimeError as exc:
-            publication_status=ObservationStatus.FAIL.value;publication_code=str(exc).split(":",1)[0];publication_data["detail"]=str(exc)
+            publication_checks.append({"name":"published-artifact-state","status":"FAIL","code":str(exc).split(":",1)[0],"path":publication_path});publication_data["detail"]=str(exc)
+
+    observed=agent.observed_git();git_checks=[]
+    if view is None:git_checks.append({"name":"git-context","status":"FAIL","code":"PROJECT_STATE_INVALID"})
+    else:git_checks.append(agent.git_context_check(state,observed,published_source_branch=published_source))
+
+    all_checks=project_checks+publication_checks+repository_checks+git_checks;verification={**agent.verification_summary(all_checks),"checks":all_checks,"remote":None}
+    project_status,project_code=summarize_checks(project_checks);publication_status,publication_code=summarize_checks(publication_checks);git_status,git_code=summarize_checks(git_checks);repository_status,repository_code=summarize_checks(repository_checks)
     return {
         "projectState":sensor(project_status,code=project_code,data={"verification":verification,"checks":project_checks},authority={"kind":"repository","path":"ops/state/project.json"}),
-        "publication":sensor(publication_status,code=publication_code,data=publication_data,authority={"kind":"repository","path":view["published"]["artifactManifest"]}),
+        "publication":sensor(publication_status,code=publication_code,data=publication_data,authority={"kind":"repository","path":publication_path}),
         "git":sensor(git_status,code=git_code,data={"observed":observed,"checks":git_checks},authority={"kind":"worktree"}),
-        "repository":sensor(repository_status,code=repository_code,data={"checks":repository_checks},authority={"kind":"repository","name":view["project"]["repository"]}),
+        "repository":sensor(repository_status,code=repository_code,data={"checks":repository_checks},authority={"kind":"repository","name":view["project"]["repository"] if view else None}),
     }

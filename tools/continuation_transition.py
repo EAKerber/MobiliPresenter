@@ -56,7 +56,7 @@ def advance(before: dict[str, Any], done: list[str], next_action: str | None = N
     return _build("advance",before,after,{"completed":done,"nextAction":normalized_next,"lastGoodSha":sha,"checkpoint":normalized_checkpoint})
 
 
-def wait(before: dict[str, Any], blockers: list[str]) -> dict[str, Any]:
+def wait(before: dict[str,Any], blockers: list[str]) -> dict[str,Any]:
     after=copy.deepcopy(continuation.valid(before))
     if after["status"] not in {WorkStatus.READY.value,WorkStatus.IN_PROGRESS.value}: raise RuntimeError("CONTINUATION_WAIT_STATUS_INVALID")
     blockers=continuation.strings(blockers,"CONTINUATION_BLOCKERS_INVALID")
@@ -66,7 +66,7 @@ def wait(before: dict[str, Any], blockers: list[str]) -> dict[str, Any]:
     return _build("wait",before,after,{"blockers":blockers})
 
 
-def handoff(before: dict[str, Any], target_worker: str, next_action: str) -> dict[str, Any]:
+def handoff(before: dict[str,Any], target_worker: str, next_action: str) -> dict[str,Any]:
     after=copy.deepcopy(continuation.valid(before))
     if after["status"] not in {WorkStatus.READY.value,WorkStatus.IN_PROGRESS.value}: raise RuntimeError("CONTINUATION_HANDOFF_STATUS_INVALID")
     target_worker=continuation._worker(target_worker,"CONTINUATION_HANDOFF_WORKER_ID_INVALID"); next_action=continuation.text(next_action,"CONTINUATION_NEXT_ACTION_INVALID")
@@ -74,7 +74,7 @@ def handoff(before: dict[str, Any], target_worker: str, next_action: str) -> dic
     return _build("handoff",before,after,{"toWorkerId":target_worker,"nextAction":next_action})
 
 
-def resume(before: dict[str, Any], worker_id: str) -> dict[str, Any]:
+def resume(before: dict[str,Any], worker_id: str) -> dict[str,Any]:
     after=copy.deepcopy(continuation.valid(before))
     if after["status"] not in {WorkStatus.WAITING.value,WorkStatus.HANDOFF.value}: raise RuntimeError("CONTINUATION_RESUME_STATUS_INVALID")
     worker_id=continuation._worker(worker_id,"CONTINUATION_WORKER_ID_INVALID")
@@ -83,7 +83,7 @@ def resume(before: dict[str, Any], worker_id: str) -> dict[str, Any]:
     return _build("resume",before,after,{"workerId":worker_id})
 
 
-def done(before: dict[str, Any], *, inventory: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def done(before: dict[str,Any], *, inventory: list[dict[str,Any]] | None = None) -> dict[str,Any]:
     after=copy.deepcopy(continuation.valid(before))
     if after["status"] not in {WorkStatus.READY.value,WorkStatus.IN_PROGRESS.value}: raise RuntimeError("CONTINUATION_DONE_STATUS_INVALID")
     work_graph.require_dependencies_done(continuation.operational_view(after),inventory)
@@ -92,7 +92,7 @@ def done(before: dict[str, Any], *, inventory: list[dict[str, Any]] | None = Non
     return _build("done",before,after,{})
 
 
-def bind_execution(before: dict[str, Any], branch: str | None, pr: int | None = None) -> dict[str, Any]:
+def bind_execution(before: dict[str,Any], branch: str | None, pr: int | None = None) -> dict[str,Any]:
     after=copy.deepcopy(continuation.valid(before))
     if after["status"]==WorkStatus.DONE.value: raise RuntimeError("CONTINUATION_BIND_EXECUTION_STATUS_INVALID")
     if branch is not None: branch=continuation.text(branch,"CONTINUATION_BRANCH_INVALID")
@@ -102,24 +102,24 @@ def bind_execution(before: dict[str, Any], branch: str | None, pr: int | None = 
     return _build("bind-execution",before,after,{"branch":branch,"prNumber":pr})
 
 
-def restart(before: dict[str, Any], remaining: list[str], next_action: str) -> dict[str, Any]:
+def restart(before: dict[str,Any], remaining: list[str], next_action: str) -> dict[str,Any]:
     after=copy.deepcopy(continuation.valid(before))
     if after["status"]!=WorkStatus.DONE.value: raise RuntimeError("CONTINUATION_RESTART_STATUS_INVALID")
     remaining=continuation.strings(remaining,"CONTINUATION_REMAINING_INVALID")
     if not remaining: raise RuntimeError("CONTINUATION_RESTART_REQUIRES_WORK")
     next_action=continuation.text(next_action,"CONTINUATION_NEXT_ACTION_INVALID")
-    after["status"]=WorkStatus.READY.value; after["completed"]=[]; after["remaining"]=remaining; after["nextAction"]=next_action; after["lastKnownGood"]={"sha":None,"checkpoint":None}; after["blockers"]=[]; after["handoffToWorkerId"]=None
+    after["status"]=WorkStatus.READY.value; after["branch"]=None; after["prNumber"]=None; after["completed"]=[]; after["remaining"]=remaining; after["nextAction"]=next_action; after["lastKnownGood"]={"sha":None,"checkpoint":None}; after["blockers"]=[]; after["handoffToWorkerId"]=None
     return _build("restart",before,after,{"remaining":remaining,"nextAction":next_action})
 
 
-def validate_work_inventory(items: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def validate_work_inventory(items: dict[str,dict[str,Any]]) -> dict[str,Any]:
     if not isinstance(items,dict): raise RuntimeError("WORK_AUTHORITY_INVENTORY_INVALID")
     views=[]
     for cid in sorted(items): continuation.valid(items[cid],cid); views.append(continuation.operational_view(items[cid]))
     return work_graph.build(views)
 
 
-def rebuild(plan: dict[str, Any], before: dict[str, Any] | None, *, inventory: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def rebuild(plan: dict[str,Any], before: dict[str,Any] | None, *, inventory: list[dict[str,Any]] | None = None) -> dict[str,Any]:
     protocol.validate_plan(plan); action=plan["action"]; intent=plan["intent"]; cid=plan["subject"].get("id")
     if action=="create":
         if before is not None: raise RuntimeError("CONTINUATION_ALREADY_EXISTS")
@@ -136,7 +136,7 @@ def rebuild(plan: dict[str, Any], before: dict[str, Any] | None, *, inventory: l
     raise RuntimeError("CONTINUATION_COMMAND_INVALID")
 
 
-def validate_plan(plan: dict[str, Any], before: dict[str, Any] | None = None, *, repository: str = DEFAULT_REPOSITORY, authority_branch: str = DEFAULT_BRANCH, state_dir: str = DEFAULT_DIR, bind_before: bool = False, inventory: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def validate_plan(plan: dict[str,Any], before: dict[str,Any] | None = None, *, repository: str = DEFAULT_REPOSITORY, authority_branch: str = DEFAULT_BRANCH, state_dir: str = DEFAULT_DIR, bind_before: bool = False, inventory: list[dict[str,Any]] | None = None) -> dict[str,Any]:
     protocol.validate_plan(plan)
     if plan["domain"]!="continuation": raise RuntimeError("CONTINUATION_PLAN_DOMAIN_INVALID")
     subject=plan["subject"]
