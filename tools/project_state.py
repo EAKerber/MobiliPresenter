@@ -12,6 +12,11 @@ CURRENT_SCHEMA_PATH = ROOT / "ops" / "schemas" / "project-state.schema.json"
 CURRENT_SCHEMA_VERSION = "ProjectState 2.0"
 REPOSITORY = "EAKerber/MobiliPresenter"
 PROJECT_ID = "mobilipresenter"
+TOP_FIELDS = {"schemaVersion", "project", "git", "published", "development"}
+PROJECT_FIELDS = {"id", "repository"}
+GIT_FIELDS = {"controlBranch", "activeDevelopmentBranch", "protectedBranches"}
+PUBLISHED_FIELDS = {"url", "artifactManifest"}
+DEVELOPMENT_FIELDS = {"initiative", "phase", "checkpoint", "nextTransition", "blockers", "prNumber"}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -50,8 +55,7 @@ def validate_current(state: dict[str, Any]) -> list[dict[str, str]]:
         return [{"code": "STATE_SCHEMA_INVALID", "detail": "state must be an object"}]
     if state.get("schemaVersion") != CURRENT_SCHEMA_VERSION:
         return [{"code": "STATE_SCHEMA_UNSUPPORTED", "detail": f"schemaVersion must be {CURRENT_SCHEMA_VERSION}"}]
-    expected_top = {"schemaVersion", "project", "git", "published", "development"}
-    if set(state) != expected_top:
+    if set(state) != TOP_FIELDS:
         _error(errors, "STATE_SCHEMA_INVALID", "ProjectState 2.0 top-level fields are invalid")
     for key in ("project", "git", "published", "development"):
         if not isinstance(state.get(key), dict):
@@ -60,7 +64,7 @@ def validate_current(state: dict[str, Any]) -> list[dict[str, str]]:
         return errors
 
     project = state["project"]
-    if set(project) != {"id", "repository"}:
+    if set(project) != PROJECT_FIELDS:
         _error(errors, "STATE_SCHEMA_INVALID", "project fields are invalid for ProjectState 2.0")
     if project.get("id") != PROJECT_ID:
         _error(errors, "PROJECT_ID_MISMATCH", f"project.id must be {PROJECT_ID}")
@@ -68,7 +72,7 @@ def validate_current(state: dict[str, Any]) -> list[dict[str, str]]:
         _error(errors, "REPOSITORY_ID_MISMATCH", f"project.repository must be {REPOSITORY}")
 
     git_state = state["git"]
-    if set(git_state) != {"controlBranch", "activeDevelopmentBranch", "protectedBranches"}:
+    if set(git_state) != GIT_FIELDS:
         _error(errors, "STATE_SCHEMA_INVALID", "git fields are invalid for ProjectState 2.0")
     if not _nonempty_string(git_state.get("controlBranch")):
         _error(errors, "STATE_SCHEMA_INVALID", "git.controlBranch must be a non-empty string")
@@ -80,15 +84,14 @@ def validate_current(state: dict[str, Any]) -> list[dict[str, str]]:
         _error(errors, "STATE_SCHEMA_INVALID", "git.protectedBranches must contain unique non-empty strings")
 
     published = state["published"]
-    if set(published) != {"url", "artifactManifest"}:
+    if set(published) != PUBLISHED_FIELDS:
         _error(errors, "STATE_SCHEMA_INVALID", "published fields are invalid for ProjectState 2.0")
     for key in ("url", "artifactManifest"):
         if not _nonempty_string(published.get(key)):
             _error(errors, "STATE_SCHEMA_INVALID", f"published.{key} must be a non-empty string")
 
     development = state["development"]
-    expected_development = {"initiative", "phase", "checkpoint", "nextTransition", "blockers", "prNumber"}
-    if set(development) != expected_development:
+    if set(development) != DEVELOPMENT_FIELDS:
         _error(errors, "STATE_SCHEMA_INVALID", "development fields are invalid for ProjectState 2.0")
     for key in ("initiative", "phase", "checkpoint", "nextTransition"):
         if not _nonempty_string(development.get(key)):
