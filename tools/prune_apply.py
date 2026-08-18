@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""CAS-style destructive executor for one exact GitPrunePlan 0.3.
+"""CAS-style destructive executor for one exact GitPrunePlan 0.4.
 
-The planner remains the sole classifier. This executor may delete only entries
+The planner remains the sole classifier. This executor may remove only entries
 already classified as delete-candidate + autoDeleteEligible by one explicit,
 materialized plan whose hash is supplied separately as expected-plan.
 
 It fails closed on plan mismatch, incomplete observations, repository-wide ref
 drift, control-head drift, open PRs, per-ref SHA mismatch, or failed readback.
+A delete that reports failure may be accepted as ALREADY_ABSENT only when an
+immediate full-inventory readback exactly matches the expected state with that
+single ref removed; any other drift remains a hard failure.
 """
 from __future__ import annotations
 
@@ -112,6 +115,17 @@ def delete_remote_ref(repository: str, branch: str) -> None:
         raise RuntimeError(f"DELETE_REF_FAILED:{branch}:{output}")
 
 
+def delete_or_confirm_absent(repository: str, branch: str, expected_after: dict[str, str]) -> str:
+    try:
+        delete_remote_ref(repository, branch)
+        return "deleted"
+    except RuntimeError as exc:
+        observed = observe_branch_inventory(repository)
+        if observed == expected_after:
+            return "already-absent"
+        raise RuntimeError(f"DELETE_REF_FAILED_WITH_DRIFT:{branch}") from exc
+
+
 def select_candidates(plan: dict[str, Any]) -> list[dict[str, Any]]:
     prune_plan.validate_plan(plan, require_complete=True)
     return sorted(
@@ -174,6 +188,7 @@ def apply_plan(plan: dict[str, Any], expected_plan: str | None) -> dict[str, Any
 
     expected = expected_inventory_from_plan(plan)
     deleted: list[dict[str, str]] = []
+    already_absent: list[dict[str, str]] = []
     deleted_this_run: dict[str, str] = {}
     readback_retries = 0
 
@@ -194,24 +209,33 @@ def apply_plan(plan: dict[str, Any], expected_plan: str | None) -> dict[str, Any
         if observe_open_prs_using_branch(repository, branch):
             raise RuntimeError(f"STALE_PLAN:OPEN_PR_RELATION_APPEARED:{branch}")
 
-        delete_remote_ref(repository, branch)
-        expected.pop(branch)
+        expected_after = dict(expected)
+        expected_after.pop(branch)
+        outcome = delete_or_confirm_absent(repository, branch, expected_after)
+        expected = expected_after
         deleted_this_run[branch] = sha
         readback_retries += wait_for_consistent_inventory(
             repository, expected, deleted_this_run, context=f"after:{branch}"
         )
-        deleted.append({"branch": branch, "sha": sha})
+        record = {"branch": branch, "sha": sha}
+        if outcome == "deleted":
+            deleted.append(record)
+        else:
+            already_absent.append(record)
 
     readback_retries += wait_for_consistent_inventory(
         repository, expected, deleted_this_run, context="final"
     )
     return {
-        "schemaVersion": "GitPruneApplyResult 0.2",
+        "schemaVersion": "GitPruneApplyResult 0.3",
         "repository": repository,
         "planHash": plan.get("planHash"),
         "controlSha": control_sha,
         "deleted": deleted,
         "deletedCount": len(deleted),
+        "alreadyAbsent": already_absent,
+        "alreadyAbsentCount": len(already_absent),
+        "concurrentDeletionObserved": bool(already_absent),
         "remainingBranchCount": len(expected),
         "readbackRetries": readback_retries,
         "readback": "PASS",
@@ -230,8 +254,9 @@ def command(as_json: bool, plan_path: Path, expected_plan: str) -> int:
     if as_json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
-        print("GIT PRUNE APPLY 0.2")
+        print("GIT PRUNE APPLY 0.3")
         print(f"  deleted: {result['deletedCount']}")
+        print(f"  already absent: {result['alreadyAbsentCount']}")
         print(f"  remaining branches: {result['remainingBranchCount']}")
         print(f"  readback retries: {result['readbackRetries']}")
         print(f"  planHash: {result['planHash']}")
@@ -240,9 +265,9 @@ def command(as_json: bool, plan_path: Path, expected_plan: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Apply one exact GitPrunePlan 0.3 with CAS-style readback")
+    parser = argparse.ArgumentParser(description="Apply one exact GitPrunePlan 0.4 with CAS-style readback")
     parser.add_argument("--json", action="store_true", dest="as_json")
-    parser.add_argument("--plan", type=Path, required=True, help="Exact materialized GitPrunePlan 0.3")
+    parser.add_argument("--plan", type=Path, required=True, help="Exact materialized GitPrunePlan 0.4")
     parser.add_argument("--expected-plan", required=True, help="Expected planHash observed before destructive execution")
     args = parser.parse_args()
     return command(args.as_json, args.plan, args.expected_plan)
