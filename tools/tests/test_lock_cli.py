@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from tools import coordination
 from tools import lock
+from tools import test_lifecycle
 from tools.coordination_remote import (
     AppliedTransition,
     AuthorityObservation,
@@ -61,6 +62,11 @@ class UnavailableAuthority:
         raise CoordinationRemoteError("COORDINATION_REMOTE_UNAVAILABLE", "offline")
 
 
+@test_lifecycle.transitional_suite(
+    owner="coordination",
+    reason="tools.lock is a legacy CLI alias for Coordination Lease operations",
+    retire_when=test_lifecycle.semantic_alias_absent("coordination.lease", "lock", "cli-name"),
+)
 class LockCliTests(unittest.TestCase):
     def run_cli(self, fake, argv, environ=None):
         stdout = io.StringIO()
