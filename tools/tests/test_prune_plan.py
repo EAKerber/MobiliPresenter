@@ -68,6 +68,16 @@ class PrunePlan03Tests(unittest.TestCase):
         self.assertIn("open-pr-head", by["ops/live"]["protections"])
         self.assertEqual(by["other/protected"]["action"], "keep")
 
+    def test_open_pr_base_is_dynamic_protection(self):
+        refs = {"main": "a" * 40, "feature/base": "b" * 40, "work/head": "c" * 40}
+        prs = [{"number": 12, "state": "open", "merged": False, "headRef": "work/head", "headSha": "c" * 40, "baseRef": "feature/base"}]
+        ancestry = {name: "ancestor-of-control" for name in refs}
+        plan = self.build(refs, prs=prs, ancestry=ancestry)
+        by = {entry["branch"]: entry for entry in plan["entries"]}
+        self.assertEqual(plan["openPrBases"], ["feature/base"])
+        self.assertIn("open-pr-base", by["feature/base"]["protections"])
+        self.assertEqual(by["feature/base"]["action"], "keep")
+
     def test_current_head_must_match_merged_pr_head(self):
         refs = {"main": "a" * 40, "ops/old": "c" * 40}
         prs = [{"number": 10, "state": "closed", "merged": True, "headRef": "ops/old", "headSha": "b" * 40}]
