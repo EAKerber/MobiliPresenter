@@ -65,6 +65,25 @@ class SchedulerSnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "SCHEDULER_SNAPSHOT_STALE_CONTROL"):
             snapshot.validate_snapshot(value, source_machine=machine, readback_machine=readback)
 
+    def test_consumer_time_expected_heads_reject_current_authority_drift(self):
+        machine, _, _, value = pipeline()
+        expected = {name: value["sourceHeads"][name]["sha"] for name in snapshot.CURRENT_HEAD_KEYS}
+        snapshot.validate_snapshot(
+            value,
+            source_machine=machine,
+            readback_machine=copy.deepcopy(machine),
+            expected_heads=expected,
+        )
+        changed = dict(expected)
+        changed["continuation"] = "9" * 40
+        with self.assertRaisesRegex(RuntimeError, "SCHEDULER_SNAPSHOT_STALE_CURRENT_CONTINUATION"):
+            snapshot.validate_snapshot(
+                value,
+                source_machine=machine,
+                readback_machine=copy.deepcopy(machine),
+                expected_heads=changed,
+            )
+
     def test_source_machine_mismatch_is_not_treated_as_readback_drift(self):
         machine, _, _, value = pipeline()
         changed = base_sensors()
