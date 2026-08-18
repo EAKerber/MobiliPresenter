@@ -20,37 +20,18 @@ SCHEMA_VERSION = "SchedulerPlan 0.2"
 ACTIONS = {item.value for item in OperationalAction}
 
 
-def work_for(value, work_id):
-    for item in value.get("workItems") or []:
-        if isinstance(item, dict) and item.get("id") == work_id:
-            return item
-    raise RuntimeError("SCHEDULER_WORK_ITEM_NOT_FOUND")
-
-
-def work_focus(focus):
-    if isinstance(focus, str) and focus.startswith("work:"):
-        value = focus.split(":", 1)[1]
-        return value if value else None
-    return None
-
-
 def route(value):
     rec = value["recommendation"]
     action = OperationalAction.parse(rec["action"]).value
-    work_id = work_focus(rec.get("focus"))
+    work_id = rec.get("workId")
+    target = rec.get("targetWorkerId")
     if action == OperationalAction.HANDOFF.value:
-        if work_id is None:
-            raise RuntimeError("SCHEDULER_HANDOFF_REQUIRES_WORK")
-        item = work_for(value, work_id)
-        target = item.get("handoffToWorkerId")
-        if item.get("status") != "HANDOFF" or not isinstance(target, str) or not target.strip():
+        if not isinstance(work_id, str) or not work_id or not isinstance(target, str) or not target:
             raise RuntimeError("SCHEDULER_HANDOFF_TARGET_INVALID")
         return {"shouldWake": True, "channelClass": "worker", "target": target, "workId": work_id}
     if action == OperationalAction.CONTINUE.value:
         if work_id is not None:
-            item = work_for(value, work_id)
-            target = item.get("workerId")
-            if item.get("status") not in {"READY", "IN_PROGRESS"} or not isinstance(target, str) or not target.strip():
+            if not isinstance(work_id, str) or not work_id or not isinstance(target, str) or not target:
                 raise RuntimeError("SCHEDULER_CONTINUE_TARGET_INVALID")
             return {"shouldWake": True, "channelClass": "worker", "target": target, "workId": work_id}
         return {"shouldWake": True, "channelClass": "supervisor", "target": "gitops-supervisor", "workId": None}
