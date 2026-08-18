@@ -9,7 +9,7 @@ from tools import transition_protocol as protocol
 
 class ProjectStateTransitionTests(unittest.TestCase):
     def state(self):
-        return {"schemaVersion":"ProjectState 2.0","project":{"id":"mobilipresenter","repository":"EAKerber/MobiliPresenter"},"git":{"controlBranch":"main","activeDevelopmentBranch":None,"protectedBranches":[]},"published":{"url":"https://example.invalid/","artifactManifest":"ops/published/viewer-next-current.json"},"development":{"initiative":"Test","phase":"between-increments","checkpoint":"BEFORE","nextTransition":"next-before","blockers":[],"prNumber":None}}
+        return {"schemaVersion":"ProjectState 2.1","project":{"id":"mobilipresenter","repository":"EAKerber/MobiliPresenter"},"git":{"controlBranch":"main","protectedBranches":[]},"published":{"url":"https://example.invalid/","artifactManifest":"ops/published/viewer-next-current.json"},"development":{"initiative":"Test","phase":"between-increments","checkpoint":"BEFORE","nextTransition":"next-before"}}
     def plan(self):return project_state_transition.checkpoint(self.state(),"AFTER","next-after",None,validator=project_state.validate_current)
     def test_checkpoint_plan_is_deterministic(self):
         first=self.plan();second=self.plan();self.assertEqual(first,second);self.assertEqual(first["schemaVersion"],"TransitionPlan 0.1");self.assertEqual(first["candidate"]["development"]["checkpoint"],"AFTER")
