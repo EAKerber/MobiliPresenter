@@ -30,7 +30,7 @@ def checkpoint_branch_allowed(branch):
 def apply(plan,expected_plan,*,state_path,load_state,validator,observe_git):
     transition.validate_project_state_plan(plan,validator=validator);protocol.require_expected_plan(plan,expected_plan);current=load_state();errors=validator(current)
     if errors:raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
-    protocol.verify_before_state(plan,current);git=observe_git()
+    transition.validate_project_state_plan(plan,validator=validator,before=current,bind_before=True);git=observe_git()
     if not git.get("worktree"):raise RuntimeError("CHECKPOINT_NOT_A_WORKTREE")
     branch=git.get("branch")
     if not checkpoint_branch_allowed(branch):raise RuntimeError(f"CHECKPOINT_BRANCH_NOT_AUTHORIZED:{branch}")
