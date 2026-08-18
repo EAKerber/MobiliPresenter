@@ -37,23 +37,38 @@ def checkpoint(before: dict[str, Any], checkpoint_name: str, next_transition: st
     return protocol.build_plan(domain="project-state", action="checkpoint", subject=PROJECT_STATE_SUBJECT, authority=PROJECT_STATE_AUTHORITY, before=before, candidate=candidate, intent=intent, reversibility="revertible")
 
 
-def set_protected_branches(before: dict[str, Any], branches: list[str], *, validator: Validator) -> dict[str, Any]:
+def _normalized_removals(remove: list[str]) -> list[str]:
+    if not isinstance(remove, list) or not remove:
+        raise RuntimeError("PROJECT_STATE_RETENTION_REMOVE_INVALID")
+    if any(not isinstance(branch, str) or not branch for branch in remove):
+        raise RuntimeError("PROJECT_STATE_RETENTION_REMOVE_INVALID")
+    if len(remove) != len(set(remove)):
+        raise RuntimeError("PROJECT_STATE_RETENTION_REMOVE_DUPLICATE")
+    return sorted(remove)
+
+
+def shrink_protected_branches(before: dict[str, Any], remove: list[str], *, validator: Validator) -> dict[str, Any]:
     _validated_before(before, validator)
-    if not isinstance(branches, list) or any(not isinstance(branch, str) or not branch for branch in branches):
-        raise RuntimeError("PROJECT_STATE_PROTECTED_BRANCHES_INVALID")
-    if len(branches) != len(set(branches)):
-        raise RuntimeError("PROJECT_STATE_PROTECTED_BRANCHES_DUPLICATE")
+    removals = _normalized_removals(remove)
+    current = list(before["git"]["protectedBranches"])
+    unknown = [branch for branch in removals if branch not in current]
+    if unknown:
+        raise RuntimeError(f"PROJECT_STATE_RETENTION_REMOVE_UNKNOWN:{unknown[0]}")
     candidate = copy.deepcopy(before)
-    candidate["git"]["protectedBranches"] = list(branches)
+    candidate["git"]["protectedBranches"] = [branch for branch in current if branch not in set(removals)]
     candidate_errors = validator(candidate)
     if candidate_errors:
-        raise RuntimeError(f"PROJECT_STATE_PROTECTED_BRANCHES_STATE_INVALID:{candidate_errors[0]['detail']}")
-    intent = {
-        "protectedBranches": list(branches),
-        "removed": [branch for branch in before["git"]["protectedBranches"] if branch not in branches],
-        "added": [branch for branch in branches if branch not in before["git"]["protectedBranches"]],
-    }
-    return protocol.build_plan(domain="project-state", action="set-protected-branches", subject=PROJECT_STATE_SUBJECT, authority=PROJECT_STATE_AUTHORITY, before=before, candidate=candidate, intent=intent, reversibility="revertible")
+        raise RuntimeError(f"PROJECT_STATE_RETENTION_STATE_INVALID:{candidate_errors[0]['detail']}")
+    return protocol.build_plan(
+        domain="project-state",
+        action="shrink-protected-branches",
+        subject=PROJECT_STATE_SUBJECT,
+        authority=PROJECT_STATE_AUTHORITY,
+        before=before,
+        candidate=candidate,
+        intent={"remove": removals},
+        reversibility="revertible",
+    )
 
 
 def _validate_common(plan: dict[str, Any], *, validator: Validator) -> None:
@@ -84,25 +99,52 @@ def validate_checkpoint_plan(plan: dict[str, Any], *, validator: Validator) -> d
     return plan
 
 
-def validate_protected_branches_plan(plan: dict[str, Any], *, validator: Validator) -> dict[str, Any]:
+def validate_shrink_protected_branches_plan(plan: dict[str, Any], *, validator: Validator) -> dict[str, Any]:
     _validate_common(plan, validator=validator)
-    if plan["action"] != "set-protected-branches":
-        raise RuntimeError("PROJECT_STATE_PROTECTED_BRANCHES_PLAN_ACTION_INVALID")
+    if plan["action"] != "shrink-protected-branches":
+        raise RuntimeError("PROJECT_STATE_RETENTION_PLAN_ACTION_INVALID")
     intent = plan["intent"]
-    if set(intent) != {"protectedBranches", "removed", "added"}:
-        raise RuntimeError("PROJECT_STATE_PROTECTED_BRANCHES_PLAN_INTENT_INVALID")
-    branches = intent["protectedBranches"]
-    if not isinstance(branches, list) or len(branches) != len(set(branches)) or any(not isinstance(branch, str) or not branch for branch in branches):
-        raise RuntimeError("PROJECT_STATE_PROTECTED_BRANCHES_PLAN_INTENT_INVALID")
-    if plan["candidate"]["git"]["protectedBranches"] != branches:
-        raise RuntimeError("PROJECT_STATE_PROTECTED_BRANCHES_PLAN_CANDIDATE_INTENT_MISMATCH")
+    if set(intent) != {"remove"}:
+        raise RuntimeError("PROJECT_STATE_RETENTION_PLAN_INTENT_INVALID")
+    removals = _normalized_removals(intent["remove"])
+    if removals != intent["remove"]:
+        raise RuntimeError("PROJECT_STATE_RETENTION_PLAN_INTENT_INVALID")
+    candidate = plan["candidate"]["git"]["protectedBranches"]
+    if any(branch in candidate for branch in removals):
+        raise RuntimeError("PROJECT_STATE_RETENTION_PLAN_CANDIDATE_INTENT_MISMATCH")
     return plan
 
 
-def validate_project_state_plan(plan: dict[str, Any], *, validator: Validator) -> dict[str, Any]:
+def rebuild(plan: dict[str, Any], before: dict[str, Any], *, validator: Validator) -> dict[str, Any]:
+    action = plan.get("action") if isinstance(plan, dict) else None
+    intent = plan.get("intent") if isinstance(plan, dict) else None
+    if not isinstance(intent, dict):
+        raise RuntimeError("PROJECT_STATE_PLAN_INTENT_INVALID")
+    if action == "checkpoint":
+        return checkpoint(before, intent.get("checkpoint"), intent.get("nextTransition"), intent.get("phase"), validator=validator)
+    if action == "shrink-protected-branches":
+        return shrink_protected_branches(before, intent.get("remove"), validator=validator)
+    raise RuntimeError("PROJECT_STATE_PLAN_ACTION_UNSUPPORTED")
+
+
+def validate_project_state_plan(
+    plan: dict[str, Any],
+    *,
+    validator: Validator,
+    before: dict[str, Any] | None = None,
+    bind_before: bool = False,
+) -> dict[str, Any]:
     action = plan.get("action") if isinstance(plan, dict) else None
     if action == "checkpoint":
-        return validate_checkpoint_plan(plan, validator=validator)
-    if action == "set-protected-branches":
-        return validate_protected_branches_plan(plan, validator=validator)
-    raise RuntimeError("PROJECT_STATE_PLAN_ACTION_UNSUPPORTED")
+        validate_checkpoint_plan(plan, validator=validator)
+    elif action == "shrink-protected-branches":
+        validate_shrink_protected_branches_plan(plan, validator=validator)
+    else:
+        raise RuntimeError("PROJECT_STATE_PLAN_ACTION_UNSUPPORTED")
+    if bind_before:
+        if before is None:
+            raise RuntimeError("PROJECT_STATE_PLAN_BEFORE_REQUIRED")
+        protocol.verify_before_state(plan, before)
+        if rebuild(plan, before, validator=validator) != plan:
+            raise RuntimeError("PROJECT_STATE_PLAN_DERIVATION_MISMATCH")
+    return plan
