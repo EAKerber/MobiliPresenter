@@ -41,20 +41,28 @@ class ProjectStateConsumerBoundaryTests(unittest.TestCase):
         self.assertIn('work_graph.active_execution_bindings',text)
         self.assertNotIn('active-development',text)
 
-    def test_live_authority_and_canonical_schema_are_v2_only(self):
+    def test_live_authority_and_canonical_schema_are_21_only(self):
         state=(ROOT/"ops/state/project.json").read_text(encoding="utf-8")
         schema=(ROOT/"ops/schemas/project-state.schema.json").read_text(encoding="utf-8")
-        self.assertIn('"schemaVersion": "ProjectState 2.0"',state)
-        self.assertIn('"ProjectState 2.0"',schema)
-        self.assertNotIn('"schemaVersion": "ProjectState 1.0"',state)
+        self.assertIn('"schemaVersion": "ProjectState 2.1"',state)
+        self.assertIn('"ProjectState 2.1"',schema)
+        self.assertNotIn('"schemaVersion": "ProjectState 2.0"',state)
+        for token in ('activeDevelopmentBranch','"prNumber"','"blockers"'):
+            self.assertNotIn(token,state)
+            self.assertNotIn(token,schema)
         self.assertFalse((ROOT/"ops/schemas/project-state-2.0.schema.json").exists())
+        self.assertFalse((ROOT/"ops/schemas/project-state-2.1.schema.json").exists())
         self.assertFalse((ROOT/"ops/migrations/project-state-2.0.json").exists())
+
+    def test_migration_machinery_is_retired_after_cutover(self):
+        self.assertFalse((ROOT/"tools/project_state_migration.py").exists())
+        self.assertFalse((ROOT/"tools/tests/test_project_state_migration.py").exists())
 
     def test_runtime_compatibility_helpers_are_retired(self):
         text=(ROOT/"tools/project_state.py").read_text(encoding="utf-8")
         for token in (
-            "validate_v1","validate_v2","validate_compatible","migrate_v1_to_v2",
-            "MIGRATION_MAP_PATH","CANDIDATE_V2_SCHEMA_PATH",
+            "validate_v1","validate_v2","validate_v20","validate_v21","validate_compatible",
+            "migrate_v1_to_v2","migrate_v20_to_v21","MIGRATION_MAP_PATH","CANDIDATE_V2_SCHEMA_PATH",
         ):
             self.assertNotIn(token,text)
         self.assertNotIn("validate_state_shape",(ROOT/"tools/agent.py").read_text(encoding="utf-8"))
