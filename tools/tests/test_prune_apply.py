@@ -23,13 +23,13 @@ APPLY_SPEC.loader.exec_module(apply_mod)
 class PruneApplyTests(unittest.TestCase):
     def state(self):
         return {
-            "schemaVersion": "ProjectState 2.0",
+            "schemaVersion": "ProjectState 2.1",
             "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
-            "git": {"controlBranch": "main", "activeDevelopmentBranch": None, "protectedBranches": []},
+            "git": {"controlBranch": "main", "protectedBranches": []},
             "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
             "development": {
                 "initiative": "I", "phase": "between-increments", "checkpoint": "C",
-                "nextTransition": "N", "blockers": [], "prNumber": None,
+                "nextTransition": "N",
             },
         }
 
