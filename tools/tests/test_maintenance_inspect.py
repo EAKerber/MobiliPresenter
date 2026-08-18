@@ -2,6 +2,7 @@ import copy
 import unittest
 
 from tools import maintenance_inspect as maintenance
+from tools import test_lifecycle
 
 SOURCE_HASH = "f" * 64
 
@@ -63,6 +64,11 @@ def coherence(status="PASS", code=None):
     return {"status": status, "ok": status != "FAIL", "complete": status == "PASS", "failedChecks": ["test.coherence"] if status == "FAIL" else [], "unknownChecks": ["test.coherence"] if status == "UNKNOWN" else [], "checks": checks}
 
 
+@test_lifecycle.transitional_suite(
+    owner="operations-core",
+    reason="fragmented Maintenance construction remains only while build_inspection is a supported migration-era entrypoint",
+    retire_when=test_lifecycle.symbol_absent("tools.maintenance_inspect", "build_inspection"),
+)
 class MaintenanceInspectTests(unittest.TestCase):
     def build(self,s=None,v=None,caps=None,remote=False,prs=None,coord=None,work_items=None,machine_trust=None,machine_coherence=None,machine_sensors=None):
         return maintenance.build_inspection(

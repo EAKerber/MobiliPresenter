@@ -1,6 +1,7 @@
 import copy
 import unittest
 from tools import peer_recovery_bus as bus
+from tools import test_lifecycle
 
 
 HEADS = {"control": "1" * 40, "coordination": "2" * 40, "continuation": "3" * 40}
@@ -53,6 +54,11 @@ def recovery_input():
     }
 
 
+@test_lifecycle.transitional_suite(
+    owner="capability",
+    reason="peer recovery tests remain transitional while peer-recovery is an experimental capability",
+    retire_when=test_lifecycle.capability_policy_changed("peer-recovery", "experimental"),
+)
 class PeerRecoveryBusTests(unittest.TestCase):
     def test_initial_health_event_is_deterministic(self):
         first = bus.build_health_event(observation("manager-gitops-a"))

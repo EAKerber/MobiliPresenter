@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from tools import project_state
+from tools import project_state, test_lifecycle
 
 
 class ProjectStateTests(unittest.TestCase):
@@ -42,6 +42,13 @@ class ProjectStateTests(unittest.TestCase):
                     state[section][key] = value
                 self.assertTrue(project_state.validate_current(state))
 
+    @test_lifecycle.transitional_test(
+        owner="operations-core",
+        reason="ProjectState 2.0 temporarily owns development branch/PR atomicity before Work becomes the sole execution authority",
+        retire_when=test_lifecycle.schema_field_absent(
+            "ops/schemas/project-state.schema.json", "git.activeDevelopmentBranch"
+        ),
+    )
     def test_development_identity_remains_atomic(self):
         state = self.state()
         state["development"]["prNumber"] = 7

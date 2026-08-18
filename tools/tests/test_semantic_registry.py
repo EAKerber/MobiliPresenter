@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import unittest
 
+from tools import test_lifecycle
 from tools.semantics import registry
 
 
@@ -35,6 +36,11 @@ class SemanticRegistryTests(unittest.TestCase):
         broken["concepts"]["identity.worker"]["related"].append("identity.missing")
         self.assertIn("SEMANTIC_RELATED_UNKNOWN", registry.validate_registry(broken))
 
+    @test_lifecycle.transitional_test(
+        owner="coordination",
+        reason="legacy lock CLI alias remains supported until its declared retirement",
+        retire_when=test_lifecycle.semantic_alias_absent("coordination.lease", "lock", "cli-name"),
+    )
     def test_lock_resolves_as_legacy_alias_of_coordination_lease(self):
         resolved = registry.resolve_term("lock", scope="cli-name")
         self.assertEqual("coordination.lease", resolved["semanticId"])

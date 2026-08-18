@@ -3,6 +3,8 @@ import importlib.util
 import unittest
 from pathlib import Path
 
+from tools import test_lifecycle
+
 MODULE_PATH = Path(__file__).resolve().parents[1] / "capability_gates.py"
 spec = importlib.util.spec_from_file_location("capability_gates_tool", MODULE_PATH)
 capability_gates = importlib.util.module_from_spec(spec)
@@ -101,6 +103,11 @@ class CapabilityGates01Tests(unittest.TestCase):
         third = capability_gates.build_review_plan(changed)
         self.assertNotEqual(first["planHash"], third["planHash"])
 
+    @test_lifecycle.transitional_test(
+        owner="capability",
+        reason="canonical coordination-leases record remains in the live Capability Authority until capability closure is implemented",
+        retire_when=test_lifecycle.capability_record_absent("coordination-leases"),
+    )
     def test_repository_capability_is_canonical_after_promotion(self):
         discovered = {value["id"]: value for value in capability_gates.discover_capabilities()}
         self.assertIn("coordination-leases", discovered)
