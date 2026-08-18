@@ -1,4 +1,4 @@
-"""Fail-closed ProjectState checkpoint executor for Transition Protocol 0.1 plans."""
+"""Fail-closed ProjectState executor for Transition Protocol 0.1 plans."""
 from __future__ import annotations
 
 import json,os,tempfile
@@ -28,7 +28,7 @@ def checkpoint_branch_allowed(branch):
     except RuntimeError:return False
     return identity.get("grammar")=="canonical" and identity.get("declaredClass")=="work" and identity.get("semanticDomain")=="operations"
 def apply(plan,expected_plan,*,state_path,load_state,validator,observe_git):
-    transition.validate_checkpoint_plan(plan,validator=validator);protocol.require_expected_plan(plan,expected_plan);current=load_state();errors=validator(current)
+    transition.validate_project_state_plan(plan,validator=validator);protocol.require_expected_plan(plan,expected_plan);current=load_state();errors=validator(current)
     if errors:raise RuntimeError(f"STATE_SCHEMA_INVALID:{errors[0]['detail']}")
     protocol.verify_before_state(plan,current);git=observe_git()
     if not git.get("worktree"):raise RuntimeError("CHECKPOINT_NOT_A_WORKTREE")
