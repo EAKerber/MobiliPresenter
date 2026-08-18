@@ -139,9 +139,38 @@ class PruneApplyTests(unittest.TestCase):
              mock.patch.object(apply_mod.time, "sleep"):
             result = apply_mod.apply_plan(plan, plan["planHash"])
         self.assertEqual(delete.call_count, 2)
+        self.assertEqual(result["schemaVersion"], "GitPruneApplyResult 0.3")
         self.assertEqual(result["deletedCount"], 2)
+        self.assertEqual(result["alreadyAbsentCount"], 0)
+        self.assertFalse(result["concurrentDeletionObserved"])
         self.assertGreaterEqual(result["readbackRetries"], 3)
         self.assertEqual(result["readback"], "PASS")
+
+    def test_delete_failure_is_idempotent_only_after_exact_full_inventory_readback(self):
+        plan = self.plan()
+        initial = {"main": "a" * 40, "old/a": "b" * 40, "review/x": "c" * 40}
+        after = {"main": "a" * 40, "review/x": "c" * 40}
+        with mock.patch.dict(os.environ, {apply_mod.AUTH_ENV: "1"}, clear=False), \
+             mock.patch.object(apply_mod, "observe_branch_inventory", side_effect=[initial, initial, after, after, after]), \
+             mock.patch.object(apply_mod, "observe_open_prs_using_branch", return_value=[]), \
+             mock.patch.object(apply_mod, "delete_remote_ref", side_effect=RuntimeError("DELETE_REF_FAILED:old/a:404")):
+            result = apply_mod.apply_plan(plan, plan["planHash"])
+        self.assertEqual(result["deletedCount"], 0)
+        self.assertEqual(result["alreadyAbsent"], [{"branch": "old/a", "sha": "b" * 40}])
+        self.assertEqual(result["alreadyAbsentCount"], 1)
+        self.assertTrue(result["concurrentDeletionObserved"])
+        self.assertEqual(result["readback"], "PASS")
+
+    def test_delete_failure_with_any_other_inventory_drift_still_blocks(self):
+        plan = self.plan()
+        initial = {"main": "a" * 40, "old/a": "b" * 40, "review/x": "c" * 40}
+        drift = {"main": "f" * 40, "review/x": "c" * 40}
+        with mock.patch.dict(os.environ, {apply_mod.AUTH_ENV: "1"}, clear=False), \
+             mock.patch.object(apply_mod, "observe_branch_inventory", side_effect=[initial, initial, drift]), \
+             mock.patch.object(apply_mod, "observe_open_prs_using_branch", return_value=[]), \
+             mock.patch.object(apply_mod, "delete_remote_ref", side_effect=RuntimeError("DELETE_REF_FAILED:old/a:404")):
+            with self.assertRaisesRegex(RuntimeError, "DELETE_REF_FAILED_WITH_DRIFT:old/a"):
+                apply_mod.apply_plan(plan, plan["planHash"])
 
     def test_unrelated_drift_during_retry_fails_immediately(self):
         expected = {"main": "a" * 40}; deleted = {"old/a": "b" * 40}; drift = {"main": "f" * 40, "old/a": "b" * 40}
