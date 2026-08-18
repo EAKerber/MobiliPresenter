@@ -3,13 +3,13 @@ import unittest
 from tools import maintenance_inspect, project_machine, project_sensors
 
 
-def state(active=None, pr=None):
+def state():
     return {
-        "schemaVersion": "ProjectState 2.0",
+        "schemaVersion": "ProjectState 2.1",
         "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
-        "git": {"activeDevelopmentBranch": active, "controlBranch": "main", "protectedBranches": ["architecture/tpc"]},
+        "git": {"controlBranch": "main", "protectedBranches": ["architecture/tpc"]},
         "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
-        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "prNumber": pr, "blockers": []},
+        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next"},
     }
 
 
@@ -36,7 +36,7 @@ def base_sensors():
 
 class ProjectMachineTests(unittest.TestCase):
     def test_complete_live_inspection_is_slim_and_valid(self):
-        value=project_machine.build_inspection(state("legacy-branch",99),base_sensors(),scope="live")
+        value=project_machine.build_inspection(state(),base_sensors(),scope="live")
         self.assertEqual(value["schemaVersion"],"ProjectMachineInspection 0.5")
         self.assertEqual(set(value["project"]),{"stateHash","controlBranch","protectedBranches","phase","checkpoint","nextTransition"})
         self.assertNotIn("activeDevelopmentBranch",value["project"]);self.assertNotIn("developmentPrNumber",value["project"]);self.assertNotIn("blockers",value["project"])
@@ -63,10 +63,10 @@ class ProjectMachineTests(unittest.TestCase):
     def test_work_pr_coherence_failure_reconciles(self):
         sensors=base_sensors();sensors["continuations"]["data"]["items"]=[work_item(status="IN_PROGRESS",branch="work/operations/work",pr=7)];machine=project_machine.build_inspection(state(),sensors,scope="live");maintenance=maintenance_inspect.from_project_inspection(machine);self.assertEqual(machine["coherence"]["status"],"FAIL");self.assertEqual(maintenance["recommendation"]["reasonCode"],"WORK_PR_NOT_OPEN")
 
-    def test_work_ci_policy_is_derived_without_projectstate_execution_identity(self):
-        item=work_item(status="IN_PROGRESS",branch="work/operations/work",pr=7);current=state("wrong-legacy",999)
+    def test_work_ci_policy_is_derived_from_work_without_projectstate_execution_identity(self):
+        item=work_item(status="IN_PROGRESS",branch="work/operations/work",pr=7)
         for ci,expected in (("pending","PAUSE"),("failed","RECONCILE"),("unknown","NEEDS_HUMAN")):
-            sensors=base_sensors();sensors["continuations"]["data"]["items"]=[item];sensors["pullRequests"]["data"]["items"]=[{"number":7,"headRef":"work/operations/work","baseRef":"main","ci":ci,"ciObserved":ci!="unknown"}];machine=project_machine.build_inspection(current,sensors,scope="live");maintenance=maintenance_inspect.from_project_inspection(machine);self.assertEqual(maintenance["recommendation"]["action"],expected)
+            sensors=base_sensors();sensors["continuations"]["data"]["items"]=[item];sensors["pullRequests"]["data"]["items"]=[{"number":7,"headRef":"work/operations/work","baseRef":"main","ci":ci,"ciObserved":ci!="unknown"}];machine=project_machine.build_inspection(state(),sensors,scope="live");maintenance=maintenance_inspect.from_project_inspection(machine);self.assertEqual(maintenance["recommendation"]["action"],expected)
 
     def test_hash_is_stable_and_sensitive(self):
         first=project_machine.build_inspection(state(),base_sensors(),scope="live");second=project_machine.build_inspection(state(),base_sensors(),scope="live");self.assertEqual(first["inspectionHash"],second["inspectionHash"]);changed=base_sensors();changed["control"]["data"]["sha"]="9"*40;third=project_machine.build_inspection(state(),changed,scope="live");self.assertNotEqual(first["inspectionHash"],third["inspectionHash"])

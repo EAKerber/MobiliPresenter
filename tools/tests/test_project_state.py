@@ -1,25 +1,28 @@
 import copy
 import unittest
 
-from tools import project_state, test_lifecycle
+from tools import project_state
 
 
 class ProjectStateTests(unittest.TestCase):
     def state(self):
         return {
-            "schemaVersion": "ProjectState 2.0",
+            "schemaVersion": "ProjectState 2.1",
             "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
-            "git": {"controlBranch": "main", "activeDevelopmentBranch": None, "protectedBranches": ["coordination/leases"]},
+            "git": {"controlBranch": "main", "protectedBranches": ["coordination/leases"]},
             "published": {"url": "https://example.invalid/", "artifactManifest": "ops/published/viewer-next-current.json"},
-            "development": {"initiative": "Viewer Next", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next", "blockers": [], "prNumber": None},
+            "development": {"initiative": "Viewer Next", "phase": "between-increments", "checkpoint": "C", "nextTransition": "next"},
         }
 
-    def test_v2_is_the_only_current_contract(self):
+    def test_v21_is_the_only_current_contract(self):
         value = self.state()
         self.assertEqual(project_state.validate_current(value), [])
-        self.assertEqual(project_state.operational_view(value), value | {"schemaVersion": value["schemaVersion"]} if False else {k: copy.deepcopy(value[k]) for k in ("project", "git", "published", "development")})
+        self.assertEqual(
+            project_state.operational_view(value),
+            {k: copy.deepcopy(value[k]) for k in ("project", "git", "published", "development")},
+        )
         old = copy.deepcopy(value)
-        old["schemaVersion"] = "ProjectState 1.0"
+        old["schemaVersion"] = "ProjectState 2.0"
         self.assertTrue(any(item["code"] == "STATE_SCHEMA_UNSUPPORTED" for item in project_state.validate_current(old)))
 
     def test_removed_baggage_is_rejected(self):
@@ -42,17 +45,18 @@ class ProjectStateTests(unittest.TestCase):
                     state[section][key] = value
                 self.assertTrue(project_state.validate_current(state))
 
-    @test_lifecycle.transitional_test(
-        owner="operations-core",
-        reason="ProjectState 2.0 temporarily owns development branch/PR atomicity before Work becomes the sole execution authority",
-        retire_when=test_lifecycle.schema_field_absent(
-            "ops/schemas/project-state.schema.json", "git.activeDevelopmentBranch"
-        ),
-    )
-    def test_development_identity_remains_atomic(self):
-        state = self.state()
-        state["development"]["prNumber"] = 7
-        self.assertTrue(any(item["code"] == "DEVELOPMENT_IDENTITY_INCOMPLETE" for item in project_state.validate_current(state)))
+    def test_execution_identity_is_not_part_of_projectstate_21(self):
+        cases = [
+            ("git", "activeDevelopmentBranch", None),
+            ("development", "prNumber", None),
+            ("development", "blockers", []),
+        ]
+        for section, key, value in cases:
+            with self.subTest(field=f"{section}.{key}"):
+                state = self.state()
+                state[section][key] = value
+                errors = project_state.validate_current(state)
+                self.assertTrue(any(item["code"] == "STATE_SCHEMA_INVALID" for item in errors))
 
 
 if __name__ == "__main__":

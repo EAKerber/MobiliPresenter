@@ -132,18 +132,19 @@ def check_project_state_contract()->list[str]:
     registry=load_registry();errors=[];contract=registry.get("contracts",{}).get("project-state")
     if not isinstance(contract,dict):return ["SEMANTIC_PROJECT_STATE_CONTRACT_MISSING"]
     if contract.get("semanticValidator")!="tools.project_state.validate_current":errors.append("SEMANTIC_PROJECT_STATE_VALIDATOR_MISMATCH")
-    schema=_schema_for(contract);properties=_properties(schema);expected={"schemaVersion","project","git","published","development"}
-    if set(properties)!=expected:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_FIELDS_MISMATCH")
-    if _required(schema)!=expected:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_REQUIRED_MISMATCH")
+    schema=_schema_for(contract);properties=_properties(schema)
+    if set(properties)!=project_state.TOP_FIELDS:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_FIELDS_MISMATCH")
+    if _required(schema)!=project_state.TOP_FIELDS:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_REQUIRED_MISMATCH")
     version=properties.get("schemaVersion") if isinstance(properties.get("schemaVersion"),dict) else {}
     if version.get("const")!=project_state.CURRENT_SCHEMA_VERSION:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_VERSION_MISMATCH")
     state=project_state.load_state();runtime_errors=project_state.validate_current(state)
     if runtime_errors:errors.append(f"SEMANTIC_PROJECT_STATE_RUNTIME_INVALID:{runtime_errors[0]['code']}")
-    if set(state)!=expected:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_REJECTS_RUNTIME")
-    nested={"project":{"id","repository"},"git":{"controlBranch","activeDevelopmentBranch","protectedBranches"},"published":{"url","artifactManifest"},"development":{"initiative","phase","checkpoint","nextTransition","blockers","prNumber"}}
+    if set(state)!=project_state.TOP_FIELDS:errors.append("SEMANTIC_PROJECT_STATE_SCHEMA_REJECTS_RUNTIME")
+    nested={"project":project_state.PROJECT_FIELDS,"git":project_state.GIT_FIELDS,"published":project_state.PUBLISHED_FIELDS,"development":project_state.DEVELOPMENT_FIELDS}
     for name,fields in nested.items():
         spec=properties.get(name) if isinstance(properties.get(name),dict) else {};required=_required(spec);value=state.get(name)
         if required!=fields:errors.append(f"SEMANTIC_PROJECT_STATE_{name.upper()}_REQUIRED_MISMATCH")
+        if set(_properties(spec))!=fields:errors.append(f"SEMANTIC_PROJECT_STATE_{name.upper()}_SCHEMA_FIELDS_MISMATCH")
         if not isinstance(value,dict) or set(value)!=fields:errors.append(f"SEMANTIC_PROJECT_STATE_{name.upper()}_RUNTIME_FIELDS_MISMATCH")
     return errors
 

@@ -59,12 +59,16 @@ class TestLifecycleTests(unittest.TestCase):
 
     def test_schema_field_predicate_follows_canonical_schema(self):
         present = test_lifecycle.schema_field_absent(
+            "ops/schemas/project-state.schema.json", "git.controlBranch"
+        )
+        retired = test_lifecycle.schema_field_absent(
             "ops/schemas/project-state.schema.json", "git.activeDevelopmentBranch"
         )
         absent = test_lifecycle.schema_field_absent(
             "ops/schemas/project-state.schema.json", "git.field-that-does-not-exist"
         )
         self.assertFalse(present.due())
+        self.assertTrue(retired.due())
         self.assertTrue(absent.due())
 
 

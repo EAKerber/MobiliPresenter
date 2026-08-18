@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/project-state-2.0.json",
-  "title": "MobiliPresenter ProjectState 2.0",
+  "$id": "https://mobilipresenter.local/schemas/project-state-2.1.json",
+  "title": "MobiliPresenter ProjectState 2.1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,7 +13,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "ProjectState 2.0"
+      "const": "ProjectState 2.1"
     },
     "project": {
       "type": "object",
@@ -36,24 +36,12 @@
       "additionalProperties": false,
       "required": [
         "controlBranch",
-        "activeDevelopmentBranch",
         "protectedBranches"
       ],
       "properties": {
         "controlBranch": {
           "type": "string",
           "minLength": 1
-        },
-        "activeDevelopmentBranch": {
-          "oneOf": [
-            {
-              "type": "string",
-              "minLength": 1
-            },
-            {
-              "type": "null"
-            }
-          ]
         },
         "protectedBranches": {
           "type": "array",
@@ -90,9 +78,7 @@
         "initiative",
         "phase",
         "checkpoint",
-        "nextTransition",
-        "blockers",
-        "prNumber"
+        "nextTransition"
       ],
       "properties": {
         "initiative": {
@@ -110,23 +96,6 @@
         "nextTransition": {
           "type": "string",
           "minLength": 1
-        },
-        "blockers": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "prNumber": {
-          "oneOf": [
-            {
-              "type": "integer",
-              "minimum": 1
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       }
     }

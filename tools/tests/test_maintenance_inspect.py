@@ -7,11 +7,11 @@ from tools import project_machine, project_sensors
 
 def state():
     return {
-        "schemaVersion": "ProjectState 2.0",
+        "schemaVersion": "ProjectState 2.1",
         "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
-        "git": {"controlBranch": "main", "activeDevelopmentBranch": None, "protectedBranches": ["architecture/tpc"]},
+        "git": {"controlBranch": "main", "protectedBranches": ["architecture/tpc"]},
         "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
-        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "open-next-slice", "blockers": [], "prNumber": None},
+        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "open-next-slice"},
     }
 
 

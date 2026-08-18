@@ -1,12 +1,11 @@
 {
-  "schemaVersion": "ProjectState 2.0",
+  "schemaVersion": "ProjectState 2.1",
   "project": {
     "id": "mobilipresenter",
     "repository": "EAKerber/MobiliPresenter"
   },
   "git": {
     "controlBranch": "main",
-    "activeDevelopmentBranch": null,
     "protectedBranches": [
       "coordination/leases",
       "coordination/continuations",
@@ -28,8 +27,6 @@
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
     "checkpoint": "POST-GUIDED-CONFIGURATOR-0.3-INTEGRATED",
-    "nextTransition": "open-developer-slice-for-responsive-fixed-frame-v0.1",
-    "blockers": [],
-    "prNumber": null
+    "nextTransition": "open-developer-slice-for-responsive-fixed-frame-v0.1"
   }
 }
