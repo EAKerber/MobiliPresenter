@@ -21,54 +21,32 @@ APPLY_SPEC.loader.exec_module(apply_mod)
 
 
 class PruneApplyTests(unittest.TestCase):
-    def plan(self, two_candidates=False):
-        def entry(branch, sha, action, auto, protections):
-            return {
-                "branch": branch,
-                "sha": sha,
-                "branchIdentity": {"name": branch, "grammar": "legacy-unknown", "namespace": None, "declaredClass": None, "domain": None, "semanticDomain": None, "legacyAlias": False, "slug": None},
-                "action": action,
-                "reason": "fixture",
-                "autoDeleteEligible": auto,
-                "protections": protections,
-                "ancestryToControl": "diverged",
-                "prProvenance": [],
-                "evidence": [],
-                "duplicateOf": [],
-            }
-        entries = [
-            entry("main", "a" * 40, "keep", False, ["control-branch"]),
-            entry("old/a", "b" * 40, "delete-candidate", True, []),
-            entry("review/x", "c" * 40, "review", False, []),
-        ]
-        if two_candidates:
-            entries.insert(2, entry("old/b", "d" * 40, "delete-candidate", True, []))
-        body = {
-            "schemaVersion": "GitPrunePlan 0.3",
-            "repository": "EAKerber/MobiliPresenter",
-            "controlBranch": "main",
-            "controlSha": "a" * 40,
-            "branchCount": len(entries),
-            "observations": {
-                "complete": True,
-                "branchInventoryComplete": True,
-                "branchInventorySource": "fixture",
-                "prHistoryComplete": True,
-                "prHistoryError": None,
-                "ancestryComplete": True,
+    def state(self):
+        return {
+            "schemaVersion": "ProjectState 2.0",
+            "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
+            "git": {"controlBranch": "main", "activeDevelopmentBranch": None, "protectedBranches": []},
+            "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
+            "development": {
+                "initiative": "I", "phase": "between-increments", "checkpoint": "C",
+                "nextTransition": "N", "blockers": [], "prNumber": None,
             },
-            "execution": {
-                "executorAvailable": True,
-                "requiresPlanFile": True,
-                "requiresExpectedPlan": True,
-                "requiresExplicitAuthorization": True,
-            },
-            "openPrHeads": [],
-            "openPrBases": [],
-            "entries": entries,
-            "note": "fixture",
         }
-        return {**body, "planHash": plan_mod.stable_hash(body)}
+
+    def plan(self, two_candidates=False):
+        refs = {"main": "a" * 40, "old/a": "b" * 40, "review/x": "c" * 40}
+        if two_candidates:
+            refs["old/b"] = "d" * 40
+        ancestry = {branch: "diverged" for branch in refs}
+        ancestry["main"] = "identical-to-control"
+        ancestry["old/a"] = "ancestor-of-control"
+        if two_candidates:
+            ancestry["old/b"] = "ancestor-of-control"
+        return plan_mod.build_prune_plan(
+            self.state(), refs, [], ancestry,
+            work_items=[], work_authority_complete=True, work_authority_head="f" * 40,
+            published_source_branch="main",
+        )
 
     def test_select_candidates_only_strong_unprotected(self):
         selected = apply_mod.select_candidates(self.plan())
@@ -103,7 +81,11 @@ class PruneApplyTests(unittest.TestCase):
             apply_mod.select_candidates(plan)
 
     def test_incomplete_plan_is_rejected(self):
-        plan = self.plan(); plan["observations"]["prHistoryComplete"] = False; plan["observations"]["complete"] = False
+        plan = self.plan()
+        plan["observations"]["workAuthorityComplete"] = False
+        plan["observations"]["workAuthorityHead"] = None
+        plan["observations"]["workAuthorityError"] = "CONTINUATION_REMOTE_UNAVAILABLE"
+        plan["observations"]["complete"] = False
         plan["planHash"] = plan_mod.stable_hash({k: v for k, v in plan.items() if k != "planHash"})
         with self.assertRaisesRegex(RuntimeError, "PLAN_OBSERVATION_INCOMPLETE"):
             apply_mod.select_candidates(plan)
