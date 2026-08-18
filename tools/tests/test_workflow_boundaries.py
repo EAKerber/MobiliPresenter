@@ -19,6 +19,16 @@ class WorkflowBoundaryTests(unittest.TestCase):
                     missing.append(f"{workflow.name}:tools/{relative}")
         self.assertEqual(missing, [])
 
+    def test_unittest_modules_referenced_by_workflows_exist(self):
+        pattern = re.compile(r"\btools\.tests\.(test_[A-Za-z0-9_]+)\b")
+        missing=[]
+        for workflow in sorted(WORKFLOWS.glob("*.yml")):
+            text=workflow.read_text(encoding="utf-8")
+            for module in pattern.findall(text):
+                if not (ROOT / "tools" / "tests" / f"{module}.py").is_file():
+                    missing.append(f"{workflow.name}:tools.tests.{module}")
+        self.assertEqual(missing,[])
+
     def test_viewer_validation_has_no_repository_write_path(self):
         text = self.text("viewer-next.yml")
         self.assertIn("contents: read", text)
