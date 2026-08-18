@@ -2,120 +2,142 @@ import copy
 import unittest
 
 from tools import maintenance_inspect as maintenance
-from tools import test_lifecycle
-
-SOURCE_HASH = "f" * 64
+from tools import project_machine, project_sensors
 
 
 def state():
     return {
-        "project": {"repository": "EAKerber/MobiliPresenter"},
-        "git": {"activeDevelopmentBranch": None, "controlBranch": "main"},
-        "development": {
-            "phase": "between-increments",
-            "checkpoint": "CHECKPOINT",
-            "nextTransition": "open-next-slice",
-            "prNumber": None,
-            "blockers": [],
-        },
+        "schemaVersion": "ProjectState 2.0",
+        "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
+        "git": {"controlBranch": "main", "activeDevelopmentBranch": None, "protectedBranches": ["architecture/tpc"]},
+        "published": {"url": "x", "artifactManifest": "ops/published/viewer-next-current.json"},
+        "development": {"initiative": "I", "phase": "between-increments", "checkpoint": "C", "nextTransition": "open-next-slice", "blockers": [], "prNumber": None},
     }
 
 
-def verification(ok=True):
-    return {"ok": ok, "checks": [] if ok else [{"name": "project-state", "status": "FAIL"}], "remote": None}
+def cap(policy="canonical", action="NO_EXPERIMENTAL_REVIEW", *, isolated=False):
+    return {"id": "cap", "policy": policy, "supervisorParticipation": "isolated" if isolated else "active", "reviewAction": action, "nextGates": ["g1"] if action == "TEST_NEXT_GATES" else [], "backlogCount": 1 if action == "TEST_NEXT_GATES" else 0, "roundsWithoutActiveGates": 0, "maxRoundsWithoutActiveGates": 3, "deferReason": None, "reviewPlanHash": "a" * 64}
 
 
-def cap():
+def work(work_id, status="READY", *, worker="developer-ui", target=None, blockers=None, depends=None, branch=None, pr=None):
+    return {"id": work_id, "workerId": worker, "status": status, "branch": branch, "prNumber": pr, "dependsOn": list(depends or []), "completed": [], "remaining": [] if status == "DONE" else ["step"], "nextAction": None if status == "DONE" else f"run {work_id}", "lastKnownGood": {"sha": None, "checkpoint": None}, "blockers": list(blockers or (["external"] if status == "WAITING" else [])), "handoffToWorkerId": target if status == "HANDOFF" else None, "sourceSchemaVersion": "ContinuationState 0.2", "stateHash": (work_id[0] if work_id else "a") * 64}
+
+
+def sensors(work_items=None, prs=None, capabilities=None):
+    verification = {"status": "PASS", "ok": True, "complete": True, "checks": [], "remote": None}
     return {
-        "id": "coordination-leases",
-        "policy": "canonical",
-        "supervisorParticipation": "active",
-        "reviewAction": "NO_EXPERIMENTAL_REVIEW",
-        "nextGates": [],
-        "backlogCount": 0,
-        "roundsWithoutActiveGates": 0,
-        "maxRoundsWithoutActiveGates": 3,
-        "deferReason": None,
-        "reviewPlanHash": "a" * 64,
+        "projectState": project_sensors.sensor("PASS", data={"verification": verification, "checks": []}, authority={"kind": "repository", "path": "ops/state/project.json"}),
+        "publication": project_sensors.sensor("PASS", data={"checks": []}, authority={"kind": "repository", "path": "ops/published/current.json"}),
+        "git": project_sensors.sensor("PASS", data={"observed": {"worktree": True, "branch": "work/operations/test", "head": "1" * 40, "dirty": False}, "checks": []}, authority={"kind": "worktree"}),
+        "repository": project_sensors.sensor("PASS", data={"checks": []}, authority={"kind": "repository", "name": "EAKerber/MobiliPresenter"}),
+        "control": project_sensors.sensor("PASS", data={"branch": "main", "sha": "2" * 40, "mode": "remote"}, authority={"kind": "git-ref", "branch": "main"}),
+        "capabilities": project_sensors.sensor("PASS", data={"items": capabilities if capabilities is not None else [cap()]}, authority={"kind": "repository", "path": "ops/capabilities"}),
+        "pullRequests": project_sensors.sensor("PASS", data={"available": True, "items": prs or []}, authority={"kind": "github", "resource": "pull-requests"}),
+        "coordination": project_sensors.sensor("PASS", data={"available": True, "authorityBranch": "coordination/leases", "authorityHead": "3" * 40, "intents": [], "leases": []}, authority={"kind": "git-authority", "branch": "coordination/leases"}),
+        "continuations": project_sensors.sensor("PASS", data={"available": True, "authorityBranch": "coordination/continuations", "authorityHead": "4" * 40, "items": work_items or []}, authority={"kind": "git-authority", "branch": "coordination/continuations"}),
     }
 
 
-def work(work_id, status="READY", *, worker="developer-ui", target=None, blockers=None, depends=None):
-    return {
-        "id": work_id,
-        "workerId": worker,
-        "status": status,
-        "branch": None,
-        "prNumber": None,
-        "dependsOn": list(depends or []),
-        "completed": [],
-        "remaining": [] if status == "DONE" else ["step"],
-        "nextAction": None if status == "DONE" else f"run {work_id}",
-        "lastKnownGood": {"sha": None, "checkpoint": None},
-        "blockers": list(blockers or (["external"] if status == "WAITING" else [])),
-        "handoffToWorkerId": target if status == "HANDOFF" else None,
-    }
+def machine(work_items=None, prs=None, capabilities=None, *, scope="live"):
+    return project_machine.build_inspection(state(), sensors(work_items, prs, capabilities), scope=scope)
 
 
-def coherence(status="PASS", code=None):
-    checks = []
-    if status in {"FAIL", "UNKNOWN"}:
-        checks = [{"id": "test.coherence", "status": status, "required": True, "code": code or "TEST_COHERENCE", "subjects": ["project-state", "github-pull-requests"], "detail": {"test": True}}]
-    return {"status": status, "ok": status != "FAIL", "complete": status == "PASS", "failedChecks": ["test.coherence"] if status == "FAIL" else [], "unknownChecks": ["test.coherence"] if status == "UNKNOWN" else [], "checks": checks}
-
-
-@test_lifecycle.transitional_suite(
-    owner="operations-core",
-    reason="fragmented Maintenance construction remains only while build_inspection is a supported migration-era entrypoint",
-    retire_when=test_lifecycle.symbol_absent("tools.maintenance_inspect", "build_inspection"),
-)
 class MaintenanceInspectTests(unittest.TestCase):
-    def build(self,s=None,v=None,caps=None,remote=False,prs=None,coord=None,work_items=None,machine_trust=None,machine_coherence=None,machine_sensors=None):
-        return maintenance.build_inspection(
-            s or state(),v or verification(),{"worktree": True, "branch": "main", "head": "1" * 40, "dirty": False},caps if caps is not None else [cap()],
-            project_machine_inspection_hash=SOURCE_HASH,
-            remote_requested=remote,pull_requests=prs or {"available": False, "reason": "NOT_REQUESTED", "items": []},coordination_state=coord or {"available": False, "reason": "NOT_REQUESTED", "intents": [], "leases": []},
-            work_items=work_items or [],machine_trust=machine_trust,machine_coherence=machine_coherence,machine_sensors=machine_sensors,
-        )
+    def test_only_project_machine_is_supported_input(self):
+        self.assertFalse(hasattr(maintenance, "build_inspection"))
+        value = maintenance.from_project_inspection(machine())
+        self.assertEqual(value["schemaVersion"], "MaintenanceInspection 0.5")
+        self.assertEqual(set(value), {"schemaVersion", "repository", "projectMachineInspectionHash", "findings", "recommendation", "readOnly", "inspectionHash"})
+        self.assertTrue(maintenance.validate_derivation(value, machine())["ok"])
 
-    def test_coherent_state_continues(self):
-        result=self.build();self.assertEqual(result["schemaVersion"],"MaintenanceInspection 0.4");self.assertEqual(result["projectMachineInspectionHash"],SOURCE_HASH);self.assertEqual(result["recommendation"]["action"],"CONTINUE");self.assertEqual(result["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE");self.assertTrue(result["readOnly"]);self.assertTrue(maintenance.validate_inspection(result)["ok"])
-    def test_verification_failure_reconciles(self):self.assertEqual(self.build(v=verification(False))["recommendation"]["action"],"RECONCILE")
-    def test_blocker_pauses(self):
-        current=state();current["development"]["blockers"]=["waiting-on-input"];self.assertEqual(self.build(s=current,work_items=[work("a")])["recommendation"]["action"],"PAUSE")
-    def test_gate_limit_requires_human(self):
-        current=cap();current.update({"id":"experiment","policy":"experimental","reviewAction":"REVIEW_EMPTY_LIMIT","roundsWithoutActiveGates":3});result=self.build(caps=[current]);self.assertEqual(result["recommendation"]["action"],"NEEDS_HUMAN");self.assertEqual(result["recommendation"]["focus"],"experiment")
-    def test_isolated_experimental_capability_does_not_change_recommendation(self):
-        current=cap();current.update({"id":"peer-recovery","policy":"experimental","supervisorParticipation":"isolated","reviewAction":"TEST_NEXT_GATES","nextGates":["runtime-shadow"],"backlogCount":1});self.assertEqual(self.build(caps=[current])["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE")
-    def test_unknown_machine_sensor_requires_human_with_original_code(self):
-        trust={"status":"UNKNOWN","ok":True,"complete":False,"failedSensors":[],"unknownSensors":["coordination"]};sensors={"coordination":{"code":"COORDINATION_AUTHORITY_UNAVAILABLE"}};result=self.build(machine_trust=trust,machine_sensors=sensors);self.assertEqual(result["recommendation"]["action"],"NEEDS_HUMAN");self.assertEqual(result["recommendation"]["reasonCode"],"COORDINATION_AUTHORITY_UNAVAILABLE")
-    def test_coherence_failure_reconciles_without_reimplementing_fact(self):
-        result=self.build(machine_coherence=coherence("FAIL","UNCLASSIFIED_OPEN_PR"));self.assertEqual(result["recommendation"]["action"],"RECONCILE");self.assertEqual(result["recommendation"]["reasonCode"],"UNCLASSIFIED_OPEN_PR")
-    def test_coherence_unknown_requires_human(self):
-        result=self.build(machine_coherence=coherence("UNKNOWN","REMOTE_PR_INVENTORY_UNAVAILABLE"));self.assertEqual(result["recommendation"]["action"],"NEEDS_HUMAN");self.assertEqual(result["recommendation"]["reasonCode"],"REMOTE_PR_INVENTORY_UNAVAILABLE")
-    def test_active_pr_pending_and_failed_are_policy(self):
-        current=state();current["git"]["activeDevelopmentBranch"]="ops/work";current["development"]["prNumber"]=7;coord={"available":True,"authorityHead":"2"*40,"intents":[],"leases":[]};prs={"available":True,"items":[{"number":7,"headRef":"ops/work","ci":"pending","ciObserved":True}]};self.assertEqual(self.build(s=current,remote=True,prs=prs,coord=coord)["recommendation"]["action"],"PAUSE");failed=copy.deepcopy(prs);failed["items"][0]["ci"]="failed";self.assertEqual(self.build(s=current,remote=True,prs=failed,coord=coord)["recommendation"]["action"],"RECONCILE")
-    def test_active_pr_unknown_ci_requires_human(self):
-        current=state();current["git"]["activeDevelopmentBranch"]="ops/work";current["development"]["prNumber"]=7;prs={"available":True,"items":[{"number":7,"headRef":"ops/work","ci":"unknown","ciObserved":True}]};result=self.build(s=current,remote=True,prs=prs);self.assertEqual(result["recommendation"]["action"],"NEEDS_HUMAN");self.assertEqual(result["recommendation"]["reasonCode"],"ACTIVE_PR_CI_UNKNOWN")
-    def test_maintenance_no_longer_detects_unclassified_pr_or_stale_lease_itself(self):
-        prs={"available":True,"items":[{"number":55,"headRef":"feature/mystery","ci":"green","ciObserved":True}]};coord={"available":True,"intents":[],"leases":[{"leaseId":"L1","owner":{"pr":99}}]};self.assertEqual(self.build(remote=True,prs=prs,coord=coord)["recommendation"]["reasonCode"],"NEXT_TRANSITION_AVAILABLE")
-    def test_waiting_work_does_not_pause_independent_runnable_work(self):
-        result=self.build(work_items=[work("a","WAITING"),work("b","READY",worker="developer-engine")]);self.assertEqual(result["recommendation"]["action"],"CONTINUE");self.assertEqual(result["recommendation"]["focus"],"work:b")
-    def test_dependency_blocked_work_does_not_pause_independent_work(self):
-        result=self.build(work_items=[work("a","READY",depends=["dep"]),work("dep","READY"),work("z","READY",worker="developer-engine")]);self.assertEqual(result["recommendation"]["action"],"CONTINUE");self.assertEqual(result["recommendation"]["focus"],"work:dep")
-    def test_handoff_precedes_runnable_work(self):
-        result=self.build(work_items=[work("a","HANDOFF",target="developer-engine"),work("b")]);self.assertEqual(result["recommendation"]["action"],"HANDOFF");self.assertEqual(result["recommendation"]["focus"],"work:a")
-    def test_waiting_only_pauses(self):
-        result=self.build(work_items=[work("a","WAITING")]);self.assertEqual(result["recommendation"]["action"],"PAUSE");self.assertEqual(result["recommendation"]["focus"],"work:a")
-    def test_capability_work_beats_waiting_pause(self):
-        experimental=cap();experimental.update({"id":"experiment","policy":"experimental","reviewAction":"TEST_NEXT_GATES","nextGates":["g1"]});result=self.build(caps=[experimental],work_items=[work("a","WAITING")]);self.assertEqual(result["recommendation"]["action"],"CONTINUE");self.assertEqual(result["recommendation"]["focus"],"experiment")
-    def test_runnable_tie_break_is_lexical(self):
-        result=self.build(work_items=[work("z"),work("a")]);self.assertEqual(result["recommendation"]["focus"],"work:a")
-    def test_hash_stable_sensitive_and_handoff_reserved(self):
-        first=self.build();second=self.build();self.assertEqual(first["inspectionHash"],second["inspectionHash"]);self.assertIn("HANDOFF",first["recommendation"]["allowedActions"]);current=state();current["development"]["nextTransition"]="different";self.assertNotEqual(first["inspectionHash"],self.build(s=current)["inspectionHash"])
-    def test_work_graph_must_be_exact_projection_of_work_items(self):
-        value=self.build(work_items=[work("a")]);value["workGraph"]["runnable"]=[];body={k:v for k,v in value.items() if k!="inspectionHash"};value["inspectionHash"]=maintenance.stable_hash(body)
-        with self.assertRaisesRegex(RuntimeError,"MAINTENANCE_WORK_GRAPH_MISMATCH"):maintenance.validate_inspection(value)
+    def test_no_work_continues_project_transition(self):
+        value = maintenance.from_project_inspection(machine())
+        self.assertEqual(value["recommendation"]["action"], "CONTINUE")
+        self.assertEqual(value["recommendation"]["reasonCode"], "NEXT_TRANSITION_AVAILABLE")
+        self.assertIsNone(value["recommendation"]["workId"])
+
+    def test_handoff_precedes_runnable_work_and_carries_target_decision(self):
+        value = maintenance.from_project_inspection(machine([work("a", "HANDOFF", target="developer-engine"), work("b")]))
+        rec = value["recommendation"]
+        self.assertEqual(rec["action"], "HANDOFF")
+        self.assertEqual(rec["workId"], "a")
+        self.assertEqual(rec["targetWorkerId"], "developer-engine")
+
+    def test_runnable_work_carries_worker_target(self):
+        value = maintenance.from_project_inspection(machine([work("a", worker="developer-engine")]))
+        rec = value["recommendation"]
+        self.assertEqual(rec["action"], "CONTINUE")
+        self.assertEqual(rec["workId"], "a")
+        self.assertEqual(rec["targetWorkerId"], "developer-engine")
+
+    def test_pending_ci_does_not_pause_independent_runnable_work(self):
+        items = [work("a", branch="work/ui/a", pr=7), work("b", worker="developer-engine")]
+        prs = [{"number": 7, "headRef": "work/ui/a", "baseRef": "main", "ci": "pending", "ciObserved": True}]
+        rec = maintenance.from_project_inspection(machine(items, prs))["recommendation"]
+        self.assertEqual(rec["action"], "CONTINUE")
+        self.assertEqual(rec["workId"], "b")
+
+    def test_single_work_ci_states_are_policy_not_sensor_trust(self):
+        item = work("a", branch="work/ui/a", pr=7)
+        base = {"number": 7, "headRef": "work/ui/a", "baseRef": "main", "ciObserved": True}
+        pending = maintenance.from_project_inspection(machine([item], [{**base, "ci": "pending"}]))
+        self.assertEqual(pending["recommendation"]["action"], "PAUSE")
+        self.assertEqual(pending["recommendation"]["reasonCode"], "WORK_PR_CI_PENDING")
+        failed = maintenance.from_project_inspection(machine([item], [{**base, "ci": "failed"}]))
+        self.assertEqual(failed["recommendation"]["action"], "RECONCILE")
+        unknown = maintenance.from_project_inspection(machine([item], [{**base, "ci": "unknown", "ciObserved": False}]))
+        self.assertEqual(unknown["recommendation"]["action"], "NEEDS_HUMAN")
+        self.assertEqual(unknown["recommendation"]["reasonCode"], "WORK_PR_CI_UNKNOWN")
+
+    def test_work_pr_identity_failure_comes_from_project_machine_coherence(self):
+        m = machine([work("a", branch="work/ui/a", pr=7)], [])
+        self.assertEqual(m["coherence"]["status"], "FAIL")
+        value = maintenance.from_project_inspection(m)
+        self.assertEqual(value["recommendation"]["action"], "RECONCILE")
+        self.assertEqual(value["recommendation"]["reasonCode"], "WORK_PR_NOT_OPEN")
+
+    def test_waiting_and_dependency_blocked_work_pause_only_without_independent_progress(self):
+        waiting = maintenance.from_project_inspection(machine([work("a", "WAITING")]))
+        self.assertEqual(waiting["recommendation"]["action"], "PAUSE")
+        dep = maintenance.from_project_inspection(machine([work("a", depends=["dep"]), work("dep", "WAITING")]))
+        self.assertEqual(dep["recommendation"]["action"], "PAUSE")
+        independent = maintenance.from_project_inspection(machine([work("a", "WAITING"), work("b")]))
+        self.assertEqual(independent["recommendation"]["action"], "CONTINUE")
+        self.assertEqual(independent["recommendation"]["workId"], "b")
+
+    def test_active_experimental_capability_can_supply_progress(self):
+        experimental = cap("experimental", "TEST_NEXT_GATES")
+        value = maintenance.from_project_inspection(machine([work("a", "WAITING")], capabilities=[experimental]))
+        self.assertEqual(value["recommendation"]["action"], "CONTINUE")
+        self.assertEqual(value["recommendation"]["focus"], "cap")
+
+    def test_isolated_experimental_capability_is_not_actionable(self):
+        experimental = cap("experimental", "TEST_NEXT_GATES", isolated=True)
+        value = maintenance.from_project_inspection(machine(capabilities=[experimental]))
+        self.assertEqual(value["recommendation"]["reasonCode"], "NEXT_TRANSITION_AVAILABLE")
+
+    def test_partial_scope_does_not_turn_unobserved_work_into_empty_work(self):
+        s = sensors()
+        s["continuations"] = project_sensors.observe_continuations_local()
+        m = project_machine.build_inspection(state(), s, scope="base")
+        value = maintenance.from_project_inspection(m)
+        self.assertEqual(value["recommendation"]["action"], "PAUSE")
+        self.assertEqual(value["recommendation"]["reasonCode"], "NOT_OBSERVED_IN_LOCAL_SCOPE")
+
+    def test_hash_and_derivation_reject_tampering(self):
+        m = machine([work("a")])
+        value = maintenance.from_project_inspection(m)
+        tampered = copy.deepcopy(value)
+        tampered["recommendation"]["focus"] = "tampered"
+        with self.assertRaisesRegex(RuntimeError, "MAINTENANCE_HASH_MISMATCH"):
+            maintenance.validate_inspection(tampered)
+        rehashed = copy.deepcopy(value)
+        rehashed["recommendation"]["detail"] = "drift"
+        body = {k: v for k, v in rehashed.items() if k != "inspectionHash"}
+        rehashed["inspectionHash"] = maintenance.stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "MAINTENANCE_DERIVATION_MISMATCH"):
+            maintenance.validate_derivation(rehashed, m)
 
 
-if __name__=="__main__":unittest.main()
+if __name__ == "__main__":
+    unittest.main()
