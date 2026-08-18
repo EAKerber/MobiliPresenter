@@ -26,13 +26,17 @@ observe -> plan -> validate -> apply -> readback
 - Quando houver plano materializado/planHash/CAS/readback no contrato do domínio, não contorne essas etapas.
 - Operações destrutivas usam a mesma disciplina de evidência: não são proibidas por serem destrutivas, nem autorizadas por heurística de nome.
 - Acknowledgement de API não substitui readback independente.
+- Ações mutáveis não são probes de discovery. Descoberta usa superfícies read/list/search; criação, atualização, merge, delete e movimentação de refs só ocorrem na fase apply.
 
 ## Git e lifecycle
 
 - `main` é o branch de controle/publicação corrente.
+- Toda mutação Git/GitHub deve nomear explicitamente o branch/ref alvo; default implícito de API nunca é autorização para escrever em `main`.
+- Mudanças normais de conteúdo usam branch explícito + PR. Writers de authority operam somente nas refs que seus contratos declaram.
 - Branch names são descritivos; não concedem por si sós retenção, authority, proteção ou elegibilidade de deleção.
 - PR/CI são observados no GitHub, não duplicados como verdade local.
 - Trabalho recuperável deve ser persistido na authority/branch apropriada antes de depender da continuidade de uma conversa ou runtime efêmero.
+- Branch Hygiene é o writer normal de coleta de branches após integração/abandono. Agentes não competem com essa coleta por deleção manual; remoção direta de ref é break-glass/recovery e exige observação + readback explícitos.
 
 ## Limites de papel
 
