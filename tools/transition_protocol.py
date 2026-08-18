@@ -2,16 +2,29 @@
 from __future__ import annotations
 
 import copy
-import json
 import re
 from typing import Any
 from tools.canonical import stable_hash
 
 PLAN_SCHEMA = "TransitionPlan 0.1"
 RECEIPT_SCHEMA = "TransitionReceipt 0.1"
-ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+ID_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
+HASH_PATTERN = r"^[0-9a-f]{64}$"
+ID_RE = re.compile(ID_PATTERN)
+HASH_RE = re.compile(HASH_PATTERN)
 REVERSIBILITY = {"revertible", "compensatable", "irreversible"}
-
+SUBJECT_FIELDS = {"kind", "id"}
+AUTHORITY_FIELDS = {"kind", "locator"}
+PLAN_FIELDS = {
+    "schemaVersion", "domain", "action", "subject", "authority",
+    "beforeStateHash", "afterStateHash", "intent", "candidate",
+    "reversibility", "planHash",
+}
+RECEIPT_FIELDS = {
+    "schemaVersion", "planHash", "domain", "action", "subject", "authority",
+    "beforeStateHash", "afterStateHash", "readbackStateHash", "authorityRevision",
+    "verified", "receiptHash",
+}
 
 
 def state_hash(value: dict[str, Any] | None) -> str | None:
@@ -25,7 +38,7 @@ def _identifier(value: Any, code: str) -> str:
 
 
 def _subject(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict) or set(value) != {"kind", "id"}:
+    if not isinstance(value, dict) or set(value) != SUBJECT_FIELDS:
         raise RuntimeError("TRANSITION_SUBJECT_INVALID")
     return {
         "kind": _identifier(value.get("kind"), "TRANSITION_SUBJECT_INVALID"),
@@ -34,7 +47,7 @@ def _subject(value: Any) -> dict[str, str]:
 
 
 def _authority(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != {"kind", "locator"}:
+    if not isinstance(value, dict) or set(value) != AUTHORITY_FIELDS:
         raise RuntimeError("TRANSITION_AUTHORITY_INVALID")
     kind = _identifier(value.get("kind"), "TRANSITION_AUTHORITY_INVALID")
     locator = value.get("locator")
@@ -89,12 +102,7 @@ def build_plan(
 
 
 def validate_plan(plan: Any) -> dict[str, Any]:
-    expected = {
-        "schemaVersion", "domain", "action", "subject", "authority",
-        "beforeStateHash", "afterStateHash", "intent", "candidate",
-        "reversibility", "planHash",
-    }
-    if not isinstance(plan, dict) or set(plan) != expected:
+    if not isinstance(plan, dict) or set(plan) != PLAN_FIELDS:
         raise RuntimeError("TRANSITION_PLAN_FIELDS_INVALID")
     if plan.get("schemaVersion") != PLAN_SCHEMA:
         raise RuntimeError("TRANSITION_PLAN_SCHEMA_UNSUPPORTED")
@@ -103,10 +111,10 @@ def validate_plan(plan: Any) -> dict[str, Any]:
     _subject(plan.get("subject"))
     _authority(plan.get("authority"))
     before_hash = plan.get("beforeStateHash")
-    if before_hash is not None and (not isinstance(before_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", before_hash)):
+    if before_hash is not None and (not isinstance(before_hash, str) or not HASH_RE.fullmatch(before_hash)):
         raise RuntimeError("TRANSITION_BEFORE_HASH_INVALID")
     after_hash = plan.get("afterStateHash")
-    if not isinstance(after_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", after_hash):
+    if not isinstance(after_hash, str) or not HASH_RE.fullmatch(after_hash):
         raise RuntimeError("TRANSITION_AFTER_HASH_INVALID")
     if not isinstance(plan.get("intent"), dict):
         raise RuntimeError("TRANSITION_INTENT_INVALID")
@@ -117,7 +125,7 @@ def validate_plan(plan: Any) -> dict[str, Any]:
     if state_hash(plan["candidate"]) != after_hash:
         raise RuntimeError("TRANSITION_CANDIDATE_HASH_MISMATCH")
     plan_hash = plan.get("planHash")
-    if not isinstance(plan_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", plan_hash):
+    if not isinstance(plan_hash, str) or not HASH_RE.fullmatch(plan_hash):
         raise RuntimeError("TRANSITION_PLAN_HASH_INVALID")
     if stable_hash(_core(plan)) != plan_hash:
         raise RuntimeError("TRANSITION_PLAN_HASH_MISMATCH")
@@ -176,12 +184,7 @@ def build_receipt(
 
 
 def validate_receipt(receipt: Any, plan: dict[str, Any] | None = None) -> dict[str, Any]:
-    expected = {
-        "schemaVersion", "planHash", "domain", "action", "subject", "authority",
-        "beforeStateHash", "afterStateHash", "readbackStateHash", "authorityRevision",
-        "verified", "receiptHash",
-    }
-    if not isinstance(receipt, dict) or set(receipt) != expected:
+    if not isinstance(receipt, dict) or set(receipt) != RECEIPT_FIELDS:
         raise RuntimeError("TRANSITION_RECEIPT_FIELDS_INVALID")
     if receipt.get("schemaVersion") != RECEIPT_SCHEMA:
         raise RuntimeError("TRANSITION_RECEIPT_SCHEMA_UNSUPPORTED")
@@ -190,10 +193,10 @@ def validate_receipt(receipt: Any, plan: dict[str, Any] | None = None) -> dict[s
     _subject(receipt.get("subject"))
     _authority(receipt.get("authority"))
     for key in ("planHash", "afterStateHash", "readbackStateHash", "receiptHash"):
-        if not isinstance(receipt.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", receipt[key]):
+        if not isinstance(receipt.get(key), str) or not HASH_RE.fullmatch(receipt[key]):
             raise RuntimeError("TRANSITION_RECEIPT_HASH_INVALID")
     before_hash = receipt.get("beforeStateHash")
-    if before_hash is not None and (not isinstance(before_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", before_hash)):
+    if before_hash is not None and (not isinstance(before_hash, str) or not HASH_RE.fullmatch(before_hash)):
         raise RuntimeError("TRANSITION_RECEIPT_HASH_INVALID")
     revision = receipt.get("authorityRevision")
     if revision is not None and (not isinstance(revision, str) or not revision):

@@ -28,8 +28,8 @@
       "additionalProperties": false,
       "required": ["kind", "id"],
       "properties": {
-        "kind": {"type": "string"},
-        "id": {"type": "string"}
+        "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}
       }
     },
     "authority": {
@@ -37,14 +37,29 @@
       "additionalProperties": false,
       "required": ["kind", "locator"],
       "properties": {
-        "kind": {"type": "string"},
-        "locator": {"type": "object", "minProperties": 1}
+        "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "locator": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"minLength": 1},
+          "additionalProperties": {
+            "oneOf": [
+              {"type": "string", "minLength": 1},
+              {"type": "integer"}
+            ]
+          }
+        }
       }
     },
     "beforeStateHash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
     "afterStateHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "readbackStateHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "authorityRevision": {"type": ["string", "null"]},
+    "authorityRevision": {
+      "oneOf": [
+        {"type": "string", "minLength": 1},
+        {"type": "null"}
+      ]
+    },
     "verified": {"const": true},
     "receiptHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
   }

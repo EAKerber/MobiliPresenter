@@ -36,14 +36,24 @@
       "required": ["kind", "locator"],
       "properties": {
         "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
-        "locator": {"type": "object", "minProperties": 1}
+        "locator": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"minLength": 1},
+          "additionalProperties": {
+            "oneOf": [
+              {"type": "string", "minLength": 1},
+              {"type": "integer"}
+            ]
+          }
+        }
       }
     },
     "beforeStateHash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
     "afterStateHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "intent": {"type": "object"},
     "candidate": {"type": "object"},
-    "reversibility": {"enum": ["revertible", "compensatable", "irreversible"]},
+    "reversibility": {"enum": ["compensatable", "irreversible", "revertible"]},
     "planHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
   }
 }

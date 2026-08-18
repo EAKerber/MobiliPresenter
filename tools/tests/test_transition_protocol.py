@@ -79,6 +79,27 @@ class TransitionProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "TRANSITION_RECEIPT_HASH_MISMATCH"):
             protocol.validate_receipt(bad, plan)
 
+    def test_authority_locator_rejects_values_outside_structural_contract(self):
+        for locator in ({"path": ""}, {"attempt": True}, {"nested": {"x": 1}}):
+            with self.subTest(locator=locator), self.assertRaisesRegex(RuntimeError, "TRANSITION_AUTHORITY_INVALID"):
+                protocol.build_plan(
+                    domain="test-domain",
+                    action="advance",
+                    subject={"kind": "test-subject", "id": "subject-a"},
+                    authority={"kind": "repository-file", "locator": locator},
+                    before={"value": 1},
+                    candidate={"value": 2},
+                    intent={"value": 2},
+                )
+
+    def test_receipt_authority_revision_is_null_or_nonempty(self):
+        plan = self.plan()
+        with self.assertRaisesRegex(RuntimeError, "TRANSITION_AUTHORITY_REVISION_INVALID"):
+            protocol.build_receipt(plan, {"value": 2}, authority_revision="")
+        receipt = protocol.build_receipt(plan, {"value": 2}, authority_revision="rev-1")
+        self.assertEqual("rev-1", receipt["authorityRevision"])
+        protocol.validate_receipt(receipt, plan)
+
 
 if __name__ == "__main__":
     unittest.main()
