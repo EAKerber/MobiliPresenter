@@ -7,8 +7,6 @@
   "git": {
     "controlBranch": "main",
     "protectedBranches": [
-      "coordination/leases",
-      "coordination/continuations",
       "renderer/fixed-view-realistic-v1",
       "architecture/technical-presentation-contract-v0.1",
       "planning/scope-and-documentation",
