@@ -64,23 +64,21 @@ def observe_continuations_live():
     except (OSError,RuntimeError,ImportError) as exc:return sensor("UNKNOWN",code="CONTINUATION_AUTHORITY_UNAVAILABLE",data={"available":False,"reason":getattr(exc,"code","CONTINUATION_UNAVAILABLE"),"detail":getattr(exc,"detail",str(exc)),"items":[]},authority={"kind":"git-authority","branch":"coordination/continuations"})
 
 
-def observe_pull_requests(state,*,live):
-    view=project_state.operational_view(state)
+def observe_pull_requests(repository: str,*,live: bool):
+    if not isinstance(repository,str) or not repository:return sensor("FAIL",code="REPOSITORY_IDENTITY_INVALID",data={"available":False,"items":[]},authority={"kind":"github","resource":"pull-requests"})
     if not live:return sensor("UNKNOWN",code="NOT_OBSERVED_IN_LOCAL_SCOPE",data={"available":False,"reason":"NOT_REQUESTED","items":[]},required=False,authority={"kind":"github","resource":"pull-requests"})
-    repo=view["project"]["repository"]; ok,payload=agent.run_gh_json(f"repos/{repo}/pulls?state=open&per_page=100")
+    ok,payload=agent.run_gh_json(f"repos/{repository}/pulls?state=open&per_page=100")
     if not ok or not isinstance(payload,list):return sensor("UNKNOWN",code="REMOTE_PR_INVENTORY_UNAVAILABLE",data={"available":False,"reason":"OPEN_PR_READ_FAILED","detail":payload,"items":[]},authority={"kind":"github","resource":"pull-requests"})
-    active_pr=view["development"].get("prNumber"); result_status="PASS"; result_code=None; items=[]
+    items=[]
     for raw in payload:
         if not isinstance(raw,dict):continue
         head=raw.get("head") if isinstance(raw.get("head"),dict) else {}; base=raw.get("base") if isinstance(raw.get("base"),dict) else {}; head_sha=head.get("sha"); runs=[]; ci="unknown"; ci_observed=False
         if isinstance(head_sha,str):
-            runs_ok,w=agent.run_gh_json(f"repos/{repo}/actions/runs?head_sha={head_sha}&per_page=100")
+            runs_ok,w=agent.run_gh_json(f"repos/{repository}/actions/runs?head_sha={head_sha}&per_page=100")
             if runs_ok and isinstance(w,dict) and isinstance(w.get("workflow_runs"),list):
                 ci_observed=True; runs=[{"name":x.get("name"),"status":x.get("status"),"conclusion":x.get("conclusion"),"id":x.get("id")} for x in w["workflow_runs"] if isinstance(x,dict)]; ci=agent.aggregate_ci(runs)
-        number=raw.get("number")
-        if isinstance(active_pr,int) and number==active_pr and not ci_observed:result_status="UNKNOWN";result_code="ACTIVE_PR_CI_UNAVAILABLE"
-        items.append({"number":number,"draft":raw.get("draft"),"headRef":head.get("ref"),"headSha":head_sha,"baseRef":base.get("ref"),"ci":ci,"ciObserved":ci_observed,"workflows":runs})
-    items.sort(key=lambda item:int(item.get("number") or 0)); return sensor(result_status,code=result_code,data={"available":True,"items":items},authority={"kind":"github","resource":"pull-requests"})
+        items.append({"number":raw.get("number"),"draft":raw.get("draft"),"headRef":head.get("ref"),"headSha":head_sha,"baseRef":base.get("ref"),"ci":ci,"ciObserved":ci_observed,"workflows":runs})
+    items.sort(key=lambda item:int(item.get("number") or 0)); return sensor("PASS",data={"available":True,"items":items},authority={"kind":"github","resource":"pull-requests"})
 
 
 def observe_coordination(*,live):
