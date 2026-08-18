@@ -10,9 +10,6 @@ def project():
         "phase": "between-increments",
         "checkpoint": "C",
         "nextTransition": "next",
-        "activeDevelopmentBranch": None,
-        "developmentPrNumber": None,
-        "blockers": [],
     }
 
 
