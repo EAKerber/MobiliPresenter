@@ -74,6 +74,28 @@ def _ensure_acyclic(by_id: dict[str, dict[str, Any]]) -> None:
         visit(work_id)
 
 
+def active_execution_bindings(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Derive execution identity only from non-terminal WorkItems."""
+    by_id = validate_items(items)
+    _ensure_acyclic(by_id)
+    bindings: list[dict[str, Any]] = []
+    for work_id in sorted(by_id):
+        item = by_id[work_id]
+        status = WorkStatus.parse(str(item.get("status") or ""))
+        if status.terminal:
+            continue
+        branch = item.get("branch")
+        pr_number = item.get("prNumber")
+        bindings.append({
+            "workId": work_id,
+            "workerId": item.get("workerId"),
+            "status": status.value,
+            "branch": branch if isinstance(branch, str) and branch else None,
+            "prNumber": pr_number if isinstance(pr_number, int) and not isinstance(pr_number, bool) else None,
+        })
+    return bindings
+
+
 def build(items: list[dict[str, Any]]) -> dict[str, Any]:
     by_id = validate_items(items)
     _ensure_acyclic(by_id)

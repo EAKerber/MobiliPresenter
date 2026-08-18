@@ -13,13 +13,15 @@ def state(active=None, pr=None):
     }
 
 
-def work_item(work_id="probe-one", status="DONE"):
+def work_item(work_id="probe-one", status="DONE", *, branch=None, pr=None):
+    if branch is None and status == "DONE": branch = "ops/old"
+    if pr is None and status == "DONE": pr = 7
     return {
         "id": work_id,
         "workerId": "developer-ui",
         "status": status,
-        "branch": "ops/old" if status == "DONE" else None,
-        "prNumber": 7 if status == "DONE" else None,
+        "branch": branch,
+        "prNumber": pr,
         "dependsOn": [],
         "completed": ["probe"] if status == "DONE" else [],
         "remaining": [] if status == "DONE" else ["probe"],
@@ -71,9 +73,9 @@ class ProjectMachineTests(unittest.TestCase):
         self.assertEqual(value["trust"]["status"], "UNKNOWN")
         self.assertFalse(value["trust"]["complete"])
 
-    def test_known_authority_contradiction_separates_trust_and_coherence(self):
-        sensors = base_sensors(); sensors["pullRequests"]["data"]["items"] = [{"number": 7, "headRef": "wrong", "baseRef": "main", "ci": "green", "ciObserved": True}]
-        value = project_machine.build_inspection(state("work/operations/work", 7), sensors, scope="live")
+    def test_known_work_pr_contradiction_separates_trust_and_coherence(self):
+        sensors = base_sensors(); sensors["continuations"]["data"]["items"] = [work_item(status="IN_PROGRESS", branch="work/operations/work", pr=7)]; sensors["pullRequests"]["data"]["items"] = [{"number": 7, "headRef": "wrong", "baseRef": "main", "ci": "green", "ciObserved": True}]
+        value = project_machine.build_inspection(state(), sensors, scope="live")
         self.assertEqual(value["trust"]["status"], "PASS")
         self.assertEqual(value["coherence"]["status"], "FAIL")
 
@@ -99,11 +101,12 @@ class ProjectMachineTests(unittest.TestCase):
         self.assertEqual(maintenance["recommendation"]["action"], "RECONCILE")
         self.assertEqual(maintenance["recommendation"]["reasonCode"], "PUBLISHED_ARTIFACT_MISMATCH")
 
-    def test_coherence_failure_reconciles_with_factual_reason(self):
-        sensors = base_sensors(); machine = project_machine.build_inspection(state("work/operations/work", 7), sensors, scope="live"); maintenance = maintenance_inspect.from_project_inspection(machine)
+    def test_work_pr_coherence_failure_reconciles_with_factual_reason(self):
+        sensors = base_sensors(); sensors["continuations"]["data"]["items"] = [work_item(status="IN_PROGRESS", branch="work/operations/work", pr=7)]
+        machine = project_machine.build_inspection(state(), sensors, scope="live"); maintenance = maintenance_inspect.from_project_inspection(machine)
         self.assertEqual(machine["trust"]["status"], "PASS")
         self.assertEqual(machine["coherence"]["status"], "FAIL")
-        self.assertEqual(maintenance["recommendation"]["reasonCode"], "ACTIVE_PR_NOT_OPEN")
+        self.assertEqual(maintenance["recommendation"]["reasonCode"], "WORK_PR_NOT_OPEN")
 
     def test_known_pending_ci_is_policy_not_trust_failure(self):
         current = state("work/operations/work", 7); sensors = base_sensors(); sensors["pullRequests"]["data"]["items"] = [{"number": 7, "headRef": "work/operations/work", "baseRef": "main", "ci": "pending", "ciObserved": True}]

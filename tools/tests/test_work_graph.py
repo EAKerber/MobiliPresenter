@@ -51,6 +51,17 @@ class WorkGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "ACTIVE_PR_CONFLICT"):
             work_graph.build([item("a", pr=7, branch="work/ui/a"), item("b", pr=7, branch="work/ui/b")])
 
+    def test_active_execution_bindings_are_derived_and_terminal_items_are_excluded(self):
+        bindings = work_graph.active_execution_bindings([
+            item("b", "WAITING", branch="work/ui/b", pr=8),
+            item("a", "IN_PROGRESS", branch="work/ui/a", pr=7),
+            item("done", "DONE", branch="work/ui/old", pr=6),
+        ])
+        self.assertEqual(bindings, [
+            {"workId": "a", "workerId": "developer-ui", "status": "IN_PROGRESS", "branch": "work/ui/a", "prNumber": 7},
+            {"workId": "b", "workerId": "developer-ui", "status": "WAITING", "branch": "work/ui/b", "prNumber": 8},
+        ])
+
     def test_terminal_items_may_share_historical_identity(self):
         graph = work_graph.build([
             item("a", "DONE", branch="work/ui/old", pr=7),
