@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from tools import test_lifecycle
 from tools.semantics.branches import parse_branch_name
 
 
@@ -30,6 +31,11 @@ class SemanticBranchTests(unittest.TestCase):
             self.assertEqual("legacy", legacy["grammar"])
             self.assertEqual("canonical", canonical["grammar"])
 
+    @test_lifecycle.transitional_test(
+        owner="git-governance",
+        reason="legacy ops branch namespace remains supported until the semantic alias is retired",
+        retire_when=test_lifecycle.semantic_alias_absent("branch.domain.operations", "ops", "legacy-branch-namespace"),
+    )
     def test_legacy_ops_alias_resolves_to_operations(self):
         value = parse_branch_name("ops/m3.5b-consumer-convergence")
         self.assertEqual("legacy", value["grammar"])
