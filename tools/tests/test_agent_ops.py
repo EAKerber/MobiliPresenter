@@ -1,6 +1,9 @@
 import importlib.util
+import io
+import json
 import os
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -34,6 +37,12 @@ class GitOps12Tests(unittest.TestCase):
         check=agent.git_context_check(self.between_increments_state(),{"worktree":True,"branch":"authority/operations/control"});self.assertEqual(check["status"],"FAIL")
     def test_status_projection_does_not_copy_execution_state(self):
         summary=agent.project_summary(project_state.operational_view(self.base_state()));self.assertNotIn("activeDevelopmentBranch",summary);self.assertNotIn("prNumber",summary);self.assertNotIn("blockers",summary)
+    def test_handoff_21_does_not_embed_full_projectstate(self):
+        state=self.base_state();view=project_state.operational_view(state);published={"release":"x","sourceBranch":"main","url":"https://example.invalid/"};verification={"status":"PASS","ok":True,"complete":True,"checks":[],"remote":None};observed={"worktree":True,"branch":"work/operations/test"}
+        with mock.patch.object(agent,"_state_and_publication",return_value=(state,view,published)),mock.patch.object(agent,"verify_state",return_value=verification),mock.patch.object(agent,"observed_git",return_value=observed),mock.patch.object(agent,"recent_commits",return_value={"available":True,"entries":[]}):
+            output=io.StringIO()
+            with redirect_stdout(output):self.assertEqual(agent.command_handoff(True),0)
+        payload=json.loads(output.getvalue());self.assertEqual(payload["schemaVersion"],"AgentHandoff 2.1");self.assertNotIn("projectState",payload);self.assertNotIn("activeDevelopmentBranch",payload["project"]);self.assertNotIn("prNumber",payload["project"]);self.assertNotIn("blockers",payload["project"])
     def test_legacy_prune_classifier_is_removed(self):
         self.assertFalse(hasattr(agent,"build_prune_plan"));self.assertFalse(hasattr(agent,"stable_plan_hash"))
     def test_ci_branch_name_uses_pull_request_head_ref(self):
