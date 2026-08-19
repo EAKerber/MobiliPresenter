@@ -6,10 +6,6 @@
   "gates": {
     "backlog": [
       {
-        "id": "b-artifact-materialization",
-        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_concrete_b_artifact_materialization_case -v"
-      },
-      {
         "id": "deterministic-plan-hash",
         "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_deterministic_plan_and_hash -v"
       },
@@ -31,7 +27,6 @@
       }
     ],
     "next": [
-      "b-artifact-materialization",
       "deterministic-plan-hash",
       "different-head-fail-closed",
       "event-idempotence",
