@@ -6,16 +6,11 @@
   "gates": {
     "backlog": [
       {
-        "id": "read-only-reproduction",
-        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_read_only_reproduction_success_is_runtime_asymmetry_and_self_retry -v"
-      },
-      {
         "id": "same-head-classification",
         "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_same_head_peer_failure_requires_reproduction -v"
       }
     ],
     "next": [
-      "read-only-reproduction",
       "same-head-classification"
     ]
   },

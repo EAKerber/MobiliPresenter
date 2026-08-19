@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "pass",
+  "planHash": "7f9122ae67c48b5a60de536e37bd8de2fb54e39e478ed567bb55e07d3e54dc0a",
+  "beforeStateHash": "d075ec91612a9758c3d870ff717b84c70ccf7f0574af18516cb24678e4bd8665",
+  "afterStateHash": "5e3e4cdb430b5a1d787eefe2e43adc8512893943dcdff9621574826bb1b21c11",
+  "details": {
+    "gateId": "read-only-reproduction"
+  },
+  "evidence": [
+    "https://github.com/EAKerber/MobiliPresenter/actions/runs/32248216962#job-96053282552:test_read_only_reproduction_success_is_runtime_asymmetry_and_self_retry@d7489342b1c242ada94295aec9725c5b1defd92e"
+  ],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-read-only-reproduction-7f9122ae67c48b5a.json"
+}
