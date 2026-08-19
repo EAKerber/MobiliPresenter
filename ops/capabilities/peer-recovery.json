@@ -1,7 +1,7 @@
 {
   "schemaVersion": "CapabilityGates 0.1",
   "id": "peer-recovery",
-  "policy": "experimental",
+  "policy": "canonical",
   "supervisorParticipation": "isolated",
   "gates": {
     "backlog": [],

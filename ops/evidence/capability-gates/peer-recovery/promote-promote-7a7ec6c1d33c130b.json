@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "promote",
+  "planHash": "7a7ec6c1d33c130b2007fa58bf4775e6f9718985ac84aa436f03c469ed253f48",
+  "beforeStateHash": "3f922f806c830f97292d5cf107f289222ce0908826a27f2e4c894ffa0defd33e",
+  "afterStateHash": "a4afb0ff0057f7ec359051b302bdb6173e73fc8d49cbed7c68098ce7563d3ef6",
+  "details": {},
+  "evidence": [
+    "ops/evidence/capability-gates/peer-recovery/pass-b-artifact-materialization-866cb538a9ebeae8.json",
+    "ops/evidence/capability-gates/peer-recovery/pass-deterministic-plan-hash-b45daeaf7777560e.json",
+    "ops/evidence/capability-gates/peer-recovery/pass-different-head-fail-closed-53c58d0240fc97b4.json",
+    "ops/evidence/capability-gates/peer-recovery/pass-event-idempotence-c293a11ffead950a.json",
+    "ops/evidence/capability-gates/peer-recovery/pass-read-only-reproduction-7f9122ae67c48b5a.json",
+    "ops/evidence/capability-gates/peer-recovery/pass-same-head-classification-c240adbf4ed92cee.json",
+    "https://github.com/EAKerber/MobiliPresenter/actions/runs/32248216962#project-machine-inspection=72ea5d734bb445804e9cd1acf96ca1426e92c64d8c12bee355f267c896521baa@d7489342b1c242ada94295aec9725c5b1defd92e",
+    "agent-bus:worker.health:manager-gitops-a:90b272a578bb7d58",
+    "agent-bus:worker.health:manager-gitops-b:1f4d8e3291e3c228"
+  ],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/promote-promote-7a7ec6c1d33c130b.json"
+}
