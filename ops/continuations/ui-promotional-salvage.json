@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "ui-promotional-salvage",
+  "workerId": "ui-ux",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "Review ui/promotional-detail-v0.2 against Guided Configurator UI 0.3 and the current ViewerUiContract.",
+    "Port only still-valid UI implementation patterns; explicitly discard superseded rail/page architecture and any incompatible state model.",
+    "Record the final disposition of branch-specific promotional-detail documentation and UI code before cold archive."
+  ],
+  "nextAction": "Perform semantic UI salvage review of ui/promotional-detail-v0.2 before cold archive.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
