@@ -1,0 +1,101 @@
+{
+  "kind": "M6-K knowledge salvage evidence",
+  "observedMainSha": "50366e104c01a9361d5bf7c5e01c79f84da9330c",
+  "createdAt": "2026-08-18",
+  "principles": [
+    "preserve-or-route-current-knowledge-before-ref-deletion",
+    "history-is-not-live-operational-state",
+    "semantic-owners-decide-product-ui-engine-promotion",
+    "no-branch-deletion-in-m6-k"
+  ],
+  "branches": [
+    {
+      "branch": "feature/viewer-runtime-ui-v0.1",
+      "classification": "DUPLICATE_HISTORY",
+      "aheadBy": 0,
+      "behindBy": 184,
+      "reason": "Branch is an ancestor of current main and has no exclusive commits.",
+      "salvageWork": null
+    },
+    {
+      "branch": "renderer/fixed-view-realistic-v1",
+      "classification": "DUPLICATE_HISTORY",
+      "aheadBy": 0,
+      "behindBy": 224,
+      "reason": "Branch is an ancestor of current main and has no exclusive commits.",
+      "salvageWork": null
+    },
+    {
+      "branch": "archive/v7.0-i5-recovery",
+      "classification": "DUPLICATE_HISTORY",
+      "aheadBy": 0,
+      "behindBy": 446,
+      "reason": "Branch is an ancestor of current main and has no exclusive commits.",
+      "salvageWork": null
+    },
+    {
+      "branch": "ui/style-guide-v0.1",
+      "classification": "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
+      "aheadBy": 3,
+      "behindBy": 164,
+      "reason": "docs/ui/style-guide-v0.1.md is byte-identical to main (blob 6b8b4e5b039031e111a12b4862eda8da6e5c9cda); main has newer UI README and decision log that explicitly supersede obsolete navigation while preserving accepted visual decisions.",
+      "salvageWork": null
+    },
+    {
+      "branch": "ui/promotional-detail-v0.2",
+      "classification": "SALVAGE_REQUIRED",
+      "aheadBy": 12,
+      "behindBy": 146,
+      "reason": "Contains exclusive UI implementation and documentation. Guided Configurator 0.3 explicitly supersedes the old rail/page architecture but names selected promotional-detail concepts as reusable; semantic UI review is required before archive.",
+      "salvageWork": "ui-promotional-salvage"
+    },
+    {
+      "branch": "planning/scope-and-documentation",
+      "classification": "SALVAGE_REQUIRED",
+      "aheadBy": 12,
+      "behindBy": 446,
+      "reason": "Contains exclusive planning documents, including preliminary constraint/capability engine proposals and documentation architecture. These files explicitly identify themselves as proposed/open and must not be promoted as current truth without semantic review.",
+      "salvageWork": "engine-planning-salvage"
+    },
+    {
+      "branch": "archive/legacy-fixed-view-variants-2026-08-11",
+      "classification": "HISTORICAL_WITH_SALVAGE_REQUIRED",
+      "aheadBy": 122,
+      "behindBy": 446,
+      "reason": "Large historical fixed-view implementation/prototype lineage. Current fixed-camera product direction is already canonical, but exclusive module-contract, rules-engine and calibration/prototype knowledge may still inform Engine/Scene Core work and requires semantic review before cold archive.",
+      "salvageWork": "engine-planning-salvage"
+    },
+    {
+      "branch": "tmp/fh06-user-artifacts",
+      "classification": "ARTIFACT_HISTORY",
+      "aheadBy": 69,
+      "behindBy": 442,
+      "reason": "Exclusive content is dominated by verified bundles, PNG/DOM fidelity evidence and artifact manifests rather than live source or authority state. Candidate for cold archive after reachability is anchored.",
+      "salvageWork": null
+    },
+    {
+      "branch": "architecture/technical-presentation-contract-v0.1",
+      "classification": "HISTORICAL_EVIDENCE",
+      "aheadBy": 1,
+      "behindBy": 164,
+      "reason": "Only exclusive file is docs/architecture/parallel-baseline-0.1.md, a nine-line historical validation note for an obsolete coordination baseline. No current authority or product contract depends on it.",
+      "salvageWork": null
+    },
+    {
+      "branch": "ops/git-ops-1.3-coordination-leases",
+      "classification": "PROMOTE_KNOWLEDGE_THEN_HISTORICAL",
+      "aheadBy": 48,
+      "behindBy": 135,
+      "reason": "The implementation has evolved and Coordination Leases are now canonical, but the branch contains the only ADR explaining the Git-backed CAS/TTL/resource rationale. M6-K promotes an updated accepted ADR to main; remaining probes and experimental implementation become historical.",
+      "promotedTo": "docs/adr/0004-coordination-leases.md",
+      "salvageWork": null
+    }
+  ],
+  "authoritiesExcludedFromSalvage": [
+    "main",
+    "coordination/leases",
+    "coordination/continuations"
+  ],
+  "nextPhase": "M6-ACT may create a single cold archive only after listed salvage Work is resolved or deliberately retained outside destructive scope.",
+  "refsDeleted": []
+}
