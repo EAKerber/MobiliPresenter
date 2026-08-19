@@ -6,10 +6,6 @@
   "gates": {
     "backlog": [
       {
-        "id": "deterministic-plan-hash",
-        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_deterministic_plan_and_hash -v"
-      },
-      {
         "id": "different-head-fail-closed",
         "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_different_heads_fail_closed -v"
       },
@@ -27,7 +23,6 @@
       }
     ],
     "next": [
-      "deterministic-plan-hash",
       "different-head-fail-closed",
       "event-idempotence",
       "read-only-reproduction",
