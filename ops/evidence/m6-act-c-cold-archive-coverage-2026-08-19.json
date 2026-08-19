@@ -3,7 +3,8 @@
   "createdAt": "2026-08-19",
   "repository": "EAKerber/MobiliPresenter",
   "observedMainSha": "34f1ccb5fd30415766f23a9309548b025b9e8ba4",
-  "observedColdArchiveSha": "6eeb0b30e7a2984e23b07954087aabcb9dc2f498",
+  "previousColdArchiveSha": "6eeb0b30e7a2984e23b07954087aabcb9dc2f498",
+  "currentColdArchiveSha": "a7aecc40223d3801e618825ebe8fa53549802fdb",
   "sourceEvidence": "ops/evidence/m6-k-knowledge-salvage-2026-08-18.json",
   "archiveCoverage": {
     "m6kArchiveEligibleTotal": 7,
@@ -13,7 +14,8 @@
     "m6kTotalCoverage": "5/7",
     "blockedByLivePr": 2,
     "semanticSalvageDeferred": 3,
-    "authoritiesExcluded": 3
+    "authoritiesExcluded": 3,
+    "postM6kResidualCovered": 1
   },
   "coveredEntries": [
     {
@@ -43,6 +45,12 @@
     {
       "branch": "ui/style-guide-v0.1",
       "headSha": "135465770e4396247d6a04d0fc21a060ba7c5af3",
+      "classification": "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
+      "reachableFromColdArchive": true
+    },
+    {
+      "branch": "work/operations/cold-archive-prune-proof-m6act-a",
+      "headSha": "10be704a0e6fa680b67b910a060b1c8f7e917604",
       "classification": "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
       "reachableFromColdArchive": true
     }
@@ -87,7 +95,7 @@
     "originalPrState": "closed-unmerged",
     "supersededByPr": 105,
     "supersedingMergeCommit": "34f1ccb5fd30415766f23a9309548b025b9e8ba4",
-    "proposedClassification": "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
+    "classification": "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
     "functionalPromotionProof": [
       {
         "path": "tools/prune_plan.py",
@@ -110,13 +118,19 @@
       "authority": "main"
     },
     "exclusiveCurrentKnowledge": false,
-    "currentlyReachableFromColdArchive": false
+    "reachableBeforeArchiveExtension": false,
+    "reachableAfterArchiveExtension": true
   },
-  "plannedArchiveExtension": {
-    "branch": "work/operations/cold-archive-prune-proof-m6act-a",
-    "headSha": "10be704a0e6fa680b67b910a060b1c8f7e917604",
-    "classification": "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
-    "evidencePath": "ops/evidence/m6-act-c-cold-archive-coverage-2026-08-19.json"
+  "archiveReceipt": {
+    "schemaVersion": "ColdArchivePlan 0.1",
+    "planHash": "3b7a6cf80a485c48ae372fc42c93558663c090ff4fe16d352c3eed70d71082e3",
+    "indexSha256": "b9ddbb9d48f1f3a5d5672f6b9fed005b66c2f5821aedf62fce3feb2d7fa74ee6",
+    "indexBlobSha": "e7c31b209284ff3f0231ba67525981faa3422a28",
+    "previousArchiveHead": "6eeb0b30e7a2984e23b07954087aabcb9dc2f498",
+    "archiveHead": "a7aecc40223d3801e618825ebe8fa53549802fdb",
+    "sourceCount": 6,
+    "parentCount": 7,
+    "readback": "PASS"
   },
   "safety": {
     "projectStateMutation": false,
