@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "engine-planning-salvage",
   "workerId": "manager-gitops",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": null,
   "prNumber": null,
   "dependsOn": [],
