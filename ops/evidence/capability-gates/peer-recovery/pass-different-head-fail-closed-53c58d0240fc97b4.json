@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "pass",
+  "planHash": "53c58d0240fc97b47e6d5f1eb9d89f7f7ba785a6ef410aeff92ab50e7d1c6023",
+  "beforeStateHash": "623c37173b1942bca63e4e3b45c7c6d74eff3e60fb6a5a469cba32af3d6fdd76",
+  "afterStateHash": "061302af6a3af9bc4e1f78df739b8bd0d87bacb9c2f417bf4e4779a4ad6c4316",
+  "details": {
+    "gateId": "different-head-fail-closed"
+  },
+  "evidence": [
+    "https://github.com/EAKerber/MobiliPresenter/actions/runs/32248216962#job-96053282552:test_different_heads_fail_closed@d7489342b1c242ada94295aec9725c5b1defd92e"
+  ],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-different-head-fail-closed-53c58d0240fc97b4.json"
+}
