@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "engine-planning-salvage",
+  "workerId": "manager-gitops",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "Review planning/scope-and-documentation proposals for current Engine/Scene Core relevance without promoting preliminary proposals as current truth.",
+    "Review archive/legacy-fixed-view-variants-2026-08-11 module-contract, rules-engine, measurement/calibration and prototype knowledge for concepts not yet represented in current Engine/Scene Core contracts.",
+    "Route any surviving semantic candidates to an explicit Engine/Scene Core owner; classify the remainder as historical before cold archive."
+  ],
+  "nextAction": "Coordinate an explicit Engine/Scene Core semantic-owner review; Manager/GitOps must not decide product/domain semantics.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
