@@ -7,13 +7,10 @@
   "git": {
     "controlBranch": "main",
     "protectedBranches": [
-      "renderer/fixed-view-realistic-v1",
       "architecture/technical-presentation-contract-v0.1",
       "planning/scope-and-documentation",
       "ui/style-guide-v0.1",
       "ui/promotional-detail-v0.2",
-      "tmp/fh06-user-artifacts",
-      "archive/v7.0-i5-recovery",
       "archive/legacy-fixed-view-variants-2026-08-11"
     ]
   },
