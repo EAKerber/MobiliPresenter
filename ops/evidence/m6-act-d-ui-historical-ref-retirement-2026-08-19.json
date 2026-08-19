@@ -2,7 +2,7 @@
   "schemaVersion": "M6ActDHistoricalRefRetirementEvidence 0.1",
   "repository": "EAKerber/MobiliPresenter",
   "slice": "M6-ACT-D",
-  "status": "PRE_ARCHIVE",
+  "status": "PRE_PR",
   "observed": {
     "mainSha": "8b0b70becdf4f8f3b9ce4cd2be78a1bb6e0993ed",
     "previousColdArchiveSha": "a7aecc40223d3801e618825ebe8fa53549802fdb",
@@ -29,13 +29,20 @@
     "createWorkBranchGitMutationPlanHash": "c77c36abd2b63885f51b902cf458c1ca0573d17c5621f23d25880c68c1e13406",
     "coldArchivePlanHash": "f4c8ad559e3dd9065bdc05bdd7f2d6b302b00987a4e88c5a1b5263074ad7cc91",
     "coldArchiveIndexSha256": "5b327388a7fe96a92d5a42061778e856e650430d49d3615b565718f046e07882",
-    "projectStatePlanHash": null,
-    "prunePlanHash": null
+    "projectStatePlanHash": "708dea81f8e77c97e6b9ffa1f24c9ae29c4447d91db18b40559f465a9587ad55",
+    "prunePlanHash": null,
+    "projectStateBeforeHash": "fd70ea06db4165faf39b39acbeffee2dd415774f850fd623fd77484681e38a27",
+    "projectStateAfterHash": "06de123f3d2e074e42d05de3c260074dabf8303f8749547548553d293916d8ea"
   },
   "receipts": {
-    "coldArchiveHead": null,
-    "coldArchiveReadback": "PENDING",
-    "projectStateReadback": "PENDING",
+    "coldArchiveHead": "78714969d54f93787caee1e1a527e870a0d982c0",
+    "coldArchiveIndexBlobSha": "4b3ab399f3c4e9f822408fc9e87514bc373342c4",
+    "coldArchiveParentCount": 8,
+    "coldArchiveHistoricalHeadReachable": true,
+    "coldArchiveReadback": "PASS",
+    "projectStateCandidateCommit": "243bcb39df9e4cbcb7bda19223f553c7d1b70681",
+    "projectStateCandidateBlobSha": "c6573f75e49ca7ab72f0c031d44db3b986bd57dc",
+    "projectStateReadback": "CANDIDATE_BRANCH_PASS",
     "branchHygiene": "PENDING"
   },
   "safety": {
@@ -46,5 +53,16 @@
     "pr12Mutation": false,
     "directBranchDeletion": false,
     "historicalRefStillProtected": true
+  },
+  "candidate": {
+    "protectedBranches": [
+      "architecture/technical-presentation-contract-v0.1",
+      "planning/scope-and-documentation",
+      "archive/legacy-fixed-view-variants-2026-08-11"
+    ],
+    "removedProtectedBranches": [
+      "ui/promotional-detail-v0.2"
+    ],
+    "developmentUnchanged": true
   }
 }
