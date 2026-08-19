@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "M6FinalHistoricalRetirementEvidence 0.1",
+  "repository": "EAKerber/MobiliPresenter",
+  "slice": "M6-FINAL-HISTORICAL-RETIREMENT",
+  "status": "READY_FOR_PR",
+  "control": {
+    "mainSha": "56ab8e396c39e400b1c29885b23130cf9b5aa491",
+    "projectStateBeforeBlob": "c6573f75e49ca7ab72f0c031d44db3b986bd57dc"
+  },
+  "semanticDisposition": {
+    "engineEvidencePath": "docs/engine/branch-semantic-disposition-2026-08-19.md",
+    "engineResult": "NO_FUNCTIONAL_SALVAGE_REQUIRED",
+    "engineDispositionMergeSha": "56ab8e396c39e400b1c29885b23130cf9b5aa491",
+    "uiIssue": 109,
+    "uiResult": "UI_SEMANTIC_DEBT_ZERO",
+    "workId": "engine-planning-salvage",
+    "workStatus": "DONE",
+    "workAuthorityRevision": "4ab9788cb78f49bf0501f2b4c79b5e2a19de14f0"
+  },
+  "prLifecycle": {
+    "pr3": {
+      "state": "closed",
+      "merged": false,
+      "branch": "planning/scope-and-documentation",
+      "headSha": "985d8644a11bb73e3b174e3135fe1c8ea3986e63"
+    },
+    "pr12": {
+      "state": "closed",
+      "merged": false,
+      "branch": "architecture/technical-presentation-contract-v0.1",
+      "headSha": "b8708535efdd4340a82566d215f39b5ff1c34144",
+      "baseBranch": "feature/viewer-runtime-ui-v0.1",
+      "baseSha": "eb383dcbd0ce87b7295e8c6c9ef5bf6325391588"
+    }
+  },
+  "coldArchive": {
+    "previousHead": "78714969d54f93787caee1e1a527e870a0d982c0",
+    "head": "e3a4c550cd233a366e27070fc96a335a27c1e46c",
+    "entryCount": 11,
+    "planHash": "32a88abf769968347e68271736eb7608779688457a1ec5f004c4c7f03c06dd94",
+    "indexSha256": "8d0a465481ffd96065d40c340651f79c4bb263654bb592db31cb30a7b5c09d01",
+    "reachabilityReadback": "PASS",
+    "sources": [
+      {
+        "branch": "architecture/technical-presentation-contract-v0.1",
+        "headSha": "b8708535efdd4340a82566d215f39b5ff1c34144",
+        "classification": "HISTORICAL_EVIDENCE"
+      },
+      {
+        "branch": "archive/legacy-fixed-view-variants-2026-08-11",
+        "headSha": "f503a6fb7248e9c3dfadcc8d7801ad042d8fe26f",
+        "classification": "HISTORICAL_EVIDENCE"
+      },
+      {
+        "branch": "feature/viewer-runtime-ui-v0.1",
+        "headSha": "eb383dcbd0ce87b7295e8c6c9ef5bf6325391588",
+        "classification": "DUPLICATE_HISTORY"
+      },
+      {
+        "branch": "planning/scope-and-documentation",
+        "headSha": "985d8644a11bb73e3b174e3135fe1c8ea3986e63",
+        "classification": "HISTORICAL_EVIDENCE"
+      }
+    ]
+  },
+  "projectStateTransition": {
+    "action": "shrink-protected-branches",
+    "planHash": "bc38e5e125264000ef71ad86524a073be04a9a76d3bccfb95294143cbd0debe1",
+    "beforeStateHash": "06de123f3d2e074e42d05de3c260074dabf8303f8749547548553d293916d8ea",
+    "afterStateHash": "c863a30355537272e7db5d3dad7298ca89a3a91508cfa03952888a3dbe6b4b8c",
+    "remove": [
+      "architecture/technical-presentation-contract-v0.1",
+      "archive/legacy-fixed-view-variants-2026-08-11",
+      "planning/scope-and-documentation"
+    ],
+    "candidateReadback": "PASS",
+    "candidateBlob": "c6073193ca5a1fdcf4e81199ff731fbbf0e20c24",
+    "developmentFieldsChanged": false
+  },
+  "expectedPruneAfterMerge": {
+    "historicalCandidates": [
+      "architecture/technical-presentation-contract-v0.1@b8708535efdd4340a82566d215f39b5ff1c34144",
+      "archive/legacy-fixed-view-variants-2026-08-11@f503a6fb7248e9c3dfadcc8d7801ad042d8fe26f",
+      "feature/viewer-runtime-ui-v0.1@eb383dcbd0ce87b7295e8c6c9ef5bf6325391588",
+      "planning/scope-and-documentation@985d8644a11bb73e3b174e3135fe1c8ea3986e63"
+    ],
+    "mustHaveNoAdditionalHistoricalCandidates": true,
+    "prunePlanHash": null
+  },
+  "safety": {
+    "productMutation": false,
+    "uiMutation": false,
+    "engineMutation": false,
+    "directBranchDeletion": false,
+    "archiveBeforeRetentionShrink": true,
+    "branchHygieneSoleDeletionExecutor": true
+  }
+}
