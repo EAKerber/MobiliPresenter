@@ -66,6 +66,19 @@ jobs:
           name: project-machine-inspection
           path: /tmp/project-machine-inspection.json
           if-no-files-found: error
+      - name: Derive routine inspection shadow
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/routines.py inspect --input /tmp/project-machine-inspection.json --json > /tmp/routine-inspection.json
+          python -m json.tool /tmp/routine-inspection.json > /dev/null
+          python tools/routines.py validate /tmp/routine-inspection.json --project-machine /tmp/project-machine-inspection.json --json
+      - name: Upload routine inspection shadow
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: routine-inspection
+          path: /tmp/routine-inspection.json
+          if-no-files-found: error
       - name: Derive maintenance inspection
         if: github.event_name == 'pull_request'
         run: |

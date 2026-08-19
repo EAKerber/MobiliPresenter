@@ -43,6 +43,18 @@ jobs:
           python tools/project_machine.py inspect --live --json > /tmp/project-machine-source.json
           python -m json.tool /tmp/project-machine-source.json > /dev/null
           python tools/project_machine.py validate /tmp/project-machine-source.json --json
+      - name: Derive routine inspection shadow
+        run: |
+          python tools/routines.py inspect --input /tmp/project-machine-source.json --json > /tmp/routine-inspection.json
+          python -m json.tool /tmp/routine-inspection.json > /dev/null
+          python tools/routines.py validate /tmp/routine-inspection.json --project-machine /tmp/project-machine-source.json --json
+      - name: Upload routine inspection shadow
+        uses: actions/upload-artifact@v4
+        with:
+          name: routine-inspection
+          path: /tmp/routine-inspection.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Derive Maintenance and SchedulerPlan
         run: |
           python tools/maintenance_inspect.py --input /tmp/project-machine-source.json --json > /tmp/live-supervisor-inspection.json
