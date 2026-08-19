@@ -33,9 +33,10 @@ class SemanticContractTests(unittest.TestCase):
     def test_every_operational_schema_is_registered(self):
         self.assertEqual([], check_schema_registry_coverage())
 
-    def test_real_peer_recovery_is_runtime_valid_and_uses_supervisor_participation(self):
+    def test_real_peer_recovery_is_canonical_isolated_and_runtime_valid(self):
         path = ROOT / "ops" / "capabilities" / "peer-recovery.json"
         value = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual("canonical", value["policy"])
         self.assertEqual("isolated", value["supervisorParticipation"])
         self.assertEqual([], capability_gates.validate_capability(value, expected_id="peer-recovery"))
 
