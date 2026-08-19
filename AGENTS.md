@@ -27,6 +27,8 @@ observe -> plan -> validate -> apply -> readback
 - Operações destrutivas usam a mesma disciplina de evidência: não são proibidas por serem destrutivas, nem autorizadas por heurística de nome.
 - Acknowledgement de API não substitui readback independente.
 - Ações mutáveis não são probes de discovery. Descoberta usa superfícies read/list/search; criação, atualização, merge, delete e movimentação de refs só ocorrem na fase apply.
+- Ausência ou falha de um provider concreto não prova ausência da capability lógica. Antes de declarar uma capability indisponível, observe os providers suportados relevantes e valide se algum satisfaz integralmente seus invariantes.
+- Provider alternativo não pode enfraquecer plan/CAS/readback, substituir evidência exigida por heurística nem ampliar authority/scope. Se a equivalência não puder ser provada, a capability permanece `UNKNOWN` e a mutação não ocorre.
 
 ## Git e lifecycle
 
@@ -60,6 +62,6 @@ Comece pelo estado/tooling corrente, não pela reconstrução do histórico:
 python3 tools/agent.py status
 ```
 
-Use `python3 tools/agent.py doctor` quando a capacidade do ambiente importar. Contratos semânticos transversais vivem em `ops/semantics/registry.json`.
+Use `python3 tools/agent.py doctor` quando a capacidade do ambiente importar. `doctor` diferencia executables/providers locais de capabilities lógicas; uma capability `UNKNOWN` pode exigir observação explícita de provider externo por `tools/runtime_capabilities.py`. Contratos semânticos transversais vivem em `ops/semantics/registry.json`.
 
 Regras específicas de papel pertencem aos Kickstarts correntes em `docs/kickstarts/roles/*-current.md`. Versões antigas são história, salvo referência explícita do documento corrente.

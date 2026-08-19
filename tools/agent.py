@@ -9,7 +9,7 @@ from typing import Any
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 
-from tools import git_mutation_plan,project_state,publication,project_state_apply,project_state_transition
+from tools import git_mutation_plan,project_state,publication,project_state_apply,project_state_transition,runtime_capabilities
 from tools import prune_plan as git_prune_plan
 from tools.canonical import stable_hash
 from tools.semantics.branches import parse_branch_name
@@ -95,14 +95,25 @@ def command_status(as_json):
     if as_json:print(json.dumps(payload,indent=2,ensure_ascii=False))
     else:print(f"PROJECT\n  id: {payload['project']['id']}\n  repository: {payload['project']['repository']}\n  phase: {payload['project']['phase']}\n  checkpoint: {payload['project']['checkpoint']}\n\nNEXT\n  {payload['next']}")
     return 0
-def command_doctor(as_json):
+def command_doctor(as_json,runtime_providers=None):
     checks=[{"name":"python","status":"PASS" if sys.version_info>=(3,10) else "FAIL"},{"name":"git-executable","status":"PASS" if shutil.which("git") else "FAIL"},{"name":"gh-executable","status":"PASS" if shutil.which("gh") else "INFO"}]
     try:state=project_state.load_state();checks.append({"name":"project-state","status":"PASS" if not project_state.validate_current(state) else "FAIL"})
     except RuntimeError as exc:checks.append({"name":"project-state","status":"FAIL","code":str(exc).split(":",1)[0]})
     git=observed_git()
     if git.get("worktree"):checks.append({"name":"git-origin","status":"PASS" if "eakerber/mobilipresenter" in str(git.get("origin") or "").lower() else "FAIL"})
     else:checks.append({"name":"git-worktree","status":"FAIL"})
-    ok=all(c["status"] in {"PASS","INFO"} for c in checks);print(json.dumps({"ok":ok,"checks":checks},indent=2,ensure_ascii=False) if as_json else "\n".join(f"{c['status']:4} {c['name']}" for c in checks));return 0 if ok else ERROR_EXIT
+    providers=runtime_capabilities.local_provider_observations()
+    if runtime_providers:providers=runtime_capabilities.merge_provider_observations(providers,runtime_capabilities.load_provider_observations(Path(runtime_providers)))
+    runtime=runtime_capabilities.build_inspection(providers)
+    ok=all(c["status"] in {"PASS","INFO"} for c in checks);payload={"ok":ok,"checks":checks,"runtimeCapabilities":runtime}
+    if as_json:print(json.dumps(payload,indent=2,ensure_ascii=False))
+    else:
+        print("\n".join(f"{c['status']:4} {c['name']}" for c in checks))
+        print("\nRUNTIME CAPABILITIES")
+        for capability_id,item in runtime["capabilities"].items():
+            providers=",".join(item["satisfiedProviders"]) or "-"
+            print(f"{item['status']:7} {capability_id} [{providers}]")
+    return 0 if ok else ERROR_EXIT
 def command_verify(as_json):
     payload=verify_state();print(json.dumps(payload,indent=2,ensure_ascii=False) if as_json else "\n".join(f"{c['status']:7} {c['name']}" for c in payload["checks"]));return 0 if payload["status"]=="PASS" else ERROR_EXIT
 def command_checkpoint(as_json,args):
@@ -129,10 +140,10 @@ def command_git_mutation_plan(as_json,args):
     else:raise RuntimeError("GIT_MUTATION_OPERATION_UNSUPPORTED")
     git_mutation_plan.validate(plan);print(json.dumps(plan,indent=2,ensure_ascii=False) if as_json else f"GIT MUTATION PLAN\n  operation: {plan['operation']}\n  connector: {plan['connectorAction']}\n  planHash: {plan['planHash']}\n  authorizesMutation: false");return 0
 def main():
-    parser=argparse.ArgumentParser(prog="agent",description="MobiliPresenter deterministic operational toolbox");parser.add_argument("command",choices=("status","doctor","verify","checkpoint","handoff","git"));parser.add_argument("subcommand",nargs="?");parser.add_argument("--json",action="store_true",dest="as_json");parser.add_argument("--to",dest="checkpoint");parser.add_argument("--next",dest="next_transition");parser.add_argument("--phase");parser.add_argument("--apply",action="store_true");parser.add_argument("--expected-plan");parser.add_argument("--operation");parser.add_argument("--branch");parser.add_argument("--base-sha");parser.add_argument("--branch-head");parser.add_argument("--path");parser.add_argument("--blob-sha");parser.add_argument("--content-sha256");parser.add_argument("--head");parser.add_argument("--base");parser.add_argument("--head-sha");parser.add_argument("--title");parser.add_argument("--body-sha256");parser.add_argument("--pr-number",type=int);parser.add_argument("--merge-method",default="squash");parser.add_argument("--current-sha");parser.add_argument("--new-sha");parser.add_argument("--force",action="store_true");args=parser.parse_args()
+    parser=argparse.ArgumentParser(prog="agent",description="MobiliPresenter deterministic operational toolbox");parser.add_argument("command",choices=("status","doctor","verify","checkpoint","handoff","git"));parser.add_argument("subcommand",nargs="?");parser.add_argument("--json",action="store_true",dest="as_json");parser.add_argument("--to",dest="checkpoint");parser.add_argument("--next",dest="next_transition");parser.add_argument("--phase");parser.add_argument("--apply",action="store_true");parser.add_argument("--expected-plan");parser.add_argument("--operation");parser.add_argument("--branch");parser.add_argument("--base-sha");parser.add_argument("--branch-head");parser.add_argument("--path");parser.add_argument("--blob-sha");parser.add_argument("--content-sha256");parser.add_argument("--head");parser.add_argument("--base");parser.add_argument("--head-sha");parser.add_argument("--title");parser.add_argument("--body-sha256");parser.add_argument("--pr-number",type=int);parser.add_argument("--merge-method",default="squash");parser.add_argument("--current-sha");parser.add_argument("--new-sha");parser.add_argument("--force",action="store_true");parser.add_argument("--runtime-providers");args=parser.parse_args()
     try:
         if args.command=="status":return command_status(args.as_json)
-        if args.command=="doctor":return command_doctor(args.as_json)
+        if args.command=="doctor":return command_doctor(args.as_json,args.runtime_providers)
         if args.command=="verify":return command_verify(args.as_json)
         if args.command=="checkpoint":
             if not args.checkpoint or not args.next_transition:raise RuntimeError("CHECKPOINT_ARGS_REQUIRED: --to and --next")
