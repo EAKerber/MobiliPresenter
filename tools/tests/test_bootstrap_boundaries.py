@@ -52,6 +52,18 @@ class BootstrapBoundaryTests(unittest.TestCase):
             self.assertNotIn(version_name, current)
             self.assertNotIn(version_name, versioned)
 
+    def test_current_bootstrap_discovers_capability_before_declaring_provider_failure_global(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        current_path = ROLE_DIR / "manager-gitops-current.md"
+        _, target = resolve_current_target(current_path)
+        versioned = target.read_text(encoding="utf-8")
+        runtime_tool = ROOT / "tools" / "runtime_capabilities.py"
+        self.assertTrue(runtime_tool.is_file())
+        self.assertIn("RuntimeCapabilityInspection", versioned)
+        self.assertIn("GH_NOT_FOUND != GITHUB_TRANSPORT_UNAVAILABLE", versioned)
+        self.assertIn("provider concreto não prova ausência da capability lógica", agents)
+        self.assertIn("--runtime-providers", versioned)
+
 
 if __name__ == "__main__":
     unittest.main()
