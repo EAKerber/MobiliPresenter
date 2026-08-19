@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "pass",
+  "planHash": "c293a11ffead950a4d97e78eda42a191c72116c44e0779a39488e2ca4560ecf0",
+  "beforeStateHash": "061302af6a3af9bc4e1f78df739b8bd0d87bacb9c2f417bf4e4779a4ad6c4316",
+  "afterStateHash": "d075ec91612a9758c3d870ff717b84c70ccf7f0574af18516cb24678e4bd8665",
+  "details": {
+    "gateId": "event-idempotence"
+  },
+  "evidence": [
+    "https://github.com/EAKerber/MobiliPresenter/actions/runs/32248216962#job-96053282552:test_repeated_event_is_idempotent@d7489342b1c242ada94295aec9725c5b1defd92e"
+  ],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-event-idempotence-c293a11ffead950a.json"
+}

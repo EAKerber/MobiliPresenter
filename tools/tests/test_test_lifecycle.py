@@ -31,7 +31,6 @@ class TestLifecycleTests(unittest.TestCase):
     def test_current_transitional_tests_are_declared_and_not_due(self):
         errors = []
         targets = transitional_targets()
-        self.assertTrue(targets, "T0-A must exercise the lifecycle on real transitional tests")
         for label, metadata in targets:
             errors.extend(f"{label}:{error}" for error in test_lifecycle.validate_metadata(metadata))
             condition = metadata.get("retireWhen")

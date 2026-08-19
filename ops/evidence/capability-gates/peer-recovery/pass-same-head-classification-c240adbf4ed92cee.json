@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "pass",
+  "planHash": "c240adbf4ed92ceee9dd861071685a1c067aa82e307e84640c15ae47bf7b9b5d",
+  "beforeStateHash": "5e3e4cdb430b5a1d787eefe2e43adc8512893943dcdff9621574826bb1b21c11",
+  "afterStateHash": "3f922f806c830f97292d5cf107f289222ce0908826a27f2e4c894ffa0defd33e",
+  "details": {
+    "gateId": "same-head-classification"
+  },
+  "evidence": [
+    "https://github.com/EAKerber/MobiliPresenter/actions/runs/32248216962#job-96053282552:test_same_head_peer_failure_requires_reproduction@d7489342b1c242ada94295aec9725c5b1defd92e"
+  ],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-same-head-classification-c240adbf4ed92cee.json"
+}

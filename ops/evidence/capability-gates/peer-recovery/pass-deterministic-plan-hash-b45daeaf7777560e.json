@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "CapabilityGateTransitionEvidence 0.1",
+  "capability": "peer-recovery",
+  "action": "pass",
+  "planHash": "b45daeaf7777560e455974b07c5043450c641700987e8d8f8a461c3614308ed8",
+  "beforeStateHash": "814d3da4405891512088b9fa203ddd3d8bc12dd936d40a686c69e542c3359bdb",
+  "afterStateHash": "623c37173b1942bca63e4e3b45c7c6d74eff3e60fb6a5a469cba32af3d6fdd76",
+  "details": {
+    "gateId": "deterministic-plan-hash"
+  },
+  "evidence": [
+    "https://github.com/EAKerber/MobiliPresenter/actions/runs/32248216962#job-96053282552:test_deterministic_plan_and_hash@d7489342b1c242ada94295aec9725c5b1defd92e"
+  ],
+  "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-deterministic-plan-hash-b45daeaf7777560e.json"
+}
