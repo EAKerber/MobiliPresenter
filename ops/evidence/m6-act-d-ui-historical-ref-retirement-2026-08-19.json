@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "M6ActDHistoricalRefRetirementEvidence 0.1",
+  "repository": "EAKerber/MobiliPresenter",
+  "slice": "M6-ACT-D",
+  "status": "PRE_ARCHIVE",
+  "observed": {
+    "mainSha": "8b0b70becdf4f8f3b9ce4cd2be78a1bb6e0993ed",
+    "previousColdArchiveSha": "a7aecc40223d3801e618825ebe8fa53549802fdb",
+    "historicalBranch": "ui/promotional-detail-v0.2",
+    "historicalHeadSha": "232e12f4cf8d333d6b387388a2bde1379f8be368",
+    "historicalHeadExact": true,
+    "projectStateBlobSha": "5abe2c8e3b30bd5bd37a5a6dde3f8d4ae1f1a187",
+    "projectStateProtectedBranches": [
+      "architecture/technical-presentation-contract-v0.1",
+      "planning/scope-and-documentation",
+      "ui/promotional-detail-v0.2",
+      "archive/legacy-fixed-view-variants-2026-08-11"
+    ],
+    "uiSalvageStatus": "DONE",
+    "openPrUsesHistoricalBranch": false,
+    "branchCount": 9
+  },
+  "semanticEvidence": {
+    "path": "docs/ui/promotional-detail-salvage-v0.1.md",
+    "result": "SAFE_FOR_COLD_ARCHIVE_AFTER_WORK_COMPLETION_READBACK",
+    "classification": "HISTORICAL_EVIDENCE"
+  },
+  "plans": {
+    "createWorkBranchGitMutationPlanHash": "c77c36abd2b63885f51b902cf458c1ca0573d17c5621f23d25880c68c1e13406",
+    "coldArchivePlanHash": "f4c8ad559e3dd9065bdc05bdd7f2d6b302b00987a4e88c5a1b5263074ad7cc91",
+    "coldArchiveIndexSha256": "5b327388a7fe96a92d5a42061778e856e650430d49d3615b565718f046e07882",
+    "projectStatePlanHash": null,
+    "prunePlanHash": null
+  },
+  "receipts": {
+    "coldArchiveHead": null,
+    "coldArchiveReadback": "PENDING",
+    "projectStateReadback": "PENDING",
+    "branchHygiene": "PENDING"
+  },
+  "safety": {
+    "productMutation": false,
+    "semanticMutation": false,
+    "continuationMutation": false,
+    "pr3Mutation": false,
+    "pr12Mutation": false,
+    "directBranchDeletion": false,
+    "historicalRefStillProtected": true
+  }
+}
