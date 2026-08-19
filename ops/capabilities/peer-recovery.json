@@ -4,15 +4,8 @@
   "policy": "experimental",
   "supervisorParticipation": "isolated",
   "gates": {
-    "backlog": [
-      {
-        "id": "same-head-classification",
-        "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_same_head_peer_failure_requires_reproduction -v"
-      }
-    ],
-    "next": [
-      "same-head-classification"
-    ]
+    "backlog": [],
+    "next": []
   },
   "roundsWithoutActiveGates": 0,
   "maxRoundsWithoutActiveGates": 3,
