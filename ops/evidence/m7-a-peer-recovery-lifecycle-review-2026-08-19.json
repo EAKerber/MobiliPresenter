@@ -2,77 +2,114 @@
   "schemaVersion": "M7APeerRecoveryLifecycleReview 0.1",
   "repository": "EAKerber/MobiliPresenter",
   "slice": "M7-A-PEER-RECOVERY-LIFECYCLE",
-  "status": "TESTING",
+  "status": "READY_FOR_FINAL_CI",
   "control": {
     "branch": "main",
     "sha": "c2f087445be06c171feda8ff57f13c98c2b2e9e7"
   },
-  "capability": {
+  "initialCapability": {
     "path": "ops/capabilities/peer-recovery.json",
     "blobSha": "374f677a10b3bca16608ed234aefd917f0367d19",
     "stateHash": "75bd9656d71f01e278a47c56f990501c2cab93c63d516ad9f0271000c414218c",
     "policy": "experimental",
     "supervisorParticipation": "isolated"
   },
-  "coordination": {
-    "leasesBlob": "dd4c4a4442549ad5d7b4b76b08d55dc4bc1a120f",
-    "activeIntents": 0,
-    "activeLeases": 0
+  "independentValidation": {
+    "agentOpsRun": 32248216962,
+    "job": 96053282552,
+    "testedHead": "d7489342b1c242ada94295aec9725c5b1defd92e",
+    "suite": "python -m unittest discover -s tools/tests -p 'test_*.py' -v",
+    "testsRun": 370,
+    "result": "PASS",
+    "projectMachineInspectionHash": "72ea5d734bb445804e9cd1acf96ca1426e92c64d8c12bee355f267c896521baa",
+    "projectMachineTrust": "PASS",
+    "projectMachineCoherence": "PASS"
   },
-  "decisionRule": {
-    "promote": "all six gates PASS on one exact lineage, no contradictory operational evidence, backlog/next empty, deferReason null; keep supervisorParticipation isolated",
-    "defer": "mechanism correct but operational evidence insufficient",
-    "disable": "evidence shows insufficient value or authority-boundary violation",
-    "failClosed": true
+  "operationalEvidence": {
+    "agentBus": [
+      {
+        "eventId": "worker.health:manager-gitops-a:90b272a578bb7d58",
+        "workerId": "manager-gitops-a",
+        "state": "HEALTHY",
+        "authorityClaim": "git-observed",
+        "failure": null
+      },
+      {
+        "eventId": "worker.health:manager-gitops-b:1f4d8e3291e3c228",
+        "workerId": "manager-gitops-b",
+        "state": "HEALTHY",
+        "authorityClaim": "git-observed",
+        "failure": null
+      }
+    ],
+    "sameHistoricalAuthorityHeads": true,
+    "sameInspectionHash": "be8086be2cc31c9b86a96c5f1b655bc616f28fbc14ab7997d8c166c959ae27a8",
+    "samePlanHash": "0c5bd8134e89204ee47d38d3539903afef3fd442cbd9f8faf2846bccecadad5f",
+    "contradictionFound": false
   },
-  "gates": [
+  "gateTransitions": [
     {
       "id": "b-artifact-materialization",
-      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_concrete_b_artifact_materialization_case -v",
-      "status": "PENDING",
-      "evidence": []
+      "status": "PASS",
+      "planHash": "866cb538a9ebeae8c4607407df8945706f9125b7a04f316c077dd4e8a213fd1f",
+      "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-b-artifact-materialization-866cb538a9ebeae8.json"
     },
     {
       "id": "deterministic-plan-hash",
-      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_deterministic_plan_and_hash -v",
-      "status": "PENDING",
-      "evidence": []
+      "status": "PASS",
+      "planHash": "b45daeaf7777560e455974b07c5043450c641700987e8d8f8a461c3614308ed8",
+      "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-deterministic-plan-hash-b45daeaf7777560e.json"
     },
     {
       "id": "different-head-fail-closed",
-      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_different_heads_fail_closed -v",
-      "status": "PENDING",
-      "evidence": []
+      "status": "PASS",
+      "planHash": "53c58d0240fc97b47e6d5f1eb9d89f7f7ba785a6ef410aeff92ab50e7d1c6023",
+      "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-different-head-fail-closed-53c58d0240fc97b4.json"
     },
     {
       "id": "event-idempotence",
-      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_repeated_event_is_idempotent -v",
-      "status": "PENDING",
-      "evidence": []
+      "status": "PASS",
+      "planHash": "c293a11ffead950a4d97e78eda42a191c72116c44e0779a39488e2ca4560ecf0",
+      "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-event-idempotence-c293a11ffead950a.json"
     },
     {
       "id": "read-only-reproduction",
-      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_read_only_reproduction_success_is_runtime_asymmetry_and_self_retry -v",
-      "status": "PENDING",
-      "evidence": []
+      "status": "PASS",
+      "planHash": "7f9122ae67c48b5a60de536e37bd8de2fb54e39e478ed567bb55e07d3e54dc0a",
+      "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-read-only-reproduction-7f9122ae67c48b5a.json"
     },
     {
       "id": "same-head-classification",
-      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_same_head_peer_failure_requires_reproduction -v",
-      "status": "PENDING",
-      "evidence": []
+      "status": "PASS",
+      "planHash": "c240adbf4ed92ceee9dd861071685a1c067aa82e307e84640c15ae47bf7b9b5d",
+      "evidencePath": "ops/evidence/capability-gates/peer-recovery/pass-same-head-classification-c240adbf4ed92cee.json"
     }
   ],
-  "postDecision": {
-    "ifPromoted": [
-      "policy becomes canonical through CapabilityTransitionPlan",
-      "supervisorParticipation remains isolated",
-      "transitional peer-recovery test suite becomes stable canonical regression coverage",
-      "Manager/GitOps current kickstart advances to v0.6"
-    ],
-    "noProjectStateMutation": true,
-    "noSchedulerSemanticMutation": true,
-    "noTaskControlExpansion": true,
-    "noNewAuthority": true
+  "decision": {
+    "result": "PROMOTE",
+    "reason": "all six gates passed on one tested lineage and real A/B worker health evidence is convergent and non-contradictory",
+    "promotePlanHash": "7a7ec6c1d33c130b2007fa58bf4775e6f9718985ac84aa436f03c469ed253f48",
+    "promoteEvidencePath": "ops/evidence/capability-gates/peer-recovery/promote-promote-7a7ec6c1d33c130b.json"
+  },
+  "finalCapability": {
+    "stateHash": "a4afb0ff0057f7ec359051b302bdb6173e73fc8d49cbed7c68098ce7563d3ef6",
+    "policy": "canonical",
+    "supervisorParticipation": "isolated",
+    "backlog": [],
+    "next": [],
+    "deferReason": null
+  },
+  "contractConvergence": {
+    "peerRecoveryTests": "permanent canonical regression coverage",
+    "zeroTransitionalTestDebtAllowed": true,
+    "managerGitOpsKickstart": "v0.6"
+  },
+  "safety": {
+    "projectStateMutation": false,
+    "schedulerSemanticMutationIntended": false,
+    "taskControlExpansion": false,
+    "supervisorParticipationExpansion": false,
+    "newAuthority": false,
+    "nextLifecycleDecision": "supervisor participation review is separate and optional"
   }
 }
