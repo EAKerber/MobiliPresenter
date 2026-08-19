@@ -60,6 +60,19 @@ ACTIONS = {"keep", "review", "delete-candidate"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
+COLD_ARCHIVE_BRANCH = "archive/cold"
+COLD_ARCHIVE_INDEX_PATH = "COLD_ARCHIVE.json"
+COLD_ARCHIVE_INDEX_SCHEMA = "ColdArchiveIndex 0.1"
+COLD_ARCHIVE_INDEX_FIELDS = {"schemaVersion", "repository", "archiveBranch", "controlSha", "entries"}
+COLD_ARCHIVE_ENTRY_FIELDS = {"branch", "headSha", "classification", "evidencePath"}
+COLD_ARCHIVE_DELETE_CLASSES = {
+    "DUPLICATE_HISTORY",
+    "ARTIFACT_HISTORY",
+    "HISTORICAL_EVIDENCE",
+    "PROMOTE_KNOWLEDGE_THEN_HISTORICAL",
+    "CURRENT_KNOWLEDGE_ALREADY_PROMOTED",
+}
+
 
 def run_process(args: list[str]) -> tuple[bool, str]:
     proc = subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=False)
@@ -291,6 +304,74 @@ def managed_git_authority_branches() -> set[str]:
     return result
 
 
+def observe_cold_archive(
+    refs: dict[str, str], repository: str, *, control_branch: str,
+) -> dict[str, str]:
+    """Return strong evidence only for exact heads safely retained by archive/cold.
+
+    Cold archive is optional evidence. Any malformed index, stale source head,
+    non-historical classification, or failed reachability proof yields no
+    delete evidence rather than blocking unrelated sanitation.
+    """
+    archive_head = refs.get(COLD_ARCHIVE_BRANCH)
+    if not isinstance(archive_head, str) or not SHA_RE.fullmatch(archive_head):
+        return {}
+    ok, raw = run_git("show", f"{archive_head}:{COLD_ARCHIVE_INDEX_PATH}")
+    if not ok:
+        return {}
+    try:
+        index = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(index, dict) or set(index) != COLD_ARCHIVE_INDEX_FIELDS:
+        return {}
+    if index.get("schemaVersion") != COLD_ARCHIVE_INDEX_SCHEMA:
+        return {}
+    if index.get("repository") != repository or index.get("archiveBranch") != COLD_ARCHIVE_BRANCH:
+        return {}
+    control_sha = index.get("controlSha")
+    if not isinstance(control_sha, str) or not SHA_RE.fullmatch(control_sha):
+        return {}
+    entries = index.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return {}
+
+    validated: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in entries:
+        if not isinstance(item, dict) or set(item) != COLD_ARCHIVE_ENTRY_FIELDS:
+            return {}
+        branch = item.get("branch")
+        head_sha = item.get("headSha")
+        classification = item.get("classification")
+        evidence_path = item.get("evidencePath")
+        if (
+            not isinstance(branch, str) or not branch or branch in seen
+            or branch in {control_branch, COLD_ARCHIVE_BRANCH}
+            or not isinstance(head_sha, str) or not SHA_RE.fullmatch(head_sha)
+            or classification not in COLD_ARCHIVE_DELETE_CLASSES
+            or not isinstance(evidence_path, str) or not evidence_path
+        ):
+            return {}
+        seen.add(branch)
+        validated.append({
+            "branch": branch,
+            "headSha": head_sha,
+            "classification": classification,
+            "evidencePath": evidence_path,
+        })
+
+    evidence: dict[str, str] = {}
+    for item in validated:
+        branch, head_sha = item["branch"], item["headSha"]
+        if refs.get(branch) != head_sha:
+            continue
+        reachable, _ = run_git("merge-base", "--is-ancestor", head_sha, archive_head)
+        if reachable:
+            evidence[branch] = f"cold-archive:{archive_head}"
+    return evidence
+
+
 def ancestry_for_ref(sha: str, control_sha: str) -> str:
     if sha == control_sha:
         return "identical-to-control"
@@ -356,6 +437,7 @@ def build_prune_plan(
     work_authority_error: str | None = None, branch_inventory_complete: bool = True,
     ancestry_complete: bool = True, branch_inventory_source: str = "fixture",
     remote_observation_error: str | None = None, published_source_branch: str | None = None,
+    cold_archive_evidence: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     view = project_state.operational_view(state)
     git_state = view["git"]
@@ -377,6 +459,7 @@ def build_prune_plan(
         if isinstance(binding.get("branch"), str) and binding["branch"]
     }
     managed_authority_branches = managed_git_authority_branches()
+    cold_archive_evidence = cold_archive_evidence or {}
 
     entries: list[dict[str, Any]] = []
     for branch, sha in sorted(refs.items()):
@@ -398,6 +481,9 @@ def build_prune_plan(
                 strong.append(f"merged-pr:{pr.get('number')}")
         if ancestry_status in {"ancestor-of-control", "identical-to-control"}:
             strong.append(ancestry_status)
+        archive_proof = cold_archive_evidence.get(branch)
+        if isinstance(archive_proof, str) and archive_proof:
+            strong.append(archive_proof)
         if protections:
             action, reason, auto = "keep", "protected", False
         elif strong:
@@ -469,8 +555,9 @@ def build_prune_plan(
         "note": (
             "Evidence-only sanitation plan. Names never authorize retention or deletion; managed Git authority "
             "branches are derived from the Semantic Registry and active Work execution branches from the canonical "
-            "Work authority; execution requires this exact materialized plan, explicit plan identity, authorization, "
-            "drift checks, and readback."
+            "Work authority; verified cold-archive reachability may retain exact historical heads while source refs "
+            "converge; execution requires this exact materialized plan, explicit plan identity, authorization, drift "
+            "checks, and readback."
         ),
     }
     return {**body, "planHash": stable_hash(body)}
@@ -486,6 +573,9 @@ def build_live_plan() -> dict[str, Any]:
     prs_ok, prs, prs_error = observe_pull_requests(state)
     ancestry, ancestry_complete = observe_ancestry(refs, view["git"]["controlBranch"])
     work_ok, work_items, work_head, work_error = observe_work(repository)
+    cold_archive_evidence = observe_cold_archive(
+        refs, repository, control_branch=view["git"]["controlBranch"],
+    )
     return build_prune_plan(
         state, refs, prs if prs_ok else None, ancestry,
         work_items=work_items,
@@ -497,6 +587,7 @@ def build_live_plan() -> dict[str, Any]:
         branch_inventory_source=source,
         remote_observation_error=None if prs_ok else prs_error,
         published_source_branch=published["sourceBranch"],
+        cold_archive_evidence=cold_archive_evidence,
     )
 
 
