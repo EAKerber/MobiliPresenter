@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "engine-planning-salvage",
   "workerId": "manager-gitops",
-  "status": "WAITING",
+  "status": "IN_PROGRESS",
   "branch": null,
   "prNumber": null,
   "dependsOn": [],
@@ -17,8 +17,6 @@
     "sha": null,
     "checkpoint": null
   },
-  "blockers": [
-    "Engine/Scene Core semantic owner review is required before promoting planning or fixed-view proposals."
-  ],
+  "blockers": [],
   "handoffToWorkerId": null
 }
