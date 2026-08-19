@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "M7APeerRecoveryLifecycleReview 0.1",
+  "repository": "EAKerber/MobiliPresenter",
+  "slice": "M7-A-PEER-RECOVERY-LIFECYCLE",
+  "status": "TESTING",
+  "control": {
+    "branch": "main",
+    "sha": "c2f087445be06c171feda8ff57f13c98c2b2e9e7"
+  },
+  "capability": {
+    "path": "ops/capabilities/peer-recovery.json",
+    "blobSha": "374f677a10b3bca16608ed234aefd917f0367d19",
+    "stateHash": "75bd9656d71f01e278a47c56f990501c2cab93c63d516ad9f0271000c414218c",
+    "policy": "experimental",
+    "supervisorParticipation": "isolated"
+  },
+  "coordination": {
+    "leasesBlob": "dd4c4a4442549ad5d7b4b76b08d55dc4bc1a120f",
+    "activeIntents": 0,
+    "activeLeases": 0
+  },
+  "decisionRule": {
+    "promote": "all six gates PASS on one exact lineage, no contradictory operational evidence, backlog/next empty, deferReason null; keep supervisorParticipation isolated",
+    "defer": "mechanism correct but operational evidence insufficient",
+    "disable": "evidence shows insufficient value or authority-boundary violation",
+    "failClosed": true
+  },
+  "gates": [
+    {
+      "id": "b-artifact-materialization",
+      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_concrete_b_artifact_materialization_case -v",
+      "status": "PENDING",
+      "evidence": []
+    },
+    {
+      "id": "deterministic-plan-hash",
+      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_deterministic_plan_and_hash -v",
+      "status": "PENDING",
+      "evidence": []
+    },
+    {
+      "id": "different-head-fail-closed",
+      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_different_heads_fail_closed -v",
+      "status": "PENDING",
+      "evidence": []
+    },
+    {
+      "id": "event-idempotence",
+      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_repeated_event_is_idempotent -v",
+      "status": "PENDING",
+      "evidence": []
+    },
+    {
+      "id": "read-only-reproduction",
+      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_read_only_reproduction_success_is_runtime_asymmetry_and_self_retry -v",
+      "status": "PENDING",
+      "evidence": []
+    },
+    {
+      "id": "same-head-classification",
+      "test": "python -m unittest tools.tests.test_peer_recovery.PeerRecoveryTests.test_same_head_peer_failure_requires_reproduction -v",
+      "status": "PENDING",
+      "evidence": []
+    }
+  ],
+  "postDecision": {
+    "ifPromoted": [
+      "policy becomes canonical through CapabilityTransitionPlan",
+      "supervisorParticipation remains isolated",
+      "transitional peer-recovery test suite becomes stable canonical regression coverage",
+      "Manager/GitOps current kickstart advances to v0.6"
+    ],
+    "noProjectStateMutation": true,
+    "noSchedulerSemanticMutation": true,
+    "noTaskControlExpansion": true,
+    "noNewAuthority": true
+  }
+}
