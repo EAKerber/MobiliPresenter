@@ -91,6 +91,26 @@
       "salvageWork": null
     }
   ],
+  "workTransitions": [
+    {
+      "id": "ui-promotional-salvage",
+      "finalStatus": "READY",
+      "createPlanHash": "95f7362fd5bccc898cce4efdef7591a26febea15d910bc126d3a5d42da8d4140",
+      "stateHash": "05860948bd5c8d28ffad3353b9579681c732f5d0407e9cc08fbfe09162577e50",
+      "authorityRevision": "20d6ce155ee321202cf19c18c2ee44201fcbdb10",
+      "receiptHash": "31883d673a643e87c14232b958ccbe598651ea58ae7431f0a42b42ff3ba458da"
+    },
+    {
+      "id": "engine-planning-salvage",
+      "finalStatus": "WAITING",
+      "createPlanHash": "923ec14d8fbe529a1a2f5ce211346594cbb773c0335a77d7ee6580614515933e",
+      "createReceiptHash": "079ebed42968f309ce7ab0d4628bd5668e3385393737131274136fd20ca04389",
+      "waitPlanHash": "e8e0dc22d3dc61222e51e17886d68d0271e5064ee4872569cf3bfe286e7ad8f7",
+      "stateHash": "0ceaee4707b630cd0ee8a3a1ccf631f7b0ed2e8b160833d54d1aab49b9fefe63",
+      "authorityRevision": "582d472ceffa07729f459fbd78f4fb74b24b8e26",
+      "receiptHash": "d45cd56f26a548f31e5d1dcf683851e8e4cd046c46cb5c815fc34f77599745bd"
+    }
+  ],
   "authoritiesExcludedFromSalvage": [
     "main",
     "coordination/leases",
