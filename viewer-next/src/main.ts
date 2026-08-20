@@ -12,8 +12,10 @@ import {
   WebGLRenderer
 } from "three";
 import { styleAnchorAppearance } from "./fixtures/style-anchor.js";
+import { resolvePresentationFrame, type ResolvedPresentationFrame } from "./renderer/presentation-frame.js";
 import {
   createThreeCamera,
+  updateThreeCameraAspect,
   updateThreeCameraCrop,
   updateThreeCameraViewport,
   type PixelCrop
@@ -97,7 +99,15 @@ renderer.setPixelRatio(fidelityCrop ? 1 : Math.min(window.devicePixelRatio || 1,
 app.appendChild(renderer.domElement);
 
 let viewport = { widthPx: 1, heightPx: 1 };
-const camera = createThreeCamera(currentFixedCamera, fidelityCrop ? fidelityFullViewport : viewport);
+const initialPresentationAspect = currentSceneBase.presentationFrame?.preferredAspectRatio;
+const camera = createThreeCamera(
+  currentFixedCamera,
+  fidelityCrop
+    ? fidelityFullViewport
+    : initialPresentationAspect
+      ? { widthPx: initialPresentationAspect, heightPx: 1 }
+      : viewport
+);
 
 function buildComposition(state: ViewerConfigurationState): ViewerComposition {
   const scene = deriveViewerScene(currentSceneBase, state);
@@ -358,14 +368,63 @@ function runLifecycleExercise(family: LifecycleFamily): void {
   }
 }
 
+function syncPresentationDatasets(resolved: ResolvedPresentationFrame): void {
+  const { rasterRect, hostViewport } = resolved;
+  app.dataset.presentationFrame = resolved.active ? "active" : "legacy";
+  app.dataset.presentationFit = resolved.fit;
+  app.dataset.presentationCrop = resolved.cropped ? "true" : "false";
+  app.dataset.presentationHostWidth = String(hostViewport.widthPx);
+  app.dataset.presentationHostHeight = String(hostViewport.heightPx);
+  app.dataset.presentationRasterX = String(rasterRect.xPx);
+  app.dataset.presentationRasterY = String(rasterRect.yPx);
+  app.dataset.presentationRasterWidth = String(rasterRect.widthPx);
+  app.dataset.presentationRasterHeight = String(rasterRect.heightPx);
+  app.dataset.presentationAspect = String(resolved.projectionAspectRatio);
+}
+
+function positionCanvas(resolved: ResolvedPresentationFrame): void {
+  const { rasterRect } = resolved;
+  renderer.domElement.style.width = `${rasterRect.widthPx}px`;
+  renderer.domElement.style.height = `${rasterRect.heightPx}px`;
+  renderer.domElement.style.marginLeft = `${rasterRect.xPx}px`;
+  renderer.domElement.style.marginTop = `${rasterRect.yPx}px`;
+}
+
 function resize(): void {
   const widthPx = Math.max(1, Math.round(app.clientWidth));
   const heightPx = Math.max(1, Math.round(app.clientHeight));
-  viewport = { widthPx, heightPx };
-  renderer.setSize(widthPx, heightPx, false);
-  if (fidelityCrop) updateThreeCameraCrop(camera, currentFixedCamera, fidelityFullViewport, fidelityCrop);
-  else updateThreeCameraViewport(camera, currentFixedCamera, viewport);
-  composition.setSize(widthPx, heightPx);
+  const hostViewport = { widthPx, heightPx };
+
+  if (fidelityCrop) {
+    viewport = hostViewport;
+    renderer.domElement.style.width = `${widthPx}px`;
+    renderer.domElement.style.height = `${heightPx}px`;
+    renderer.domElement.style.marginLeft = "0px";
+    renderer.domElement.style.marginTop = "0px";
+    renderer.setSize(widthPx, heightPx, false);
+    updateThreeCameraCrop(camera, currentFixedCamera, fidelityFullViewport, fidelityCrop);
+    composition.setSize(widthPx, heightPx);
+    app.dataset.presentationFrame = "fidelity-crop";
+    app.dataset.presentationFit = "crop";
+    app.dataset.presentationCrop = "true";
+    app.dataset.presentationHostWidth = String(widthPx);
+    app.dataset.presentationHostHeight = String(heightPx);
+    app.dataset.presentationRasterX = "0";
+    app.dataset.presentationRasterY = "0";
+    app.dataset.presentationRasterWidth = String(widthPx);
+    app.dataset.presentationRasterHeight = String(heightPx);
+    app.dataset.presentationAspect = String(camera.aspect);
+  } else {
+    const resolved = resolvePresentationFrame(hostViewport, composition.scenePackage.presentationFrame);
+    const { rasterRect } = resolved;
+    viewport = { widthPx: rasterRect.widthPx, heightPx: rasterRect.heightPx };
+    positionCanvas(resolved);
+    renderer.setSize(rasterRect.widthPx, rasterRect.heightPx, false);
+    if (resolved.active) updateThreeCameraAspect(camera, currentFixedCamera, resolved.projectionAspectRatio);
+    else updateThreeCameraViewport(camera, currentFixedCamera, viewport);
+    composition.setSize(rasterRect.widthPx, rasterRect.heightPx);
+    syncPresentationDatasets(resolved);
+  }
   render();
 }
 

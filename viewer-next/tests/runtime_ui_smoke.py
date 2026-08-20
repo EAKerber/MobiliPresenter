@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import struct
 import subprocess
@@ -10,6 +11,7 @@ from urllib.parse import urlencode
 BASE_URL = "http://127.0.0.1:4173/"
 OUT = Path("artifacts/runtime-ui")
 EVIDENCE = OUT / "evidence.json"
+PRESENTATION_ASPECT = 1.9286452947259565
 
 
 def find_chrome() -> str:
@@ -82,6 +84,62 @@ def require(dom: str, name: str, needles: tuple[str, ...]) -> None:
         raise SystemExit(f"RUNTIME_UI_DOM_GATE_FAILED:{name}:{missing}")
 
 
+def presentation_frame_evidence(dom: str, name: str) -> dict[str, object]:
+    app_match = re.search(r'<div id="app"([^>]*)>', dom)
+    if app_match is None:
+        raise SystemExit(f"RUNTIME_UI_APP_MISSING:{name}")
+    attrs = dict(re.findall(r'data-([a-z0-9-]+)="([^"]*)"', app_match.group(1)))
+    required = (
+        "presentation-frame",
+        "presentation-fit",
+        "presentation-crop",
+        "presentation-host-width",
+        "presentation-host-height",
+        "presentation-raster-x",
+        "presentation-raster-y",
+        "presentation-raster-width",
+        "presentation-raster-height",
+        "presentation-aspect",
+    )
+    missing = [key for key in required if key not in attrs]
+    if missing:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_MARKERS_MISSING:{name}:{missing}")
+    if attrs["presentation-frame"] != "active" or attrs["presentation-fit"] != "contain":
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_POLICY_INVALID:{name}:{attrs}")
+    if attrs["presentation-crop"] != "false":
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_CROPPED:{name}")
+
+    host_width = int(attrs["presentation-host-width"])
+    host_height = int(attrs["presentation-host-height"])
+    raster_x = int(attrs["presentation-raster-x"])
+    raster_y = int(attrs["presentation-raster-y"])
+    raster_width = int(attrs["presentation-raster-width"])
+    raster_height = int(attrs["presentation-raster-height"])
+    aspect = float(attrs["presentation-aspect"])
+
+    if abs(aspect - PRESENTATION_ASPECT) > 1e-12:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_ASPECT_DRIFT:{name}:{aspect}")
+    if min(host_width, host_height, raster_width, raster_height) <= 0:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_SIZE_INVALID:{name}")
+    if raster_x < 0 or raster_y < 0:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_OFFSET_INVALID:{name}")
+    if raster_x + raster_width > host_width or raster_y + raster_height > host_height:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_OUTSIDE_HOST:{name}")
+    if abs((host_width - raster_width) - 2 * raster_x) > 1:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_NOT_CENTERED_X:{name}")
+    if abs((host_height - raster_height) - 2 * raster_y) > 1:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_NOT_CENTERED_Y:{name}")
+
+    return {
+        "id": name,
+        "hostPx": [host_width, host_height],
+        "rasterPx": [raster_x, raster_y, raster_width, raster_height],
+        "projectionAspectRatio": aspect,
+        "fit": attrs["presentation-fit"],
+        "cropped": False,
+    }
+
+
 def main() -> None:
     chrome = find_chrome()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -134,18 +192,27 @@ def main() -> None:
     )
     require(unavailable_dom, "unavailable", unavailable_required)
 
-    captures = [
-        capture(chrome, ready_url, "runtime-ui-desktop-modules-detail", 1366, 768),
-        capture(chrome, ready_url, "runtime-ui-mobile-modules-detail", 390, 844),
-        capture(chrome, unavailable_url, "runtime-ui-desktop-unavailable", 1366, 768),
-    ]
+    matrix = (
+        ("runtime-ui-desktop-modules-detail", 1366, 768),
+        ("runtime-ui-compact-landscape-modules-detail", 1024, 768),
+        ("runtime-ui-tablet-portrait-modules-detail", 768, 1024),
+        ("runtime-ui-mobile-modules-detail", 390, 844),
+    )
+    captures: list[dict[str, object]] = []
+    presentation_frames: list[dict[str, object]] = []
+    for name, width, height in matrix:
+        dom = ready_dom if (width, height) == (1366, 768) else dump_dom(chrome, ready_url, name, width, height)
+        presentation_frames.append(presentation_frame_evidence(dom, name))
+        captures.append(capture(chrome, ready_url, name, width, height))
+    captures.append(capture(chrome, unavailable_url, "runtime-ui-desktop-unavailable", 1366, 768))
 
     evidence = {
-        "schemaVersion": "ViewerRuntimeUiEvidence 0.3.0",
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.4.0",
         "status": "PASS",
         "readyUrl": ready_url,
         "unavailableUrl": unavailable_url,
         "captures": captures,
+        "presentationFrames": presentation_frames,
         "readyRequiredDomMarkers": list(ready_required),
         "unavailableRequiredDomMarkers": list(unavailable_required),
         "invariants": {
@@ -158,7 +225,10 @@ def main() -> None:
             "technicalFidelityComesFromPublicContract": True,
             "frontPresetProjectedByRuntime": True,
             "stonePresetProjectedByRuntime": True,
-            "desktopAndMobileCaptured": True,
+            "responsiveFixedFrameContained": True,
+            "responsiveFixedFrameNeverCrops": True,
+            "responsiveFixedFrameProjectionAspectStable": True,
+            "desktopCompactTabletAndMobileCaptured": True,
         },
     }
     EVIDENCE.write_text(json.dumps(evidence, indent=2, ensure_ascii=False), encoding="utf-8")
