@@ -5,7 +5,7 @@ import argparse,json,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
-from tools import project_coherence,project_sensors,project_state,work_graph
+from tools import project_coherence,project_sensors,project_state,runtime_observation_sensors,runtime_observations,work_graph
 from tools.canonical import stable_hash
 from tools.semantics.observation import ObservationStatus
 SCHEMA_VERSION="ProjectMachineInspection 0.5";REPOSITORY="EAKerber/MobiliPresenter";SCOPES={"local","base","live"};ERROR_EXIT=2;UNKNOWN_EXIT=1
@@ -63,8 +63,13 @@ def inspect_local():
     state=_load_state();view=project_state.operational_view(state);sensors=_common_sensors(state);sensors["control"]=project_sensors.observe_control_head(state,live=False);sensors["pullRequests"]=project_sensors.observe_pull_requests(view["project"]["repository"],live=False);sensors["coordination"]=project_sensors.observe_coordination(live=False);sensors["continuations"]=project_sensors.observe_continuations_local();return build_inspection(state,sensors,scope="local")
 def inspect_base():
     state=_load_state();view=project_state.operational_view(state);sensors=_common_sensors(state);sensors["control"]=project_sensors.observe_control_head(state,live=True);sensors["pullRequests"]=project_sensors.observe_pull_requests(view["project"]["repository"],live=True);sensors["coordination"]=project_sensors.observe_coordination(live=True);sensors["continuations"]=project_sensors.observe_continuations_local();return build_inspection(state,sensors,scope="base")
-def inspect_live():
-    state=_load_state();view=project_state.operational_view(state);sensors=_common_sensors(state);sensors["control"]=project_sensors.observe_control_head(state,live=True);sensors["pullRequests"]=project_sensors.observe_pull_requests(view["project"]["repository"],live=True);sensors["coordination"]=project_sensors.observe_coordination(live=True);sensors["continuations"]=project_sensors.observe_continuations_live();return build_inspection(state,sensors,scope="live")
+def inspect_live(observations=None):
+    state=_load_state();view=project_state.operational_view(state);sensors=_common_sensors(state)
+    if observations is None:
+        sensors["control"]=project_sensors.observe_control_head(state,live=True);sensors["pullRequests"]=project_sensors.observe_pull_requests(view["project"]["repository"],live=True);sensors["coordination"]=project_sensors.observe_coordination(live=True);sensors["continuations"]=project_sensors.observe_continuations_live()
+    else:
+        remote=runtime_observation_sensors.observe_bundle(state,observations);sensors.update(remote)
+    return build_inspection(state,sensors,scope="live")
 def _require_sha_or_none(value,code):
     if value is None:return
     if not isinstance(value,str) or len(value)!=40 or any(char not in "0123456789abcdef" for char in value):raise RuntimeError(code)
@@ -114,10 +119,12 @@ def load_json(path):
 def _print_human(payload):
     trust=payload["trust"];coherence=payload["coherence"];project=payload["project"];graph=payload["workGraph"];print("PROJECT MACHINE INSPECTION");print(f"  scope: {payload['scope']}");print(f"  trust: {trust['status']}");print(f"  coherence: {coherence['status']}");print(f"  phase: {project['phase']}");print(f"  checkpoint: {project['checkpoint']}");print(f"  next: {project['nextTransition']}");print(f"  runnable work: {len(graph['runnable'])}");print(f"  authorities: {len(payload['authorities'])}");print(f"  observations: {len(payload['observations'])}");print(f"  inspectionHash: {payload['inspectionHash']}")
 def main(argv=None):
-    parser=argparse.ArgumentParser(prog="project-machine");sub=parser.add_subparsers(dest="command",required=True);inspect_parser=sub.add_parser("inspect");scope_group=inspect_parser.add_mutually_exclusive_group(required=True);scope_group.add_argument("--live",action="store_true");scope_group.add_argument("--base",action="store_true");scope_group.add_argument("--local",action="store_true");inspect_parser.add_argument("--json",action="store_true",dest="as_json");validate_parser=sub.add_parser("validate");validate_parser.add_argument("path");validate_parser.add_argument("--json",action="store_true",dest="as_json");args=parser.parse_args(argv)
+    parser=argparse.ArgumentParser(prog="project-machine");sub=parser.add_subparsers(dest="command",required=True);inspect_parser=sub.add_parser("inspect");scope_group=inspect_parser.add_mutually_exclusive_group(required=True);scope_group.add_argument("--live",action="store_true");scope_group.add_argument("--base",action="store_true");scope_group.add_argument("--local",action="store_true");inspect_parser.add_argument("--observations");inspect_parser.add_argument("--json",action="store_true",dest="as_json");validate_parser=sub.add_parser("validate");validate_parser.add_argument("path");validate_parser.add_argument("--json",action="store_true",dest="as_json");args=parser.parse_args(argv)
     try:
         if args.command=="validate":result=validate_inspection(load_json(args.path));print(json.dumps(result,indent=2 if args.as_json else None,ensure_ascii=False));return 0
-        payload=inspect_live() if args.live else (inspect_base() if args.base else inspect_local())
+        if args.observations and not args.live:raise RuntimeError("PROJECT_MACHINE_OBSERVATIONS_REQUIRE_LIVE")
+        bundle=runtime_observations.load_bundle(args.observations) if args.observations else None
+        payload=inspect_live(bundle) if args.live else (inspect_base() if args.base else inspect_local())
         print(json.dumps(payload,indent=2,ensure_ascii=False) if args.as_json else "") if args.as_json else _print_human(payload);status=payload["trust"]["status"];coherence_status=payload["coherence"]["status"]
         if status==ObservationStatus.FAIL.value or coherence_status==ObservationStatus.FAIL.value:return ERROR_EXIT
         if status==ObservationStatus.UNKNOWN.value or coherence_status==ObservationStatus.UNKNOWN.value:return UNKNOWN_EXIT
