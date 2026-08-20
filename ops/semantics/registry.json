@@ -1,85 +1,643 @@
 {
   "schemaVersion": "OperationalSemantics 0.2",
   "owners": {
-    "capability": {"description": "Capability lifecycle and gate semantics."},
-    "coordination": {"description": "Coordination lease semantics."},
-    "git-governance": {"description": "Git branch and repository governance semantics."},
-    "operations-core": {"description": "Cross-domain operational identity, observation, and action semantics."},
-    "scheduler": {"description": "Operational routing semantics."},
-    "transition-protocol": {"description": "Verifiable mutation plan and receipt semantics."},
-    "work": {"description": "Persistent work and handoff semantics."}
+    "capability": {
+      "description": "Capability lifecycle and gate semantics."
+    },
+    "coordination": {
+      "description": "Coordination lease semantics."
+    },
+    "git-governance": {
+      "description": "Git branch and repository governance semantics."
+    },
+    "operations-core": {
+      "description": "Cross-domain operational identity, observation, and action semantics."
+    },
+    "scheduler": {
+      "description": "Operational routing semantics."
+    },
+    "transition-protocol": {
+      "description": "Verifiable mutation plan and receipt semantics."
+    },
+    "work": {
+      "description": "Persistent work and handoff semantics."
+    }
   },
   "concepts": {
-    "action.operational": {"term": "OperationalAction", "kind": "action-vocabulary", "owner": "operations-core", "definition": "Cross-domain operational action vocabulary: CONTINUE, RECONCILE, HANDOFF, PAUSE, NEEDS_HUMAN."},
-    "artifact.inspection": {"term": "Inspection", "kind": "artifact", "owner": "operations-core", "definition": "Read-only derived factual projection."},
-    "artifact.receipt": {"term": "Receipt", "kind": "artifact", "owner": "transition-protocol", "definition": "Evidence emitted only after a mutation is applied and verified by readback."},
-    "artifact.recommendation": {"term": "Recommendation", "kind": "artifact", "owner": "operations-core", "definition": "Read-only policy interpretation that does not itself authorize mutation."},
-    "artifact.routing-plan": {"term": "RoutingPlan", "kind": "artifact", "owner": "scheduler", "definition": "Read-only routing decision without transport side effects."},
-    "artifact.sanitization-plan": {"term": "SanitizationPlan", "kind": "artifact", "owner": "git-governance", "definition": "Plan describing potentially destructive maintenance; execution requires a separate guarded executor."},
-    "artifact.transition-plan": {"term": "TransitionPlan", "kind": "artifact", "owner": "transition-protocol", "definition": "Deterministic mutation candidate bound to before-state and exact plan identity."},
-    "branch.class.authority": {"term": "authority", "kind": "branch-class", "owner": "git-governance", "definition": "Branch class reserved for an explicitly declared live authority; the name alone never grants authority."},
-    "branch.class.control": {"term": "control", "kind": "branch-class", "owner": "git-governance", "definition": "Repository control branch class."},
-    "branch.class.experiment": {"term": "experiment", "kind": "branch-class", "owner": "git-governance", "definition": "Branch class for bounded experimental work; the name does not imply retention or promotion."},
-    "branch.class.work": {"term": "work", "kind": "branch-class", "owner": "git-governance", "definition": "Branch class for transient implementation work; the name does not imply deletion eligibility."},
-    "branch.domain.engine": {"term": "engine", "kind": "branch-domain", "owner": "git-governance", "definition": "Semantic branch domain for Engine/runtime implementation work."},
-    "branch.domain.operations": {"term": "operations", "kind": "branch-domain", "owner": "git-governance", "definition": "Semantic branch domain for operational framework and GitOps work.", "aliases": [{"term": "ops", "scope": "legacy-branch-namespace", "status": "legacy", "retireBy": "M11"}]},
-    "branch.domain.ui": {"term": "ui", "kind": "branch-domain", "owner": "git-governance", "definition": "Semantic branch domain for UI implementation work."},
-    "capability.policy": {"term": "CapabilityPolicy", "kind": "domain-policy", "owner": "capability", "definition": "Current capability policy vocabulary: experimental, canonical, deprecated, disabled."},
-    "coordination.lease": {"term": "CoordinationLease", "kind": "domain-concept", "owner": "coordination", "definition": "Temporary exclusive write ownership over an exact coordination resource.", "aliases": [{"term": "lock", "scope": "cli-name", "status": "legacy", "retireBy": "M11"}]},
-    "core.authority": {"term": "authority", "kind": "operational-role", "owner": "operations-core", "definition": "Canonical source for a mutable operational fact within a domain."},
-    "core.canonical-writer": {"term": "canonical-writer", "kind": "operational-role", "owner": "operations-core", "definition": "The single supported mutation surface for one mutable authority."},
-    "core.projection": {"term": "projection", "kind": "operational-role", "owner": "operations-core", "definition": "Derived representation that never becomes an independent source of truth."},
-    "identity.role": {"term": "role", "kind": "identity", "owner": "operations-core", "definition": "Logical function fulfilled by one or more workers.", "related": ["identity.worker"]},
-    "identity.session": {"term": "session", "kind": "identity", "owner": "operations-core", "definition": "Ephemeral execution instance of a worker.", "related": ["identity.worker"]},
-    "identity.worker": {"term": "worker", "kind": "identity", "owner": "operations-core", "definition": "Persistent identifiable executor of a logical role.", "related": ["identity.role", "identity.session"]},
-    "identity.worker-reference": {"term": "worker-reference", "kind": "identity-reference", "owner": "operations-core", "definition": "Reference to a worker identity from another operational contract.", "related": ["identity.worker"]},
-    "status.observation": {"term": "ObservationStatus", "kind": "status-vocabulary", "owner": "operations-core", "definition": "Epistemic observation status: PASS means required facts were observed and validated; UNKNOWN means they could not be determined; FAIL means required factual observation or contract validation failed."},
-    "status.work": {"term": "WorkStatus", "kind": "status-vocabulary", "owner": "work", "definition": "Persistent work lifecycle vocabulary: READY, IN_PROGRESS, WAITING, HANDOFF, DONE."},
-    "work.dependency": {"term": "WorkDependency", "kind": "domain-concept", "owner": "work", "definition": "Directed dependsOn relation between persistent work items. Dependencies are resolved only when the referenced work item is DONE."},
-    "work.graph": {"term": "WorkGraph", "kind": "projection", "owner": "work", "definition": "Read-only deterministic graph derived from work items and their dependsOn relations; never an independent authority."},
-    "work.item": {"term": "WorkItem", "kind": "domain-concept", "owner": "work", "definition": "Persistent unit of executable work stored in the existing continuations authority."}
+    "action.operational": {
+      "term": "OperationalAction",
+      "kind": "action-vocabulary",
+      "owner": "operations-core",
+      "definition": "Cross-domain operational action vocabulary: CONTINUE, RECONCILE, HANDOFF, PAUSE, NEEDS_HUMAN."
+    },
+    "artifact.inspection": {
+      "term": "Inspection",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only derived factual projection."
+    },
+    "artifact.receipt": {
+      "term": "Receipt",
+      "kind": "artifact",
+      "owner": "transition-protocol",
+      "definition": "Evidence emitted only after a mutation is applied and verified by readback."
+    },
+    "artifact.recommendation": {
+      "term": "Recommendation",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only policy interpretation that does not itself authorize mutation."
+    },
+    "artifact.routing-plan": {
+      "term": "RoutingPlan",
+      "kind": "artifact",
+      "owner": "scheduler",
+      "definition": "Read-only routing decision without transport side effects."
+    },
+    "artifact.sanitization-plan": {
+      "term": "SanitizationPlan",
+      "kind": "artifact",
+      "owner": "git-governance",
+      "definition": "Plan describing potentially destructive maintenance; execution requires a separate guarded executor."
+    },
+    "artifact.transition-plan": {
+      "term": "TransitionPlan",
+      "kind": "artifact",
+      "owner": "transition-protocol",
+      "definition": "Deterministic mutation candidate bound to before-state and exact plan identity."
+    },
+    "branch.class.authority": {
+      "term": "authority",
+      "kind": "branch-class",
+      "owner": "git-governance",
+      "definition": "Branch class reserved for an explicitly declared live authority; the name alone never grants authority."
+    },
+    "branch.class.control": {
+      "term": "control",
+      "kind": "branch-class",
+      "owner": "git-governance",
+      "definition": "Repository control branch class."
+    },
+    "branch.class.experiment": {
+      "term": "experiment",
+      "kind": "branch-class",
+      "owner": "git-governance",
+      "definition": "Branch class for bounded experimental work; the name does not imply retention or promotion."
+    },
+    "branch.class.work": {
+      "term": "work",
+      "kind": "branch-class",
+      "owner": "git-governance",
+      "definition": "Branch class for transient implementation work; the name does not imply deletion eligibility."
+    },
+    "branch.domain.engine": {
+      "term": "engine",
+      "kind": "branch-domain",
+      "owner": "git-governance",
+      "definition": "Semantic branch domain for Engine/runtime implementation work."
+    },
+    "branch.domain.operations": {
+      "term": "operations",
+      "kind": "branch-domain",
+      "owner": "git-governance",
+      "definition": "Semantic branch domain for operational framework and GitOps work.",
+      "aliases": [
+        {
+          "term": "ops",
+          "scope": "legacy-branch-namespace",
+          "status": "legacy",
+          "retireBy": "M11"
+        }
+      ]
+    },
+    "branch.domain.ui": {
+      "term": "ui",
+      "kind": "branch-domain",
+      "owner": "git-governance",
+      "definition": "Semantic branch domain for UI implementation work."
+    },
+    "capability.policy": {
+      "term": "CapabilityPolicy",
+      "kind": "domain-policy",
+      "owner": "capability",
+      "definition": "Current capability policy vocabulary: experimental, canonical, deprecated, disabled."
+    },
+    "coordination.lease": {
+      "term": "CoordinationLease",
+      "kind": "domain-concept",
+      "owner": "coordination",
+      "definition": "Temporary exclusive write ownership over an exact coordination resource.",
+      "aliases": [
+        {
+          "term": "lock",
+          "scope": "cli-name",
+          "status": "legacy",
+          "retireBy": "M11"
+        }
+      ]
+    },
+    "core.authority": {
+      "term": "authority",
+      "kind": "operational-role",
+      "owner": "operations-core",
+      "definition": "Canonical source for a mutable operational fact within a domain."
+    },
+    "core.canonical-writer": {
+      "term": "canonical-writer",
+      "kind": "operational-role",
+      "owner": "operations-core",
+      "definition": "The single supported mutation surface for one mutable authority."
+    },
+    "core.projection": {
+      "term": "projection",
+      "kind": "operational-role",
+      "owner": "operations-core",
+      "definition": "Derived representation that never becomes an independent source of truth."
+    },
+    "identity.role": {
+      "term": "role",
+      "kind": "identity",
+      "owner": "operations-core",
+      "definition": "Logical function fulfilled by one or more workers.",
+      "related": [
+        "identity.worker"
+      ]
+    },
+    "identity.session": {
+      "term": "session",
+      "kind": "identity",
+      "owner": "operations-core",
+      "definition": "Ephemeral execution instance of a worker.",
+      "related": [
+        "identity.worker"
+      ]
+    },
+    "identity.worker": {
+      "term": "worker",
+      "kind": "identity",
+      "owner": "operations-core",
+      "definition": "Persistent identifiable executor of a logical role.",
+      "related": [
+        "identity.role",
+        "identity.session"
+      ]
+    },
+    "identity.worker-reference": {
+      "term": "worker-reference",
+      "kind": "identity-reference",
+      "owner": "operations-core",
+      "definition": "Reference to a worker identity from another operational contract.",
+      "related": [
+        "identity.worker"
+      ]
+    },
+    "status.observation": {
+      "term": "ObservationStatus",
+      "kind": "status-vocabulary",
+      "owner": "operations-core",
+      "definition": "Epistemic observation status: PASS means required facts were observed and validated; UNKNOWN means they could not be determined; FAIL means required factual observation or contract validation failed."
+    },
+    "status.work": {
+      "term": "WorkStatus",
+      "kind": "status-vocabulary",
+      "owner": "work",
+      "definition": "Persistent work lifecycle vocabulary: READY, IN_PROGRESS, WAITING, HANDOFF, DONE."
+    },
+    "work.dependency": {
+      "term": "WorkDependency",
+      "kind": "domain-concept",
+      "owner": "work",
+      "definition": "Directed dependsOn relation between persistent work items. Dependencies are resolved only when the referenced work item is DONE."
+    },
+    "work.graph": {
+      "term": "WorkGraph",
+      "kind": "projection",
+      "owner": "work",
+      "definition": "Read-only deterministic graph derived from work items and their dependsOn relations; never an independent authority."
+    },
+    "work.item": {
+      "term": "WorkItem",
+      "kind": "domain-concept",
+      "owner": "work",
+      "definition": "Persistent unit of executable work stored in the existing continuations authority."
+    }
   },
   "contracts": {
-    "capability-gates": {"owner": "capability", "semanticValidator": "tools.capability_gates.validate_capability", "structuralSchema": "ops/schemas/capability-gates.schema.json"},
-    "continuation-state": {"owner": "work", "semanticValidator": "tools.continuation.validate_current", "structuralSchema": "ops/schemas/continuation-state.schema.json"},
-    "coordination-state": {"owner": "coordination", "semanticValidator": "tools.coordination.validate_state", "structuralSchema": "ops/schemas/coordination-state.schema.json"},
-    "operational-semantics": {"owner": "operations-core", "semanticValidator": "tools.semantics.registry.validate_registry", "structuralSchema": "ops/schemas/operational-semantics.schema.json"},
-    "project-state": {"owner": "operations-core", "semanticValidator": "tools.project_state.validate_current", "structuralSchema": "ops/schemas/project-state.schema.json"},
-    "source-build": {"owner": "operations-core", "semanticValidator": "tools.publication.validate_manifest", "structuralSchema": "ops/schemas/source-build.schema.json"},
-    "transition-plan": {"owner": "transition-protocol", "semanticValidator": "tools.transition_protocol.validate_plan", "structuralSchema": "ops/schemas/transition-plan.schema.json"},
-    "transition-receipt": {"owner": "transition-protocol", "semanticValidator": "tools.transition_protocol.validate_receipt", "structuralSchema": "ops/schemas/transition-receipt.schema.json"}
+    "capability-gates": {
+      "owner": "capability",
+      "semanticValidator": "tools.capability_gates.validate_capability",
+      "structuralSchema": "ops/schemas/capability-gates.schema.json"
+    },
+    "continuation-state": {
+      "owner": "work",
+      "semanticValidator": "tools.continuation.validate_current",
+      "structuralSchema": "ops/schemas/continuation-state.schema.json"
+    },
+    "coordination-state": {
+      "owner": "coordination",
+      "semanticValidator": "tools.coordination.validate_state",
+      "structuralSchema": "ops/schemas/coordination-state.schema.json"
+    },
+    "operational-semantics": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.semantics.registry.validate_registry",
+      "structuralSchema": "ops/schemas/operational-semantics.schema.json"
+    },
+    "project-state": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.project_state.validate_current",
+      "structuralSchema": "ops/schemas/project-state.schema.json"
+    },
+    "source-build": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.publication.validate_manifest",
+      "structuralSchema": "ops/schemas/source-build.schema.json"
+    },
+    "transition-plan": {
+      "owner": "transition-protocol",
+      "semanticValidator": "tools.transition_protocol.validate_plan",
+      "structuralSchema": "ops/schemas/transition-plan.schema.json"
+    },
+    "transition-receipt": {
+      "owner": "transition-protocol",
+      "semanticValidator": "tools.transition_protocol.validate_receipt",
+      "structuralSchema": "ops/schemas/transition-receipt.schema.json"
+    }
   },
   "branchGrammar": {
-    "controlBranches": ["main"],
-    "canonical": {"authority": "authority/<domain>/<slug>", "experiment": "experiment/<domain>/<slug>", "work": "work/<domain>/<slug>"},
-    "legacyNamespaces": ["agent", "architecture", "archive", "backup", "coordination", "deploy", "engine", "ops", "planning", "renderer", "tmp", "ui", "variant"]
+    "controlBranches": [
+      "main"
+    ],
+    "canonical": {
+      "authority": "authority/<domain>/<slug>",
+      "experiment": "experiment/<domain>/<slug>",
+      "work": "work/<domain>/<slug>"
+    },
+    "legacyNamespaces": [
+      "agent",
+      "architecture",
+      "archive",
+      "backup",
+      "coordination",
+      "deploy",
+      "engine",
+      "ops",
+      "planning",
+      "renderer",
+      "tmp",
+      "ui",
+      "variant"
+    ]
   },
   "managedAuthorities": {
-    "capability-gates": {"owner": "capability", "mutable": true, "locator": {"kind": "repository-directory", "path": "ops/capabilities"}, "requiresCanonicalWriter": true},
-    "continuations": {"owner": "work", "mutable": true, "locator": {"kind": "git-authority", "branch": "coordination/continuations", "path": "ops/continuations"}, "requiresCanonicalWriter": true},
-    "coordination-leases": {"owner": "coordination", "mutable": true, "locator": {"kind": "git-authority", "branch": "coordination/leases", "path": "ops/coordination/leases.json"}, "requiresCanonicalWriter": true},
-    "project-state": {"owner": "operations-core", "mutable": true, "locator": {"kind": "repository-file", "path": "ops/state/project.json"}, "requiresCanonicalWriter": true}
+    "capability-gates": {
+      "owner": "capability",
+      "mutable": true,
+      "locator": {
+        "kind": "repository-directory",
+        "path": "ops/capabilities"
+      },
+      "requiresCanonicalWriter": true
+    },
+    "continuations": {
+      "owner": "work",
+      "mutable": true,
+      "locator": {
+        "kind": "git-authority",
+        "branch": "coordination/continuations",
+        "path": "ops/continuations"
+      },
+      "requiresCanonicalWriter": true
+    },
+    "coordination-leases": {
+      "owner": "coordination",
+      "mutable": true,
+      "locator": {
+        "kind": "git-authority",
+        "branch": "coordination/leases",
+        "path": "ops/coordination/leases.json"
+      },
+      "requiresCanonicalWriter": true
+    },
+    "project-state": {
+      "owner": "operations-core",
+      "mutable": true,
+      "locator": {
+        "kind": "repository-file",
+        "path": "ops/state/project.json"
+      },
+      "requiresCanonicalWriter": true
+    }
   },
   "resources": {
-    "capability-transition-evidence": {"owner": "capability", "locator": {"kind": "repository-directory", "path": "ops/evidence/capability-gates"}},
-    "git-branch-refs": {"owner": "git-governance", "locator": {"kind": "github-git-refs", "repository": "EAKerber/MobiliPresenter"}}
+    "capability-transition-evidence": {
+      "owner": "capability",
+      "locator": {
+        "kind": "repository-directory",
+        "path": "ops/evidence/capability-gates"
+      }
+    },
+    "git-branch-refs": {
+      "owner": "git-governance",
+      "locator": {
+        "kind": "github-git-refs",
+        "repository": "EAKerber/MobiliPresenter"
+      }
+    }
   },
   "components": {
-    "agent-cli": {"module": "tools.agent", "owner": "operations-core", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["project-state"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["project-state-executor", "runtime-capability-inspection"]},
-    "capability-executor": {"module": "tools.capability_apply", "owner": "capability", "kind": "authority-executor", "sideEffects": true, "readsAuthorities": ["capability-gates"], "writesAuthorities": ["capability-gates"], "readsResources": ["capability-transition-evidence"], "writesResources": ["capability-transition-evidence"], "produces": [], "canonicalWriterFor": ["capability-gates"], "delegatesTo": []},
-    "capability-lifecycle-cli": {"module": "tools.capability_lifecycle", "owner": "capability", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["capability-gates"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["capability-executor"]},
-    "continuation-executor": {"module": "tools.continuation_remote", "owner": "work", "kind": "authority-executor", "sideEffects": true, "readsAuthorities": ["continuations"], "writesAuthorities": ["continuations"], "readsResources": [], "writesResources": [], "produces": ["artifact.receipt"], "canonicalWriterFor": ["continuations"], "delegatesTo": []},
-    "continuation-live-cli": {"module": "tools.continuation_live", "owner": "work", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["continuations"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["continuation-executor"]},
-    "coordination-admin-cli": {"module": "tools.coordination_admin", "owner": "coordination", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["coordination-leases"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["coordination-executor"]},
-    "coordination-executor": {"module": "tools.coordination_remote", "owner": "coordination", "kind": "authority-executor", "sideEffects": true, "readsAuthorities": ["coordination-leases"], "writesAuthorities": ["coordination-leases"], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": ["coordination-leases"], "delegatesTo": []},
-    "coordination-lock-cli": {"module": "tools.lock", "owner": "coordination", "kind": "cli-adapter", "sideEffects": true, "readsAuthorities": ["coordination-leases"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": [], "canonicalWriterFor": [], "delegatesTo": ["coordination-executor"]},
-    "maintenance-inspection": {"module": "tools.maintenance_inspect", "owner": "operations-core", "kind": "recommendation", "sideEffects": false, "readsAuthorities": [], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": ["artifact.inspection", "artifact.recommendation"], "canonicalWriterFor": [], "delegatesTo": ["project-machine"]},
-    "project-machine": {"module": "tools.project_machine", "owner": "operations-core", "kind": "inspection", "sideEffects": false, "readsAuthorities": ["capability-gates", "continuations", "coordination-leases", "project-state"], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": ["artifact.inspection"], "canonicalWriterFor": [], "delegatesTo": []},
-    "project-state-executor": {"module": "tools.project_state_apply", "owner": "operations-core", "kind": "authority-executor", "sideEffects": true, "readsAuthorities": ["project-state"], "writesAuthorities": ["project-state"], "readsResources": [], "writesResources": [], "produces": ["artifact.receipt"], "canonicalWriterFor": ["project-state"], "delegatesTo": []},
-    "prune-apply": {"module": "tools.prune_apply", "owner": "git-governance", "kind": "sanitization-executor", "sideEffects": true, "readsAuthorities": [], "writesAuthorities": [], "readsResources": ["git-branch-refs"], "writesResources": ["git-branch-refs"], "produces": [], "canonicalWriterFor": [], "delegatesTo": []},
-    "prune-plan": {"module": "tools.prune_plan", "owner": "git-governance", "kind": "sanitization-planner", "sideEffects": false, "readsAuthorities": ["continuations", "project-state"], "writesAuthorities": [], "readsResources": ["git-branch-refs"], "writesResources": [], "produces": ["artifact.sanitization-plan"], "canonicalWriterFor": [], "delegatesTo": []},
-    "routine-inspection": {"module": "tools.routines", "owner": "operations-core", "kind": "inspection", "sideEffects": false, "readsAuthorities": [], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": ["artifact.inspection"], "canonicalWriterFor": [], "delegatesTo": ["project-machine"]},
-    "runtime-capability-inspection": {"module": "tools.runtime_capabilities", "owner": "operations-core", "kind": "inspection", "sideEffects": false, "readsAuthorities": [], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": ["artifact.inspection"], "canonicalWriterFor": [], "delegatesTo": []},
-    "scheduler-plan": {"module": "tools.scheduler_plan", "owner": "scheduler", "kind": "routing-planner", "sideEffects": false, "readsAuthorities": [], "writesAuthorities": [], "readsResources": [], "writesResources": [], "produces": ["artifact.routing-plan"], "canonicalWriterFor": [], "delegatesTo": []}
+    "agent-cli": {
+      "module": "tools.agent",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "project-state"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "project-state-executor",
+        "runtime-capability-inspection"
+      ]
+    },
+    "capability-executor": {
+      "module": "tools.capability_apply",
+      "owner": "capability",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "capability-gates"
+      ],
+      "writesAuthorities": [
+        "capability-gates"
+      ],
+      "readsResources": [
+        "capability-transition-evidence"
+      ],
+      "writesResources": [
+        "capability-transition-evidence"
+      ],
+      "produces": [],
+      "canonicalWriterFor": [
+        "capability-gates"
+      ],
+      "delegatesTo": []
+    },
+    "capability-lifecycle-cli": {
+      "module": "tools.capability_lifecycle",
+      "owner": "capability",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "capability-gates"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "capability-executor"
+      ]
+    },
+    "continuation-executor": {
+      "module": "tools.continuation_remote",
+      "owner": "work",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "continuations"
+      ],
+      "writesAuthorities": [
+        "continuations"
+      ],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.receipt"
+      ],
+      "canonicalWriterFor": [
+        "continuations"
+      ],
+      "delegatesTo": []
+    },
+    "continuation-live-cli": {
+      "module": "tools.continuation_live",
+      "owner": "work",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "continuations"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "continuation-executor"
+      ]
+    },
+    "coordination-admin-cli": {
+      "module": "tools.coordination_admin",
+      "owner": "coordination",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "coordination-leases"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "coordination-executor"
+      ]
+    },
+    "coordination-executor": {
+      "module": "tools.coordination_remote",
+      "owner": "coordination",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "coordination-leases"
+      ],
+      "writesAuthorities": [
+        "coordination-leases"
+      ],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [
+        "coordination-leases"
+      ],
+      "delegatesTo": []
+    },
+    "coordination-lock-cli": {
+      "module": "tools.lock",
+      "owner": "coordination",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "coordination-leases"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "coordination-executor"
+      ]
+    },
+    "maintenance-inspection": {
+      "module": "tools.maintenance_inspect",
+      "owner": "operations-core",
+      "kind": "recommendation",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.inspection",
+        "artifact.recommendation"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "project-machine",
+        "routine-inspection"
+      ]
+    },
+    "project-machine": {
+      "module": "tools.project_machine",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": [
+        "capability-gates",
+        "continuations",
+        "coordination-leases",
+        "project-state"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.inspection"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "project-state-executor": {
+      "module": "tools.project_state_apply",
+      "owner": "operations-core",
+      "kind": "authority-executor",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "project-state"
+      ],
+      "writesAuthorities": [
+        "project-state"
+      ],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.receipt"
+      ],
+      "canonicalWriterFor": [
+        "project-state"
+      ],
+      "delegatesTo": []
+    },
+    "prune-apply": {
+      "module": "tools.prune_apply",
+      "owner": "git-governance",
+      "kind": "sanitization-executor",
+      "sideEffects": true,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [
+        "git-branch-refs"
+      ],
+      "writesResources": [
+        "git-branch-refs"
+      ],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "prune-plan": {
+      "module": "tools.prune_plan",
+      "owner": "git-governance",
+      "kind": "sanitization-planner",
+      "sideEffects": false,
+      "readsAuthorities": [
+        "continuations",
+        "project-state"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [
+        "git-branch-refs"
+      ],
+      "writesResources": [],
+      "produces": [
+        "artifact.sanitization-plan"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "routine-inspection": {
+      "module": "tools.routines",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.inspection"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "project-machine"
+      ]
+    },
+    "runtime-capability-inspection": {
+      "module": "tools.runtime_capabilities",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.inspection"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "scheduler-plan": {
+      "module": "tools.scheduler_plan",
+      "owner": "scheduler",
+      "kind": "routing-planner",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.routing-plan"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    }
   }
 }
