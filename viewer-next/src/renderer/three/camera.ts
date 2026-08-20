@@ -18,6 +18,10 @@ function assertViewport(viewport: PixelViewport): void {
   if (!(viewport.widthPx > 0 && viewport.heightPx > 0)) throw new Error("VIEWPORT_INVALID");
 }
 
+function assertAspectRatio(aspectRatio: number): void {
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) throw new Error("CAMERA_ASPECT_INVALID");
+}
+
 function assertCrop(fullViewport: PixelViewport, crop: PixelCrop): void {
   if (!(crop.widthPx > 0 && crop.heightPx > 0 && crop.xPx >= 0 && crop.yPx >= 0)) {
     throw new Error("CAMERA_CROP_INVALID");
@@ -98,13 +102,23 @@ export function createThreeCamera(
   return camera;
 }
 
+export function updateThreeCameraAspect(
+  camera: PerspectiveCamera,
+  source: FixedPerspectiveCamera,
+  aspectRatio: number
+): void {
+  assertAspectRatio(aspectRatio);
+  camera.aspect = aspectRatio;
+  configureOffAxisProjection(camera, source, { widthPx: aspectRatio, heightPx: 1 });
+}
+
 export function updateThreeCameraViewport(
   camera: PerspectiveCamera,
   source: FixedPerspectiveCamera,
   viewport: PixelViewport
 ): void {
-  camera.aspect = viewport.widthPx / viewport.heightPx;
-  configureOffAxisProjection(camera, source, viewport);
+  assertViewport(viewport);
+  updateThreeCameraAspect(camera, source, viewport.widthPx / viewport.heightPx);
 }
 
 export function updateThreeCameraCrop(
