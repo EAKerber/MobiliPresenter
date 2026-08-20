@@ -1052,7 +1052,7 @@ body.viewer-product-ui[data-viewer-detail-open="true"] #app {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   :root {
     --ui-topbar-height: 58px;
     --ui-actions-height: 64px;

@@ -3,7 +3,7 @@
  * Selectors intentionally outrank runtime-controls.css so Vite/dev CSS load order cannot
  * reintroduce detail-driven scene compression.
  */
-@media (min-width: 761px) and (max-width: 1240px) {
+@media (min-width: 901px) and (max-width: 1240px) {
   html:root {
     --ui-stage-width: clamp(260px, 28vw, 300px);
     --ui-detail-width: clamp(340px, 38vw, 420px);
