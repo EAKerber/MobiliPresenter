@@ -75,6 +75,17 @@ class BootstrapBoundaryTests(unittest.TestCase):
         self.assertIn("routine-inspection.json", versioned)
         self.assertLess(versioned.index("tools/routines.py inspect"), versioned.index("tools/maintenance_inspect.py"))
 
+    def test_current_bootstrap_supports_closed_provider_neutral_live_observations(self):
+        current_path = ROLE_DIR / "manager-gitops-current.md"
+        _, target = resolve_current_target(current_path)
+        versioned = target.read_text(encoding="utf-8")
+        self.assertTrue((ROOT / "tools" / "runtime_observations.py").is_file())
+        self.assertIn("RuntimeObservationBundle 0.1", versioned)
+        self.assertIn("tools/runtime_observations.py validate", versioned)
+        self.assertIn("--live --observations", versioned)
+        self.assertIn("input remoto fechado", versioned)
+        self.assertIn("trustedRemoteTime", versioned)
+
 
 if __name__ == "__main__":
     unittest.main()
