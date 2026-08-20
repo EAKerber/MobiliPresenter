@@ -1,6 +1,6 @@
 # Manager / GitOps — current
 
-Documento corrente e autocontido do papel: [`manager-gitops-v0.9.md`](./manager-gitops-v0.9.md).
+Documento corrente e autocontido do papel: [`manager-gitops-v1.0.md`](./manager-gitops-v1.0.md).
 
 Versões anteriores permanecem como histórico e **não são importadas normativamente** pelo bootstrap corrente.
 
