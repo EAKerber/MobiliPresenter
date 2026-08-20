@@ -130,7 +130,7 @@ class SemanticTopologyTests(unittest.TestCase):
         maintenance = registry.component("maintenance-inspection")
         scheduler = registry.component("scheduler-plan")
         self.assertEqual([], maintenance["readsAuthorities"])
-        self.assertEqual(["project-machine"], maintenance["delegatesTo"])
+        self.assertEqual(["project-machine", "routine-inspection"], maintenance["delegatesTo"])
         self.assertEqual([], scheduler["readsAuthorities"])
 
     def test_component_projection_reports_adapter_delegation(self):

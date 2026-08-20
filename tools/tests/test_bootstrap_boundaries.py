@@ -64,6 +64,17 @@ class BootstrapBoundaryTests(unittest.TestCase):
         self.assertIn("provider concreto não prova ausência da capability lógica", agents)
         self.assertIn("--runtime-providers", versioned)
 
+    def test_current_bootstrap_materializes_routines_before_maintenance(self):
+        current_path = ROLE_DIR / "manager-gitops-current.md"
+        _, target = resolve_current_target(current_path)
+        versioned = target.read_text(encoding="utf-8")
+        self.assertTrue((ROOT / "tools" / "routines.py").is_file())
+        self.assertIn("RoutineInspection 0.1", versioned)
+        self.assertIn("tools/routines.py inspect", versioned)
+        self.assertIn("--routines", versioned)
+        self.assertIn("routine-inspection.json", versioned)
+        self.assertLess(versioned.index("tools/routines.py inspect"), versioned.index("tools/maintenance_inspect.py"))
+
 
 if __name__ == "__main__":
     unittest.main()
