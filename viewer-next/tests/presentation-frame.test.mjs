@@ -1,63 +1,108 @@
-# Responsive Fixed-Frame 0.1 — PresentationFrame Enforcement
+import assert from "node:assert/strict";
+import test from "node:test";
+import { currentFixedCamera, currentSceneBase } from "@mobilipresenter/scene-core";
+import { resolvePresentationFrame } from "../dist-ts/src/renderer/presentation-frame.js";
+import {
+  createThreeCamera,
+  projectScenePointWithThree,
+  updateThreeCameraAspect
+} from "../dist-ts/src/renderer/three/camera.js";
 
-Status: implementation slice RF-0.1A
+const frame = currentSceneBase.presentationFrame;
+assert.ok(frame);
 
-## Objective
+const HOSTS = [
+  { widthPx: 1366, heightPx: 768 },
+  { widthPx: 1024, heightPx: 768 },
+  { widthPx: 768, heightPx: 1024 },
+  { widthPx: 390, heightPx: 844 }
+];
 
-Make the normal Viewer Next runtime honor the `ScenePackage.presentationFrame` that is already published by Scene Core. UI may allocate any host rectangle, but that allocation must not redefine the physical fixed camera or the normalized composition of the scene.
+function normalizedProjection(camera, point) {
+  const viewport = { widthPx: 1000, heightPx: 1000 };
+  const [x, y] = projectScenePointWithThree(camera, viewport, point);
+  return [x / viewport.widthPx, y / viewport.heightPx];
+}
 
-This slice deliberately separates two questions:
+test("contain uses the complete host when the host already matches the preferred aspect", () => {
+  const resolved = resolvePresentationFrame(
+    { widthPx: frame.preferredAspectRatio * 500, heightPx: 500 },
+    frame
+  );
+  assert.equal(resolved.active, true);
+  assert.equal(resolved.fit, "contain");
+  assert.equal(resolved.cropped, false);
+  assert.equal(resolved.rasterRect.xPx, 0);
+  assert.equal(resolved.rasterRect.yPx, 0);
+  assert.equal(resolved.rasterRect.heightPx, 500);
+  assert.ok(Math.abs(resolved.rasterRect.widthPx / resolved.rasterRect.heightPx - frame.preferredAspectRatio) < 0.002);
+});
 
-1. **RF-0.1A:** does the renderer preserve the published frame inside any UI allocation?
-2. **RF-0.1B:** does the UI allocate a useful amount of space to that frame at compact widths?
+test("contain centers pillarbox and letterbox without escaping the host", () => {
+  const wide = resolvePresentationFrame({ widthPx: 1600, heightPx: 600 }, frame);
+  assert.ok(wide.rasterRect.xPx > 0);
+  assert.equal(wide.rasterRect.yPx, 0);
 
-RF-0.1B is not part of this slice.
+  const tall = resolvePresentationFrame({ widthPx: 600, heightPx: 1000 }, frame);
+  assert.equal(tall.rasterRect.xPx, 0);
+  assert.ok(tall.rasterRect.yPx > 0);
 
-## Current contract
+  for (const resolved of [wide, tall]) {
+    const { rasterRect, hostViewport } = resolved;
+    assert.ok(rasterRect.xPx >= 0 && rasterRect.yPx >= 0);
+    assert.ok(rasterRect.xPx + rasterRect.widthPx <= hostViewport.widthPx);
+    assert.ok(rasterRect.yPx + rasterRect.heightPx <= hostViewport.heightPx);
+    assert.ok(Math.abs((hostViewport.widthPx - rasterRect.widthPx) - 2 * rasterRect.xPx) <= 1);
+    assert.ok(Math.abs((hostViewport.heightPx - rasterRect.heightPx) - 2 * rasterRect.yPx) <= 1);
+  }
+});
 
-The current scene publishes a fixed calibrated camera and a `PresentationFrame` with a preferred aspect ratio, `fit: contain`, and no cropping. The physical camera fields remain unchanged. The frame is a presentation contract, not a request to pan, zoom, focus, or heuristically move the camera.
+test("projection aspect is exact and independent from raster rounding", () => {
+  for (const host of HOSTS) {
+    const resolved = resolvePresentationFrame(host, frame);
+    assert.equal(resolved.projectionAspectRatio, frame.preferredAspectRatio);
+    assert.equal(resolved.cropped, false);
+  }
+});
 
-## Runtime rule
+test("same fixed camera and PresentationFrame preserve normalized composition across hosts", () => {
+  const camera = createThreeCamera(currentFixedCamera, { widthPx: 1, heightPx: 1 });
+  const points = [
+    currentFixedCamera.targetMm,
+    { x: currentFixedCamera.targetMm.x - 900, y: currentFixedCamera.targetMm.y + 1800, z: 700 },
+    { x: currentFixedCamera.targetMm.x + 1050, y: currentFixedCamera.targetMm.y + 2400, z: 1650 }
+  ];
+  let baseline = null;
+  for (const host of HOSTS) {
+    const resolved = resolvePresentationFrame(host, frame);
+    updateThreeCameraAspect(camera, currentFixedCamera, resolved.projectionAspectRatio);
+    const projected = points.map(point => normalizedProjection(camera, point));
+    if (baseline === null) baseline = projected;
+    else {
+      projected.forEach((value, index) => {
+        assert.ok(Math.abs(value[0] - baseline[index][0]) < 1e-12);
+        assert.ok(Math.abs(value[1] - baseline[index][1]) < 1e-12);
+      });
+    }
+  }
+});
 
-Normal runtime rendering follows:
+test("scene without PresentationFrame retains legacy full-host projection", () => {
+  const resolved = resolvePresentationFrame({ widthPx: 800, heightPx: 500 });
+  assert.equal(resolved.active, false);
+  assert.equal(resolved.fit, "legacy");
+  assert.deepEqual(resolved.rasterRect, { xPx: 0, yPx: 0, widthPx: 800, heightPx: 500 });
+  assert.equal(resolved.projectionAspectRatio, 1.6);
+});
 
-```text
-UI host allocation
-  -> resolve PresentationFrame
-  -> centered contained raster rectangle
-  -> exact published projection aspect
-  -> fixed camera render
-```
-
-Raster dimensions are integer pixels. Projection aspect is the exact `preferredAspectRatio`; pixel rounding must not redefine the camera projection.
-
-When no `presentationFrame` is present, the legacy full-host behavior remains valid. A present but unsupported frame policy fails closed instead of silently falling back to host-dependent framing.
-
-The fidelity crop path remains independent and keeps its calibrated full-viewport/crop semantics.
-
-## Evidence
-
-The runtime exposes diagnostic `data-presentation-*` markers on `#app` for browser verification. They are inspection evidence only and do not create application state or authority.
-
-Browser evidence covers four host viewports:
-
-- 1366x768;
-- 1024x768;
-- 768x1024;
-- 390x844.
-
-The same fixed camera and PresentationFrame must yield the same normalized landmark projection across all four.
-
-## Non-goals
-
-- no change to Guided Configurator flow;
-- no UI breakpoint redesign;
-- no compact-detail overlay policy;
-- no Scene Core schema change;
-- no camera movement;
-- no pan, user zoom, focus-to-module, or heuristic reframe;
-- no product/catalog/content changes.
-
-## Completion gate
-
-RF-0.1A is complete when the current fixed camera and current PresentationFrame produce invariant normalized composition across the four reference viewports, with contain/no-crop behavior, while Viewer Next, fidelity, browser smoke, and renderer lifecycle gates remain green.
+test("unsupported present policies and invalid inputs fail closed", () => {
+  assert.throws(() => resolvePresentationFrame({ widthPx: 0, heightPx: 500 }, frame), /PRESENTATION_HOST_WIDTH_INVALID/);
+  assert.throws(
+    () => resolvePresentationFrame({ widthPx: 800, heightPx: 500 }, { ...frame, preferredAspectRatio: 0 }),
+    /PRESENTATION_FRAME_ASPECT_INVALID/
+  );
+  assert.throws(
+    () => resolvePresentationFrame({ widthPx: 800, heightPx: 500 }, { ...frame, fit: "cover" }),
+    /PRESENTATION_FRAME_POLICY_UNSUPPORTED/
+  );
+});

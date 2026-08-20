@@ -1,108 +1,239 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { currentFixedCamera, currentSceneBase } from "@mobilipresenter/scene-core";
-import { resolvePresentationFrame } from "../dist-ts/src/renderer/presentation-frame.js";
-import {
-  createThreeCamera,
-  projectScenePointWithThree,
-  updateThreeCameraAspect
-} from "../dist-ts/src/renderer/three/camera.js";
+from __future__ import annotations
 
-const frame = currentSceneBase.presentationFrame;
-assert.ok(frame);
+import json
+import re
+import shutil
+import struct
+import subprocess
+from pathlib import Path
+from urllib.parse import urlencode
 
-const HOSTS = [
-  { widthPx: 1366, heightPx: 768 },
-  { widthPx: 1024, heightPx: 768 },
-  { widthPx: 768, heightPx: 1024 },
-  { widthPx: 390, heightPx: 844 }
-];
+BASE_URL = "http://127.0.0.1:4173/"
+OUT = Path("artifacts/runtime-ui")
+EVIDENCE = OUT / "evidence.json"
+PRESENTATION_ASPECT = 1.9286452947259565
 
-function normalizedProjection(camera, point) {
-  const viewport = { widthPx: 1000, heightPx: 1000 };
-  const [x, y] = projectScenePointWithThree(camera, viewport, point);
-  return [x / viewport.widthPx, y / viewport.heightPx];
-}
 
-test("contain uses the complete host when the host already matches the preferred aspect", () => {
-  const resolved = resolvePresentationFrame(
-    { widthPx: frame.preferredAspectRatio * 500, heightPx: 500 },
-    frame
-  );
-  assert.equal(resolved.active, true);
-  assert.equal(resolved.fit, "contain");
-  assert.equal(resolved.cropped, false);
-  assert.equal(resolved.rasterRect.xPx, 0);
-  assert.equal(resolved.rasterRect.yPx, 0);
-  assert.equal(resolved.rasterRect.heightPx, 500);
-  assert.ok(Math.abs(resolved.rasterRect.widthPx / resolved.rasterRect.heightPx - frame.preferredAspectRatio) < 0.002);
-});
+def find_chrome() -> str:
+    for candidate in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        path = shutil.which(candidate)
+        if path:
+            return path
+    raise SystemExit("CHROME_NOT_FOUND")
 
-test("contain centers pillarbox and letterbox without escaping the host", () => {
-  const wide = resolvePresentationFrame({ widthPx: 1600, heightPx: 600 }, frame);
-  assert.ok(wide.rasterRect.xPx > 0);
-  assert.equal(wide.rasterRect.yPx, 0);
 
-  const tall = resolvePresentationFrame({ widthPx: 600, heightPx: 1000 }, frame);
-  assert.equal(tall.rasterRect.xPx, 0);
-  assert.ok(tall.rasterRect.yPx > 0);
+def chrome_args(chrome: str, width: int, height: int) -> list[str]:
+    return [
+        chrome,
+        "--headless=new",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--ignore-gpu-blocklist",
+        "--enable-webgl",
+        "--enable-unsafe-swiftshader",
+        "--use-angle=swiftshader",
+        f"--window-size={width},{height}",
+        "--force-device-scale-factor=1",
+        "--virtual-time-budget=6000",
+    ]
 
-  for (const resolved of [wide, tall]) {
-    const { rasterRect, hostViewport } = resolved;
-    assert.ok(rasterRect.xPx >= 0 && rasterRect.yPx >= 0);
-    assert.ok(rasterRect.xPx + rasterRect.widthPx <= hostViewport.widthPx);
-    assert.ok(rasterRect.yPx + rasterRect.heightPx <= hostViewport.heightPx);
-    assert.ok(Math.abs((hostViewport.widthPx - rasterRect.widthPx) - 2 * rasterRect.xPx) <= 1);
-    assert.ok(Math.abs((hostViewport.heightPx - rasterRect.heightPx) - 2 * rasterRect.yPx) <= 1);
-  }
-});
 
-test("projection aspect is exact and independent from raster rounding", () => {
-  for (const host of HOSTS) {
-    const resolved = resolvePresentationFrame(host, frame);
-    assert.equal(resolved.projectionAspectRatio, frame.preferredAspectRatio);
-    assert.equal(resolved.cropped, false);
-  }
-});
+def run(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, text=True, capture_output=True, check=False, timeout=90)
 
-test("same fixed camera and PresentationFrame preserve normalized composition across hosts", () => {
-  const camera = createThreeCamera(currentFixedCamera, { widthPx: 1, heightPx: 1 });
-  const points = [
-    currentFixedCamera.targetMm,
-    { x: currentFixedCamera.targetMm.x - 900, y: currentFixedCamera.targetMm.y + 1800, z: 700 },
-    { x: currentFixedCamera.targetMm.x + 1050, y: currentFixedCamera.targetMm.y + 2400, z: 1650 }
-  ];
-  let baseline = null;
-  for (const host of HOSTS) {
-    const resolved = resolvePresentationFrame(host, frame);
-    updateThreeCameraAspect(camera, currentFixedCamera, resolved.projectionAspectRatio);
-    const projected = points.map(point => normalizedProjection(camera, point));
-    if (baseline === null) baseline = projected;
-    else {
-      projected.forEach((value, index) => {
-        assert.ok(Math.abs(value[0] - baseline[index][0]) < 1e-12);
-        assert.ok(Math.abs(value[1] - baseline[index][1]) < 1e-12);
-      });
+
+def png_size(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"RUNTIME_UI_SCREENSHOT_NOT_PNG:{path.name}")
+    return struct.unpack(">II", data[16:24])
+
+
+def capture(chrome: str, url: str, name: str, width: int, height: int) -> dict[str, object]:
+    screenshot_path = OUT / f"{name}.png"
+    shot_result = run(chrome_args(chrome, width, height) + [f"--screenshot={screenshot_path}", url])
+    if shot_result.returncode != 0 or not screenshot_path.is_file():
+        raise SystemExit(f"RUNTIME_UI_SCREENSHOT_FAILED:{name}:{shot_result.stderr[-2000:]}")
+    actual_width, actual_height = png_size(screenshot_path)
+    if (actual_width, actual_height) != (width, height):
+        raise SystemExit(
+            f"RUNTIME_UI_SCREENSHOT_SIZE_MISMATCH:{name}:{actual_width}x{actual_height}"
+        )
+    if screenshot_path.stat().st_size < 10_000:
+        raise SystemExit(
+            f"RUNTIME_UI_SCREENSHOT_SUSPICIOUSLY_SMALL:{name}:{screenshot_path.stat().st_size}"
+        )
+    return {
+        "id": name,
+        "viewportPx": [actual_width, actual_height],
+        "screenshotBytes": screenshot_path.stat().st_size,
     }
-  }
-});
 
-test("scene without PresentationFrame retains legacy full-host projection", () => {
-  const resolved = resolvePresentationFrame({ widthPx: 800, heightPx: 500 });
-  assert.equal(resolved.active, false);
-  assert.equal(resolved.fit, "legacy");
-  assert.deepEqual(resolved.rasterRect, { xPx: 0, yPx: 0, widthPx: 800, heightPx: 500 });
-  assert.equal(resolved.projectionAspectRatio, 1.6);
-});
 
-test("unsupported present policies and invalid inputs fail closed", () => {
-  assert.throws(() => resolvePresentationFrame({ widthPx: 0, heightPx: 500 }, frame), /PRESENTATION_HOST_WIDTH_INVALID/);
-  assert.throws(
-    () => resolvePresentationFrame({ widthPx: 800, heightPx: 500 }, { ...frame, preferredAspectRatio: 0 }),
-    /PRESENTATION_FRAME_ASPECT_INVALID/
-  );
-  assert.throws(
-    () => resolvePresentationFrame({ widthPx: 800, heightPx: 500 }, { ...frame, fit: "cover" }),
-    /PRESENTATION_FRAME_POLICY_UNSUPPORTED/
-  );
-});
+def dump_dom(chrome: str, url: str, name: str, width: int = 1366, height: int = 768) -> str:
+    result = run(chrome_args(chrome, width, height) + ["--dump-dom", url])
+    if result.returncode != 0:
+        raise SystemExit(f"RUNTIME_UI_DOM_FAILED:{name}:{result.stderr[-2000:]}")
+    (OUT / f"{name}.html").write_text(result.stdout, encoding="utf-8")
+    return result.stdout
+
+
+def require(dom: str, name: str, needles: tuple[str, ...]) -> None:
+    missing = [needle for needle in needles if needle not in dom]
+    if missing:
+        raise SystemExit(f"RUNTIME_UI_DOM_GATE_FAILED:{name}:{missing}")
+
+
+def presentation_frame_evidence(dom: str, name: str) -> dict[str, object]:
+    app_match = re.search(r'<div id="app"([^>]*)>', dom)
+    if app_match is None:
+        raise SystemExit(f"RUNTIME_UI_APP_MISSING:{name}")
+    attrs = dict(re.findall(r'data-([a-z0-9-]+)="([^"]*)"', app_match.group(1)))
+    required = (
+        "presentation-frame",
+        "presentation-fit",
+        "presentation-crop",
+        "presentation-host-width",
+        "presentation-host-height",
+        "presentation-raster-x",
+        "presentation-raster-y",
+        "presentation-raster-width",
+        "presentation-raster-height",
+        "presentation-aspect",
+    )
+    missing = [key for key in required if key not in attrs]
+    if missing:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_MARKERS_MISSING:{name}:{missing}")
+    if attrs["presentation-frame"] != "active" or attrs["presentation-fit"] != "contain":
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_POLICY_INVALID:{name}:{attrs}")
+    if attrs["presentation-crop"] != "false":
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_CROPPED:{name}")
+
+    host_width = int(attrs["presentation-host-width"])
+    host_height = int(attrs["presentation-host-height"])
+    raster_x = int(attrs["presentation-raster-x"])
+    raster_y = int(attrs["presentation-raster-y"])
+    raster_width = int(attrs["presentation-raster-width"])
+    raster_height = int(attrs["presentation-raster-height"])
+    aspect = float(attrs["presentation-aspect"])
+
+    if abs(aspect - PRESENTATION_ASPECT) > 1e-12:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_ASPECT_DRIFT:{name}:{aspect}")
+    if min(host_width, host_height, raster_width, raster_height) <= 0:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_SIZE_INVALID:{name}")
+    if raster_x < 0 or raster_y < 0:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_OFFSET_INVALID:{name}")
+    if raster_x + raster_width > host_width or raster_y + raster_height > host_height:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_OUTSIDE_HOST:{name}")
+    if abs((host_width - raster_width) - 2 * raster_x) > 1:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_NOT_CENTERED_X:{name}")
+    if abs((host_height - raster_height) - 2 * raster_y) > 1:
+        raise SystemExit(f"RUNTIME_UI_PRESENTATION_NOT_CENTERED_Y:{name}")
+
+    return {
+        "id": name,
+        "hostPx": [host_width, host_height],
+        "rasterPx": [raster_x, raster_y, raster_width, raster_height],
+        "projectionAspectRatio": aspect,
+        "fit": attrs["presentation-fit"],
+        "cropped": False,
+    }
+
+
+def main() -> None:
+    chrome = find_chrome()
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    ready_params = {
+        "controls": "1",
+        "select": "02",
+        "hide": "02",
+        "front": "02:neutral-greige",
+        "stone": "graphite-speckled",
+        "light": "warm-worktop",
+    }
+    ready_url = BASE_URL + "?" + urlencode(ready_params)
+    ready_dom = dump_dom(chrome, ready_url, "runtime-ui-ready")
+    ready_required = (
+        'data-renderer-ready="true"',
+        'data-frame-rendered="true"',
+        'data-viewer-controls="true"',
+        'data-viewer-runtime-ui="mounted"',
+        'data-current-step="modules"',
+        'data-viewer-detail-open="true"',
+        'data-configurator-step="modules"',
+        'data-configurator-step="finishes"',
+        'data-configurator-step="accessories"',
+        'data-configurator-step="summary"',
+        'aria-current="step"',
+        'data-stage-panel="modules"',
+        'data-module-alias="02"',
+        'data-module-visibility="02"',
+        'data-visible="false"',
+        'data-selected="true"',
+        'aria-label="Mostrar módulo 02"',
+        'data-presentation-status="ready"',
+        'data-technical-fidelity="geometry-derived"',
+        'Continuar para acabamentos',
+        'Detalhes',
+    )
+    require(ready_dom, "ready", ready_required)
+
+    unavailable_params = {"controls": "1", "select": "01"}
+    unavailable_url = BASE_URL + "?" + urlencode(unavailable_params)
+    unavailable_dom = dump_dom(chrome, unavailable_url, "runtime-ui-unavailable")
+    unavailable_required = (
+        'data-viewer-runtime-ui="mounted"',
+        'data-module-alias="01"',
+        'data-selected="true"',
+        'data-presentation-status="unavailable"',
+        'Detalhes técnicos ainda não publicados',
+        'Informações técnicas ausentes não são inferidas pela interface.',
+    )
+    require(unavailable_dom, "unavailable", unavailable_required)
+
+    matrix = (
+        ("runtime-ui-desktop-modules-detail", 1366, 768),
+        ("runtime-ui-compact-landscape-modules-detail", 1024, 768),
+        ("runtime-ui-tablet-portrait-modules-detail", 768, 1024),
+        ("runtime-ui-mobile-modules-detail", 390, 844),
+    )
+    captures: list[dict[str, object]] = []
+    presentation_frames: list[dict[str, object]] = []
+    for name, width, height in matrix:
+        dom = ready_dom if (width, height) == (1366, 768) else dump_dom(chrome, ready_url, name, width, height)
+        presentation_frames.append(presentation_frame_evidence(dom, name))
+        captures.append(capture(chrome, ready_url, name, width, height))
+    captures.append(capture(chrome, unavailable_url, "runtime-ui-desktop-unavailable", 1366, 768))
+
+    evidence = {
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.4.0",
+        "status": "PASS",
+        "readyUrl": ready_url,
+        "unavailableUrl": unavailable_url,
+        "captures": captures,
+        "presentationFrames": presentation_frames,
+        "readyRequiredDomMarkers": list(ready_required),
+        "unavailableRequiredDomMarkers": list(unavailable_required),
+        "invariants": {
+            "canonicalBaselineControlsRemainOptIn": True,
+            "guidedFourStepNavigationMounted": True,
+            "sceneRemainsSeparateFromUiState": True,
+            "moduleVisibilitySeparatedFromInspection": True,
+            "selectedModuleDetailIsContextual": True,
+            "validSelectionWithoutTpcDegradesGracefully": True,
+            "technicalFidelityComesFromPublicContract": True,
+            "frontPresetProjectedByRuntime": True,
+            "stonePresetProjectedByRuntime": True,
+            "responsiveFixedFrameContained": True,
+            "responsiveFixedFrameNeverCrops": True,
+            "responsiveFixedFrameProjectionAspectStable": True,
+            "desktopCompactTabletAndMobileCaptured": True,
+        },
+    }
+    EVIDENCE.write_text(json.dumps(evidence, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps(evidence, indent=2, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
