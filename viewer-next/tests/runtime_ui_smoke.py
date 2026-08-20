@@ -140,6 +140,33 @@ def presentation_frame_evidence(dom: str, name: str) -> dict[str, object]:
     }
 
 
+def compact_detail_allocation_evidence(
+    *,
+    open_frame: dict[str, object],
+    closed_frame: dict[str, object],
+    viewport: tuple[int, int],
+    minimum_scene_width: int,
+) -> dict[str, object]:
+    open_host = open_frame["hostPx"]
+    closed_host = closed_frame["hostPx"]
+    if open_host != closed_host:
+        raise SystemExit(
+            f"RUNTIME_UI_COMPACT_DETAIL_REFRAMES_SCENE:{viewport[0]}x{viewport[1]}:"
+            f"open={open_host}:closed={closed_host}"
+        )
+    if not isinstance(open_host, list) or len(open_host) != 2 or int(open_host[0]) < minimum_scene_width:
+        raise SystemExit(
+            f"RUNTIME_UI_COMPACT_SCENE_TOO_NARROW:{viewport[0]}x{viewport[1]}:{open_host}"
+        )
+    return {
+        "viewportPx": list(viewport),
+        "detailOpenHostPx": open_host,
+        "detailClosedHostPx": closed_host,
+        "minimumSceneWidthPx": minimum_scene_width,
+        "detailReframesScene": False,
+    }
+
+
 def main() -> None:
     chrome = find_chrome()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -200,19 +227,47 @@ def main() -> None:
     )
     captures: list[dict[str, object]] = []
     presentation_frames: list[dict[str, object]] = []
+    open_frames_by_viewport: dict[tuple[int, int], dict[str, object]] = {}
     for name, width, height in matrix:
         dom = ready_dom if (width, height) == (1366, 768) else dump_dom(chrome, ready_url, name, width, height)
-        presentation_frames.append(presentation_frame_evidence(dom, name))
+        frame = presentation_frame_evidence(dom, name)
+        presentation_frames.append(frame)
+        open_frames_by_viewport[(width, height)] = frame
         captures.append(capture(chrome, ready_url, name, width, height))
     captures.append(capture(chrome, unavailable_url, "runtime-ui-desktop-unavailable", 1366, 768))
 
+    closed_params = {
+        "controls": "1",
+        "hide": "02",
+        "front": "02:neutral-greige",
+        "stone": "graphite-speckled",
+        "light": "warm-worktop",
+    }
+    closed_url = BASE_URL + "?" + urlencode(closed_params)
+    compact_detail_allocations: list[dict[str, object]] = []
+    for width, height, minimum_width in ((1024, 768, 700), (768, 1024, 500)):
+        closed_name = f"runtime-ui-{width}x{height}-detail-closed"
+        closed_dom = dump_dom(chrome, closed_url, closed_name, width, height)
+        require(closed_dom, closed_name, ('data-viewer-detail-open="false"',))
+        closed_frame = presentation_frame_evidence(closed_dom, closed_name)
+        compact_detail_allocations.append(
+            compact_detail_allocation_evidence(
+                open_frame=open_frames_by_viewport[(width, height)],
+                closed_frame=closed_frame,
+                viewport=(width, height),
+                minimum_scene_width=minimum_width,
+            )
+        )
+
     evidence = {
-        "schemaVersion": "ViewerRuntimeUiEvidence 0.4.0",
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.5.0",
         "status": "PASS",
         "readyUrl": ready_url,
         "unavailableUrl": unavailable_url,
+        "closedDetailUrl": closed_url,
         "captures": captures,
         "presentationFrames": presentation_frames,
+        "compactDetailAllocations": compact_detail_allocations,
         "readyRequiredDomMarkers": list(ready_required),
         "unavailableRequiredDomMarkers": list(unavailable_required),
         "invariants": {
@@ -228,6 +283,8 @@ def main() -> None:
             "responsiveFixedFrameContained": True,
             "responsiveFixedFrameNeverCrops": True,
             "responsiveFixedFrameProjectionAspectStable": True,
+            "compactDetailDoesNotReframeScene": True,
+            "compactSceneAllocationGuarded": True,
             "desktopCompactTabletAndMobileCaptured": True,
         },
     }

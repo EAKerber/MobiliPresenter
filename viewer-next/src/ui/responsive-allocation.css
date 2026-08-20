@@ -1,0 +1,26 @@
+/* RF-0.1B — compact allocation policy.
+ * PresentationFrame owns framing; this sheet only decides how much host space UI gives it.
+ * Selectors intentionally outrank runtime-controls.css so Vite/dev CSS load order cannot
+ * reintroduce detail-driven scene compression.
+ */
+@media (min-width: 761px) and (max-width: 1240px) {
+  html:root {
+    --ui-stage-width: clamp(260px, 28vw, 300px);
+    --ui-detail-width: clamp(340px, 38vw, 420px);
+  }
+
+  html body.viewer-product-ui[data-viewer-detail-open="true"] #app {
+    right: 0;
+  }
+
+  body.viewer-product-ui .viewer-product-detail {
+    top: calc(var(--ui-topbar-height) + 12px);
+    right: 12px;
+    bottom: calc(var(--ui-actions-height) + 12px);
+    width: min(var(--ui-detail-width), calc(100vw - var(--ui-stage-width) - 24px));
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: 0 18px 56px rgba(35, 31, 28, .18);
+    overflow: hidden;
+  }
+}

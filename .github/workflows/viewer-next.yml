@@ -83,6 +83,10 @@ jobs:
         working-directory: viewer-next
         run: python3 tests/fidelity_smoke.py
 
+      - name: Browser runtime UI responsive allocation
+        working-directory: viewer-next
+        run: python3 tests/runtime_ui_smoke.py
+
       - name: Capture targeted 4x readability crops
         working-directory: viewer-next
         run: |
