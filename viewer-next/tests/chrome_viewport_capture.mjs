@@ -176,7 +176,7 @@ const READY_EXPRESSION = `(() => {
   return document.readyState === 'complete'
     && app?.dataset.rendererReady === 'true'
     && app?.dataset.frameRendered === 'true'
-    && document.querySelector('[data-viewer-runtime-ui="mounted"]');
+    && Boolean(document.querySelector('[data-viewer-runtime-ui="mounted"]'));
 })()`;
 
 const METRICS_EXPRESSION = `(() => {
