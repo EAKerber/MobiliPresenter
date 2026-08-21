@@ -1,6 +1,6 @@
 # M12-S1 — fechamento governado 0.1
 
-Status: `CLOSED_DEFERRED`
+Status: `CLOSED_DEFERRED / CLEANUP_COMPLETE`
 Experimento: `m12-s1-bounded-branch-lifecycle-0.2`
 Modo executado: `PROMPT_BOUND_PROTOTYPE`
 Base admitida: `e2859ad69568e0b8ec958c05b2b202ca1ccb8d9b`
@@ -64,8 +64,9 @@ como `USER_REPORTED`, não `PROVIDER_VERIFIED`.
 | `manager-gitops-b` | `experiment/operations/m12-s1-manager-gitops-b` | `890731a6264633d4f45b5f1c6f0c4304976fc5bd` |
 | `ui-ux-a` | `experiment/ui/m12-s1-ui-ux-a` | `5895e3b1595b9e1a8f6004a9c37b16622427ff20` |
 
-Esses heads devem ser preservados pelo cold archive antes da coleta. Branch
-Hygiene continua sendo o único writer normal de remoção das refs.
+Esses heads estão preservados em `archive/cold` no head
+`82c8436768fea30684f4c56f3221b7e0925418da`. Branch Hygiene foi o único writer
+de remoção das refs e coletou as três por plano exato, CAS e readback.
 
 ## Correções para o protocolo seguinte
 
@@ -87,10 +88,14 @@ melhoria de `implementationMode`.
 
 ## Exit gates
 
-O fechamento fica completo quando:
+Todos os exit gates passaram:
 
-1. esta avaliação e o conhecimento negativo estiverem em `main` por PR;
-2. os três heads históricos estiverem alcançáveis por `archive/cold`;
-3. Branch Hygiene coletar as três refs com plan/CAS/readback;
-4. não houver PR, lease, continuation ou task ativa do experimento;
-5. o readback final registrar `residualCountAfterCleanup=0`.
+1. avaliação e conhecimento negativo integrados em `main` pelo PR #124;
+2. três heads históricos alcançáveis por `archive/cold`;
+3. três refs coletadas pelo Branch Hygiene com plan/CAS/readback;
+4. nenhum PR, lease, continuation ou task ativa do experimento;
+5. `residualBranchCountAfterCleanup=0`.
+
+O apply final pertence ao workflow run `32491120536`, job `96800988557`, com
+`planHash=c072ab4f0b9d63e9ff63a05c72d48e8e4ddd32bb7b63a032378ce1ac318110fb`,
+`deletedCount=3`, `remainingBranchCount=4` e `readback=PASS`.
