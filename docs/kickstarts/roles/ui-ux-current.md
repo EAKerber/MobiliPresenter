@@ -19,6 +19,6 @@ There is currently no UI-specific Scheduler, continuation store, lease store, he
 
 ## Current product baseline note
 
-`Guided Configurator UI 0.3` is the integrated UI baseline in the ProjectState observed when v0.1 was authored. It explicitly supersedes the older three-page `Módulos / Cores / Acessórios` navigation model where those documents conflict.
+`Responsive Fixed-Frame 0.1` is integrated and is the current UI baseline declared by ProjectState. It preserves the fixed-camera presentation frame across desktop, compact landscape, tablet and mobile layouts.
 
-The next planned development front is `Responsive Fixed-Frame 0.1`, but a UI worker must not claim or start that work merely from a generic `nextTransition`; it still requires explicit role scope/continuation/handoff/routing as defined in the versioned Kickstart.
+The next declared transition is `plan-coordinated-module-presentation-metadata-v0.1`. It has coordinated semantic/API dependencies and is not an assignment to UI. A UI worker must not claim or start it merely from `nextTransition`; explicit role scope, Work, continuation, handoff or routing remains required by the versioned Kickstart.

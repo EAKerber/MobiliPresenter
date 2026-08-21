@@ -13,9 +13,8 @@ concede authority adicional.
 - a transição é coordenada e possui dependência semântica/API; não é assignment
   automático para UI.
 
-O texto histórico do kickstart UI v0.1 que ainda chama Responsive Fixed-Frame de
-“próximo” é stale context. As regras de authority e handoff do mesmo kickstart
-continuam válidas.
+O ponteiro `ui-ux-current.md` corrige a nota histórica do documento versionado
+v0.1 sem substituir suas regras de authority, Work, handoff e routing.
 
 ## Missão da execução
 
@@ -50,4 +49,3 @@ Além do relatório comum, indicar:
 - `handoff`: identificador ou `none`;
 - `allowedPaths`: conjunto derivado do assignment, ou vazio;
 - `roleDecision`: `ROLE_NOOP` ou bloqueio observado.
-
