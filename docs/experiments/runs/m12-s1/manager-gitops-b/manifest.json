@@ -1,0 +1,13 @@
+{
+  "contract": "M12S1AdmissionManifest 0.1",
+  "experimentId": "m12-s1-bounded-branch-lifecycle-0.2",
+  "implementationMode": "PROMPT_BOUND_PROTOTYPE",
+  "worker": "manager-gitops-b",
+  "role": "manager-gitops",
+  "branch": "experiment/operations/m12-s1-manager-gitops-b",
+  "admittedFromMainHead": "e2859ad69568e0b8ec958c05b2b202ca1ccb8d9b",
+  "allowedReceiptPrefix": "docs/experiments/runs/m12-s1/manager-gitops-b/receipts/",
+  "runBudget": 2,
+  "durableLifecycleState": "ADMITTED",
+  "authoritative": false
+}
