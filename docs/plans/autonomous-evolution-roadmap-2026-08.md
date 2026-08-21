@@ -3,7 +3,7 @@
 Status: planejamento derivado, não authority  
 Data de reconciliação: 2026-08-21  
 Repositório observado: `EAKerber/MobiliPresenter`  
-Entrada desta reconciliação: `main@9ae230a9d9bbe24830cf9a93aa655566aae9c1d8`
+Entrada desta reconciliação: `main@221d41b260250db5ed7f1072009c73346af75afd`
 
 Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
 `M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
@@ -14,6 +14,7 @@ Fontes preservadas:
 
 - `docs/plans/project-machine-m0-m12-original-source.md`;
 - `docs/plans/autonomous-evolution-architecture-v0.1.md`;
+- `docs/plans/m9-m13-closure-v0.1.md`;
 - `docs/experiments/scheduled-cycle-maturity-s1-closure-v0.1.md`;
 - `docs/experiments/scheduled-cycle-maturity-s1-result-v0.1.json`.
 
@@ -37,11 +38,11 @@ Fontes preservadas:
 | Faixa | Objetivo revisado | Estado reconciliado em 2026-08-21 |
 |---|---|---|
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
-| M9 | Technical Dictionary, Semantic Scope e Determinism Contract | parcial; infraestrutura 0.2 existe, contratos finais não estão fechados |
-| M10 | `OperationalSemantics 0.3` e cobertura integral | aberto; registry corrente permanece 0.2 |
-| M11 | convergência de `lock`, aliases, triggers e resíduos | aberto; `tools/lock.py` ainda é implementação independente |
-| M12 | maturity proof sob trabalho funcional real | executado em S0/S1, mas **não aprovado**; S1 terminou `CLOSED_DEFERRED` |
-| M13 | Reflection + OperationalQuiescence | não iniciado como implementação; bloqueado por plano/closure M9–M12 |
+| M9 | Technical Dictionary, Semantic Scope e Determinism Contract | plano de fechamento aceito; implementação é a próxima transição |
+| M10 | `OperationalSemantics 0.3` e cobertura integral | planejado; registry corrente permanece 0.2 |
+| M11 | convergência de `lock`, aliases, triggers e resíduos | planejado; implementação não iniciada |
+| M12 | remote canonical execution e maturity proof | S1 terminou `CLOSED_DEFERRED`; bridge e novo proof estão planejados, não aprovados |
+| M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M9–M12 |
 | M14–M16 | Hypothesis, Experiment/Deathcycle, capability e prova longa | bloqueados |
 
 M12-S1 não é mais o próximo estágio. Ele terminou com:
@@ -63,7 +64,7 @@ Essas correções vivem em
 `docs/experiments/scheduled-cycle-maturity-next-protocol-v0.1.md`. Não existe
 S2 ativo, task ativa ou branch experimental reservada.
 
-## 3. Resultado do recorte PCS-01A
+## 3. Resultado dos recortes de planejamento
 
 O plano coordenado de metadata de apresentação foi aceito sem implementar
 produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
@@ -72,37 +73,52 @@ e escolhas/acessórios configuráveis (`PCS-02`).
 Estado materializado pela mesma transição que integra esta reconciliação:
 
 ```text
-checkpoint = MODULE-PRESENTATION-METADATA-PLAN-0.1-ACCEPTED
+checkpoint = M9-M13-CLOSURE-PLAN-0.1-ACCEPTED
 phase = between-increments
-nextTransition = plan-m9-m13-closure-before-module-metadata-implementation-v0.1
+nextTransition = implement-m9-semantic-foundations-v0.1
 ```
 
-Assim, o plano de produto fica recuperável, mas sua implementação não compete
-com a decisão do usuário de fechar o caminho até M13 antes de avançar além
-deste recorte.
+O plano PCS-01A continua recuperável e sua implementação permanece não admitida.
+O plano M9–M13 agora define slices, gates, checkpoints e blockers em
+`docs/plans/m9-m13-closure-v0.1.md`.
+
+Ele incorpora ao Semantic Scope:
+
+- `AgentSemanticBrief` como projeção contextual read-only;
+- `CapabilityRelevanceProjection` baseada em facetas tipadas, role, intenção,
+  fase, scope e capabilities observadas;
+- `EcosystemMaxim` como lembrete cultural explicitamente não autoritativo;
+- `CAPABILITY_DISCOVERY_FRESHNESS_GUARD`;
+- `ROADMAP_FRESHNESS_GUARD` como implementação obrigatória de M9, e não apenas
+  dívida narrativa.
 
 ## 4. Próxima sequência deliberada
 
-O readback pós-merge de PCS-01A é condição de validade deste estado, não uma
-nova slice. A sequência posterior é:
+O plano foi concluído. A sequência de implementação é:
 
-1. Planejar M9–M13 como uma sequência de slices verificáveis, sem declarar
-   marcos concluídos apenas porque parte do mecanismo existe.
-2. Fechar M9, M10 e M11 ou materializar blockers precisos.
-3. Definir o que constitui aprovação M12 após o resultado `DEFERRED` de S1.
-4. Implementar Reflection e OperationalQuiescence M13 somente sobre inputs
-   canônicos e com `UNKNOWN != PASS`.
-5. Reavaliar a admissão de PCS-01B depois do gate acordado.
-6. Manter M14–M16 bloqueados até seus predecessores reais passarem.
+1. M9-SF1 fecha Technical Dictionary, Semantic Scope e Determinism Contract.
+2. M9-FG1 implementa coverage determinística para roadmap e ponteiros correntes.
+3. M10-OS1 promove OperationalSemantics para 0.3 e implementa o
+   `AgentSemanticBrief` sem criar authority.
+4. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
+   consumidores.
+5. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
+6. M12-S2 repete o maturity proof somente depois dessa qualificação.
+7. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
+   read-only.
+8. Só então PCS-01B pode ser reavaliado para admissão.
 
 Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
 de contrato e uma qualificação manual branch-confined com planner e readback
 canônicos.
 
-## 5. Lacunas conhecidas que o plano M9–M13 deverá resolver
+## 5. Lacunas conhecidas cobertas pelo plano M9–M13
 
 - registry ainda em `OperationalSemantics 0.2`;
-- cobertura semântica e guard correspondentes ainda incompletos;
+- não existe ainda `AgentSemanticBrief`, projeção contextual de capabilities ou
+  catálogo semântico de máximas não autoritativas;
+- cobertura semântica, `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` e
+  `ROADMAP_FRESHNESS_GUARD` ainda não estão implementados;
 - `tools/lock.py` ainda não convergiu para alias fino da Coordination canônica;
 - Routine Layer obrigatória cobre somente `capability-deathcircle`;
 - Reflection e OperationalQuiescence não possuem contratos/tooling correntes;
@@ -111,9 +127,10 @@ canônicos.
 - execution context normal versus Work não é provider-verified na superfície
   observada.
 
-Uma lacuna de provider e uma lacuna de implementação interna podem coexistir;
-nenhuma deve ser usada para esconder a outra. A classificação precisa fica para
-o plano M9–M13.
+Uma lacuna de provider e uma lacuna de implementação interna podem coexistir.
+M12-RP1 fecha a parte interna: contract, planner, validator, executor e readback
+pertencem ao repositório; provider/carrier apenas expõe o caminho e não ganha
+authority semântica.
 
 ## 6. Freshness deste roadmap
 
@@ -130,13 +147,12 @@ Regra imediata:
 - baseline histórico deve ser rotulado como entrada da reconciliação, nunca
   como substituto do head corrente.
 
-Débito declarado para o plano M9–M13:
+Estado do débito depois da aceitação do plano:
 
 ```text
-ROADMAP_FRESHNESS_GUARD = OPEN
+ROADMAP_FRESHNESS_GUARD = PLANNED_NOT_IMPLEMENTED
 ```
 
-O objetivo é transformar essa revisão recorrente em cobertura determinística ou
-derivação, em vez de depender permanentemente da memória do autor. Até essa
-capability existir, este roadmap continua honestamente classificado como
-derivado e pode apresentar drift sem corromper authority.
+M9-FG1 transforma a revisão recorrente em coverage determinística. Até esse gate
+passar, este roadmap continua honestamente classificado como derivado e pode
+apresentar drift sem corromper authority.

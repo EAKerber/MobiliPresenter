@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "MODULE-PRESENTATION-METADATA-PLAN-0.1-ACCEPTED",
-    "nextTransition": "plan-m9-m13-closure-before-module-metadata-implementation-v0.1"
+    "checkpoint": "M9-M13-CLOSURE-PLAN-0.1-ACCEPTED",
+    "nextTransition": "implement-m9-semantic-foundations-v0.1"
   }
 }
