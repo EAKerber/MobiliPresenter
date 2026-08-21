@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "POST-GUIDED-CONFIGURATOR-0.3-INTEGRATED",
-    "nextTransition": "open-developer-slice-for-responsive-fixed-frame-v0.1"
+    "checkpoint": "POST-RESPONSIVE-FIXED-FRAME-0.1-INTEGRATED",
+    "nextTransition": "plan-coordinated-module-presentation-metadata-v0.1"
   }
 }
