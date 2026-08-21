@@ -163,7 +163,20 @@ class CdpClient {
     const payload = { id, method, params };
     if (sessionId) payload.sessionId = sessionId;
     const response = new Promise((resolveCommand, rejectCommand) => {
-      this.pending.set(id, { resolveCommand, rejectCommand });
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        rejectCommand(new Error(`Chrome DevTools command timeout: ${method}`));
+      }, 20_000);
+      this.pending.set(id, {
+        resolveCommand: (value) => {
+          clearTimeout(timeout);
+          resolveCommand(value);
+        },
+        rejectCommand: (error) => {
+          clearTimeout(timeout);
+          rejectCommand(error);
+        },
+      });
     });
     this.socket.send(JSON.stringify(payload));
     return response;
@@ -356,8 +369,7 @@ async function capture(options) {
 
 try {
   const result = await capture(parseArgs(process.argv.slice(2)));
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  process.stdout.write(`${JSON.stringify(result)}\n`, () => process.exit(0));
 } catch (error) {
-  process.stderr.write(`${error?.stack ?? error}\n`);
-  process.exitCode = 1;
+  process.stderr.write(`${error?.stack ?? error}\n`, () => process.exit(1));
 }
