@@ -107,8 +107,15 @@ escreve. A branch `experiment/operations/scheduled-cycle-maturity-0.1` fica
 reservada para uma fase posterior que possua uma mutação experimental aprovada e
 persistível; não será criada como placeholder.
 
-As três tasks são limitadas a três execuções cada. O limite materializa o
-deathcycle no próprio agendamento e impede um shadow sem fim.
+As três tasks S0 foram configuradas com três execuções cada. Depois do primeiro
+run de B produzir `UNKNOWN_PROVIDER_GAP`, elas foram pausadas: A e UI ainda não
+haviam executado. O resultado é um baseline empírico da fronteira do provider,
+não um PASS de S0.
+
+O estágio seguinte é `M12-S1 — Bounded Branch Lifecycle Probe 0.2`. Ele preserva
+o blocker, admite branches exclusivas fora de `main` e limita cada worker a duas
+ocorrências (`COUNT=2`). A hipótese, os receipts e as métricas permanecem fixos
+para comparação futura com a implementation de Experiment authority/writer.
 
 ## 5. Gate de quiescence usado em S0
 
@@ -158,12 +165,14 @@ S0 não possui branch própria nem PR de execução, seu rollback normal não de
 de coleta Git. Qualquer fase posterior com branch continua subordinada a Branch
 Hygiene.
 
-## 8. Próxima sequência, se S0 passar
+## 8. Próxima sequência após o baseline S0
 
-1. Fechar as lacunas M9–M11 que a execução realmente tornar bloqueantes.
-2. Expor observação canônica provider-backed em vez de copiar lógica para prompt.
-3. Repetir o shadow com receipts comparáveis.
-4. Só então especificar Reflection e OperationalQuiescence M13.
-5. Hipóteses e experimentos M14 usam writers existentes e isolamento real.
-6. Autonomous Evolution entra no capability lifecycle apenas em M15.
-7. M16 prova que o sistema converge, encerra ciclos e sabe não agir.
+1. Executar S1 com branches pré-admitidas, `COUNT=2` e zero writes em `main`.
+2. Materializar a comparação e o deathcycle, inclusive quando o resultado for
+   provider gap sem receipt durável.
+3. Fechar apenas as lacunas M9–M11 que o teste demonstrar como bloqueantes.
+4. Repetir o protocolo com tooling canônico, mantendo o mesmo envelope.
+5. Só então especificar Reflection e OperationalQuiescence M13.
+6. Hipóteses e experimentos M14 usam writers existentes e isolamento real.
+7. Autonomous Evolution entra no capability lifecycle apenas em M15.
+8. M16 prova que o sistema converge, encerra ciclos e sabe não agir.
