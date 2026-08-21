@@ -1,39 +1,6 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "f7ce40f9892c9bb68fb5b7875df65cb9d1b02f2d",
+  "revision": "0b02ec7c08518f88215fb36c4f35dd58c597c4e4",
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "acquire:codex-project-state-rf01b-20260821:0",
-      "resource": "branch:work/operations/project-state-responsive-fixed-frame-0.1",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "codex-project-state-rf01b-20260821",
-        "branch": "work/operations/project-state-responsive-fixed-frame-0.1",
-        "pr": null
-      },
-      "reason": "Checkpoint Responsive Fixed-Frame 0.1 after verified product integration",
-      "acquiredAt": "2026-08-21T00:46:01Z",
-      "renewedAt": "2026-08-21T00:46:01Z",
-      "expiresAt": "2026-08-21T01:46:01Z",
-      "ttlSeconds": 3600
-    },
-    {
-      "leaseId": "acquire:codex-project-state-rf01b-20260821:1",
-      "resource": "file:ops/state/project.json",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "codex-project-state-rf01b-20260821",
-        "branch": "work/operations/project-state-responsive-fixed-frame-0.1",
-        "pr": null
-      },
-      "reason": "Checkpoint Responsive Fixed-Frame 0.1 after verified product integration",
-      "acquiredAt": "2026-08-21T00:46:01Z",
-      "renewedAt": "2026-08-21T00:46:01Z",
-      "expiresAt": "2026-08-21T01:46:01Z",
-      "ttlSeconds": 3600
-    }
-  ]
+  "leases": []
 }
