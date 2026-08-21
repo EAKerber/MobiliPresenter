@@ -3,176 +3,140 @@
 Status: planejamento derivado, não authority  
 Data de reconciliação: 2026-08-21  
 Repositório observado: `EAKerber/MobiliPresenter`  
-Baseline observado: `main@f3401015fdd6390a6b18d7c29b90e51170ed1c00`
+Entrada desta reconciliação: `main@9ae230a9d9bbe24830cf9a93aa655566aae9c1d8`
 
-Este documento reconcilia duas fontes de planejamento que nasceram em momentos
-diferentes:
+Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
+`M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
+contracts nem writers canônicos. Estados de experimento continuam nas suas
+evidências próprias; aqui existe apenas uma projeção de planejamento.
 
-- o plano original `M0`–`M12`, cujo alvo é uma Project Machine governada por
-  authorities especializadas e pelo protocolo comum de transição;
-- a evolução posterior `M9`–`M16`, que torna explícitos semântica operacional,
-  quiescence, reflexão, hipóteses, experimentos e prova de longo prazo.
-
-Ele não substitui `ProjectState`, Work, Coordination, capabilities, contracts nem
-os writers canônicos. Serve para tornar novamente encontrável a intenção e para
-impedir que números iguais de documentos diferentes sejam tratados como o mesmo
-milestone.
-
-Fontes preservadas nesta mesma branch:
+Fontes preservadas:
 
 - `docs/plans/project-machine-m0-m12-original-source.md`;
-- `docs/plans/autonomous-evolution-architecture-v0.1.md`.
+- `docs/plans/autonomous-evolution-architecture-v0.1.md`;
+- `docs/experiments/scheduled-cycle-maturity-s1-closure-v0.1.md`;
+- `docs/experiments/scheduled-cycle-maturity-s1-result-v0.1.json`.
 
-## 1. Invariantes herdados dos dois planos
+## 1. Invariantes herdados
 
-1. Toda mudança significativa percorre:
-
+1. Toda mudança significativa percorre
    `observe -> plan -> validate -> apply -> readback -> receipt -> sanitize`.
-
 2. Um fato mutável possui uma authority e um writer canônico.
 3. Representação derivada nunca vira authority por conveniência.
 4. Nondeterminism pode propor; somente política determinística pode autorizar.
 5. `UNKNOWN` nunca equivale a `PASS`.
-6. Trabalho normal possui prioridade sobre manutenção, reflexão e evolução.
-7. O paved path deve ser o caminho mais curto; uma nova camada só se paga se
-   remover mais procedimento recorrente do que adiciona.
-8. Quiescence não significa apenas ausência de Work. Significa que observação e
-   coerência são suficientes e que nenhuma transição obrigatória conhecida está
-   pendente.
-9. Autonomia nasce em shadow, passa por isolamento e limites e só então pode
+6. O paved path deve ser o caminho mais curto.
+7. Quiescence exige observação suficiente, coerência e ausência de transição
+   obrigatória conhecida; não é apenas fila vazia.
+8. Autonomia nasce em shadow, passa por isolamento e limites e só então pode
    receber authority estreita.
-10. Superfícies constitucionais nunca são promovidas automaticamente.
+9. Superfícies constitucionais nunca são promovidas automaticamente.
 
-## 2. Como ler a sobreposição dos roadmaps
+## 2. Estado reconciliado dos marcos
 
-| Faixa | Intenção original | Evolução posterior | Leitura reconciliada |
-|---|---|---|---|
-| M0–M8 original | baseline confiável, ProjectMachine, coerência, protocolo, ProjectState enxuto, Work, sanitizer, Experiment, retirement | pré-condições assumidas | fundação substancialmente presente; não é re-certificada por este documento |
-| M9 original | compressão documental e RoleManifest | M9 = Technical Dictionary + Semantic Scope + Determinism Contract | existe infraestrutura semântica, mas a cobertura revisada ainda não está concluída |
-| M10 original | supervisor e encapsulamento de transporte | M10 = OperationalSemantics 0.3 e cobertura integral | supervisor existe; registry observado permanece `OperationalSemantics 0.2` |
-| M11 original | convergência e remoção de legado | M11 = `lock` para Coordination canônica, aliases, triggers e limpeza | incompleto enquanto `tools/lock.py` continuar implementação independente e não alias fino |
-| M12 original | prova autônoma longa | M12 revisado = prova de maturidade em desenvolvimento funcional real | próximo gate seguro para tasks agendadas; deve começar em shadow |
-| — | — | M13 = Reflection + Quiescence | bloqueado para authority ativa até M12 produzir evidência suficiente |
-| — | — | M14-A/B = hipóteses, experimentos e deathcycle | bloqueado; nenhum writer genérico deve ser criado antecipadamente |
-| — | — | M15 = capability Autonomous Evolution | bloqueado; deve seguir shadow -> bounded active |
-| — | — | M16 = prova autônoma longa | bloqueado; exige convergência, encerramento e no-op saudável |
+| Faixa | Objetivo revisado | Estado reconciliado em 2026-08-21 |
+|---|---|---|
+| M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
+| M9 | Technical Dictionary, Semantic Scope e Determinism Contract | parcial; infraestrutura 0.2 existe, contratos finais não estão fechados |
+| M10 | `OperationalSemantics 0.3` e cobertura integral | aberto; registry corrente permanece 0.2 |
+| M11 | convergência de `lock`, aliases, triggers e resíduos | aberto; `tools/lock.py` ainda é implementação independente |
+| M12 | maturity proof sob trabalho funcional real | executado em S0/S1, mas **não aprovado**; S1 terminou `CLOSED_DEFERRED` |
+| M13 | Reflection + OperationalQuiescence | não iniciado como implementação; bloqueado por plano/closure M9–M12 |
+| M14–M16 | Hypothesis, Experiment/Deathcycle, capability e prova longa | bloqueados |
 
-## 3. Evidência observada no repositório
+M12-S1 não é mais o próximo estágio. Ele terminou com:
 
-O baseline de 2026-08-21 demonstra peças maduras e reutilizáveis:
+- seis runs elegíveis;
+- `providerGapRate=1.0`;
+- `pavedPathCompletionRate=0.0`;
+- zero falso PASS, mutação em `main` ou escape de escopo;
+- disposition `DEFERRED`, retry `ON_CONTRACT_CHANGE`;
+- tasks desabilitadas e branches coletadas com cleanup readback `PASS`.
 
-- `ProjectState 2.1` está em `between-increments` e aponta a próxima transição;
-- ProjectMachine, RoutineInspection, Maintenance, SchedulerPlan e
-  SchedulerSnapshot formam o bootstrap do Manager/GitOps v1.0;
-- GitMutationPlan e GitMutationBundle materializam intenção e publicação
-  atômica sem force;
-- Coordination possui authorities separadas para leases e continuations;
-- Branch Hygiene, capability lifecycle, receipts, sanitization e supervisor
-  possuem tooling e CI;
-- o fluxo RF-0.1B provou bundle, tree proof, aggregate readback, gates de browser
-  e integração com head esperado.
+O protocolo futuro já corrige dois pontos de S1, mas não está admitido:
 
-Também permanecem lacunas que impedem declarar M9–M12 concluído:
+- branches por role, não por worker;
+- preferência verificável por ChatGPT web standalone fora de Work, falhando
+  fechado quando o contexto não puder ser selecionado ou observado.
 
-- o registry corrente declara `OperationalSemantics 0.2`, não 0.3;
-- `tools/lock.py` ainda é uma implementação operacional completa;
-- o catálogo de Routine cobre obrigatoriamente apenas
-  `capability-deathcircle`;
-- não existe contrato canônico de OperationalQuiescence nem sua janela;
-- a task web não possui automaticamente um worktree local onde os verificadores
-  Python possam executar;
-- o kickstart UI v0.1 ainda descreve como próximo o recorte Responsive
-  Fixed-Frame que já foi integrado.
+Essas correções vivem em
+`docs/experiments/scheduled-cycle-maturity-next-protocol-v0.1.md`. Não existe
+S2 ativo, task ativa ou branch experimental reservada.
 
-Essas lacunas não devem ser resolvidas dentro do prompt agendado. O prompt deve
-observá-las e falhar fechado.
+## 3. Resultado do recorte PCS-01A
 
-## 4. Decisão de estágio
+O plano coordenado de metadata de apresentação foi aceito sem implementar
+produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
+e escolhas/acessórios configuráveis (`PCS-02`).
 
-O próximo passo é denominado:
+Estado materializado pela mesma transição que integra esta reconciliação:
 
-> M12-S0 — Scheduled Cycle Maturity Shadow 0.1
+```text
+checkpoint = MODULE-PRESENTATION-METADATA-PLAN-0.1-ACCEPTED
+phase = between-increments
+nextTransition = plan-m9-m13-closure-before-module-metadata-implementation-v0.1
+```
 
-Ele testa bootstrap repetido de dois Managers/GitOps e um worker UI usando apenas
-leitura e no-op. Não é M13, não cria hipótese, não abre experimento de produto,
-não promove capability e não altera authority.
+Assim, o plano de produto fica recuperável, mas sua implementação não compete
+com a decisão do usuário de fechar o caminho até M13 antes de avançar além
+deste recorte.
 
-A instalação deste baseline usa uma branch normal e termina antes do experimento:
+## 4. Próxima sequência deliberada
 
-`work/operations/scheduled-cycle-maturity-bootstrap-0.1`
+O readback pós-merge de PCS-01A é condição de validade deste estado, não uma
+nova slice. A sequência posterior é:
 
-Depois de CI, revisão, merge e readback, as tasks leem charter, prompts e fontes
-de planejamento de `main`. S0 não cria branch própria: nenhum worker agendado
-escreve. A branch `experiment/operations/scheduled-cycle-maturity-0.1` fica
-reservada para uma fase posterior que possua uma mutação experimental aprovada e
-persistível; não será criada como placeholder.
+1. Planejar M9–M13 como uma sequência de slices verificáveis, sem declarar
+   marcos concluídos apenas porque parte do mecanismo existe.
+2. Fechar M9, M10 e M11 ou materializar blockers precisos.
+3. Definir o que constitui aprovação M12 após o resultado `DEFERRED` de S1.
+4. Implementar Reflection e OperationalQuiescence M13 somente sobre inputs
+   canônicos e com `UNKNOWN != PASS`.
+5. Reavaliar a admissão de PCS-01B depois do gate acordado.
+6. Manter M14–M16 bloqueados até seus predecessores reais passarem.
 
-As três tasks S0 foram configuradas com três execuções cada. Depois do primeiro
-run de B produzir `UNKNOWN_PROVIDER_GAP`, elas foram pausadas: A e UI ainda não
-haviam executado. O resultado é um baseline empírico da fronteira do provider,
-não um PASS de S0.
+Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
+de contrato e uma qualificação manual branch-confined com planner e readback
+canônicos.
 
-O estágio seguinte é `M12-S1 — Bounded Branch Lifecycle Probe 0.2`. Ele preserva
-o blocker, admite branches exclusivas fora de `main` e limita cada worker a duas
-ocorrências (`COUNT=2`). A hipótese, os receipts e as métricas permanecem fixos
-para comparação futura com a implementation de Experiment authority/writer.
+## 5. Lacunas conhecidas que o plano M9–M13 deverá resolver
 
-## 5. Gate de quiescence usado em S0
+- registry ainda em `OperationalSemantics 0.2`;
+- cobertura semântica e guard correspondentes ainda incompletos;
+- `tools/lock.py` ainda não convergiu para alias fino da Coordination canônica;
+- Routine Layer obrigatória cobre somente `capability-deathcircle`;
+- Reflection e OperationalQuiescence não possuem contratos/tooling correntes;
+- o runtime de Scheduled Tasks observado em S1 não executou o planner canônico;
+- lifecycle/deathcycle persistível do experimento ainda não foi provado;
+- execution context normal versus Work não é provider-verified na superfície
+  observada.
 
-S0 não autoriza `OperationalQuiescence`. Ele coleta somente uma projeção shadow:
+Uma lacuna de provider e uma lacuna de implementação interna podem coexistir;
+nenhuma deve ser usada para esconder a outra. A classificação precisa fica para
+o plano M9–M13.
 
-- `ROLE_NOOP`: o papel não possui trabalho explicitamente roteado;
-- `KNOWN_MANDATORY_TRANSITION`: há transição obrigatória observável;
-- `UNKNOWN_PROVIDER_GAP`: falta executar um verificador canônico;
-- `INCOHERENT`: authorities observadas divergem;
-- `BLOCKED`: há impedimento explícito.
+## 6. Freshness deste roadmap
 
-Somente uma fase posterior poderá calcular uma janela de quiescence, por exemplo
-três observações qualificadas entre as últimas seis elegíveis, com eventos
-invalidantes reiniciando a janela. Essa política ainda precisa de contrato,
-testes e authority antes de autorizar qualquer ação.
+Este arquivo já ficou defasado depois de S1, repetindo um padrão anterior de
+documentação narrativa que continuava anunciando o recorte recém-concluído como
+“próximo”. A correção aqui é factual, mas ainda não elimina a causa estrutural.
 
-## 6. Critérios para promover S0
+Regra imediata:
 
-Após no mínimo três ciclos comparáveis de cada worker:
+- qualquer PR que altere `ProjectState.development.checkpoint` ou
+  `nextTransition` deve revisar afirmações de estado corrente neste roadmap e
+  nos ponteiros `*-current.md` afetados;
+- a revisão pode concluir `NO_CHANGE`, mas precisa ser explícita no PR;
+- baseline histórico deve ser rotulado como entrada da reconciliação, nunca
+  como substituto do head corrente.
 
-- A e B observaram heads compatíveis e produziram classificações coerentes;
-- nenhum worker declarou PASS para verificador que não executou;
-- UI produziu `ROLE_NOOP` quando não havia Work/handoff explícito;
-- `nextTransition` não foi confundida com assignment;
-- nenhuma task criou branch, PR, comentário, issue, lease, continuation ou email;
-- nenhuma task inventou uma segunda authority ou um algoritmo paralelo;
-- o custo do bootstrap e as lacunas de provider ficaram explícitos;
-- pausar ou remover as tasks não deixa resíduo no repositório.
+Débito declarado para o plano M9–M13:
 
-A promoção será uma decisão humana e uma mudança separada. O passo seguinte pode
-ser S1 provider-backed ou a conclusão de M9–M11, conforme a evidência; não há
-promoção automática por contagem de execuções.
+```text
+ROADMAP_FRESHNESS_GUARD = OPEN
+```
 
-## 7. Critérios de morte
-
-O experimento termina sem promoção se:
-
-- qualquer worker mutar estado em S0;
-- o prompt reconstruir policy que já pertence ao tooling;
-- a ausência de provider for tratada como sucesso;
-- os dois Managers divergirem repetidamente sem causa observável;
-- UI assumir trabalho de API, runtime, renderer ou Scene Core;
-- o custo operacional crescer sem reduzir procedimento manual.
-
-Encerramento consiste em deixar as tasks expirarem ou pausá-las/removê-las. Como
-S0 não possui branch própria nem PR de execução, seu rollback normal não depende
-de coleta Git. Qualquer fase posterior com branch continua subordinada a Branch
-Hygiene.
-
-## 8. Próxima sequência após o baseline S0
-
-1. Executar S1 com branches pré-admitidas, `COUNT=2` e zero writes em `main`.
-2. Materializar a comparação e o deathcycle, inclusive quando o resultado for
-   provider gap sem receipt durável.
-3. Fechar apenas as lacunas M9–M11 que o teste demonstrar como bloqueantes.
-4. Repetir o protocolo com tooling canônico, mantendo o mesmo envelope.
-5. Só então especificar Reflection e OperationalQuiescence M13.
-6. Hipóteses e experimentos M14 usam writers existentes e isolamento real.
-7. Autonomous Evolution entra no capability lifecycle apenas em M15.
-8. M16 prova que o sistema converge, encerra ciclos e sabe não agir.
+O objetivo é transformar essa revisão recorrente em cobertura determinística ou
+derivação, em vez de depender permanentemente da memória do autor. Até essa
+capability existir, este roadmap continua honestamente classificado como
+derivado e pode apresentar drift sem corromper authority.

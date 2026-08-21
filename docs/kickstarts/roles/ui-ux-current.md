@@ -21,4 +21,14 @@ There is currently no UI-specific Scheduler, continuation store, lease store, he
 
 `Responsive Fixed-Frame 0.1` is integrated and is the current UI baseline declared by ProjectState. It preserves the fixed-camera presentation frame across desktop, compact landscape, tablet and mobile layouts.
 
-The next declared transition is `plan-coordinated-module-presentation-metadata-v0.1`. It has coordinated semantic/API dependencies and is not an assignment to UI. A UI worker must not claim or start it merely from `nextTransition`; explicit role scope, Work, continuation, handoff or routing remains required by the versioned Kickstart.
+The coordinated module-presentation metadata plan is accepted at checkpoint
+`MODULE-PRESENTATION-METADATA-PLAN-0.1-ACCEPTED`. Its implementation is not
+admitted. The current plan is
+[`docs/plans/coordinated-module-presentation-metadata-v0.1.md`](../../plans/coordinated-module-presentation-metadata-v0.1.md).
+
+The next declared transition is
+`plan-m9-m13-closure-before-module-metadata-implementation-v0.1`. It is not an
+assignment to UI. A UI worker must not claim the infrastructure transition or
+start metadata implementation merely from `nextTransition`; explicit role
+scope, Work, continuation, handoff or routing remains required by the versioned
+Kickstart.
