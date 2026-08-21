@@ -346,7 +346,11 @@ async function capture(options) {
       // Best-effort cleanup after evidence capture.
     }
     await terminateChrome(launched?.child);
-    rmSync(profileDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    try {
+      rmSync(profileDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      if (!new Set(["ENOTEMPTY", "EBUSY", "EPERM"]).has(error?.code)) throw error;
+    }
   }
 }
 
