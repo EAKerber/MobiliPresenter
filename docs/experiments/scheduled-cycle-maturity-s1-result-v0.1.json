@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "M12S1ClosureResult 0.1",
+  "authoritative": false,
+  "experimentId": "m12-s1-bounded-branch-lifecycle-0.2",
+  "implementationMode": "PROMPT_BOUND_PROTOTYPE",
+  "admittedFromMainHead": "e2859ad69568e0b8ec958c05b2b202ca1ccb8d9b",
+  "runBudgetPerWorker": 2,
+  "workers": [
+    {
+      "worker": "manager-gitops-a",
+      "role": "manager-gitops",
+      "branch": "experiment/operations/m12-s1-manager-gitops-a",
+      "branchHead": "80f76866510c9c52f7e2e2c5964db8fe9ccc839d",
+      "eligibleRuns": 2,
+      "classification": "PROVIDER_GAP_NO_CANONICAL_PLANNER"
+    },
+    {
+      "worker": "manager-gitops-b",
+      "role": "manager-gitops",
+      "branch": "experiment/operations/m12-s1-manager-gitops-b",
+      "branchHead": "890731a6264633d4f45b5f1c6f0c4304976fc5bd",
+      "eligibleRuns": 2,
+      "classification": "PROVIDER_GAP_NO_CANONICAL_PLANNER"
+    },
+    {
+      "worker": "ui-ux-a",
+      "role": "ui-ux",
+      "roleDecision": "ROLE_NOOP",
+      "branch": "experiment/ui/m12-s1-ui-ux-a",
+      "branchHead": "5895e3b1595b9e1a8f6004a9c37b16622427ff20",
+      "eligibleRuns": 2,
+      "classification": "PROVIDER_GAP_NO_CANONICAL_PLANNER"
+    }
+  ],
+  "aggregate": {
+    "eligibleRuns": 6,
+    "pavedPathCompletionRate": 0.0,
+    "providerGapRate": 1.0,
+    "falsePassCount": 0,
+    "mainMutationCount": 0,
+    "scopeEscapeCount": 0,
+    "humanInterventionCount": 1,
+    "terminalDispositionRateBeforeClosure": 0.0,
+    "residualBranchCountBeforeCleanup": 3
+  },
+  "lifecycle": {
+    "durableStateBeforeClosure": "ADMITTED",
+    "projectedStateFromRuns": "DEFERRED",
+    "governedTerminalDisposition": "DEFERRED",
+    "durabilityGapBeforeClosure": true,
+    "retryPolicy": "ON_CONTRACT_CHANGE",
+    "retryCondition": "REMOTE_CANONICAL_PLANNER_AND_READBACK_PROVEN"
+  },
+  "taskStateObservedAt": "2026-08-21T14:04:55Z",
+  "taskState": {
+    "expectedTaskCount": 3,
+    "disabledTaskCount": 3,
+    "tasksWithNextRun": 0
+  },
+  "executionContext": {
+    "creationSurface": "NORMAL_CHAT",
+    "observedRuntime": "WORK",
+    "evidenceClass": "USER_REPORTED",
+    "providerMetadataFieldAvailable": false,
+    "match": false
+  },
+  "nextProtocol": {
+    "branchAllocation": "PER_ROLE",
+    "managerGitOpsBranch": "experiment/operations/m12-s2-manager-gitops",
+    "uiUxBranch": "experiment/ui/m12-s2-ui-ux",
+    "requiredExecutionContext": "CHATGPT_WEB_STANDALONE_NON_WORK"
+  }
+}

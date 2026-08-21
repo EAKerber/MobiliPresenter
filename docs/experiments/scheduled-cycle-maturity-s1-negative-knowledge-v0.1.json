@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "M12S1NegativeKnowledge 0.1",
+  "authoritative": false,
+  "experimentId": "m12-s1-bounded-branch-lifecycle-0.2",
+  "terminalDisposition": "DEFERRED",
+  "retryPolicy": "ON_CONTRACT_CHANGE",
+  "retryCondition": "REMOTE_CANONICAL_PLANNER_AND_READBACK_PROVEN",
+  "blocker": "PROVIDER_GAP_NO_CANONICAL_PLANNER",
+  "facts": [
+    "Repository read access does not prove canonical tool execution.",
+    "GitHub direct mutation availability does not satisfy GitMutationPlan execution.",
+    "A provider gap must not degrade to Contents API writes or prompt-local planner reconstruction.",
+    "COUNT exhaustion stops wake-ups but does not materialize lifecycle state or cleanup.",
+    "Without durable receipts, a second run cannot infer its ordinal from chat memory.",
+    "A projected terminal disposition is not a durable terminal state.",
+    "Creating a task from a normal chat does not by itself prove a non-Work execution context.",
+    "Future experiment branches are allocated per role, not per worker."
+  ],
+  "retrialForbiddenUntil": [
+    "A supported provider can execute and validate the canonical planner.",
+    "The same provider can apply a branch-confined mutation with expected-head semantics.",
+    "Aggregate ref, commit, changed-path and content readback is proven.",
+    "The task creation surface can confirm the requested execution context or fails closed."
+  ]
+}

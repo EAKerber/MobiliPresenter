@@ -1,6 +1,6 @@
 # M12-S1 — Bounded Branch Lifecycle Probe 0.2
 
-Status: `EXPERIMENTAL / BOUNDED_ACTIVE / BRANCH_CONFINED`
+Status: `EXPERIMENTAL / CLOSED_DEFERRED / BRANCH_CONFINED`
 Owner operacional: Manager/GitOps
 Base de comparação: M12-S0 e o primeiro `UNKNOWN_PROVIDER_GAP` de
 `manager-gitops-b`
@@ -217,3 +217,37 @@ Após os seis runs ou uma death condition:
 
 As tasks não deletam branches. Branch Hygiene continua sendo o writer normal de
 coleta.
+
+## 11. Resultado e fechamento
+
+O budget foi consumido em seis ocorrências, duas por worker. As três tasks
+terminaram desabilitadas e sem próxima execução. Todas as ocorrências
+completaram o bootstrap, mas pararam antes de qualquer write com
+`PROVIDER_GAP_NO_CANONICAL_PLANNER`.
+
+O resultado durável do protótipo é:
+
+```text
+durableLifecycleState = ADMITTED
+projectedLifecycleState = DEFERRED
+terminalDisposition = DEFERRED
+retryPolicy = ON_CONTRACT_CHANGE
+```
+
+`DEFERRED` foi materializado pela revisão humana/governada de fechamento, não
+pelas Scheduled Tasks. A condição mínima para um novo probe é a existência de
+um provider que execute e valide o planner canônico e prove apply/readback sem
+fallback direto para Contents API.
+
+O resultado completo, o conhecimento negativo e os deltas de protocolo futuros
+estão registrados em:
+
+- `scheduled-cycle-maturity-s1-closure-v0.1.md`;
+- `scheduled-cycle-maturity-s1-result-v0.1.json`;
+- `scheduled-cycle-maturity-s1-negative-knowledge-v0.1.json`;
+- `scheduled-cycle-maturity-comparison-v0.2.md`;
+- `scheduled-cycle-maturity-next-protocol-v0.1.md`.
+
+As três branches por worker permanecem parte do desenho histórico executado.
+Elas não são renomeadas nem consolidadas. Uma futura execução usa uma branch
+por papel e registra essa mudança explicitamente como delta de protocolo.
