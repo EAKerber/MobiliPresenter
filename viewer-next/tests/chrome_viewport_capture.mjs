@@ -68,6 +68,21 @@ function delay(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+async function terminateChrome(child) {
+  if (!child || child.exitCode !== null) return;
+  let resolveExit;
+  const exited = new Promise((resolveExited) => {
+    resolveExit = resolveExited;
+  });
+  child.once("exit", resolveExit);
+  child.kill("SIGTERM");
+  await Promise.race([exited, delay(2_000)]);
+  if (child.exitCode === null) {
+    child.kill("SIGKILL");
+    await Promise.race([exited, delay(2_000)]);
+  }
+}
+
 async function launchChrome(chrome, profileDirectory) {
   const child = spawn(
     chrome,
@@ -330,8 +345,8 @@ async function capture(options) {
     } catch {
       // Best-effort cleanup after evidence capture.
     }
-    if (launched?.child && !launched.child.killed) launched.child.kill("SIGTERM");
-    rmSync(profileDirectory, { recursive: true, force: true });
+    await terminateChrome(launched?.child);
+    rmSync(profileDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 
