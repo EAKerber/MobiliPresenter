@@ -41,7 +41,8 @@
     "scopeEscapeCount": 0,
     "humanInterventionCount": 1,
     "terminalDispositionRateBeforeClosure": 0.0,
-    "residualBranchCountBeforeCleanup": 3
+    "residualBranchCountBeforeCleanup": 3,
+    "residualBranchCountAfterCleanup": 0
   },
   "lifecycle": {
     "durableStateBeforeClosure": "ADMITTED",
@@ -63,6 +64,16 @@
     "evidenceClass": "USER_REPORTED",
     "providerMetadataFieldAvailable": false,
     "match": false
+  },
+  "cleanup": {
+    "observedAt": "2026-08-21T14:23:04Z",
+    "coldArchiveHead": "82c8436768fea30684f4c56f3221b7e0925418da",
+    "branchHygieneWorkflowRunId": 32491120536,
+    "branchHygieneJobId": 96800988557,
+    "planHash": "c072ab4f0b9d63e9ff63a05c72d48e8e4ddd32bb7b63a032378ce1ac318110fb",
+    "deletedBranchCount": 3,
+    "remainingRepositoryBranchCount": 4,
+    "readback": "PASS"
   },
   "nextProtocol": {
     "branchAllocation": "PER_ROLE",
