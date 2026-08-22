@@ -73,9 +73,13 @@
         "capabilityProjection",
         "context.declaredIntent",
         "context.lifecyclePhase",
+        "context.objects",
+        "context.operations",
         "context.role",
         "context.scope",
         "inputs.contextHash",
+        "inputs.maximsCatalogHash",
+        "inputs.operationalSemanticsCoverageHash",
         "inputs.operationalSemanticsHash",
         "inputs.roleContractRefs",
         "inputs.runtimeCapabilityInspectionHash",
@@ -89,9 +93,13 @@
           "briefHash",
           "context.declaredIntent",
           "context.lifecyclePhase",
+          "context.objects",
+          "context.operations",
           "context.role",
           "context.scope",
           "inputs.contextHash",
+          "inputs.maximsCatalogHash",
+          "inputs.operationalSemanticsCoverageHash",
           "inputs.operationalSemanticsHash",
           "inputs.roleContractRefs",
           "inputs.runtimeCapabilityInspectionHash",
@@ -149,7 +157,21 @@
         ],
         "requiredCapabilityMustRemainVisible": true,
         "inventoryCountMustEqualSelectedPlusOmitted": true,
-        "unknownAvailabilityMustNotPass": true
+        "unknownAvailabilityMustNotPass": true,
+        "defaultIntentRelevance": "relevant",
+        "requiredCapabilitiesByIntent": {
+          "bootstrap-discovery": [
+            "project.bootstrap.inspect"
+          ],
+          "governed-mutation": [],
+          "inspect-and-plan": [
+            "project.inspect",
+            "routine.inspect",
+            "runtime.capabilities.inspect",
+            "semantics.inspect"
+          ],
+          "validate-and-integrate": []
+        }
       }
     },
     "ecosystem-maxim": {
@@ -198,6 +220,8 @@
   "freshnessContract": {
     "requiredInputs": [
       "context",
+      "maximsCatalogHash",
+      "operationalSemanticsCoverageHash",
       "operationalSemanticsHash",
       "roleContractRefs",
       "runtimeCapabilityInspectionHash"
@@ -205,8 +229,10 @@
     "invalidationTriggers": [
       "authority-or-lease-change",
       "declared-intent-change",
+      "ecosystem-maxims-change",
       "lifecycle-phase-change",
       "operational-semantics-change",
+      "operational-semantics-coverage-change",
       "provider-observation-change",
       "role-contract-change",
       "role-or-scope-change"

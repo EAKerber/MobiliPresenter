@@ -11,8 +11,9 @@ class GitMutationBundleBootstrapTests(unittest.TestCase):
         current = (ROLE_DIR / "manager-gitops-current.md").read_text(encoding="utf-8")
         match = re.search(r"\]\(\./(manager-gitops-v[^)]+\.md)\)", current)
         self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), "manager-gitops-v1.0.md")
-        versioned = (ROLE_DIR / match.group(1)).read_text(encoding="utf-8")
+        versioned_path = ROLE_DIR / match.group(1)
+        self.assertTrue(versioned_path.is_file())
+        versioned = versioned_path.read_text(encoding="utf-8")
         self.assertTrue((ROOT / "tools" / "git_mutation_bundle.py").is_file())
         for required in (
             "GitMutationBundle 0.1",

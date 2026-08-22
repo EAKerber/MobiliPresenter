@@ -10,49 +10,26 @@ from tools.semantics.registry import ROOT, load_registry
 FOUNDATIONS_PATH = ROOT / "ops" / "semantics" / "foundations.json"
 SCHEMA_VERSION = "SemanticFoundations 0.1"
 TOP_FIELDS = {
-    "schemaVersion",
-    "readOnly",
-    "semanticAuthority",
-    "authorizesMutation",
-    "technicalDictionary",
-    "determinismPolicy",
-    "artifactContracts",
-    "freshnessContract",
+    "schemaVersion", "readOnly", "semanticAuthority", "authorizesMutation",
+    "technicalDictionary", "determinismPolicy", "artifactContracts", "freshnessContract",
 }
 DICTIONARY_TERMS = {
-    "Authority",
-    "CoordinationIntent",
-    "DeclaredIntent",
-    "EcosystemCapability",
-    "LogicalCapability",
-    "Maxim",
-    "Projection",
-    "Provider",
-    "Role",
-    "ToolSurface",
+    "Authority", "CoordinationIntent", "DeclaredIntent", "EcosystemCapability",
+    "LogicalCapability", "Maxim", "Projection", "Provider", "Role", "ToolSurface",
 }
-ARTIFACT_IDS = {
-    "agent-semantic-brief",
-    "capability-relevance-projection",
-    "ecosystem-maxim",
-}
+ARTIFACT_IDS = {"agent-semantic-brief", "capability-relevance-projection", "ecosystem-maxim"}
 DETERMINISM_CLASSES = {
-    "factual-deterministic",
-    "policy-deterministic",
-    "non-authoritative-recommendation",
+    "factual-deterministic", "policy-deterministic", "non-authoritative-recommendation",
 }
 FORBIDDEN_HEURISTIC_TARGETS = {
-    "authority",
-    "availability",
-    "eligibility",
-    "mutationPermission",
-    "scope",
+    "authority", "availability", "eligibility", "mutationPermission", "scope",
 }
 REQUIRED_CAPABILITY_BUCKETS = {
-    "conditional",
-    "relevantAvailable",
-    "required",
-    "requiredUnavailable",
+    "conditional", "relevantAvailable", "required", "requiredUnavailable",
+}
+REQUIRED_FRESHNESS_INPUTS = {
+    "context", "maximsCatalogHash", "operationalSemanticsCoverageHash",
+    "operationalSemanticsHash", "roleContractRefs", "runtimeCapabilityInspectionHash",
 }
 
 
@@ -121,7 +98,38 @@ def _validate_classifications(contract: dict[str, Any], errors: list[str]) -> No
         errors.append("SEMANTIC_FOUNDATIONS_FIELD_CLASS_COVERAGE_INVALID")
 
 
-def _validate_artifacts(value: Any, errors: list[str]) -> None:
+def _validate_relevance_policy(invariants: dict[str, Any], registry: dict[str, Any], errors: list[str]) -> None:
+    if set(invariants.get("requiredBuckets") or []) != REQUIRED_CAPABILITY_BUCKETS:
+        errors.append("SEMANTIC_FOUNDATIONS_CAPABILITY_BUCKETS_INVALID")
+    if invariants.get("requiredCapabilityMustRemainVisible") is not True:
+        errors.append("SEMANTIC_FOUNDATIONS_REQUIRED_CAPABILITY_VISIBILITY_INVALID")
+    if invariants.get("inventoryCountMustEqualSelectedPlusOmitted") is not True:
+        errors.append("SEMANTIC_FOUNDATIONS_COVERAGE_COUNT_INVALID")
+    if invariants.get("unknownAvailabilityMustNotPass") is not True:
+        errors.append("SEMANTIC_FOUNDATIONS_UNKNOWN_AVAILABILITY_INVALID")
+    if invariants.get("defaultIntentRelevance") != "relevant":
+        errors.append("SEMANTIC_FOUNDATIONS_DEFAULT_RELEVANCE_INVALID")
+    policy = invariants.get("requiredCapabilitiesByIntent")
+    intents = registry.get("facetVocabulary", {}).get("intentClasses", [])
+    capabilities = registry.get("logicalCapabilities", {})
+    if not isinstance(policy, dict) or set(policy) != set(intents):
+        errors.append("SEMANTIC_FOUNDATIONS_REQUIRED_POLICY_COVERAGE_INVALID")
+        return
+    for intent in sorted(policy):
+        ids = policy[intent]
+        if not _unique_strings(ids, allow_empty=True) or ids != sorted(ids):
+            errors.append(f"SEMANTIC_FOUNDATIONS_REQUIRED_POLICY_INVALID:{intent}")
+            continue
+        for capability_id in ids:
+            item = capabilities.get(capability_id)
+            if not isinstance(item, dict):
+                errors.append(f"SEMANTIC_FOUNDATIONS_REQUIRED_CAPABILITY_UNKNOWN:{capability_id}")
+                continue
+            if intent not in item.get("facets", {}).get("intentClasses", []):
+                errors.append(f"SEMANTIC_FOUNDATIONS_REQUIRED_CAPABILITY_INTENT_MISMATCH:{capability_id}:{intent}")
+
+
+def _validate_artifacts(value: Any, registry: dict[str, Any], errors: list[str]) -> None:
     if not isinstance(value, dict) or set(value) != ARTIFACT_IDS:
         errors.append("SEMANTIC_FOUNDATIONS_ARTIFACT_COVERAGE_INVALID")
         return
@@ -152,14 +160,7 @@ def _validate_artifacts(value: Any, errors: list[str]) -> None:
         if artifact_id == "ecosystem-maxim" and invariants.get("overridesContract") is not False:
             errors.append("SEMANTIC_FOUNDATIONS_MAXIM_OVERRIDE_FORBIDDEN")
         if artifact_id == "capability-relevance-projection":
-            if set(invariants.get("requiredBuckets") or []) != REQUIRED_CAPABILITY_BUCKETS:
-                errors.append("SEMANTIC_FOUNDATIONS_CAPABILITY_BUCKETS_INVALID")
-            if invariants.get("requiredCapabilityMustRemainVisible") is not True:
-                errors.append("SEMANTIC_FOUNDATIONS_REQUIRED_CAPABILITY_VISIBILITY_INVALID")
-            if invariants.get("inventoryCountMustEqualSelectedPlusOmitted") is not True:
-                errors.append("SEMANTIC_FOUNDATIONS_COVERAGE_COUNT_INVALID")
-            if invariants.get("unknownAvailabilityMustNotPass") is not True:
-                errors.append("SEMANTIC_FOUNDATIONS_UNKNOWN_AVAILABILITY_INVALID")
+            _validate_relevance_policy(invariants, registry, errors)
 
 
 def validate_foundations(value: dict[str, Any] | None = None) -> list[str]:
@@ -194,7 +195,7 @@ def validate_foundations(value: dict[str, Any] | None = None) -> list[str]:
         if policy.get("unknownNeverEqualsPass") is not True:
             errors.append("SEMANTIC_FOUNDATIONS_UNKNOWN_POLICY_INVALID")
 
-    _validate_artifacts(foundations.get("artifactContracts"), errors)
+    _validate_artifacts(foundations.get("artifactContracts"), registry, errors)
 
     freshness = foundations.get("freshnessContract")
     if not isinstance(freshness, dict) or set(freshness) != {
@@ -205,6 +206,8 @@ def validate_foundations(value: dict[str, Any] | None = None) -> list[str]:
         for field in ("requiredInputs", "invalidationTriggers", "staleRules"):
             if not _unique_strings(freshness.get(field)):
                 errors.append("SEMANTIC_FOUNDATIONS_FRESHNESS_COVERAGE_INVALID")
+        if set(freshness.get("requiredInputs") or []) != REQUIRED_FRESHNESS_INPUTS:
+            errors.append("SEMANTIC_FOUNDATIONS_FRESHNESS_INPUTS_INVALID")
         if freshness.get("guardId") != "CAPABILITY_DISCOVERY_FRESHNESS_GUARD":
             errors.append("SEMANTIC_FOUNDATIONS_FRESHNESS_GUARD_INVALID")
     return errors
