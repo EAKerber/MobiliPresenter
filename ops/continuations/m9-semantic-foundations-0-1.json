@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "m9-semantic-foundations-0-1",
+  "workerId": "manager-gitops-primary",
+  "status": "READY",
+  "branch": "work/operations/m9-semantic-foundations-0.1",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "admit-and-branch",
+    "implement-semantic-foundations",
+    "implement-roadmap-freshness-guard",
+    "reconcile-project-state",
+    "validate-and-integrate"
+  ],
+  "nextAction": "admit work and create governed branch",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
