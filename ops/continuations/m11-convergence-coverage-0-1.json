@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m11-convergence-coverage-0-1",
   "workerId": "manager-gitops-primary",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/m11-cv1a-reconcile-0.1",
   "prNumber": 135,
   "dependsOn": [
@@ -14,15 +14,14 @@
     "compose-runtime-residue-evidence",
     "close-current-document-blind-spots",
     "integrate-convergence-ci-gate",
-    "validate-and-integrate"
-  ],
-  "remaining": [
+    "validate-and-integrate",
     "reconcile-cv1a-state"
   ],
-  "nextAction": "reconcile-cv1a-state",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "b31d78ac077651e50e5b7581b6d7b9db1a57d5ae",
-    "checkpoint": "M11-CV1A-CONVERGENCE-COVERAGE-0.1-INTEGRATED"
+    "sha": "3022efe1a3fa6e43c081d2c59002d6cba72e4d93",
+    "checkpoint": "M11-CV1A-CONVERGENCE-COVERAGE-0.1-CLOSED"
   },
   "blockers": [],
   "handoffToWorkerId": null
