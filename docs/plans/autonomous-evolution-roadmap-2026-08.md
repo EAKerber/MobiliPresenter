@@ -3,7 +3,7 @@
 Status: planejamento derivado, não authority  
 Data de reconciliação: 2026-08-22
 Repositório observado: `EAKerber/MobiliPresenter`  
-Entrada desta reconciliação: `main@b31d78ac077651e50e5b7581b6d7b9db1a57d5ae`
+Entrada desta reconciliação: `main@309ef9dc04e689025f78219825a1fbd08512d191`
 
 Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
 `M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
@@ -40,7 +40,7 @@ Fontes preservadas:
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
 | M9 | Technical Dictionary, Semantic Scope, Determinism Contract e Roadmap Freshness Guard | fechado por M9-SF1 + M9-FG1; contratos e coverage read-only integrados |
 | M10 | `OperationalSemantics 0.3` + Agent Cycle semântico | fechado por OS1A + OS1B + OS1C; inventário/coverage, AgentSemanticBrief, freshness, Agent Cycle Entry e Agent Cycle Close/receipt integrados |
-| M11 | convergência de `lock`, aliases, triggers e resíduos | CV1A fechado: `ConvergenceInspection 0.1` integrada; `lock` e `ops` possuem coverage PASS e continuam `MIGRATION_REQUIRED`; CV1B é o próximo recorte |
+| M11 | convergência de `lock`, aliases, triggers e resíduos | CV1A e CV1B fechados: coverage materializada e superfície Coordination canônica integrada; `lock` permanece wrapper compatível e `lock`/`ops` seguem `MIGRATION_REQUIRED`; CV1C é o próximo recorte |
 | M12 | remote canonical execution e maturity proof | S1 terminou `CLOSED_DEFERRED`; bridge e novo proof estão planejados, não aprovados |
 | M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M11–M12 |
 | M14–M16 | Hypothesis, Experiment/Deathcycle, capability e prova longa | bloqueados |
@@ -70,12 +70,12 @@ O plano coordenado de metadata de apresentação foi aceito sem implementar
 produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
 e escolhas/acessórios configuráveis (`PCS-02`).
 
-Estado materializado após o fechamento de M11-CV1A:
+Estado materializado após o fechamento de M11-CV1B:
 
 ```text
-checkpoint = M11-CV1A-CONVERGENCE-COVERAGE-0.1-CLOSED
+checkpoint = M11-CV1B-CANONICAL-COORDINATION-SURFACE-0.1-CLOSED
 phase = between-increments
-nextTransition = implement-m11-cv1b-canonical-coordination-surface-v0.1
+nextTransition = implement-m11-cv1c-legacy-retirement-and-trigger-convergence-v0.1
 ```
 
 O plano PCS-01A continua recuperável e sua implementação permanece não admitida.
@@ -108,19 +108,34 @@ M11-CV1A materializou:
 - remoção de direção mutável duplicada do ponteiro `ui-ux-current.md`;
 - inventário explícito de triggers legacy adjacentes sem aposentadoria automática.
 
+M11-CV1B materializou:
+
+- `TransitionPlan 0.1` determinístico para mutações Coordination, com rebuild
+  semântico, expected authority head e segurança temporal no apply;
+- `tools/coordination_cli.py` como paved surface canônica de operador;
+- `apply --expected-plan` com readback pelo writer existente e
+  `TransitionReceipt 0.1` aceito diretamente por Agent Cycle Close;
+- `tools/lock.py` reduzido a wrapper de compatibilidade, sem planner ou
+  primitive de write próprio;
+- topologia explícita `lock -> coordination-cli -> coordination-executor`,
+  preservando exatamente um writer para `coordination-leases`;
+- ConvergenceInspection pós-migração com 7/7 classes em `PASS`, `lock` como
+  `LEGACY_COMPATIBILITY_WRAPPER` e `lock`/`ops` ainda `MIGRATION_REQUIRED`;
+- ADR-0006 substituindo apenas a decisão de entrypoint do ADR-0005.
+
 ## 4. Próxima sequência deliberada
 
-M9-SF1/M9-FG1, M10-OS1A/OS1B/OS1C e M11-CV1A estão fechados. A sequência restante é:
+M9-SF1/M9-FG1, M10-OS1A/OS1B/OS1C, M11-CV1A e M11-CV1B estão fechados.
+A sequência restante é:
 
-1. M11-CV1B migra `tools/lock.py` para uma superfície Coordination canônica,
-   preservando compatibilidade até prova de equivalência.
-2. M11-CV1C reexecuta a coverage e aposenta `lock`/`ops` e triggers somente
-   quando `retirementReadiness=READY`.
-3. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
-4. M12-S2 repete o maturity proof somente depois dessa qualificação.
-5. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
+1. M11-CV1C reexecuta a coverage e aposenta `lock`/`ops` e triggers somente
+   quando `retirementReadiness=READY`, sem confundir path filter `ops/**` com
+   branch namespace legacy.
+2. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
+3. M12-S2 repete o maturity proof somente depois dessa qualificação.
+4. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
    read-only.
-6. Só então PCS-01B pode ser reavaliado para admissão.
+5. Só então PCS-01B pode ser reavaliado para admissão.
 
 Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
 de contrato e uma qualificação manual branch-confined com planner e readback
@@ -134,9 +149,10 @@ canônicos.
   freshness e entrada única do ciclo foram fechados em M10-OS1B;
 - `agent close`, `AgentCycleDelta`, aggregate readback e `AgentCycleReceipt`
   foram fechados em M10-OS1C sem criar nova authority ou writer;
-- M11-CV1A fechou o inventário/coverage de convergência; `tools/lock.py`,
-  o alias `lock`, o alias `ops` e o branch trigger `ops/**` continuam vivos por
-  evidência explícita de migração pendente;
+- M11-CV1A fechou o inventário/coverage de convergência;
+- M11-CV1B fechou a migração para a superfície Coordination canônica; o alias
+  `lock`, o wrapper compatível, o alias `ops` e o branch trigger `ops/**`
+  continuam vivos por evidência explícita e pertencem ao CV1C;
 - triggers legacy adjacentes `renderer/**` e `architecture/**` permanecem
   classificados para decisão posterior, sem compartilhar automaticamente a
   death condition de `ops/**`;
