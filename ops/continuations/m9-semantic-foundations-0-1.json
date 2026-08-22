@@ -19,6 +19,6 @@
   "prNumber": 128,
   "remaining": [],
   "schemaVersion": "ContinuationState 0.2",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "workerId": "manager-gitops-primary"
 }
