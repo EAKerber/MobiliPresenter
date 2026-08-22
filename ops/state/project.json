@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M9-M13-CLOSURE-PLAN-0.1-ACCEPTED",
-    "nextTransition": "implement-m9-semantic-foundations-v0.1"
+    "checkpoint": "M9-SEMANTIC-FOUNDATIONS-0.1-CLOSED",
+    "nextTransition": "implement-operational-semantics-0.3-and-agent-semantic-brief-v0.1"
   }
 }
