@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-primary",
   "status": "IN_PROGRESS",
   "branch": "work/operations/m11-cv1c-retirement-proof-0.2",
-  "prNumber": null,
+  "prNumber": 139,
   "dependsOn": [
     "m11-canonical-coordination-surface-0-1"
   ],
