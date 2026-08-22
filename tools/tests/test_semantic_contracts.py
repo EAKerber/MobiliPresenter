@@ -8,7 +8,9 @@ from tools.semantics.contracts import (
     check_capability_gates_contract,
     check_coordination_state_contract,
     check_project_state_contract,
+    check_roadmap_freshness_contract,
     check_schema_registry_coverage,
+    check_semantic_foundations_contract,
     check_source_build_contract,
     check_transition_plan_contract,
     check_transition_receipt_contract,
@@ -49,6 +51,12 @@ class SemanticContractTests(unittest.TestCase):
 
     def test_project_state_contract_is_conformant(self):
         self.assertEqual([], check_project_state_contract())
+
+    def test_semantic_foundations_contract_is_conformant(self):
+        self.assertEqual([], check_semantic_foundations_contract())
+
+    def test_roadmap_freshness_contract_is_conformant(self):
+        self.assertEqual([], check_roadmap_freshness_contract())
 
 
 if __name__ == "__main__":

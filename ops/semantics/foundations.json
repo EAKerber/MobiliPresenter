@@ -1,0 +1,221 @@
+{
+  "schemaVersion": "SemanticFoundations 0.1",
+  "readOnly": true,
+  "semanticAuthority": false,
+  "authorizesMutation": false,
+  "technicalDictionary": {
+    "Authority": {
+      "semanticId": "core.authority",
+      "definition": "Canonical source for a mutable fact within one domain; authority is never inferred from a role, tool, provider or branch name."
+    },
+    "CoordinationIntent": {
+      "semanticId": "coordination.intent",
+      "definition": "Advisory operational record in the Coordination authority; it is not DeclaredIntent, assignment, lease or authorization."
+    },
+    "DeclaredIntent": {
+      "semanticId": "intent.declared",
+      "definition": "Contextual objective supplied to a semantic projection; it is not Work, CoordinationIntent, assignment or authorization."
+    },
+    "EcosystemCapability": {
+      "semanticId": "capability.ecosystem",
+      "definition": "Governed feature of the ecosystem whose lifecycle is represented by Capability Policy and gates."
+    },
+    "LogicalCapability": {
+      "semanticId": "capability.logical",
+      "definition": "Provider-neutral ability required by an operation and defined by invariants rather than a concrete executable."
+    },
+    "Maxim": {
+      "semanticId": "guidance.maxim",
+      "definition": "Short non-authoritative cultural reminder linked to operational questions and contracts; it never overrides policy."
+    },
+    "Projection": {
+      "semanticId": "core.projection",
+      "definition": "Derived representation reconstructed from explicit inputs that never becomes an independent source of truth."
+    },
+    "Provider": {
+      "semanticId": "runtime.provider",
+      "definition": "Runtime or carrier exposing concrete features; its presence does not grant semantic authority or permission."
+    },
+    "Role": {
+      "semanticId": "identity.role",
+      "definition": "Logical function fulfilled by one or more workers; a role does not imply ownership of another semantic domain."
+    },
+    "ToolSurface": {
+      "semanticId": "surface.tool",
+      "definition": "Concrete invocable interface such as a CLI, connector tool or workflow entrypoint that may expose a LogicalCapability."
+    }
+  },
+  "determinismPolicy": {
+    "classes": [
+      "factual-deterministic",
+      "policy-deterministic",
+      "non-authoritative-recommendation"
+    ],
+    "heuristicMayInfluence": [
+      "recommendationOrder"
+    ],
+    "heuristicMustNotInfluence": [
+      "authority",
+      "availability",
+      "eligibility",
+      "mutationPermission",
+      "scope"
+    ],
+    "unknownNeverEqualsPass": true
+  },
+  "artifactContracts": {
+    "agent-semantic-brief": {
+      "schemaVersion": "AgentSemanticBrief 0.1",
+      "kind": "projection",
+      "fieldInventory": [
+        "authorizesMutation",
+        "briefHash",
+        "capabilityProjection",
+        "context.declaredIntent",
+        "context.lifecyclePhase",
+        "context.role",
+        "context.scope",
+        "inputs.contextHash",
+        "inputs.operationalSemanticsHash",
+        "inputs.roleContractRefs",
+        "inputs.runtimeCapabilityInspectionHash",
+        "maxims",
+        "readOnly",
+        "semanticAuthority"
+      ],
+      "fieldClassifications": {
+        "factual-deterministic": [
+          "authorizesMutation",
+          "briefHash",
+          "context.declaredIntent",
+          "context.lifecyclePhase",
+          "context.role",
+          "context.scope",
+          "inputs.contextHash",
+          "inputs.operationalSemanticsHash",
+          "inputs.roleContractRefs",
+          "inputs.runtimeCapabilityInspectionHash",
+          "readOnly",
+          "semanticAuthority"
+        ],
+        "policy-deterministic": [
+          "capabilityProjection"
+        ],
+        "non-authoritative-recommendation": [
+          "maxims"
+        ]
+      },
+      "invariants": {
+        "readOnly": true,
+        "semanticAuthority": false,
+        "authorizesMutation": false,
+        "maximsMaximum": 3
+      }
+    },
+    "capability-relevance-projection": {
+      "schemaVersion": "CapabilityRelevanceProjection 0.1",
+      "kind": "projection",
+      "fieldInventory": [
+        "conditional",
+        "inventoryCount",
+        "missingCoverage",
+        "omittedCount",
+        "relevantAvailable",
+        "required",
+        "requiredUnavailable",
+        "selectedCount"
+      ],
+      "fieldClassifications": {
+        "factual-deterministic": [
+          "inventoryCount",
+          "missingCoverage",
+          "omittedCount",
+          "selectedCount"
+        ],
+        "policy-deterministic": [
+          "conditional",
+          "relevantAvailable",
+          "required",
+          "requiredUnavailable"
+        ],
+        "non-authoritative-recommendation": []
+      },
+      "invariants": {
+        "requiredBuckets": [
+          "conditional",
+          "relevantAvailable",
+          "required",
+          "requiredUnavailable"
+        ],
+        "requiredCapabilityMustRemainVisible": true,
+        "inventoryCountMustEqualSelectedPlusOmitted": true,
+        "unknownAvailabilityMustNotPass": true
+      }
+    },
+    "ecosystem-maxim": {
+      "schemaVersion": "EcosystemMaxim 0.1",
+      "kind": "recommendation",
+      "fieldInventory": [
+        "appliesTo",
+        "authorizesMutation",
+        "deathCondition",
+        "editorialOwner",
+        "id",
+        "justification",
+        "misreadRisk",
+        "operationalQuestion",
+        "overridesContract",
+        "relatedContracts",
+        "semanticAuthority",
+        "statement"
+      ],
+      "fieldClassifications": {
+        "factual-deterministic": [
+          "appliesTo",
+          "authorizesMutation",
+          "deathCondition",
+          "editorialOwner",
+          "id",
+          "overridesContract",
+          "relatedContracts",
+          "semanticAuthority"
+        ],
+        "policy-deterministic": [],
+        "non-authoritative-recommendation": [
+          "justification",
+          "misreadRisk",
+          "operationalQuestion",
+          "statement"
+        ]
+      },
+      "invariants": {
+        "semanticAuthority": false,
+        "authorizesMutation": false,
+        "overridesContract": false
+      }
+    }
+  },
+  "freshnessContract": {
+    "requiredInputs": [
+      "context",
+      "operationalSemanticsHash",
+      "roleContractRefs",
+      "runtimeCapabilityInspectionHash"
+    ],
+    "invalidationTriggers": [
+      "authority-or-lease-change",
+      "declared-intent-change",
+      "lifecycle-phase-change",
+      "operational-semantics-change",
+      "provider-observation-change",
+      "role-contract-change",
+      "role-or-scope-change"
+    ],
+    "staleRules": [
+      "stale-brief-is-informative-only",
+      "stale-brief-cannot-prove-availability",
+      "missing-or-unverifiable-input-is-unknown"
+    ],
+    "guardId": "CAPABILITY_DISCOVERY_FRESHNESS_GUARD"
+  }
+}

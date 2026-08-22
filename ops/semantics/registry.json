@@ -30,6 +30,24 @@
       "owner": "operations-core",
       "definition": "Cross-domain operational action vocabulary: CONTINUE, RECONCILE, HANDOFF, PAUSE, NEEDS_HUMAN."
     },
+    "artifact.agent-semantic-brief": {
+      "term": "AgentSemanticBrief",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only contextual projection of relevant capabilities and a bounded selection of non-authoritative maxims."
+    },
+    "artifact.capability-relevance-projection": {
+      "term": "CapabilityRelevanceProjection",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Deterministic coverage projection that keeps required, available, conditional and unavailable capabilities explicit."
+    },
+    "artifact.ecosystem-maxim": {
+      "term": "EcosystemMaxim",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Non-authoritative cultural recommendation with an owner, justification, misread risk and death condition."
+    },
     "artifact.inspection": {
       "term": "Inspection",
       "kind": "artifact",
@@ -47,6 +65,12 @@
       "kind": "artifact",
       "owner": "operations-core",
       "definition": "Read-only policy interpretation that does not itself authorize mutation."
+    },
+    "artifact.roadmap-freshness-inspection": {
+      "term": "RoadmapFreshnessInspection",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only proof that known consumers were explicitly reviewed when mutable ProjectState direction changed."
     },
     "artifact.routing-plan": {
       "term": "RoutingPlan",
@@ -116,11 +140,29 @@
       "owner": "git-governance",
       "definition": "Semantic branch domain for UI implementation work."
     },
+    "capability.ecosystem": {
+      "term": "EcosystemCapability",
+      "kind": "domain-concept",
+      "owner": "capability",
+      "definition": "Governed ecosystem feature whose lifecycle is represented by Capability Policy and gates."
+    },
+    "capability.logical": {
+      "term": "LogicalCapability",
+      "kind": "domain-concept",
+      "owner": "operations-core",
+      "definition": "Provider-neutral operational ability defined by required invariants rather than a concrete executable."
+    },
     "capability.policy": {
       "term": "CapabilityPolicy",
       "kind": "domain-policy",
       "owner": "capability",
       "definition": "Current capability policy vocabulary: experimental, canonical, deprecated, disabled."
+    },
+    "coordination.intent": {
+      "term": "CoordinationIntent",
+      "kind": "domain-concept",
+      "owner": "coordination",
+      "definition": "Advisory planned-write record in the Coordination authority; it is not a lease, assignment or authorization."
     },
     "coordination.lease": {
       "term": "CoordinationLease",
@@ -137,7 +179,7 @@
       ]
     },
     "core.authority": {
-      "term": "authority",
+      "term": "Authority",
       "kind": "operational-role",
       "owner": "operations-core",
       "definition": "Canonical source for a mutable operational fact within a domain."
@@ -149,13 +191,19 @@
       "definition": "The single supported mutation surface for one mutable authority."
     },
     "core.projection": {
-      "term": "projection",
+      "term": "Projection",
       "kind": "operational-role",
       "owner": "operations-core",
       "definition": "Derived representation that never becomes an independent source of truth."
     },
+    "guidance.maxim": {
+      "term": "Maxim",
+      "kind": "guidance",
+      "owner": "operations-core",
+      "definition": "Short non-authoritative cultural reminder that never overrides a contract or authorizes mutation."
+    },
     "identity.role": {
-      "term": "role",
+      "term": "Role",
       "kind": "identity",
       "owner": "operations-core",
       "definition": "Logical function fulfilled by one or more workers.",
@@ -191,6 +239,18 @@
         "identity.worker"
       ]
     },
+    "intent.declared": {
+      "term": "DeclaredIntent",
+      "kind": "context",
+      "owner": "operations-core",
+      "definition": "Contextual objective supplied to a projection; it is not Work, CoordinationIntent, assignment or authority."
+    },
+    "runtime.provider": {
+      "term": "Provider",
+      "kind": "runtime-concept",
+      "owner": "operations-core",
+      "definition": "Runtime or carrier exposing concrete features without acquiring semantic authority by its existence."
+    },
     "status.observation": {
       "term": "ObservationStatus",
       "kind": "status-vocabulary",
@@ -202,6 +262,12 @@
       "kind": "status-vocabulary",
       "owner": "work",
       "definition": "Persistent work lifecycle vocabulary: READY, IN_PROGRESS, WAITING, HANDOFF, DONE."
+    },
+    "surface.tool": {
+      "term": "ToolSurface",
+      "kind": "runtime-concept",
+      "owner": "operations-core",
+      "definition": "Concrete invocable interface such as a CLI, connector tool or workflow entrypoint."
     },
     "work.dependency": {
       "term": "WorkDependency",
@@ -247,6 +313,16 @@
       "owner": "operations-core",
       "semanticValidator": "tools.project_state.validate_current",
       "structuralSchema": "ops/schemas/project-state.schema.json"
+    },
+    "roadmap-freshness-coverage": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.roadmap_freshness.validate_coverage",
+      "structuralSchema": "ops/schemas/roadmap-freshness-coverage.schema.json"
+    },
+    "semantic-foundations": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.semantics.foundations.validate_foundations",
+      "structuralSchema": "ops/schemas/semantic-foundations.schema.json"
     },
     "source-build": {
       "owner": "operations-core",
@@ -342,6 +418,20 @@
       "locator": {
         "kind": "github-git-refs",
         "repository": "EAKerber/MobiliPresenter"
+      }
+    },
+    "roadmap-freshness-coverage": {
+      "owner": "operations-core",
+      "locator": {
+        "kind": "repository-file",
+        "path": "ops/semantics/roadmap-freshness-coverage.json"
+      }
+    },
+    "semantic-foundations-contract": {
+      "owner": "operations-core",
+      "locator": {
+        "kind": "repository-file",
+        "path": "ops/semantics/foundations.json"
       }
     }
   },
@@ -592,6 +682,26 @@
       "canonicalWriterFor": [],
       "delegatesTo": []
     },
+    "roadmap-freshness-inspection": {
+      "module": "tools.roadmap_freshness",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": [
+        "project-state"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [
+        "git-branch-refs",
+        "roadmap-freshness-coverage"
+      ],
+      "writesResources": [],
+      "produces": [
+        "artifact.roadmap-freshness-inspection"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
     "routine-inspection": {
       "module": "tools.routines",
       "owner": "operations-core",
@@ -635,6 +745,23 @@
       "writesResources": [],
       "produces": [
         "artifact.routing-plan"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
+    "semantic-foundations-validator": {
+      "module": "tools.semantics.foundations",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [
+        "semantic-foundations-contract"
+      ],
+      "writesResources": [],
+      "produces": [
+        "artifact.inspection"
       ],
       "canonicalWriterFor": [],
       "delegatesTo": []

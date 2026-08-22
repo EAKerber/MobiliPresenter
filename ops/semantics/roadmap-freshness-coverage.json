@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "RoadmapFreshnessCoverage 0.1",
+  "projectState": {
+    "baseHash": "526566a8aa1fbf475769477d1c6c9f4ccb24aec75a133054de13256ff228221e",
+    "currentHash": "526566a8aa1fbf475769477d1c6c9f4ccb24aec75a133054de13256ff228221e",
+    "changedFields": []
+  },
+  "consumers": [
+    {
+      "path": "docs/kickstarts/roles/ui-ux-current.md",
+      "disposition": "NO_CHANGE",
+      "contentHash": "9435bf4279c88d3d1f8ec285d92f491911a131b6812653a662e88589b11c4aa1"
+    },
+    {
+      "path": "docs/plans/autonomous-evolution-roadmap-2026-08.md",
+      "disposition": "NO_CHANGE",
+      "contentHash": "e2f69418b54df588c777b5a503c9ea4740adb9e302816d679554b12f46ce8aa3"
+    }
+  ],
+  "readOnly": true,
+  "semanticAuthority": false,
+  "authorizesMutation": false
+}
