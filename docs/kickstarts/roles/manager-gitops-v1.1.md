@@ -184,6 +184,8 @@ observe base head/tree + target ref
 -> verify-readback
 ```
 
+O Bundle exige `force=false`; qualquer update de ref é non-force e continua vinculado ao head observado.
+
 Comandos read-only do contrato:
 
 ```bash
