@@ -5,7 +5,19 @@ import json
 
 from tools.semantics.branches import parse_branch_name
 from tools.semantics.contracts import check_contracts
-from tools.semantics.registry import aliases_for, component, concept, managed_authority, owner_of, validate_registry
+from tools.semantics.coverage import build_inspection
+from tools.semantics.maxims import maxim
+from tools.semantics.registry import (
+    aliases_for,
+    component,
+    concept,
+    logical_capability,
+    managed_authority,
+    owner_of,
+    provider_profile,
+    tool_surface,
+    validate_registry,
+)
 
 ERROR_EXIT = 2
 
@@ -29,7 +41,7 @@ def _check() -> dict:
     errors.extend(check_contracts())
     return {
         "ok": not errors,
-        "schemaVersion": "OperationalSemanticsCheck 0.2",
+        "schemaVersion": "OperationalSemanticsCheck 0.3",
         "errors": errors,
     }
 
@@ -50,6 +62,25 @@ def parser() -> argparse.ArgumentParser:
     component_parser.add_argument("component_id")
     component_parser.add_argument("--json", action="store_true", dest="as_json")
 
+    capability_parser = sub.add_parser("capability")
+    capability_parser.add_argument("capability_id")
+    capability_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    provider_parser = sub.add_parser("provider")
+    provider_parser.add_argument("provider_id")
+    provider_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    surface_parser = sub.add_parser("surface")
+    surface_parser.add_argument("surface_id")
+    surface_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    maxim_parser = sub.add_parser("maxim")
+    maxim_parser.add_argument("maxim_id")
+    maxim_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    coverage_parser = sub.add_parser("coverage")
+    coverage_parser.add_argument("--json", action="store_true", dest="as_json")
+
     check = sub.add_parser("check")
     check.add_argument("--json", action="store_true", dest="as_json")
 
@@ -69,6 +100,18 @@ def main(argv=None) -> int:
             payload = managed_authority(args.authority_id)
         elif args.command == "component":
             payload = component(args.component_id)
+        elif args.command == "capability":
+            payload = logical_capability(args.capability_id)
+        elif args.command == "provider":
+            payload = provider_profile(args.provider_id)
+        elif args.command == "surface":
+            payload = tool_surface(args.surface_id)
+        elif args.command == "maxim":
+            payload = maxim(args.maxim_id)
+        elif args.command == "coverage":
+            payload = build_inspection()
+            _emit(payload, args.as_json)
+            return 0 if payload["coverageComplete"] else ERROR_EXIT
         elif args.command == "branch":
             payload = parse_branch_name(args.name)
         else:

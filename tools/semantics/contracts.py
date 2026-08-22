@@ -5,12 +5,26 @@ from pathlib import Path
 from typing import Any
 
 from tools import capability_gates, continuation, coordination, project_state, publication, roadmap_freshness, transition_protocol
-from tools.semantics import foundations
+from tools.semantics import coverage, foundations, maxims
 from tools.semantics.registry import ROOT, load_registry, validate_registry
 from tools.semantics.work import WorkStatus
 
 CAPABILITY_BASE_FIELDS={"schemaVersion","id","policy","gates","roundsWithoutActiveGates","maxRoundsWithoutActiveGates","deferReason"}
-SEMANTIC_TOP_FIELDS={"schemaVersion","owners","concepts","contracts","branchGrammar","managedAuthorities","resources","components"}
+SEMANTIC_TOP_FIELDS={
+    "schemaVersion",
+    "owners",
+    "concepts",
+    "contracts",
+    "branchGrammar",
+    "managedAuthorities",
+    "resources",
+    "components",
+    "facetVocabulary",
+    "logicalCapabilities",
+    "providerProfiles",
+    "toolSurfaces",
+    "coveragePolicy",
+}
 SOURCE_BUILD_FIELDS=set(publication.TOP_FIELDS)
 
 
@@ -105,13 +119,17 @@ def check_operational_semantics_contract()->list[str]:
     if not isinstance(contract,dict):return errors+["SEMANTIC_REGISTRY_CONTRACT_MISSING"]
     if contract.get("semanticValidator")!="tools.semantics.registry.validate_registry":errors.append("SEMANTIC_REGISTRY_VALIDATOR_MISMATCH")
     schema=_schema_for(contract)
-    if schema.get("title")!="OperationalSemantics 0.2":errors.append("SEMANTIC_REGISTRY_SCHEMA_TITLE_MISMATCH")
+    if schema.get("title")!="OperationalSemantics 0.3":errors.append("SEMANTIC_REGISTRY_SCHEMA_TITLE_MISMATCH")
     properties=_properties(schema)
     if set(properties)!=SEMANTIC_TOP_FIELDS:errors.append("SEMANTIC_REGISTRY_SCHEMA_FIELDS_MISMATCH")
     if _required(schema)!=SEMANTIC_TOP_FIELDS:errors.append("SEMANTIC_REGISTRY_SCHEMA_REQUIRED_MISMATCH")
     schema_version=properties.get("schemaVersion") if isinstance(properties.get("schemaVersion"),dict) else {}
     if schema_version.get("const")!=registry.get("schemaVersion"):errors.append("SEMANTIC_REGISTRY_SCHEMA_VERSION_MISMATCH")
     component_schema=properties.get("components") if isinstance(properties.get("components"),dict) else {};component_item=component_schema.get("additionalProperties") if isinstance(component_schema.get("additionalProperties"),dict) else {};required_component=set(component_item.get("required") or []);expected_component={"module","owner","kind","sideEffects","readsAuthorities","writesAuthorities","readsResources","writesResources","produces","canonicalWriterFor","delegatesTo"}
+    if "$ref" in component_item:
+        defs=schema.get("$defs") if isinstance(schema.get("$defs"),dict) else {}
+        component_item=defs.get("component") if isinstance(defs.get("component"),dict) else {}
+        required_component=set(component_item.get("required") or [])
     if required_component!=expected_component:errors.append("SEMANTIC_COMPONENT_SCHEMA_REQUIRED_MISMATCH")
     return errors
 
@@ -124,6 +142,31 @@ def check_semantic_foundations_contract()->list[str]:
     if set(properties)!=foundations.TOP_FIELDS or _required(schema)!=foundations.TOP_FIELDS:errors.append("SEMANTIC_FOUNDATIONS_SCHEMA_FIELDS_MISMATCH")
     runtime_errors=foundations.validate_foundations()
     if runtime_errors:errors.append(f"SEMANTIC_FOUNDATIONS_RUNTIME_INVALID:{runtime_errors[0]}")
+    return errors
+
+def check_ecosystem_maxims_contract()->list[str]:
+    contract,errors=_contract("ecosystem-maxims","tools.semantics.maxims.validate_catalog")
+    if contract is None:return errors
+    schema=_schema_for(contract);properties=_properties(schema)
+    if schema.get("title")!=maxims.SCHEMA_VERSION:errors.append("SEMANTIC_ECOSYSTEM_MAXIMS_SCHEMA_TITLE_MISMATCH")
+    if schema.get("additionalProperties") is not False:errors.append("SEMANTIC_ECOSYSTEM_MAXIMS_SCHEMA_OPEN_ROOT")
+    if set(properties)!=maxims.TOP_FIELDS or _required(schema)!=maxims.TOP_FIELDS:errors.append("SEMANTIC_ECOSYSTEM_MAXIMS_SCHEMA_FIELDS_MISMATCH")
+    runtime_errors=maxims.validate_catalog()
+    if runtime_errors:errors.append(f"SEMANTIC_ECOSYSTEM_MAXIMS_RUNTIME_INVALID:{runtime_errors[0]}")
+    return errors
+
+def check_operational_semantics_coverage_contract()->list[str]:
+    contract,errors=_contract("operational-semantics-coverage","tools.semantics.coverage.validate_inspection")
+    if contract is None:return errors
+    schema=_schema_for(contract);properties=_properties(schema)
+    expected={"schemaVersion","operationalSemanticsHash","catalogCounts","findings","coverageComplete","readOnly","semanticAuthority","authorizesMutation","inspectionHash"}
+    if schema.get("title")!=coverage.SCHEMA_VERSION:errors.append("SEMANTIC_OPERATIONAL_COVERAGE_SCHEMA_TITLE_MISMATCH")
+    if schema.get("additionalProperties") is not False:errors.append("SEMANTIC_OPERATIONAL_COVERAGE_SCHEMA_OPEN_ROOT")
+    if set(properties)!=expected or _required(schema)!=expected:errors.append("SEMANTIC_OPERATIONAL_COVERAGE_SCHEMA_FIELDS_MISMATCH")
+    inspection=coverage.build_inspection()
+    try:coverage.validate_inspection(inspection)
+    except RuntimeError as exc:errors.append(f"SEMANTIC_OPERATIONAL_COVERAGE_RUNTIME_INVALID:{exc}")
+    if not inspection.get("coverageComplete"):errors.append("SEMANTIC_OPERATIONAL_COVERAGE_INCOMPLETE")
     return errors
 
 def check_roadmap_freshness_contract()->list[str]:
@@ -217,4 +260,4 @@ def check_transition_receipt_contract()->list[str]:
     return errors
 
 def check_contracts()->list[str]:
-    errors=check_schema_registry_coverage();errors.extend(check_capability_gates_contract());errors.extend(check_continuation_state_contract());errors.extend(check_coordination_state_contract());errors.extend(check_operational_semantics_contract());errors.extend(check_roadmap_freshness_contract());errors.extend(check_semantic_foundations_contract());errors.extend(check_source_build_contract());errors.extend(check_project_state_contract());errors.extend(check_transition_plan_contract());errors.extend(check_transition_receipt_contract());return errors
+    errors=check_schema_registry_coverage();errors.extend(check_capability_gates_contract());errors.extend(check_continuation_state_contract());errors.extend(check_coordination_state_contract());errors.extend(check_ecosystem_maxims_contract());errors.extend(check_operational_semantics_contract());errors.extend(check_operational_semantics_coverage_contract());errors.extend(check_roadmap_freshness_contract());errors.extend(check_semantic_foundations_contract());errors.extend(check_source_build_contract());errors.extend(check_project_state_contract());errors.extend(check_transition_plan_contract());errors.extend(check_transition_receipt_contract());return errors

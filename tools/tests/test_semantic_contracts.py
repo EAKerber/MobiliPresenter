@@ -7,6 +7,8 @@ from tools import capability_gates
 from tools.semantics.contracts import (
     check_capability_gates_contract,
     check_coordination_state_contract,
+    check_ecosystem_maxims_contract,
+    check_operational_semantics_coverage_contract,
     check_project_state_contract,
     check_roadmap_freshness_contract,
     check_schema_registry_coverage,
@@ -54,6 +56,12 @@ class SemanticContractTests(unittest.TestCase):
 
     def test_semantic_foundations_contract_is_conformant(self):
         self.assertEqual([], check_semantic_foundations_contract())
+
+    def test_ecosystem_maxims_contract_is_conformant(self):
+        self.assertEqual([], check_ecosystem_maxims_contract())
+
+    def test_operational_semantics_coverage_contract_is_conformant(self):
+        self.assertEqual([], check_operational_semantics_coverage_contract())
 
     def test_roadmap_freshness_contract_is_conformant(self):
         self.assertEqual([], check_roadmap_freshness_contract())

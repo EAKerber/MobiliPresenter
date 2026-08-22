@@ -28,6 +28,17 @@ jobs:
         run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
       - name: Semantic contracts
         run: python -m tools.semantics check --json
+      - name: Operational semantics coverage
+        run: |
+          python -m tools.semantics coverage --json > /tmp/operational-semantics-coverage.json
+          python -m json.tool /tmp/operational-semantics-coverage.json > /dev/null
+      - name: Upload operational semantics coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operational-semantics-coverage
+          path: /tmp/operational-semantics-coverage.json
+          if-no-files-found: error
       - name: Roadmap freshness coverage
         if: github.event_name == 'pull_request'
         run: |

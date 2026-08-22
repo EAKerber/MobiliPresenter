@@ -1,26 +1,692 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/operational-semantics-0.2.json",
-  "title": "OperationalSemantics 0.2",
+  "$id": "https://mobilipresenter.local/schemas/operational-semantics-0.3.json",
+  "title": "OperationalSemantics 0.3",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "owners", "concepts", "contracts", "branchGrammar", "managedAuthorities", "resources", "components"],
+  "required": [
+    "schemaVersion",
+    "owners",
+    "concepts",
+    "contracts",
+    "branchGrammar",
+    "managedAuthorities",
+    "resources",
+    "components",
+    "facetVocabulary",
+    "logicalCapabilities",
+    "providerProfiles",
+    "toolSurfaces",
+    "coveragePolicy"
+  ],
   "properties": {
-    "schemaVersion": {"const": "OperationalSemantics 0.2"},
-    "owners": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["description"], "properties": {"description": {"type": "string", "minLength": 1}}}},
-    "concepts": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["term", "kind", "owner", "definition"], "properties": {"term": {"type": "string", "minLength": 1}, "kind": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "definition": {"type": "string", "minLength": 1}, "related": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "aliases": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["term", "scope", "status"], "properties": {"term": {"type": "string", "minLength": 1}, "scope": {"type": "string", "minLength": 1}, "status": {"enum": ["legacy", "supported"]}, "retireBy": {"type": "string", "minLength": 1}}}}}}},
-    "contracts": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["owner", "semanticValidator", "structuralSchema"], "properties": {"owner": {"type": "string", "minLength": 1}, "semanticValidator": {"type": "string", "minLength": 1}, "structuralSchema": {"type": "string", "minLength": 1}}}},
-    "branchGrammar": {"type": "object", "additionalProperties": false, "required": ["controlBranches", "canonical", "legacyNamespaces"], "properties": {"controlBranches": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "canonical": {"type": "object", "additionalProperties": false, "required": ["authority", "experiment", "work"], "properties": {"authority": {"type": "string", "minLength": 1}, "experiment": {"type": "string", "minLength": 1}, "work": {"type": "string", "minLength": 1}}}, "legacyNamespaces": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
-    "managedAuthorities": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["owner", "mutable", "locator", "requiresCanonicalWriter"], "properties": {"owner": {"type": "string", "minLength": 1}, "mutable": {"type": "boolean"}, "requiresCanonicalWriter": {"type": "boolean"}, "locator": {"$ref": "#/$defs/locator"}}}},
-    "resources": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["owner", "locator"], "properties": {"owner": {"type": "string", "minLength": 1}, "locator": {"$ref": "#/$defs/locator"}}}},
-    "components": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["module", "owner", "kind", "sideEffects", "readsAuthorities", "writesAuthorities", "readsResources", "writesResources", "produces", "canonicalWriterFor", "delegatesTo"], "properties": {"module": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "kind": {"enum": ["authority-executor", "cli-adapter", "inspection", "recommendation", "routing-planner", "sanitization-executor", "sanitization-planner"]}, "sideEffects": {"type": "boolean"}, "readsAuthorities": {"$ref": "#/$defs/idList"}, "writesAuthorities": {"$ref": "#/$defs/idList"}, "readsResources": {"$ref": "#/$defs/idList"}, "writesResources": {"$ref": "#/$defs/idList"}, "produces": {"$ref": "#/$defs/idList"}, "canonicalWriterFor": {"$ref": "#/$defs/idList"}, "delegatesTo": {"$ref": "#/$defs/idList"}}}}
+    "schemaVersion": {
+      "const": "OperationalSemantics 0.3"
+    },
+    "owners": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/owner"
+      }
+    },
+    "concepts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/concept"
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/contract"
+      }
+    },
+    "branchGrammar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controlBranches",
+        "canonical",
+        "legacyNamespaces"
+      ],
+      "properties": {
+        "controlBranches": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "canonical": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "experiment",
+            "work"
+          ],
+          "properties": {
+            "authority": {
+              "type": "string",
+              "minLength": 1
+            },
+            "experiment": {
+              "type": "string",
+              "minLength": 1
+            },
+            "work": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "legacyNamespaces": {
+          "$ref": "#/$defs/idList"
+        }
+      }
+    },
+    "managedAuthorities": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner",
+          "mutable",
+          "locator",
+          "requiresCanonicalWriter"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutable": {
+            "type": "boolean"
+          },
+          "locator": {
+            "$ref": "#/$defs/locator"
+          },
+          "requiresCanonicalWriter": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner",
+          "locator"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1
+          },
+          "locator": {
+            "$ref": "#/$defs/locator"
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/component"
+      }
+    },
+    "facetVocabulary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "roles",
+        "intentClasses",
+        "lifecyclePhases",
+        "operations",
+        "objects",
+        "riskClasses",
+        "scopes"
+      ],
+      "properties": {
+        "roles": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "intentClasses": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "lifecyclePhases": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "operations": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "objects": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "riskClasses": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "scopes": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        }
+      }
+    },
+    "logicalCapabilities": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/logicalCapability"
+      }
+    },
+    "providerProfiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/providerProfile"
+      }
+    },
+    "toolSurfaces": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/toolSurface"
+      }
+    },
+    "coveragePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entrypointGlobs",
+        "workflowGlobs",
+        "exclusions"
+      ],
+      "properties": {
+        "entrypointGlobs": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "workflowGlobs": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/coverageExclusion"
+          }
+        }
+      }
+    }
   },
   "$defs": {
-    "idList": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-    "locator": {"oneOf": [
-      {"type": "object", "additionalProperties": false, "required": ["kind", "path"], "properties": {"kind": {"enum": ["repository-file", "repository-directory"]}, "path": {"type": "string", "minLength": 1}}},
-      {"type": "object", "additionalProperties": false, "required": ["kind", "branch", "path"], "properties": {"kind": {"const": "git-authority"}, "branch": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}}},
-      {"type": "object", "additionalProperties": false, "required": ["kind", "repository"], "properties": {"kind": {"const": "github-git-refs"}, "repository": {"type": "string", "minLength": 1}}}
-    ]}
+    "idList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nonEmptyIdList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "repository-file",
+                "repository-directory"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "branch",
+            "path"
+          ],
+          "properties": {
+            "kind": {
+              "const": "git-authority"
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "repository"
+          ],
+          "properties": {
+            "kind": {
+              "const": "github-git-refs"
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "term",
+        "kind",
+        "owner",
+        "definition"
+      ],
+      "properties": {
+        "term": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "related": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "term",
+              "scope",
+              "status"
+            ],
+            "properties": {
+              "term": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "legacy",
+                  "supported"
+                ]
+              },
+              "retireBy": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "semanticValidator",
+        "structuralSchema"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semanticValidator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structuralSchema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "owner",
+        "kind",
+        "sideEffects",
+        "readsAuthorities",
+        "writesAuthorities",
+        "readsResources",
+        "writesResources",
+        "produces",
+        "canonicalWriterFor",
+        "delegatesTo"
+      ],
+      "properties": {
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "authority-executor",
+            "cli-adapter",
+            "inspection",
+            "mutation-planner",
+            "recommendation",
+            "routing-planner",
+            "sanitization-executor",
+            "sanitization-planner"
+          ]
+        },
+        "sideEffects": {
+          "type": "boolean"
+        },
+        "readsAuthorities": {
+          "$ref": "#/$defs/idList"
+        },
+        "writesAuthorities": {
+          "$ref": "#/$defs/idList"
+        },
+        "readsResources": {
+          "$ref": "#/$defs/idList"
+        },
+        "writesResources": {
+          "$ref": "#/$defs/idList"
+        },
+        "produces": {
+          "$ref": "#/$defs/idList"
+        },
+        "canonicalWriterFor": {
+          "$ref": "#/$defs/idList"
+        },
+        "delegatesTo": {
+          "$ref": "#/$defs/idList"
+        }
+      }
+    },
+    "facets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "roles",
+        "intentClasses",
+        "lifecyclePhases",
+        "operations",
+        "objects",
+        "riskClasses"
+      ],
+      "properties": {
+        "roles": {
+          "$ref": "#/$defs/idList"
+        },
+        "intentClasses": {
+          "$ref": "#/$defs/idList"
+        },
+        "lifecyclePhases": {
+          "$ref": "#/$defs/idList"
+        },
+        "operations": {
+          "$ref": "#/$defs/idList"
+        },
+        "objects": {
+          "$ref": "#/$defs/idList"
+        },
+        "riskClasses": {
+          "$ref": "#/$defs/idList"
+        }
+      }
+    },
+    "logicalCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "description",
+        "availabilityClass",
+        "facets",
+        "requiredAuthorities",
+        "requiredScopes",
+        "preconditions",
+        "providerRequirements",
+        "toolSurfaces",
+        "fallbackPolicy"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availabilityClass": {
+          "enum": [
+            "contextual",
+            "repository-static",
+            "runtime-observed"
+          ]
+        },
+        "facets": {
+          "$ref": "#/$defs/facets"
+        },
+        "requiredAuthorities": {
+          "$ref": "#/$defs/idList"
+        },
+        "requiredScopes": {
+          "$ref": "#/$defs/idList"
+        },
+        "preconditions": {
+          "$ref": "#/$defs/idList"
+        },
+        "providerRequirements": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/nonEmptyIdList"
+          }
+        },
+        "toolSurfaces": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "fallbackPolicy": {
+          "enum": [
+            "equivalent-only",
+            "forbidden",
+            "not-applicable"
+          ]
+        }
+      }
+    },
+    "providerProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "observationClass",
+        "featureVocabulary"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observationClass": {
+          "enum": [
+            "artifact",
+            "connected",
+            "local",
+            "workflow"
+          ]
+        },
+        "featureVocabulary": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetKind",
+        "target",
+        "capabilities"
+      ],
+      "properties": {
+        "targetKind": {
+          "enum": [
+            "component",
+            "external",
+            "workflow"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilities": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        }
+      }
+    },
+    "toolSurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "kind",
+        "provider",
+        "locator",
+        "features",
+        "bindings",
+        "sideEffects"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "artifact",
+            "cli",
+            "connector",
+            "workflow"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "features": {
+          "$ref": "#/$defs/nonEmptyIdList"
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        },
+        "sideEffects": {
+          "type": "boolean"
+        }
+      }
+    },
+    "coverageExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "owner",
+        "reason",
+        "deathCondition"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deathCondition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
   }
 }
