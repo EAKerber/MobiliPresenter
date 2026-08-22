@@ -2,17 +2,18 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m11-canonical-coordination-surface-0-1",
   "workerId": "manager-gitops-primary",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/m11-cv1b-coordination-transition-0.1",
-  "prNumber": null,
+  "prNumber": 136,
   "dependsOn": [
     "m11-convergence-coverage-0-1"
   ],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "define-coordination-transition-contract",
     "implement-plan-rebuild-validation",
-    "implement-canonical-executor-apply-and-receipt",
+    "implement-canonical-executor-apply-and-receipt"
+  ],
+  "remaining": [
     "qualify-transition-protocol",
     "implement-canonical-coordination-cli",
     "reduce-lock-to-compatibility-wrapper",
@@ -21,7 +22,7 @@
     "validate-and-integrate",
     "reconcile-cv1b-state"
   ],
-  "nextAction": "define-coordination-transition-contract",
+  "nextAction": "qualify-transition-protocol",
   "lastKnownGood": {
     "sha": "3022efe1a3fa6e43c081d2c59002d6cba72e4d93",
     "checkpoint": "M11-CV1A-CONVERGENCE-COVERAGE-0.1-CLOSED"
