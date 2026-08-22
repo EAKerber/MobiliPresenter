@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-primary",
   "status": "IN_PROGRESS",
   "branch": "work/operations/m10-agent-cycle-close-0.1",
-  "prNumber": null,
+  "prNumber": 132,
   "dependsOn": [
     "m10-agent-cycle-entry-0-1"
   ],
