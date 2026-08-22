@@ -11,15 +11,46 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools import agent_commands as _commands
-from tools import agent_cycle_close
+from tools.canonical import stable_hash
 
-# Re-export the established toolbox surface. The command implementation moved as
-# one blob so the public facade can grow without duplicating operational logic.
-for _name in dir(_commands):
-    if _name not in {"main"}:
-        globals()[_name] = getattr(_commands, _name)
+ERROR_EXIT = 2
+TOOLBOX_COMMANDS = {
+    "begin", "close", "status", "doctor", "verify", "checkpoint", "handoff",
+    "git prune-plan", "git mutation-plan",
+}
 
-TOOLBOX_COMMANDS = set(_commands.TOOLBOX_COMMANDS) | {"close"}
+
+def __getattr__(name):
+    """Lazily preserve the established toolbox/helper surface.
+
+    project_sensors imports tools.agent while agent_commands is still being
+    initialized. Avoid reading the implementation package during that cycle;
+    later attribute access resolves against the completed implementation.
+    """
+    try:
+        return getattr(_commands, name)
+    except AttributeError as exc:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+
+
+def _state_and_publication():
+    return _commands._state_and_publication()
+
+
+def project_summary(view):
+    return _commands.project_summary(view)
+
+
+def observed_git():
+    return _commands.observed_git()
+
+
+def verify_state():
+    return _commands.verify_state()
+
+
+def recent_commits(control_branch):
+    return _commands.recent_commits(control_branch)
 
 
 def command_status(as_json):
@@ -75,6 +106,7 @@ def command_handoff(as_json):
 
 def main():
     if len(sys.argv) >= 2 and sys.argv[1] == "close":
+        from tools import agent_cycle_close
         return agent_cycle_close.main(sys.argv[2:])
     return _commands.main()
 
