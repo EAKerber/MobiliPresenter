@@ -13,15 +13,14 @@
     "implement-agent-cycle-delta-and-receipt",
     "implement-agent-close-facade",
     "update-role-contract-and-documentation",
-    "validate-and-integrate"
-  ],
-  "remaining": [
+    "validate-and-integrate",
     "close-m10-and-reconcile-state"
   ],
-  "nextAction": "close-m10-and-reconcile-state",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "001163e4d18399a3c7a47f21fa1c761acef3cb65",
-    "checkpoint": null
+    "sha": "16d207bc6de9e58677f32cba9ccf5e7a79eee7ef",
+    "checkpoint": "M10-OPERATIONAL-SEMANTICS-0.3-CLOSED"
   },
   "blockers": [],
   "handoffToWorkerId": null
