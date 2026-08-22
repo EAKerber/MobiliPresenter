@@ -3,8 +3,8 @@
   "id": "m10-agent-cycle-close-0-1",
   "workerId": "manager-gitops-primary",
   "status": "IN_PROGRESS",
-  "branch": "work/operations/m10-agent-cycle-close-0.1",
-  "prNumber": 132,
+  "branch": "work/operations/m10-operational-semantics-closure-0.3",
+  "prNumber": null,
   "dependsOn": [
     "m10-agent-cycle-entry-0-1"
   ],
