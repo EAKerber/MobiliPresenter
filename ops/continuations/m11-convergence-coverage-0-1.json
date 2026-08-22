@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "m11-convergence-coverage-0-1",
+  "workerId": "manager-gitops-primary",
+  "status": "READY",
+  "branch": "work/operations/m11-convergence-coverage-0.1",
+  "prNumber": null,
+  "dependsOn": [
+    "m10-agent-cycle-close-0-1"
+  ],
+  "completed": [],
+  "remaining": [
+    "define-convergence-inspection-contract",
+    "implement-static-consumer-coverage",
+    "compose-runtime-residue-evidence",
+    "close-current-document-blind-spots",
+    "integrate-convergence-ci-gate",
+    "validate-and-integrate",
+    "reconcile-cv1a-state"
+  ],
+  "nextAction": "define-convergence-inspection-contract",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
