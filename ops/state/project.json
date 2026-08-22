@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M10-OS1B-AGENT-CYCLE-ENTRY-0.1-CLOSED",
-    "nextTransition": "implement-agent-cycle-close-protocol-0.1"
+    "checkpoint": "M10-OPERATIONAL-SEMANTICS-0.3-CLOSED",
+    "nextTransition": "converge-m11-coordination-aliases-and-residues-v0.1"
   }
 }
