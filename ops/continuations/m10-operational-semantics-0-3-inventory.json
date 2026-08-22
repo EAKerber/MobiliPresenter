@@ -1,17 +1,7 @@
 {
   "blockers": [],
   "branch": "work/operations/m10-operational-semantics-0.3-inventory",
-  "completed": [],
-  "dependsOn": [],
-  "handoffToWorkerId": null,
-  "id": "m10-operational-semantics-0-3-inventory",
-  "lastKnownGood": {
-    "checkpoint": null,
-    "sha": null
-  },
-  "nextAction": "admit work and create governed branch",
-  "prNumber": 129,
-  "remaining": [
+  "completed": [
     "admit-and-branch",
     "migrate-registry-schema",
     "catalog-capabilities-and-surfaces",
@@ -20,7 +10,17 @@
     "document-and-integrate-ci",
     "validate-and-integrate"
   ],
+  "dependsOn": [],
+  "handoffToWorkerId": null,
+  "id": "m10-operational-semantics-0-3-inventory",
+  "lastKnownGood": {
+    "checkpoint": "M10-OS1A-INVENTORY-0.3-CLOSED",
+    "sha": "f9c2206e912ab7b121d7e04e19cc9fb1b1c43b02"
+  },
+  "nextAction": null,
+  "prNumber": 129,
+  "remaining": [],
   "schemaVersion": "ContinuationState 0.2",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "workerId": "manager-gitops-primary"
 }
