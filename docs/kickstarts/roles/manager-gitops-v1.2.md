@@ -64,7 +64,7 @@ Brief stale permanece informativo, mas não prova availability. `UNKNOWN` nunca 
 
 ## Fechamento obrigatório do Agent Cycle
 
-Toda execução iniciada por `agent begin` deve preservar o context emitido e terminar por `agent close` depois do trabalho:
+Toda execução iniciada por `agent begin` deve preservar o context emitido e terminar por `agent close` depois do trabalho. A obrigação explícita emitida pelo begin é `CLOSE_REQUIRED_AFTER_WORK` e só é satisfeita por um fechamento com receipt verificável ou estado `UNKNOWN/BLOCKED` explicitado.
 
 ```bash
 python3 tools/agent.py close \
