@@ -39,7 +39,7 @@ Fontes preservadas:
 |---|---|---|
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
 | M9 | Technical Dictionary, Semantic Scope, Determinism Contract e Roadmap Freshness Guard | fechado por M9-SF1 + M9-FG1; contratos e coverage read-only integrados |
-| M10 | `OperationalSemantics 0.3` e cobertura integral | próxima transição; registry corrente permanece 0.2 |
+| M10 | `OperationalSemantics 0.3` e cobertura integral | OS1A fecha o inventário 0.3; AgentSemanticBrief e freshness permanecem em OS1B |
 | M11 | convergência de `lock`, aliases, triggers e resíduos | planejado; implementação não iniciada |
 | M12 | remote canonical execution e maturity proof | S1 terminou `CLOSED_DEFERRED`; bridge e novo proof estão planejados, não aprovados |
 | M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M9–M12 |
@@ -96,15 +96,17 @@ Ele incorpora ao Semantic Scope:
 
 O plano foi concluído. M9-SF1 e M9-FG1 estão fechados. A sequência restante é:
 
-1. M10-OS1 promove OperationalSemantics para 0.3 e implementa o
-   `AgentSemanticBrief` sem criar authority.
-2. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
+1. M10-OS1A promove OperationalSemantics para 0.3, fecha descriptors tipados,
+   catálogo de máximas e coverage integral sem criar authority.
+2. M10-OS1B implementa o `AgentSemanticBrief`, seleção contextual e freshness;
+   somente então M10 pode fechar.
+3. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
    consumidores.
-3. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
-4. M12-S2 repete o maturity proof somente depois dessa qualificação.
-5. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
+4. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
+5. M12-S2 repete o maturity proof somente depois dessa qualificação.
+6. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
    read-only.
-6. Só então PCS-01B pode ser reavaliado para admissão.
+7. Só então PCS-01B pode ser reavaliado para admissão.
 
 Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
 de contrato e uma qualificação manual branch-confined com planner e readback
@@ -112,10 +114,11 @@ canônicos.
 
 ## 5. Lacunas conhecidas cobertas pelo plano M9–M13
 
-- registry permanece intencionalmente em `OperationalSemantics 0.2` até M10;
-- os contratos de `AgentSemanticBrief`, `CapabilityRelevanceProjection` e
-  `EcosystemMaxim` estão fechados, mas gerador, catálogo versionado e validator
-  runtime pertencem a M10;
+- registry 0.3, descriptors tipados, catálogo versionado de
+  `EcosystemMaxim` e coverage integral pertencem a M10-OS1A;
+- os contratos de `AgentSemanticBrief` e `CapabilityRelevanceProjection`
+  estão fechados, mas gerador, validator runtime, seleção contextual e freshness
+  permanecem em M10-OS1B;
 - `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` está contratado e ainda depende da
   implementação do brief em M10;
 - `tools/lock.py` ainda não convergiu para alias fino da Coordination canônica;
