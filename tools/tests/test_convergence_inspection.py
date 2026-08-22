@@ -67,6 +67,43 @@ def without_lock_surface(registry):
     return value
 
 
+def with_lock_surface(registry):
+    """Build an explicit pre-retirement fixture independent of the live registry."""
+    value = copy.deepcopy(registry)
+    value["concepts"]["coordination.lease"]["aliases"] = [
+        {"term": "lock", "scope": "cli-name", "status": "legacy", "retireBy": "M11"}
+    ]
+    value["components"]["coordination-lock-cli"] = {
+        "module": "tools.lock",
+        "owner": "coordination",
+        "kind": "cli-adapter",
+        "sideEffects": True,
+        "readsAuthorities": ["coordination-leases"],
+        "writesAuthorities": [],
+        "readsResources": [],
+        "writesResources": [],
+        "produces": [],
+        "canonicalWriterFor": [],
+        "delegatesTo": ["coordination-cli"],
+    }
+    value["components"] = {
+        key: value["components"][key] for key in sorted(value["components"])
+    }
+    bindings = value["toolSurfaces"]["python-module-cli"]["bindings"]
+    if not any(item.get("target") == "coordination-lock-cli" for item in bindings):
+        binding = {
+            "targetKind": "component",
+            "target": "coordination-lock-cli",
+            "capabilities": ["coordination.mutate"],
+        }
+        insert_at = next(
+            (index + 1 for index, item in enumerate(bindings) if item.get("target") == "coordination-cli"),
+            len(bindings),
+        )
+        bindings.insert(insert_at, binding)
+    return value
+
+
 class ConvergenceInspectionTests(unittest.TestCase):
     def inputs(self):
         texts = {
@@ -104,7 +141,7 @@ class ConvergenceInspectionTests(unittest.TestCase):
             {"path": path, "contentHash": "0" * 64}
             for path in sorted(texts)
         ]
-        return load_registry(), records, texts, complete_prune_plan()
+        return with_lock_surface(load_registry()), records, texts, complete_prune_plan()
 
     def build(self, registry=None, texts=None, prune=None):
         current_registry, records, current_texts, current_prune = self.inputs()
