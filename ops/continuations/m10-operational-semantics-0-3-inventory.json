@@ -1,0 +1,26 @@
+{
+  "blockers": [],
+  "branch": "work/operations/m10-operational-semantics-0.3-inventory",
+  "completed": [],
+  "dependsOn": [],
+  "handoffToWorkerId": null,
+  "id": "m10-operational-semantics-0-3-inventory",
+  "lastKnownGood": {
+    "checkpoint": null,
+    "sha": null
+  },
+  "nextAction": "admit work and create governed branch",
+  "prNumber": null,
+  "remaining": [
+    "admit-and-branch",
+    "migrate-registry-schema",
+    "catalog-capabilities-and-surfaces",
+    "catalog-maxims",
+    "implement-semantic-coverage",
+    "document-and-integrate-ci",
+    "validate-and-integrate"
+  ],
+  "schemaVersion": "ContinuationState 0.2",
+  "status": "READY",
+  "workerId": "manager-gitops-primary"
+}
