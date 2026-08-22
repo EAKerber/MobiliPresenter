@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m11-canonical-coordination-surface-0-1",
   "workerId": "manager-gitops-primary",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/m11-cv1b-reconcile-0.1",
   "prNumber": 138,
   "dependsOn": [
@@ -17,15 +17,14 @@
     "reduce-lock-to-compatibility-wrapper",
     "update-operational-semantics-and-documentation",
     "rebuild-convergence-evidence",
-    "validate-and-integrate"
-  ],
-  "remaining": [
+    "validate-and-integrate",
     "reconcile-cv1b-state"
   ],
-  "nextAction": "reconcile-cv1b-state",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "309ef9dc04e689025f78219825a1fbd08512d191",
-    "checkpoint": "M11-CV1B-CANONICAL-COORDINATION-SURFACE-0.1-INTEGRATED"
+    "sha": "7e74c7a71a2e81930b8b78b85617f2cca656890d",
+    "checkpoint": "M11-CV1B-CANONICAL-COORDINATION-SURFACE-0.1-CLOSED"
   },
   "blockers": [],
   "handoffToWorkerId": null
