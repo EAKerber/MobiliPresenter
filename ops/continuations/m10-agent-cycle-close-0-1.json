@@ -12,15 +12,15 @@
     "define-agent-cycle-close-contract",
     "implement-agent-cycle-delta-and-receipt",
     "implement-agent-close-facade",
-    "update-role-contract-and-documentation"
+    "update-role-contract-and-documentation",
+    "validate-and-integrate"
   ],
   "remaining": [
-    "validate-and-integrate",
     "close-m10-and-reconcile-state"
   ],
-  "nextAction": "validate-and-integrate",
+  "nextAction": "close-m10-and-reconcile-state",
   "lastKnownGood": {
-    "sha": null,
+    "sha": "001163e4d18399a3c7a47f21fa1c761acef3cb65",
     "checkpoint": null
   },
   "blockers": [],
