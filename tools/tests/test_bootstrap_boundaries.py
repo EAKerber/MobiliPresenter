@@ -29,6 +29,23 @@ class BootstrapBoundaryTests(unittest.TestCase):
                 self.assertTrue(target.is_file(), f"missing current target: {target.name}")
                 self.assertNotEqual(current_path, target)
 
+    def test_current_role_pointers_do_not_copy_mutable_project_direction(self):
+        current_paths = sorted(ROLE_DIR.glob("*-current.md"))
+        self.assertTrue(current_paths)
+        forbidden = (
+            re.compile(r"\bcheckpoint\b", re.IGNORECASE),
+            re.compile(r"\bnextTransition\b", re.IGNORECASE),
+            re.compile(r"\bnext declared transition\b", re.IGNORECASE),
+        )
+        for current_path in current_paths:
+            text = current_path.read_text(encoding="utf-8")
+            for pattern in forbidden:
+                with self.subTest(current=current_path.name, pattern=pattern.pattern):
+                    self.assertIsNone(
+                        pattern.search(text),
+                        f"{current_path.name} must locate role contracts, not copy mutable ProjectState direction",
+                    )
+
     def test_current_bootstrap_has_no_retired_operational_surfaces_or_delta_chain(self):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         current_path = ROLE_DIR / "manager-gitops-current.md"

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from tools.semantics.branches import parse_branch_name
 from tools.semantics.contracts import check_contracts
+from tools.semantics.convergence import build_inspection as build_convergence_inspection
+from tools.semantics.convergence import load_prune_plan, validate_inspection as validate_convergence_inspection
 from tools.semantics.coverage import build_inspection
 from tools.semantics.maxims import maxim
 from tools.semantics.registry import (
@@ -81,6 +84,10 @@ def parser() -> argparse.ArgumentParser:
     coverage_parser = sub.add_parser("coverage")
     coverage_parser.add_argument("--json", action="store_true", dest="as_json")
 
+    convergence = sub.add_parser("convergence")
+    convergence.add_argument("--prune-plan", required=True)
+    convergence.add_argument("--json", action="store_true", dest="as_json")
+
     check = sub.add_parser("check")
     check.add_argument("--json", action="store_true", dest="as_json")
 
@@ -112,6 +119,11 @@ def main(argv=None) -> int:
             payload = build_inspection()
             _emit(payload, args.as_json)
             return 0 if payload["coverageComplete"] else ERROR_EXIT
+        elif args.command == "convergence":
+            payload = build_convergence_inspection(load_prune_plan(Path(args.prune_plan)))
+            validate_convergence_inspection(payload)
+            _emit(payload, args.as_json)
+            return 0 if payload["coverageComplete"] and not payload["residues"] else ERROR_EXIT
         elif args.command == "branch":
             payload = parse_branch_name(args.name)
         else:

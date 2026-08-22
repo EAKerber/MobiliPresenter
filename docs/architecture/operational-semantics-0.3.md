@@ -1,6 +1,6 @@
 # OperationalSemantics 0.3 — typed inventory and contextual entry
 
-Status: **M10-OS1A inventory implemented; M10-OS1B Agent Cycle Entry implemented on this branch; M10 remains open for OS1C closure**.
+Status: **M10 closed. OperationalSemantics 0.3, Agent Cycle Entry and Agent Cycle Close/receipt are integrated; M11 convergence is the next infrastructure stage.**
 
 ## Purpose
 
@@ -22,7 +22,7 @@ Only runtime-observed descriptors are resolved by `RuntimeCapabilityInspection 0
 
 An intent facet says that a capability is semantically relevant to an intent; it does not by itself mean the capability is mandatory.
 
-M10-OS1B therefore records required capabilities explicitly in the SemanticFoundations contract. Unlisted matching capabilities use the closed default `relevant`.
+Required capabilities are recorded explicitly in the SemanticFoundations contract. Unlisted matching capabilities use the closed default `relevant`.
 
 Required capabilities remain visible even when provider observation or scope is insufficient.
 
@@ -36,22 +36,35 @@ Required capabilities remain visible even when provider observation or scope is 
 
 ## EcosystemMaxims
 
-The eight maxims remain versioned in `ops/semantics/maxims.json`. Selection in OS1B is deterministic. Maxims may influence recommendation ordering only; they never alter availability, eligibility, scope, authority or permission.
+The eight maxims remain versioned in `ops/semantics/maxims.json`. Selection is deterministic. Maxims may influence recommendation ordering only; they never alter availability, eligibility, scope, authority or permission.
 
-## Agent Cycle Entry
+## Agent Cycle
 
-`python3 tools/agent.py begin` is now the intended composition facade for bootstrap. It builds one `AgentCycleContext 0.1` from existing canonical projections instead of requiring a worker to remember their manual order. Agent Cycle is not Routine and creates no authority. See `docs/architecture/agent-cycle-0.1.md`.
+`python3 tools/agent.py begin` is the composition facade for bootstrap. It builds one `AgentCycleContext 0.1` from existing canonical projections instead of requiring a worker to remember their manual order. Agent Cycle is not Routine and creates no authority.
+
+After work, `python3 tools/agent.py close` reobserves the same ProjectMachine scope, derives `AgentCycleDelta 0.1`, verifies attributable transition/Git evidence and emits aggregate readback plus `AgentCycleReceipt 0.1`. Durable delta without attributable evidence is `UNKNOWN`, never a silent `PASS`.
+
+See `docs/architecture/agent-cycle-0.1.md`.
 
 ## Freshness
 
 `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` binds the brief to context, OperationalSemantics, semantic coverage, EcosystemMaxims, role contract content and runtime capability observation. `STALE != FRESH` and `TAMPERED != STALE`.
 
+Role `*-current.md` files are locators for the current versioned role contract. Mutable infrastructure direction belongs to ProjectState and must not be copied into those pointers. This prevents an already-stale pointer from disappearing from value-based freshness discovery merely because it no longer contains the current value.
+
 ## Coverage
 
-OperationalSemantics coverage continues to scan policy-declared Python entrypoints and workflows, registered contracts/schemas, runtime capability descriptors and provider profiles. Internal pure composition modules do not become new invocable surfaces merely because they are Python modules. The existing `agent-cli` remains the public entrypoint.
+OperationalSemantics coverage scans policy-declared Python entrypoints and workflows, registered contracts/schemas, runtime capability descriptors and provider profiles. Internal pure composition modules do not become new invocable surfaces merely because they are Python modules. The existing `semantic-cli` and `agent-cli` remain the public composition surfaces.
+
+M11-CV1A adds `ConvergenceInspection 0.1` as an internal read-only inspection exposed through the already registered semantic CLI. It separates two questions:
+
+- `coverageStatus`: whether all required consumer classes were observed;
+- `retirementReadiness`: whether a legacy alias is actually ready to be retired.
+
+`coverageStatus=PASS` therefore does not imply `retirementReadiness=READY`. A fully observed alias may correctly remain `MIGRATION_REQUIRED`.
 
 ## Boundaries preserved
 
-M10-OS1B does not create semantic authority or a new canonical writer, persist an open-cycle state marker, implement executable `agent close`, alter Routine semantics, admit M11/M12/M13 work, retry Scheduled Task maturity proofs, or reopen PCS-01B.
+OperationalSemantics does not become a mutation authority. `ConvergenceInspection 0.1` does not retire aliases, rewrite Coordination, alter writer topology, infer external consumers from absence of repository matches, or authorize future milestones.
 
-M10-OS1C owns Agent Cycle Closure 0.1. Only after that slice may the M10 checkpoint close.
+M11 convergence must preserve the existing single-writer rule. `tools/lock.py` and the `lock`/`ops` aliases remain until their supported consumers are migrated and a later convergence slice proves retirement admissible.
