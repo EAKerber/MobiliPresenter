@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "m10-agent-cycle-close-0-1",
+  "workerId": "manager-gitops-primary",
+  "status": "READY",
+  "branch": "work/operations/m10-agent-cycle-close-0.1",
+  "prNumber": null,
+  "dependsOn": [
+    "m10-agent-cycle-entry-0-1"
+  ],
+  "completed": [],
+  "remaining": [
+    "define-agent-cycle-close-contract",
+    "implement-agent-cycle-delta-and-receipt",
+    "implement-agent-close-facade",
+    "update-role-contract-and-documentation",
+    "validate-and-integrate",
+    "close-m10-and-reconcile-state"
+  ],
+  "nextAction": "define-agent-cycle-close-contract",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
