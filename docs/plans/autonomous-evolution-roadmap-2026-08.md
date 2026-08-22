@@ -3,7 +3,7 @@
 Status: planejamento derivado, não authority  
 Data de reconciliação: 2026-08-22
 Repositório observado: `EAKerber/MobiliPresenter`  
-Entrada desta reconciliação: `main@4078ee2da62fef853d3c8a317f18612a716cfac2`
+Entrada desta reconciliação: `main@001163e4d18399a3c7a47f21fa1c761acef3cb65`
 
 Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
 `M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
@@ -39,10 +39,10 @@ Fontes preservadas:
 |---|---|---|
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
 | M9 | Technical Dictionary, Semantic Scope, Determinism Contract e Roadmap Freshness Guard | fechado por M9-SF1 + M9-FG1; contratos e coverage read-only integrados |
-| M10 | `OperationalSemantics 0.3` + Agent Cycle semântico | OS1A fecha inventário/coverage 0.3; OS1B fecha AgentSemanticBrief, freshness e Agent Cycle Entry; OS1C permanece para fechamento/receipt do ciclo |
-| M11 | convergência de `lock`, aliases, triggers e resíduos | planejado; implementação não iniciada |
+| M10 | `OperationalSemantics 0.3` + Agent Cycle semântico | fechado por OS1A + OS1B + OS1C; inventário/coverage, AgentSemanticBrief, freshness, Agent Cycle Entry e Agent Cycle Close/receipt integrados |
+| M11 | convergência de `lock`, aliases, triggers e resíduos | próximo estágio; implementação não iniciada |
 | M12 | remote canonical execution e maturity proof | S1 terminou `CLOSED_DEFERRED`; bridge e novo proof estão planejados, não aprovados |
-| M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M10–M12 |
+| M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M11–M12 |
 | M14–M16 | Hypothesis, Experiment/Deathcycle, capability e prova longa | bloqueados |
 
 M12-S1 não é mais o próximo estágio. Ele terminou com:
@@ -70,43 +70,44 @@ O plano coordenado de metadata de apresentação foi aceito sem implementar
 produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
 e escolhas/acessórios configuráveis (`PCS-02`).
 
-Estado materializado após M10-OS1B:
+Estado materializado após o fechamento de M10:
 
 ```text
-checkpoint = M10-OS1B-AGENT-CYCLE-ENTRY-0.1-CLOSED
+checkpoint = M10-OPERATIONAL-SEMANTICS-0.3-CLOSED
 phase = between-increments
-nextTransition = implement-agent-cycle-close-protocol-0.1
+nextTransition = converge-m11-coordination-aliases-and-residues-v0.1
 ```
 
 O plano PCS-01A continua recuperável e sua implementação permanece não admitida.
 O plano M9–M13 define slices, gates, checkpoints e blockers em
-`docs/plans/m9-m13-closure-v0.1.md`; o Agent Cycle detalhado em OS1B acrescenta
-OS1C como recorte obrigatório de fechamento antes da convergência M11.
+`docs/plans/m9-m13-closure-v0.1.md`.
 
-M10-OS1B materializou:
+M10 materializou:
 
+- `OperationalSemantics 0.3` com inventário/coverage integral;
 - `AgentSemanticBrief 0.1` como projeção contextual read-only;
 - `CapabilityRelevanceProjection 0.1` baseada em facetas tipadas, role,
   intenção, fase, scope e capabilities observadas;
 - `CAPABILITY_DISCOVERY_FRESHNESS_GUARD`, distinguindo `STALE` de `TAMPERED`;
 - `AgentCycleContext 0.1` e a entrada única `python3 tools/agent.py begin`;
 - `CLOSE_REQUIRED_AFTER_WORK` como obrigação explícita sem criar nova authority;
+- `agent close`, `AgentCycleDelta 0.1`, aggregate readback,
+  `AgentCycleReceipt 0.1` e `AgentCycleClosure 0.1`;
+- durable delta sem evidência atribuível como `UNKNOWN`, nunca falso `PASS`;
+- compatibilidade com contexts OS1B e baseline ligado aos artifacts embutidos;
 - `EcosystemMaxim` limitado e não autoritativo dentro do brief.
 
 ## 4. Próxima sequência deliberada
 
-M9-SF1/M9-FG1, M10-OS1A e M10-OS1B estão fechados. A sequência restante é:
+M9-SF1/M9-FG1 e M10-OS1A/OS1B/OS1C estão fechados. A sequência restante é:
 
-1. M10-OS1C implementa `agent close`, reobservação before/after,
-   `AgentCycleDelta`, aggregate readback e `AgentCycleReceipt`, sem criar
-   authority paralela aos writers correntes.
-2. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
+1. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
    consumidores.
-3. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
-4. M12-S2 repete o maturity proof somente depois dessa qualificação.
-5. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
+2. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
+3. M12-S2 repete o maturity proof somente depois dessa qualificação.
+4. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
    read-only.
-6. Só então PCS-01B pode ser reavaliado para admissão.
+5. Só então PCS-01B pode ser reavaliado para admissão.
 
 Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
 de contrato e uma qualificação manual branch-confined com planner e readback
@@ -118,8 +119,8 @@ canônicos.
   `EcosystemMaxim` e coverage integral foram fechados em M10-OS1A;
 - `AgentSemanticBrief`, `CapabilityRelevanceProjection`, seleção contextual,
   freshness e entrada única do ciclo foram fechados em M10-OS1B;
-- o fechamento obrigatório do ciclo ainda não possui `agent close`,
-  `AgentCycleDelta` nem `AgentCycleReceipt`; isso pertence a M10-OS1C;
+- `agent close`, `AgentCycleDelta`, aggregate readback e `AgentCycleReceipt`
+  foram fechados em M10-OS1C sem criar nova authority ou writer;
 - `tools/lock.py` ainda não convergiu para alias fino da Coordination canônica;
 - Routine Layer obrigatória cobre somente `capability-deathcircle`;
 - Reflection e OperationalQuiescence não possuem contratos/tooling correntes;
