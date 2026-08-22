@@ -1,6 +1,183 @@
 {
   "schemaVersion": "CoordinationState 0.1",
-  "revision": "0b02ec7c08518f88215fb36c4f35dd58c597c4e4",
+  "revision": "696235ed919626c07143c46f4f673c897107d7d8",
   "intents": [],
-  "leases": []
+  "leases": [
+    {
+      "leaseId": "m9-sf1-fg1-acquire:0",
+      "resource": "branch:work/operations/m9-semantic-foundations-0.1",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:1",
+      "resource": "file:.github/workflows/agent-ops.yml",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:2",
+      "resource": "file:docs/architecture/semantic-foundations-0.1.md",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:3",
+      "resource": "file:docs/kickstarts/roles/ui-ux-current.md",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:4",
+      "resource": "file:docs/plans/autonomous-evolution-roadmap-2026-08.md",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:5",
+      "resource": "file:ops/state/project.json",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:6",
+      "resource": "file:tools/roadmap_freshness.py",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:7",
+      "resource": "path:ops/schemas/**",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:8",
+      "resource": "path:ops/semantics/**",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:9",
+      "resource": "path:tools/semantics/**",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    },
+    {
+      "leaseId": "m9-sf1-fg1-acquire:10",
+      "resource": "path:tools/tests/**",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m9-semantic-foundations-20260822",
+        "branch": "work/operations/m9-semantic-foundations-0.1",
+        "pr": null
+      },
+      "reason": "Implement M9-SF1 and M9-FG1",
+      "acquiredAt": "2026-08-22T00:30:19Z",
+      "renewedAt": "2026-08-22T00:30:19Z",
+      "expiresAt": "2026-08-22T04:30:19Z",
+      "ttlSeconds": 14400
+    }
+  ]
 }
