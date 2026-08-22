@@ -10,7 +10,7 @@ class AgentCycleTests(unittest.TestCase):
         self.assertIn("repository:read", profile["scope"])
         self.assertNotIn("repository:write", profile["scope"])
 
-    def test_local_cycle_has_hash_bound_baseline_and_close_obligation(self):
+    def test_local_cycle_has_hash_bound_baseline_and_executable_close_obligation(self):
         machine = project_machine.inspect_local()
         runtime = runtime_capabilities.build_inspection(
             {"schemaVersion": runtime_capabilities.PROVIDER_OBSERVATIONS_SCHEMA, "providers": {}}
@@ -28,8 +28,9 @@ class AgentCycleTests(unittest.TestCase):
         )
         agent_cycle.validate_context(value)
         self.assertTrue(value["closeRequirements"]["required"])
-        self.assertFalse(value["closeRequirements"]["implemented"])
-        self.assertEqual(value["closeRequirements"]["nextSlice"], "M10-OS1C")
+        self.assertTrue(value["closeRequirements"]["implemented"])
+        self.assertIsNone(value["closeRequirements"]["nextSlice"])
+        self.assertEqual(value["closeRequirements"]["schemaVersion"], "AgentCycleCloseContract 0.1")
         self.assertEqual(value["closeRequirements"]["reminder"], "CLOSE_REQUIRED_AFTER_WORK")
         self.assertFalse(value["authorizesMutation"])
         self.assertTrue(value["cycleId"].startswith("cycle-"))
