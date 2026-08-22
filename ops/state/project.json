@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M10-OPERATIONAL-SEMANTICS-0.3-CLOSED",
-    "nextTransition": "converge-m11-coordination-aliases-and-residues-v0.1"
+    "checkpoint": "M11-CV1A-CONVERGENCE-COVERAGE-0.1-CLOSED",
+    "nextTransition": "implement-m11-cv1b-canonical-coordination-surface-v0.1"
   }
 }
