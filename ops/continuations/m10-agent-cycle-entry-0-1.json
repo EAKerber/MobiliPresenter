@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-primary",
   "status": "READY",
   "branch": "work/operations/m10-agent-cycle-entry-0.1",
-  "prNumber": null,
+  "prNumber": 130,
   "dependsOn": [
     "m10-operational-semantics-0-3-inventory"
   ],
