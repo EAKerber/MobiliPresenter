@@ -2,6 +2,7 @@
 """Stable public facade for MobiliPresenter agent operations."""
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -27,6 +28,8 @@ def __getattr__(name):
     initialized. Avoid reading the implementation package during that cycle;
     later attribute access resolves against the completed implementation.
     """
+    if name == "agent_cycle_close":
+        return importlib.import_module("tools.agent_cycle_close")
     try:
         return getattr(_commands, name)
     except AttributeError as exc:
@@ -106,8 +109,7 @@ def command_handoff(as_json):
 
 def main():
     if len(sys.argv) >= 2 and sys.argv[1] == "close":
-        from tools import agent_cycle_close
-        return agent_cycle_close.main(sys.argv[2:])
+        return __getattr__("agent_cycle_close").main(sys.argv[2:])
     return _commands.main()
 
 
