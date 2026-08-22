@@ -64,16 +64,20 @@ class BootstrapBoundaryTests(unittest.TestCase):
         self.assertIn("provider concreto não prova ausência da capability lógica", agents)
         self.assertIn("--runtime-providers", versioned)
 
-    def test_current_bootstrap_materializes_routines_before_maintenance(self):
+    def test_current_bootstrap_uses_single_agent_cycle_entry(self):
         current_path = ROLE_DIR / "manager-gitops-current.md"
         _, target = resolve_current_target(current_path)
         versioned = target.read_text(encoding="utf-8")
-        self.assertTrue((ROOT / "tools" / "routines.py").is_file())
-        self.assertIn("RoutineInspection 0.1", versioned)
-        self.assertIn("tools/routines.py inspect", versioned)
-        self.assertIn("--routines", versioned)
-        self.assertIn("routine-inspection.json", versioned)
-        self.assertLess(versioned.index("tools/routines.py inspect"), versioned.index("tools/maintenance_inspect.py"))
+        self.assertTrue((ROOT / "tools" / "agent_cycle.py").is_file())
+        self.assertTrue((ROOT / "tools" / "semantics" / "brief.py").is_file())
+        self.assertIn("AgentCycleContext 0.1", versioned)
+        self.assertIn("AgentSemanticBrief 0.1", versioned)
+        self.assertIn("python3 tools/agent.py begin", versioned)
+        self.assertIn("CLOSE_REQUIRED_AFTER_WORK", versioned)
+        self.assertNotIn(
+            "Execute manualmente `status`, `doctor`, ProjectMachine, RoutineInspection, Maintenance e Scheduler",
+            versioned,
+        )
 
     def test_current_bootstrap_supports_closed_provider_neutral_live_observations(self):
         current_path = ROLE_DIR / "manager-gitops-current.md"
@@ -82,7 +86,7 @@ class BootstrapBoundaryTests(unittest.TestCase):
         self.assertTrue((ROOT / "tools" / "runtime_observations.py").is_file())
         self.assertIn("RuntimeObservationBundle 0.1", versioned)
         self.assertIn("tools/runtime_observations.py validate", versioned)
-        self.assertIn("--live --observations", versioned)
+        self.assertIn("--machine-scope live --observations", versioned)
         self.assertIn("input remoto fechado", versioned)
         self.assertIn("trustedRemoteTime", versioned)
 
