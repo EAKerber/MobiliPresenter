@@ -203,12 +203,20 @@ def _lock_consumers(
 ) -> list[dict[str, Any]]:
     consumers: list[dict[str, Any]] = []
     current_contracts = _current_role_contract_paths(texts)
-    if "tools/lock.py" in texts:
-        consumers.append(_consumer(
-            "LEGACY_IMPLEMENTATION",
-            "tools/lock.py",
-            "legacy CLI implementation still exists",
-        ))
+    lock_text = texts.get("tools/lock.py")
+    if lock_text is not None:
+        if "LEGACY_LOCK_WRAPPER = True" in lock_text:
+            consumers.append(_consumer(
+                "LEGACY_COMPATIBILITY_WRAPPER",
+                "tools/lock.py",
+                "legacy CLI delegates to canonical Coordination surface",
+            ))
+        else:
+            consumers.append(_consumer(
+                "LEGACY_IMPLEMENTATION",
+                "tools/lock.py",
+                "legacy CLI implementation still exists",
+            ))
     for component_id, item in registry.get("components", {}).items():
         if isinstance(item, dict) and item.get("module") == "tools.lock":
             consumers.append(_consumer(
@@ -224,8 +232,6 @@ def _lock_consumers(
             if _python_imports_lock(text):
                 kind = "COMPATIBILITY_TEST" if path.startswith("tools/tests/") else "ACTIVE_REPOSITORY_CONSUMER"
                 consumers.append(_consumer(kind, path, "imports tools.lock"))
-            # Python source can contain detector fixtures or regex literals. Import
-            # topology is the supported Python consumer signal in 0.1.
             continue
         if not LOCK_CLI_RE.search(text):
             continue
