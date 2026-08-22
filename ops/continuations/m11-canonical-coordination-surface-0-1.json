@@ -3,8 +3,8 @@
   "id": "m11-canonical-coordination-surface-0-1",
   "workerId": "manager-gitops-primary",
   "status": "IN_PROGRESS",
-  "branch": "work/operations/m11-cv1b-canonical-coordination-cli-0.1",
-  "prNumber": 137,
+  "branch": "work/operations/m11-cv1b-reconcile-0.1",
+  "prNumber": 138,
   "dependsOn": [
     "m11-convergence-coverage-0-1"
   ],
