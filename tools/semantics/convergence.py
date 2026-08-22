@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
@@ -21,9 +22,6 @@ CURRENT_ROLE_DIR = ROOT / "docs" / "kickstarts" / "roles"
 MUTABLE_DIRECTION_RE = re.compile(
     r"\bcheckpoint\b|\bnextTransition\b|\bnext declared transition\b",
     re.IGNORECASE,
-)
-LOCK_IMPORT_RE = re.compile(
-    r"(?:from\s+tools\s+import\s+lock\b|from\s+tools\.lock\s+import\b|import\s+tools\.lock\b)"
 )
 LOCK_CLI_RE = re.compile(r"(?:python(?:3)?\s+)?tools/lock\.py\b|python\s+-m\s+tools\.lock\b")
 OPS_BRANCH_LITERAL_RE = re.compile(r"(?:parse_branch_name|headBranch|headRef|baseRef|--branch)[^\n]{0,120}[\"']ops/")
@@ -168,11 +166,43 @@ def current_pointer_residues(texts: dict[str, str]) -> list[dict[str, str]]:
     return rows
 
 
+def _current_role_contract_paths(texts: dict[str, str]) -> set[str]:
+    paths: set[str] = set()
+    prefix = "docs/kickstarts/roles/"
+    target_re = re.compile(r"\]\(\./([A-Za-z0-9._-]+-v[A-Za-z0-9._-]+\.md)\)")
+    for path, text in sorted(texts.items()):
+        if not path.startswith(prefix) or not path.endswith("-current.md"):
+            continue
+        paths.add(path)
+        targets = target_re.findall(text)
+        if len(targets) == 1:
+            paths.add(prefix + targets[0])
+    return paths
+
+
+def _python_imports_lock(text: str) -> bool:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name == "tools.lock" for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "tools.lock":
+                return True
+            if node.module == "tools" and any(alias.name == "lock" for alias in node.names):
+                return True
+    return False
+
+
 def _lock_consumers(
     registry: dict[str, Any],
     texts: dict[str, str],
 ) -> list[dict[str, Any]]:
     consumers: list[dict[str, Any]] = []
+    current_contracts = _current_role_contract_paths(texts)
     if "tools/lock.py" in texts:
         consumers.append(_consumer(
             "LEGACY_IMPLEMENTATION",
@@ -186,20 +216,29 @@ def _lock_consumers(
                 "ops/semantics/registry.json",
                 f"component:{component_id}",
             ))
+    self_paths = {"tools/semantics/convergence.py", "tools/tests/test_convergence_inspection.py"}
     for path, text in sorted(texts.items()):
-        if path == "tools/lock.py":
+        if path == "tools/lock.py" or path in self_paths:
             continue
-        if LOCK_IMPORT_RE.search(text):
-            kind = "COMPATIBILITY_TEST" if path.startswith("tools/tests/") else "ACTIVE_REPOSITORY_CONSUMER"
-            consumers.append(_consumer(kind, path, "imports tools.lock"))
-        if LOCK_CLI_RE.search(text):
-            if path.startswith("tools/tests/"):
-                kind = "COMPATIBILITY_TEST"
-            elif path.endswith("-current.md") or path == "AGENTS.md":
-                kind = "CURRENT_CONTRACT_REFERENCE"
-            else:
-                kind = "ACTIVE_REPOSITORY_CONSUMER"
-            consumers.append(_consumer(kind, path, "invokes tools/lock.py"))
+        if path.endswith(".py"):
+            if _python_imports_lock(text):
+                kind = "COMPATIBILITY_TEST" if path.startswith("tools/tests/") else "ACTIVE_REPOSITORY_CONSUMER"
+                consumers.append(_consumer(kind, path, "imports tools.lock"))
+            # Python source can contain detector fixtures or regex literals. Import
+            # topology is the supported Python consumer signal in 0.1.
+            continue
+        if not LOCK_CLI_RE.search(text):
+            continue
+        if path in current_contracts or path == "AGENTS.md":
+            consumers.append(_consumer("CURRENT_CONTRACT_REFERENCE", path, "invokes tools/lock.py"))
+        elif path.startswith(".github/workflows/"):
+            consumers.append(_consumer("ACTIVE_REPOSITORY_CONSUMER", path, "invokes tools/lock.py"))
+        elif path.startswith("ops/evidence/"):
+            consumers.append(_consumer("HISTORICAL_EVIDENCE_REFERENCE", path, "mentions tools/lock.py", blocking=False))
+        elif path.startswith("docs/"):
+            consumers.append(_consumer("DOCUMENTATION_REFERENCE", path, "mentions tools/lock.py", blocking=False))
+        else:
+            consumers.append(_consumer("REFERENCE_REQUIRES_REVIEW", path, "mentions tools/lock.py", blocking=True))
     return _sort_consumers(consumers)
 
 
@@ -217,6 +256,8 @@ def _ops_consumers(
                 "push/listener branch pattern ops/**",
             ))
     for path, text in sorted(texts.items()):
+        if path == "tools/tests/test_convergence_inspection.py":
+            continue
         if path.startswith("tools/tests/") and OPS_BRANCH_LITERAL_RE.search(text):
             consumers.append(_consumer("COMPATIBILITY_TEST", path, "exercises legacy ops branch semantics"))
     for entry in prune.get("entries", []):

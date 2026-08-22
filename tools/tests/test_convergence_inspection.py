@@ -87,6 +87,23 @@ class ConvergenceInspectionTests(unittest.TestCase):
         )
         self.assertEqual(1, patterns.count("ops/**"))
 
+    def test_documentation_reference_is_visible_but_nonblocking(self):
+        registry, records, texts, prune = self.inputs()
+        texts["docs/adr/example.md"] = "Run `python tools/lock.py status --json` while migrating.\n"
+        inspection = convergence.build_from_inputs(
+            registry=registry,
+            tracked_records=records,
+            texts=texts,
+            prune=prune,
+        )
+        lock = next(item for item in inspection["subjects"] if item["alias"]["term"] == "lock")
+        ref = next(item for item in lock["consumers"] if item["path"] == "docs/adr/example.md")
+        self.assertEqual("DOCUMENTATION_REFERENCE", ref["class"])
+        self.assertFalse(ref["blocking"])
+
+    def test_detector_literals_do_not_create_python_lock_consumers(self):
+        self.assertFalse(convergence._python_imports_lock('LOCK_CLI_RE = re.compile(r"tools/lock.py")'))
+
     def test_lock_error_code_is_not_treated_as_cli_consumer(self):
         registry, records, texts, prune = self.inputs()
         inspection = convergence.build_from_inputs(

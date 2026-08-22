@@ -45,7 +45,9 @@ Repository coverage is derived from the checked-out tracked tree. Runtime Git/PR
 
 ## `lock`
 
-`tools/lock.py` is treated as an active legacy implementation, not as a cosmetic alias. Registered components, imports, executable invocations and transitional tests remain visible as consumers.
+`tools/lock.py` is treated as an active legacy implementation, not as a cosmetic alias. Registered components, real Python imports, executable invocations and transitional tests remain visible as consumers.
+
+Documentation and historical evidence that merely mention `tools/lock.py` remain visible as non-blocking references; they must be reconciled during retirement, but they do not prove runtime dependency. The convergence detector and its own fixture tests are excluded from retirement readiness so the proof cannot create a self-dependency by naming the subject it inspects.
 
 `LOCK_OWNERSHIP_VIOLATION` is not considered use of the `lock` CLI merely because the token contains the word "LOCK". Error-code retirement is a separate compatibility decision.
 
