@@ -14,18 +14,18 @@
     "implement-canonical-executor-apply-and-receipt",
     "qualify-transition-protocol",
     "implement-canonical-coordination-cli",
-    "reduce-lock-to-compatibility-wrapper"
-  ],
-  "remaining": [
+    "reduce-lock-to-compatibility-wrapper",
     "update-operational-semantics-and-documentation",
     "rebuild-convergence-evidence",
-    "validate-and-integrate",
+    "validate-and-integrate"
+  ],
+  "remaining": [
     "reconcile-cv1b-state"
   ],
-  "nextAction": "update-operational-semantics-and-documentation",
+  "nextAction": "reconcile-cv1b-state",
   "lastKnownGood": {
-    "sha": "fd1dd628501ddcda01fb30b2788e6c08f858db35",
-    "checkpoint": "M11-CV1B-COORDINATION-TRANSITION-0.1-INTEGRATED"
+    "sha": "309ef9dc04e689025f78219825a1fbd08512d191",
+    "checkpoint": "M11-CV1B-CANONICAL-COORDINATION-SURFACE-0.1-INTEGRATED"
   },
   "blockers": [],
   "handoffToWorkerId": null
