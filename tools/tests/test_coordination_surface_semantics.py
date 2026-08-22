@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from tools.semantics import registry
-from tools.semantics import convergence
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class CoordinationSurfaceSemanticsTests(unittest.TestCase):
@@ -16,16 +18,14 @@ class CoordinationSurfaceSemanticsTests(unittest.TestCase):
         self.assertEqual("cli-adapter", item["kind"])
         self.assertEqual([], item["writesAuthorities"])
         self.assertEqual(["coordination-executor"], item["delegatesTo"])
-        self.assertEqual(
-            ["artifact.receipt", "artifact.transition-plan"],
-            item["produces"],
-        )
+        self.assertEqual(["artifact.receipt", "artifact.transition-plan"], item["produces"])
 
-    def test_legacy_lock_delegates_to_canonical_surface(self):
-        item = registry.component("coordination-lock-cli")
-        self.assertEqual("tools.lock", item["module"])
-        self.assertEqual([], item["writesAuthorities"])
-        self.assertEqual(["coordination-cli"], item["delegatesTo"])
+    def test_legacy_lock_surface_is_absent(self):
+        self.assertFalse((ROOT / "tools" / "lock.py").exists())
+        self.assertNotIn("coordination-lock-cli", self.value["components"])
+        bindings = self.value["toolSurfaces"]["python-module-cli"]["bindings"]
+        self.assertFalse(any(item.get("target") == "coordination-lock-cli" for item in bindings))
+        self.assertEqual([], registry.aliases_for("coordination.lease"))
 
     def test_coordination_authority_still_has_exactly_one_writer(self):
         writers = [
@@ -39,23 +39,7 @@ class CoordinationSurfaceSemanticsTests(unittest.TestCase):
         bindings = self.value["toolSurfaces"]["python-module-cli"]["bindings"]
         matches = [item for item in bindings if item.get("target") == "coordination-cli"]
         self.assertEqual(1, len(matches))
-        self.assertEqual(
-            ["coordination.guard.inspect", "coordination.mutate"],
-            matches[0]["capabilities"],
-        )
-
-    def test_convergence_classifies_thin_lock_wrapper(self):
-        texts = {
-            "tools/lock.py": (
-                "from tools.coordination_cli import legacy_lock_main\n"
-                "LEGACY_LOCK_WRAPPER = True\n"
-            )
-        }
-        consumers = convergence._lock_consumers(self.value, texts)
-        wrapper = [item for item in consumers if item["path"] == "tools/lock.py"]
-        self.assertEqual(1, len(wrapper))
-        self.assertEqual("LEGACY_COMPATIBILITY_WRAPPER", wrapper[0]["class"])
-        self.assertTrue(wrapper[0]["blocking"])
+        self.assertEqual(["coordination.guard.inspect", "coordination.mutate"], matches[0]["capabilities"])
 
 
 if __name__ == "__main__":
