@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/operational-semantics-coverage-0.1.json",
+  "title": "OperationalSemanticsCoverage 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operationalSemanticsHash",
+    "catalogCounts",
+    "findings",
+    "coverageComplete",
+    "readOnly",
+    "semanticAuthority",
+    "authorizesMutation",
+    "inspectionHash"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "OperationalSemanticsCoverage 0.1"
+    },
+    "operationalSemanticsHash": {
+      "$ref": "#/$defs/hash"
+    },
+    "catalogCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concepts",
+        "contracts",
+        "authorities",
+        "resources",
+        "components",
+        "logicalCapabilities",
+        "providerProfiles",
+        "toolSurfaces",
+        "entrypoints",
+        "workflows",
+        "exclusions"
+      ],
+      "properties": {
+        "concepts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contracts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "authorities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resources": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "logicalCapabilities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "providerProfiles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "toolSurfaces": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entrypoints": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "workflows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exclusions": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "findings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registryErrors",
+        "missingEntrypointComponents",
+        "missingEntrypointBindings",
+        "missingWorkflowBindings",
+        "orphanedWorkflowBindings",
+        "unregisteredSchemas",
+        "missingSchemaFiles",
+        "runtimeCapabilityMismatch",
+        "providerProfileMismatch",
+        "invalidExclusions"
+      ],
+      "properties": {
+        "registryErrors": {
+          "$ref": "#/$defs/stringList"
+        },
+        "missingEntrypointComponents": {
+          "$ref": "#/$defs/stringList"
+        },
+        "missingEntrypointBindings": {
+          "$ref": "#/$defs/stringList"
+        },
+        "missingWorkflowBindings": {
+          "$ref": "#/$defs/stringList"
+        },
+        "orphanedWorkflowBindings": {
+          "$ref": "#/$defs/stringList"
+        },
+        "unregisteredSchemas": {
+          "$ref": "#/$defs/stringList"
+        },
+        "missingSchemaFiles": {
+          "$ref": "#/$defs/stringList"
+        },
+        "runtimeCapabilityMismatch": {
+          "$ref": "#/$defs/stringList"
+        },
+        "providerProfileMismatch": {
+          "$ref": "#/$defs/stringList"
+        },
+        "invalidExclusions": {
+          "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "coverageComplete": {
+      "type": "boolean"
+    },
+    "readOnly": {
+      "const": true
+    },
+    "semanticAuthority": {
+      "const": false
+    },
+    "authorizesMutation": {
+      "const": false
+    },
+    "inspectionHash": {
+      "$ref": "#/$defs/hash"
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "stringList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

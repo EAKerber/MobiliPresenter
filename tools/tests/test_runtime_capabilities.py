@@ -145,6 +145,23 @@ class RuntimeCapabilityTests(unittest.TestCase):
             inspection["capabilities"]["coordination.mutate"]["status"], "UNKNOWN"
         )
 
+    def test_validated_artifact_provider_satisfies_artifact_read_only(self):
+        observed = payload(
+            **{
+                "gh-api": provider("FAIL", reason="PROVIDER_NOT_PRESENT"),
+                "github-connector": provider("FAIL", reason="PROVIDER_NOT_PRESENT"),
+                "validated-workflow-artifact": provider("PASS", ["artifact-read"]),
+            }
+        )
+        inspection = rc.build_inspection(observed)
+        self.assertEqual(
+            inspection["capabilities"]["github.artifact.read"]["status"], "PASS"
+        )
+        self.assertEqual(
+            inspection["capabilities"]["supervisor.snapshot-consume"]["status"],
+            "FAIL",
+        )
+
     def test_unverified_provider_cannot_claim_features(self):
         with self.assertRaisesRegex(RuntimeError, "RUNTIME_PROVIDER_UNVERIFIED_FEATURES"):
             rc.validate_provider_observations(

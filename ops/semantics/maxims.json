@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "EcosystemMaximCatalog 0.1",
+  "readOnly": true,
+  "semanticAuthority": false,
+  "authorizesMutation": false,
+  "overridesContract": false,
+  "items": {
+    "birth-requires-death-condition": {
+      "id": "birth-requires-death-condition",
+      "statement": "Tudo que nasce tem condição de morte.",
+      "justification": "Prevents operational entities from acquiring an undefined permanent lifecycle.",
+      "operationalQuestion": "Qual é a condição terminal, de substituição ou de retirada desta entidade?",
+      "misreadRisk": "Não significa encerrar trabalho apenas pela passagem do tempo.",
+      "appliesTo": [
+        "artifact",
+        "capability",
+        "coordination",
+        "work-item"
+      ],
+      "relatedContracts": [
+        "capability-gates",
+        "continuation-state",
+        "coordination-state",
+        "semantic-foundations"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire when every governed lifecycle contract requires an equivalent terminal or replacement condition.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "creation-requires-justification": {
+      "id": "creation-requires-justification",
+      "statement": "Tudo que é criado é justificado.",
+      "justification": "Makes the purpose and expected value of new operational structures reviewable.",
+      "operationalQuestion": "Que problema observável justifica criar isto?",
+      "misreadRisk": "Não proíbe exploração limitada nem exige benefício já comprovado.",
+      "appliesTo": [
+        "artifact",
+        "capability",
+        "repository",
+        "workflow"
+      ],
+      "relatedContracts": [
+        "operational-semantics",
+        "semantic-foundations"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire if creation rationale becomes a mechanically enforced invariant across all governed artifacts.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "discovery-does-not-authorize": {
+      "id": "discovery-does-not-authorize",
+      "statement": "Descoberta não concede autoridade.",
+      "justification": "Prevents available tools, branches, providers, or suggestions from being mistaken for permission.",
+      "operationalQuestion": "Qual authority, scope e precondição realmente autorizam a ação descoberta?",
+      "misreadRisk": "Não reduz o valor da descoberta; apenas separa possibilidade de permissão.",
+      "appliesTo": [
+        "capability",
+        "repository",
+        "workflow"
+      ],
+      "relatedContracts": [
+        "coordination-state",
+        "operational-semantics",
+        "semantic-foundations"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire only if every discovery surface mechanically proves and separately labels authority without semantic ambiguity.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "negative-knowledge-is-knowledge": {
+      "id": "negative-knowledge-is-knowledge",
+      "statement": "Conhecimento negativo também é resultado.",
+      "justification": "Preserves validated absence, failure, and non-applicability as useful evidence.",
+      "operationalQuestion": "Que caminho foi descartado, com qual evidência e sob quais limites?",
+      "misreadRisk": "Não transforma ausência de observação em prova de inexistência.",
+      "appliesTo": [
+        "artifact",
+        "capability",
+        "repository"
+      ],
+      "relatedContracts": [
+        "operational-semantics",
+        "semantic-foundations"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire if negative observations become first-class mandatory evidence in every relevant inspection contract.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "persistence-requires-justification": {
+      "id": "persistence-requires-justification",
+      "statement": "Permanece o que se justifica.",
+      "justification": "Prevents obsolete operational structures from surviving only through inertia.",
+      "operationalQuestion": "A justificativa original ainda é observável e superior ao custo de manutenção?",
+      "misreadRisk": "Não autoriza remoção sem ownership, evidência, reversibilidade e contrato aplicável.",
+      "appliesTo": [
+        "artifact",
+        "branch",
+        "capability",
+        "workflow"
+      ],
+      "relatedContracts": [
+        "operational-semantics",
+        "semantic-foundations"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire when retention and retirement evidence are mechanically required for all covered structures.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "proposal-does-not-authorize": {
+      "id": "proposal-does-not-authorize",
+      "statement": "Propor não é autorizar.",
+      "justification": "Keeps heuristic recommendations and plans separate from deterministic eligibility and mutation authority.",
+      "operationalQuestion": "Que validação e writer canônico transformariam esta proposta em ação elegível?",
+      "misreadRisk": "Não desvaloriza planos ou recomendações; eles continuam necessários antes da aplicação.",
+      "appliesTo": [
+        "artifact",
+        "capability",
+        "work-item"
+      ],
+      "relatedContracts": [
+        "semantic-foundations",
+        "transition-plan"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire if every proposal artifact is mechanically incapable of being confused with mutation authorization.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "readback-proves-change": {
+      "id": "readback-proves-change",
+      "statement": "Sem readback, mudança não está comprovada.",
+      "justification": "Requires independent observation of the intended state after an acknowledged mutation.",
+      "operationalQuestion": "Qual estado foi reobservado e como ele se vincula ao plano aplicado?",
+      "misreadRisk": "Não afirma que todo readback prova correção semântica; prova apenas o estado observado contratado.",
+      "appliesTo": [
+        "artifact",
+        "branch",
+        "coordination",
+        "project-state",
+        "work-item"
+      ],
+      "relatedContracts": [
+        "transition-plan",
+        "transition-receipt"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire if all mutable writers make verified readback structurally inseparable from successful completion.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    },
+    "residue-needs-owner-and-destination": {
+      "id": "residue-needs-owner-and-destination",
+      "statement": "Todo resíduo tem owner e destino.",
+      "justification": "Prevents aliases, branches, compatibility paths, and migration remnants from becoming ownerless permanent infrastructure.",
+      "operationalQuestion": "Quem decide o destino deste resíduo e qual evento o arquiva, converge ou remove?",
+      "misreadRisk": "Não autoriza apagar resíduos sem preservar evidência e observar o writer apropriado.",
+      "appliesTo": [
+        "artifact",
+        "branch",
+        "repository",
+        "workflow"
+      ],
+      "relatedContracts": [
+        "operational-semantics",
+        "semantic-foundations"
+      ],
+      "editorialOwner": "operations-core",
+      "deathCondition": "Retire when every residual structure is mechanically bound to owner, disposition, and terminal condition.",
+      "semanticAuthority": false,
+      "authorizesMutation": false,
+      "overridesContract": false
+    }
+  }
+}

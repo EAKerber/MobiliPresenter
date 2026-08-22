@@ -21,7 +21,12 @@ class RuntimeCapabilityCoreTests(unittest.TestCase):
                 }
             ),
             "capability.read",
-            {"providers": ("provider-a", "provider-b"), "requires": ("read",)},
+            {
+                "providerRequirements": {
+                    "provider-a": ["read"],
+                    "provider-b": ["read"],
+                }
+            },
         )
         self.assertEqual(value["status"], "UNKNOWN")
 
@@ -34,7 +39,12 @@ class RuntimeCapabilityCoreTests(unittest.TestCase):
                 }
             ),
             "capability.read",
-            {"providers": ("provider-a", "provider-b"), "requires": ("read",)},
+            {
+                "providerRequirements": {
+                    "provider-a": ["read"],
+                    "provider-b": ["read"],
+                }
+            },
         )
         self.assertEqual(value["status"], "PASS")
         self.assertEqual(value["satisfiedProviders"], ["provider-a", "provider-b"])
@@ -48,7 +58,12 @@ class RuntimeCapabilityCoreTests(unittest.TestCase):
                 }
             ),
             "capability.transaction",
-            {"providers": ("provider-a", "provider-b"), "requires": ("read", "write")},
+            {
+                "providerRequirements": {
+                    "provider-a": ["read", "write"],
+                    "provider-b": ["read", "write"],
+                }
+            },
         )
         self.assertEqual(value["status"], "FAIL")
         self.assertEqual(value["reasonCode"], "NO_SUPPORTED_PROVIDER_SATISFIES_REQUIREMENTS")
@@ -57,10 +72,29 @@ class RuntimeCapabilityCoreTests(unittest.TestCase):
         value = rc._evaluate_capability(
             observed(**{"anything": provider("PASS", ["feature-x"])}),
             "capability.synthetic",
-            {"providers": ("anything",), "requires": ("feature-x",)},
+            {"providerRequirements": {"anything": ["feature-x"]}},
         )
         self.assertEqual(value["status"], "PASS")
         self.assertEqual(value["satisfiedProviders"], ["anything"])
+
+    def test_provider_specific_requirements_do_not_weaken_other_provider(self):
+        value = rc._evaluate_capability(
+            observed(
+                **{
+                    "provider-a": provider("PASS", ["read"]),
+                    "provider-b": provider("PASS", ["read"]),
+                }
+            ),
+            "capability.synthetic",
+            {
+                "providerRequirements": {
+                    "provider-a": ["read"],
+                    "provider-b": ["read", "readback"],
+                }
+            },
+        )
+        self.assertEqual(value["status"], "PASS")
+        self.assertEqual(value["satisfiedProviders"], ["provider-a"])
 
 
 if __name__ == "__main__":

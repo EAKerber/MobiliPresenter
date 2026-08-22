@@ -11,9 +11,47 @@ REGISTRY_PATH = ROOT / "ops" / "semantics" / "registry.json"
 SEMANTIC_ID_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
 OWNER_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 TOPOLOGY_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-READ_ONLY_COMPONENT_KINDS = {"inspection", "recommendation", "routing-planner", "sanitization-planner"}
+READ_ONLY_COMPONENT_KINDS = {
+    "inspection",
+    "mutation-planner",
+    "recommendation",
+    "routing-planner",
+    "sanitization-planner",
+}
 COMPONENT_KINDS = READ_ONLY_COMPONENT_KINDS | {"authority-executor", "cli-adapter", "sanitization-executor"}
 LOCATOR_KINDS = {"repository-file", "repository-directory", "git-authority", "github-git-refs"}
+FACET_FIELDS = {
+    "roles",
+    "intentClasses",
+    "lifecyclePhases",
+    "operations",
+    "objects",
+    "riskClasses",
+}
+FACET_VOCABULARY_FIELDS = FACET_FIELDS | {"scopes"}
+CAPABILITY_FIELDS = {
+    "owner",
+    "description",
+    "availabilityClass",
+    "facets",
+    "requiredAuthorities",
+    "requiredScopes",
+    "preconditions",
+    "providerRequirements",
+    "toolSurfaces",
+    "fallbackPolicy",
+}
+PROVIDER_FIELDS = {"description", "observationClass", "featureVocabulary"}
+TOOL_SURFACE_FIELDS = {
+    "owner",
+    "kind",
+    "provider",
+    "locator",
+    "features",
+    "bindings",
+    "sideEffects",
+}
+COVERAGE_POLICY_FIELDS = {"entrypointGlobs", "workflowGlobs", "exclusions"}
 
 
 def load_registry(path: Path = REGISTRY_PATH) -> dict[str, Any]:
@@ -30,6 +68,14 @@ def load_registry(path: Path = REGISTRY_PATH) -> dict[str, Any]:
 
 def _unique_string_list(value: Any) -> bool:
     return isinstance(value, list) and all(isinstance(item, str) and item for item in value) and len(value) == len(set(value))
+
+
+def _sorted_string_list(value: Any, *, allow_empty: bool = True) -> bool:
+    return (
+        _unique_string_list(value)
+        and (allow_empty or bool(value))
+        and value == sorted(value)
+    )
 
 
 def _module_exists(module: str) -> bool:
@@ -61,6 +107,214 @@ def _validate_locator(locator: Any, errors: list[str]) -> None:
             errors.append("SEMANTIC_LOCATOR_FIELDS_INVALID")
 
 
+def _validate_v03_extensions(
+    registry: dict[str, Any],
+    owners: dict[str, Any],
+    authorities: dict[str, Any],
+    components: dict[str, Any],
+    errors: list[str],
+) -> None:
+    vocabulary = registry.get("facetVocabulary")
+    if not isinstance(vocabulary, dict) or set(vocabulary) != FACET_VOCABULARY_FIELDS:
+        errors.append("SEMANTIC_FACET_VOCABULARY_INVALID")
+        vocabulary = {key: [] for key in FACET_VOCABULARY_FIELDS}
+    for field in FACET_VOCABULARY_FIELDS:
+        if not _sorted_string_list(vocabulary.get(field), allow_empty=False):
+            errors.append(f"SEMANTIC_FACET_{field.upper()}_INVALID")
+
+    providers = registry.get("providerProfiles")
+    if not isinstance(providers, dict) or not providers:
+        errors.append("SEMANTIC_PROVIDER_PROFILES_INVALID")
+        providers = {}
+    if list(providers) != sorted(providers):
+        errors.append("SEMANTIC_PROVIDER_PROFILES_NOT_SORTED")
+    for provider_id, item in providers.items():
+        if not TOPOLOGY_ID_RE.fullmatch(str(provider_id)):
+            errors.append("SEMANTIC_PROVIDER_ID_INVALID")
+        if not isinstance(item, dict) or set(item) != PROVIDER_FIELDS:
+            errors.append("SEMANTIC_PROVIDER_FIELDS_INVALID")
+            continue
+        if not isinstance(item.get("description"), str) or not item["description"].strip():
+            errors.append("SEMANTIC_PROVIDER_DESCRIPTION_INVALID")
+        if item.get("observationClass") not in {"artifact", "connected", "local", "workflow"}:
+            errors.append("SEMANTIC_PROVIDER_OBSERVATION_CLASS_INVALID")
+        if not _sorted_string_list(item.get("featureVocabulary"), allow_empty=False):
+            errors.append("SEMANTIC_PROVIDER_FEATURES_INVALID")
+
+    capabilities = registry.get("logicalCapabilities")
+    if not isinstance(capabilities, dict) or not capabilities:
+        errors.append("SEMANTIC_LOGICAL_CAPABILITIES_INVALID")
+        capabilities = {}
+    if list(capabilities) != sorted(capabilities):
+        errors.append("SEMANTIC_LOGICAL_CAPABILITIES_NOT_SORTED")
+    for capability_id, item in capabilities.items():
+        if not SEMANTIC_ID_RE.fullmatch(str(capability_id)):
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_ID_INVALID")
+        if not isinstance(item, dict) or set(item) != CAPABILITY_FIELDS:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_FIELDS_INVALID")
+            continue
+        if item.get("owner") not in owners:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_OWNER_UNKNOWN")
+        if not isinstance(item.get("description"), str) or not item["description"].strip():
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_DESCRIPTION_INVALID")
+        availability = item.get("availabilityClass")
+        if availability not in {"contextual", "repository-static", "runtime-observed"}:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_AVAILABILITY_INVALID")
+        facets = item.get("facets")
+        if not isinstance(facets, dict) or set(facets) != FACET_FIELDS:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_FACETS_INVALID")
+            facets = {key: [] for key in FACET_FIELDS}
+        for field in FACET_FIELDS:
+            values = facets.get(field)
+            if not _sorted_string_list(values, allow_empty=False):
+                errors.append("SEMANTIC_LOGICAL_CAPABILITY_FACET_VALUES_INVALID")
+                continue
+            unknown = sorted(set(values) - set(vocabulary.get(field, [])))
+            if unknown:
+                errors.append(f"SEMANTIC_LOGICAL_CAPABILITY_FACET_UNKNOWN:{field}:{unknown[0]}")
+        for field in ("requiredAuthorities", "requiredScopes", "preconditions", "toolSurfaces"):
+            if not _sorted_string_list(item.get(field)):
+                errors.append(f"SEMANTIC_LOGICAL_CAPABILITY_{field.upper()}_INVALID")
+        for authority_id in item.get("requiredAuthorities", []):
+            if authority_id not in authorities:
+                errors.append("SEMANTIC_LOGICAL_CAPABILITY_AUTHORITY_UNKNOWN")
+        for scope in item.get("requiredScopes", []):
+            if scope not in vocabulary.get("scopes", []):
+                errors.append("SEMANTIC_LOGICAL_CAPABILITY_SCOPE_UNKNOWN")
+        requirements = item.get("providerRequirements")
+        if not isinstance(requirements, dict) or list(requirements) != sorted(requirements):
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_PROVIDER_REQUIREMENTS_INVALID")
+            requirements = {}
+        for provider_id, features in requirements.items():
+            if provider_id not in providers:
+                errors.append("SEMANTIC_LOGICAL_CAPABILITY_PROVIDER_UNKNOWN")
+                continue
+            if not _sorted_string_list(features, allow_empty=False):
+                errors.append("SEMANTIC_LOGICAL_CAPABILITY_PROVIDER_FEATURES_INVALID")
+                continue
+            if not set(features).issubset(set(providers[provider_id].get("featureVocabulary", []))):
+                errors.append("SEMANTIC_LOGICAL_CAPABILITY_PROVIDER_FEATURE_UNKNOWN")
+        if availability == "runtime-observed" and not requirements:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_RUNTIME_REQUIREMENTS_MISSING")
+        if availability != "runtime-observed" and requirements:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_STATIC_PROVIDER_REQUIREMENTS_FORBIDDEN")
+        if item.get("fallbackPolicy") not in {"equivalent-only", "forbidden", "not-applicable"}:
+            errors.append("SEMANTIC_LOGICAL_CAPABILITY_FALLBACK_INVALID")
+
+    surfaces = registry.get("toolSurfaces")
+    if not isinstance(surfaces, dict) or not surfaces:
+        errors.append("SEMANTIC_TOOL_SURFACES_INVALID")
+        surfaces = {}
+    if list(surfaces) != sorted(surfaces):
+        errors.append("SEMANTIC_TOOL_SURFACES_NOT_SORTED")
+    bound_capabilities: dict[str, set[str]] = {key: set() for key in capabilities}
+    used_providers: set[str] = set()
+    for surface_id, item in surfaces.items():
+        if not TOPOLOGY_ID_RE.fullmatch(str(surface_id)):
+            errors.append("SEMANTIC_TOOL_SURFACE_ID_INVALID")
+        if not isinstance(item, dict) or set(item) != TOOL_SURFACE_FIELDS:
+            errors.append("SEMANTIC_TOOL_SURFACE_FIELDS_INVALID")
+            continue
+        if item.get("owner") not in owners:
+            errors.append("SEMANTIC_TOOL_SURFACE_OWNER_UNKNOWN")
+        if item.get("kind") not in {"artifact", "cli", "connector", "workflow"}:
+            errors.append("SEMANTIC_TOOL_SURFACE_KIND_INVALID")
+        provider_id = item.get("provider")
+        if provider_id not in providers:
+            errors.append("SEMANTIC_TOOL_SURFACE_PROVIDER_UNKNOWN")
+        else:
+            used_providers.add(provider_id)
+        if not isinstance(item.get("locator"), str) or not item["locator"].strip():
+            errors.append("SEMANTIC_TOOL_SURFACE_LOCATOR_INVALID")
+        features = item.get("features")
+        if not _sorted_string_list(features, allow_empty=False):
+            errors.append("SEMANTIC_TOOL_SURFACE_FEATURES_INVALID")
+        elif provider_id in providers and not set(features).issubset(
+            set(providers[provider_id].get("featureVocabulary", []))
+        ):
+            errors.append("SEMANTIC_TOOL_SURFACE_FEATURE_UNKNOWN")
+        if not isinstance(item.get("sideEffects"), bool):
+            errors.append("SEMANTIC_TOOL_SURFACE_SIDE_EFFECTS_INVALID")
+        bindings = item.get("bindings")
+        if not isinstance(bindings, list) or not bindings:
+            errors.append("SEMANTIC_TOOL_SURFACE_BINDINGS_INVALID")
+            continue
+        identities: set[tuple[str, str]] = set()
+        for binding in bindings:
+            if not isinstance(binding, dict) or set(binding) != {
+                "targetKind",
+                "target",
+                "capabilities",
+            }:
+                errors.append("SEMANTIC_TOOL_SURFACE_BINDING_FIELDS_INVALID")
+                continue
+            target_kind = binding.get("targetKind")
+            target = binding.get("target")
+            if target_kind not in {"component", "external", "workflow"}:
+                errors.append("SEMANTIC_TOOL_SURFACE_TARGET_KIND_INVALID")
+            if not isinstance(target, str) or not target.strip():
+                errors.append("SEMANTIC_TOOL_SURFACE_TARGET_INVALID")
+                continue
+            identity = (str(target_kind), target)
+            if identity in identities:
+                errors.append("SEMANTIC_TOOL_SURFACE_BINDING_DUPLICATE")
+            identities.add(identity)
+            if target_kind == "component" and target not in components:
+                errors.append("SEMANTIC_TOOL_SURFACE_COMPONENT_UNKNOWN")
+            capability_ids = binding.get("capabilities")
+            if not _sorted_string_list(capability_ids, allow_empty=False):
+                errors.append("SEMANTIC_TOOL_SURFACE_CAPABILITIES_INVALID")
+                continue
+            for capability_id in capability_ids:
+                if capability_id not in capabilities:
+                    errors.append("SEMANTIC_TOOL_SURFACE_CAPABILITY_UNKNOWN")
+                else:
+                    bound_capabilities[capability_id].add(surface_id)
+
+    if set(providers) != used_providers:
+        for provider_id in sorted(set(providers) - used_providers):
+            errors.append(f"SEMANTIC_PROVIDER_ORPHAN:{provider_id}")
+    for capability_id, item in capabilities.items():
+        declared = set(item.get("toolSurfaces", []))
+        unknown = sorted(declared - set(surfaces))
+        if unknown:
+            errors.append(f"SEMANTIC_LOGICAL_CAPABILITY_TOOL_SURFACE_UNKNOWN:{unknown[0]}")
+        if declared != bound_capabilities.get(capability_id, set()):
+            errors.append(f"SEMANTIC_LOGICAL_CAPABILITY_SURFACE_BINDING_MISMATCH:{capability_id}")
+
+    coverage = registry.get("coveragePolicy")
+    if not isinstance(coverage, dict) or set(coverage) != COVERAGE_POLICY_FIELDS:
+        errors.append("SEMANTIC_COVERAGE_POLICY_INVALID")
+        return
+    for field in ("entrypointGlobs", "workflowGlobs"):
+        if not _sorted_string_list(coverage.get(field), allow_empty=False):
+            errors.append(f"SEMANTIC_COVERAGE_{field.upper()}_INVALID")
+    exclusions = coverage.get("exclusions")
+    if not isinstance(exclusions, list):
+        errors.append("SEMANTIC_COVERAGE_EXCLUSIONS_INVALID")
+        return
+    paths: set[str] = set()
+    for exclusion in exclusions:
+        if not isinstance(exclusion, dict) or set(exclusion) != {
+            "path",
+            "owner",
+            "reason",
+            "deathCondition",
+        }:
+            errors.append("SEMANTIC_COVERAGE_EXCLUSION_FIELDS_INVALID")
+            continue
+        path = exclusion.get("path")
+        if not isinstance(path, str) or not path.strip() or path in paths:
+            errors.append("SEMANTIC_COVERAGE_EXCLUSION_PATH_INVALID")
+        else:
+            paths.add(path)
+        if exclusion.get("owner") not in owners:
+            errors.append("SEMANTIC_COVERAGE_EXCLUSION_OWNER_UNKNOWN")
+        for field in ("reason", "deathCondition"):
+            if not isinstance(exclusion.get(field), str) or not exclusion[field].strip():
+                errors.append("SEMANTIC_COVERAGE_EXCLUSION_RATIONALE_INVALID")
+
+
 def validate_registry(value: dict[str, Any] | None = None) -> list[str]:
     registry = load_registry() if value is None else value
     errors: list[str] = []
@@ -73,10 +327,15 @@ def validate_registry(value: dict[str, Any] | None = None) -> list[str]:
         "managedAuthorities",
         "resources",
         "components",
+        "facetVocabulary",
+        "logicalCapabilities",
+        "providerProfiles",
+        "toolSurfaces",
+        "coveragePolicy",
     }
     if set(registry) != expected_top:
         errors.append("SEMANTIC_REGISTRY_FIELDS_INVALID")
-    if registry.get("schemaVersion") != "OperationalSemantics 0.2":
+    if registry.get("schemaVersion") != "OperationalSemantics 0.3":
         errors.append("SEMANTIC_REGISTRY_SCHEMA_UNSUPPORTED")
 
     owners = registry.get("owners")
@@ -291,6 +550,7 @@ def validate_registry(value: dict[str, Any] | None = None) -> list[str]:
                 errors.append("SEMANTIC_AUTHORITY_CANONICAL_WRITER_COUNT_INVALID")
             if writers and canonical_writers and writers[0] != canonical_writers[0]:
                 errors.append("SEMANTIC_AUTHORITY_WRITER_MISMATCH")
+    _validate_v03_extensions(registry, owners, authorities, components, errors)
     return errors
 
 
@@ -335,6 +595,30 @@ def component(component_id: str) -> dict[str, Any]:
     if value is None:
         raise RuntimeError("SEMANTIC_COMPONENT_UNKNOWN")
     return {"componentId": component_id, **deepcopy(value)}
+
+
+def logical_capability(capability_id: str) -> dict[str, Any]:
+    registry = _validated_registry()
+    value = registry["logicalCapabilities"].get(capability_id)
+    if value is None:
+        raise RuntimeError("SEMANTIC_LOGICAL_CAPABILITY_UNKNOWN")
+    return {"capabilityId": capability_id, **deepcopy(value)}
+
+
+def provider_profile(provider_id: str) -> dict[str, Any]:
+    registry = _validated_registry()
+    value = registry["providerProfiles"].get(provider_id)
+    if value is None:
+        raise RuntimeError("SEMANTIC_PROVIDER_UNKNOWN")
+    return {"providerId": provider_id, **deepcopy(value)}
+
+
+def tool_surface(surface_id: str) -> dict[str, Any]:
+    registry = _validated_registry()
+    value = registry["toolSurfaces"].get(surface_id)
+    if value is None:
+        raise RuntimeError("SEMANTIC_TOOL_SURFACE_UNKNOWN")
+    return {"toolSurfaceId": surface_id, **deepcopy(value)}
 
 
 def resolve_term(term: str, *, scope: str) -> dict[str, Any]:

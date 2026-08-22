@@ -20,99 +20,32 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.canonical import stable_hash
+from tools.semantics.registry import load_registry, validate_registry
 
 INSPECTION_SCHEMA = "RuntimeCapabilityInspection 0.1"
 PROVIDER_OBSERVATIONS_SCHEMA = "RuntimeProviderObservations 0.1"
 STATUSES = {"PASS", "UNKNOWN", "FAIL"}
 
-PROVIDERS = (
-    "gh-api",
-    "github-connector",
-    "local-git",
-    "validated-workflow-artifact",
-)
+def _runtime_catalog() -> tuple[tuple[str, ...], dict[str, dict[str, dict[str, list[str]]]]]:
+    registry = load_registry()
+    errors = validate_registry(registry)
+    if errors:
+        raise RuntimeError(errors[0])
+    providers = tuple(sorted(registry["providerProfiles"]))
+    capabilities = {
+        capability_id: {
+            "providerRequirements": {
+                provider_id: list(features)
+                for provider_id, features in item["providerRequirements"].items()
+            }
+        }
+        for capability_id, item in registry["logicalCapabilities"].items()
+        if item["availabilityClass"] == "runtime-observed"
+    }
+    return providers, capabilities
 
-CAPABILITIES: dict[str, dict[str, tuple[str, ...]]] = {
-    "coordination.mutate": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": (
-            "blob-create",
-            "commit-create-with-parent",
-            "content-read",
-            "content-readback",
-            "non-force-ref-update",
-            "ref-read",
-            "tree-create",
-            "trusted-remote-time",
-        ),
-    },
-    "git.direct-mutation": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": (
-            "blob-create",
-            "commit-create-with-parent",
-            "content-readback",
-            "non-force-ref-update",
-            "ref-read",
-            "tree-create",
-        ),
-    },
-    "github.artifact.read": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": ("artifact-read",),
-    },
-    "github.ci.read": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": ("ci-read",),
-    },
-    "github.expected-head-write": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": (
-            "commit-create-with-parent",
-            "non-force-ref-update",
-            "ref-read",
-        ),
-    },
-    "github.git-data.write": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": (
-            "blob-create",
-            "commit-create-with-parent",
-            "tree-create",
-        ),
-    },
-    "github.mutation-readback": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": (
-            "content-readback",
-            "ref-read",
-        ),
-    },
-    "github.pr.read": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": ("pr-read",),
-    },
-    "github.ref.read": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": ("ref-read",),
-    },
-    "github.remote-time": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": ("trusted-remote-time",),
-    },
-    "github.repository.read": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": ("repository-read",),
-    },
-    "supervisor.snapshot-consume": {
-        "providers": ("gh-api", "github-connector"),
-        "requires": (
-            "artifact-read",
-            "ci-read",
-            "ref-read",
-        ),
-    },
-}
+
+PROVIDERS, CAPABILITIES = _runtime_catalog()
 
 
 def _unique_strings(value: Any, code: str) -> list[str]:
@@ -201,6 +134,11 @@ def local_provider_observations() -> dict[str, Any]:
             "features": [],
             "reason": "PROVIDER_NOT_PRESENT",
         }
+    providers["local-python"] = {
+        "status": "PASS",
+        "features": ["python-module-execution"],
+        "reason": None,
+    }
     return validate_provider_observations(
         {"schemaVersion": PROVIDER_OBSERVATIONS_SCHEMA, "providers": providers}
     )
@@ -240,16 +178,23 @@ def normalize_provider_observations(value: dict[str, Any]) -> dict[str, Any]:
 def _evaluate_capability(
     provider_observations: dict[str, Any],
     capability_id: str,
-    spec: dict[str, tuple[str, ...]],
+    spec: dict[str, dict[str, list[str]]],
 ) -> dict[str, Any]:
-    required = sorted(spec["requires"])
+    requirements = spec["providerRequirements"]
+    required = sorted(
+        {
+            feature
+            for features in requirements.values()
+            for feature in features
+        }
+    )
     evaluations: list[dict[str, Any]] = []
     satisfied: list[str] = []
     undecided = False
-    for provider_id in spec["providers"]:
+    for provider_id, provider_required in requirements.items():
         provider = provider_observations["providers"][provider_id]
         status = provider["status"]
-        missing = sorted(set(required) - set(provider["features"]))
+        missing = sorted(set(provider_required) - set(provider["features"]))
         if status == "PASS" and not missing:
             outcome = "SATISFIED"
             satisfied.append(provider_id)
@@ -282,7 +227,7 @@ def _evaluate_capability(
         "status": status,
         "reasonCode": reason_code,
         "requiredFeatures": required,
-        "supportedProviders": list(spec["providers"]),
+        "supportedProviders": list(requirements),
         "satisfiedProviders": sorted(satisfied),
         "providerEvaluations": evaluations,
     }
