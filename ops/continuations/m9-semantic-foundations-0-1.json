@@ -1,12 +1,16 @@
 {
-  "schemaVersion": "ContinuationState 0.2",
-  "id": "m9-semantic-foundations-0-1",
-  "workerId": "manager-gitops-primary",
-  "status": "READY",
+  "blockers": [],
   "branch": "work/operations/m9-semantic-foundations-0.1",
-  "prNumber": null,
-  "dependsOn": [],
   "completed": [],
+  "dependsOn": [],
+  "handoffToWorkerId": null,
+  "id": "m9-semantic-foundations-0-1",
+  "lastKnownGood": {
+    "checkpoint": null,
+    "sha": null
+  },
+  "nextAction": "admit work and create governed branch",
+  "prNumber": 128,
   "remaining": [
     "admit-and-branch",
     "implement-semantic-foundations",
@@ -14,11 +18,7 @@
     "reconcile-project-state",
     "validate-and-integrate"
   ],
-  "nextAction": "admit work and create governed branch",
-  "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
-  },
-  "blockers": [],
-  "handoffToWorkerId": null
+  "schemaVersion": "ContinuationState 0.2",
+  "status": "READY",
+  "workerId": "manager-gitops-primary"
 }
