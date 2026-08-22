@@ -68,39 +68,11 @@ def without_lock_surface(registry):
 
 
 def with_lock_surface(registry):
-    """Build an explicit pre-retirement fixture independent of the live registry."""
+    """Build explicit pre-retirement alias state independent of the live registry."""
     value = copy.deepcopy(registry)
     value["concepts"]["coordination.lease"]["aliases"] = [
         {"term": "lock", "scope": "cli-name", "status": "legacy", "retireBy": "M11"}
     ]
-    value["components"]["coordination-lock-cli"] = {
-        "module": "tools.lock",
-        "owner": "coordination",
-        "kind": "cli-adapter",
-        "sideEffects": True,
-        "readsAuthorities": ["coordination-leases"],
-        "writesAuthorities": [],
-        "readsResources": [],
-        "writesResources": [],
-        "produces": [],
-        "canonicalWriterFor": [],
-        "delegatesTo": ["coordination-cli"],
-    }
-    value["components"] = {
-        key: value["components"][key] for key in sorted(value["components"])
-    }
-    bindings = value["toolSurfaces"]["python-module-cli"]["bindings"]
-    if not any(item.get("target") == "coordination-lock-cli" for item in bindings):
-        binding = {
-            "targetKind": "component",
-            "target": "coordination-lock-cli",
-            "capabilities": ["coordination.mutate"],
-        }
-        insert_at = next(
-            (index + 1 for index, item in enumerate(bindings) if item.get("target") == "coordination-cli"),
-            len(bindings),
-        )
-        bindings.insert(insert_at, binding)
     return value
 
 
