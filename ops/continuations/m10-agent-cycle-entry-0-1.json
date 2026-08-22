@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "m10-agent-cycle-entry-0-1",
+  "workerId": "manager-gitops-primary",
+  "status": "READY",
+  "branch": "work/operations/m10-agent-cycle-entry-0.1",
+  "prNumber": null,
+  "dependsOn": [
+    "m10-operational-semantics-0-3-inventory"
+  ],
+  "completed": [],
+  "remaining": [
+    "close-semantic-contract-gaps",
+    "implement-capability-relevance-projection",
+    "implement-agent-semantic-brief",
+    "implement-agent-cycle-context",
+    "implement-agent-begin",
+    "define-agent-cycle-close-contract-foundation",
+    "validate-document-and-integrate"
+  ],
+  "nextAction": "close semantic contract gaps for relevance and freshness",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
