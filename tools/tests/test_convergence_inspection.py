@@ -50,6 +50,23 @@ def without_alias(registry, semantic_id, term, scope):
     return value
 
 
+def without_lock_surface(registry):
+    value = copy.deepcopy(registry)
+    value["components"].pop("coordination-lock-cli", None)
+    for surface in value.get("toolSurfaces", {}).values():
+        bindings = surface.get("bindings") if isinstance(surface, dict) else None
+        if isinstance(bindings, list):
+            surface["bindings"] = [
+                item for item in bindings
+                if not (
+                    isinstance(item, dict)
+                    and item.get("targetKind") == "component"
+                    and item.get("target") == "coordination-lock-cli"
+                )
+            ]
+    return value
+
+
 class ConvergenceInspectionTests(unittest.TestCase):
     def inputs(self):
         texts = {
@@ -111,6 +128,7 @@ class ConvergenceInspectionTests(unittest.TestCase):
 
     def test_present_alias_without_blockers_is_ready(self):
         registry, _, texts, prune = self.inputs()
+        registry = without_lock_surface(registry)
         texts = {
             path: text for path, text in texts.items()
             if path not in {
@@ -128,6 +146,7 @@ class ConvergenceInspectionTests(unittest.TestCase):
 
     def test_absent_alias_without_blockers_is_retired(self):
         registry, _, texts, prune = self.inputs()
+        registry = without_lock_surface(registry)
         registry = without_alias(registry, "coordination.lease", "lock", "cli-name")
         texts.pop("tools/lock.py")
         texts.pop("tools/tests/test_lock_cli.py")
