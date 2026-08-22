@@ -1,22 +1,12 @@
-# Agent Cycle 0.1 — Entry Protocol and Closure Foundation
+# Agent Cycle 0.1 — Entry and Close Protocol
 
-Status: **M10-OS1B implementation contract**.
+Status: **M10 executable contract**.
 
 ## Problem
 
-MobiliPresenter already has deterministic tools for ProjectState, ProjectMachine, runtime capability inspection, Routines, Maintenance, Scheduler, Work, Coordination and Git mutation. Before this slice, a worker still had to remember the bootstrap sequence and manually compose those artifacts.
+MobiliPresenter has deterministic tools for ProjectState, ProjectMachine, runtime capability discovery, Routine, Maintenance, Scheduler, Work, Coordination and Git mutation. Agent Cycle composes the recurring session protocol so correctness does not depend on a worker remembering an informal sequence.
 
-That is a protocol-memory failure mode: the system can have correct tools while a worker omits one.
-
-Agent Cycle moves the recurring execution protocol from model memory into deterministic tooling.
-
-## Boundary
-
-Agent Cycle is **not** Routine.
-
-`RoutineInspection 0.1` remains a recurring read-only obligation evaluated over one materialized ProjectMachine. Agent Cycle is the outer session protocol that composes existing projections for a worker execution.
-
-Agent Cycle creates no authority and no canonical writer in OS1B.
+Agent Cycle is not Routine and creates no authority or writer.
 
 ## Entry
 
@@ -30,149 +20,100 @@ python3 tools/agent.py begin \
   --json
 ```
 
-Optional closed provider inputs:
+Optional closed provider inputs are `--observations <RuntimeObservationBundle 0.1>` and `--runtime-providers <RuntimeProviderObservations 0.1>`.
 
-```text
---observations <RuntimeObservationBundle 0.1>
---runtime-providers <RuntimeProviderObservations 0.1>
+The result is `AgentCycleContext 0.1`, always read-only, `semanticAuthority=false`, `authorizesMutation=false`. It binds semantic context, ProjectMachine, runtime capabilities, RoutineInspection, MaintenanceInspection, SchedulerPlan, AgentSemanticBrief and a baseline of source heads/artifact hashes.
+
+Unavailable downstream derivations remain explicit `UNKNOWN` slots. No missing observation is silently rebuilt or promoted to PASS.
+
+## Baseline integrity
+
+The baseline is self-hashed and also bound back to the embedded ProjectMachine/runtime/semantic artifacts. Re-hashing a tampered baseline cannot make it valid if its facts no longer match those artifacts.
+
+No open-cycle marker is persisted. The context is the immutable closure input; this avoids creating an accidental mutable cycle authority.
+
+## Close
+
+After work, close the preserved context:
+
+```bash
+python3 tools/agent.py close --context <agent-cycle-context.json> --json
 ```
 
-`agent begin` does not silently substitute one observation scope/provider for another.
+Close reobserves the same ProjectMachine scope used at begin. Scope substitution fails closed. Live provider inputs may be supplied again explicitly.
 
-The result is `AgentCycleContext 0.1`.
-
-Downstream projections that cannot be derived from the selected observation scope
-remain explicit artifact slots with `status=UNKNOWN`, `value=null` and a stable
-`reasonCode`. A missing local branch-backed authority therefore degrades the
-cycle context instead of aborting the entire bootstrap or being silently rebuilt.
-
-## AgentCycleContext 0.1
-
-The context binds:
-
-- role + DeclaredIntent entry profile;
-- ProjectMachine inspection;
-- RuntimeCapabilityInspection;
-- RoutineInspection;
-- MaintenanceInspection;
-- SchedulerPlan;
-- AgentSemanticBrief;
-- source-head/project hashes in an immutable baseline;
-- explicit blockers/unknowns;
-- close requirement metadata.
-
-It is always:
+The deterministic close pipeline is:
 
 ```text
-readOnly = true
-semanticAuthority = false
-authorizesMutation = false
+preserved AgentCycleContext
+-> reobserve after-state
+-> AgentCycleDelta 0.1
+-> validate supplied canonical mutation/readback evidence
+-> AgentCycleAggregateReadback 0.1
+-> AgentCycleReceipt 0.1
+-> AgentCycleClosure 0.1
 ```
 
-The `cycleId` is derived from the baseline hash. Equal normalized evidence produces the same cycle identity; the id is not a lease, assignment or authority.
+All outputs are projections: read-only, `semanticAuthority=false`, `authorizesMutation=false`.
 
-## Entry profiles
+## AgentCycleDelta 0.1
 
-OS1B intentionally avoids heuristic classification of arbitrary task prose.
+Delta separates:
 
-A closed `(role, DeclaredIntent)` entry profile supplies the lifecycle phase, objects, operations and read scopes used by the semantic projection. Profiles cover the current bootstrap/inspect cases. Intents without a closed profile fail with `AGENT_CYCLE_ENTRY_PROFILE_REQUIRED`.
+- durable changes: ProjectState hash and source-head changes;
+- derived changes: ProjectMachine/runtime/routine/maintenance/scheduler/semantic-brief hash changes;
+- blocking unknowns added/resolved;
+- before/after cycle status.
 
-Mutation profiles are intentionally absent in OS1B. Discovery does not authorize mutation.
+Delta observes effects; it never authorizes or attributes them by itself.
 
-## CapabilityRelevanceProjection
+## Mutation evidence
 
-Selection uses typed OperationalSemantics facets:
+Agent Cycle does not execute mutation. Mutation remains delegated to the existing domain writer or governed Git operation. Close accepts only evidence it can deterministically validate:
+
+- `transition-receipt`: a `TransitionPlan 0.1` with its verified `TransitionReceipt 0.1`;
+- `git-mutation-bundle-readback`: a `GitMutationBundle 0.1` with provider readback accepted by the canonical bundle verifier;
+- `git-mutation-plan-readback`: a `GitMutationPlan 0.1` with an observed result matching the plan's readback contract.
+
+Evidence is normalized and hash-bound in the receipt. Duplicate evidence is rejected.
+
+## Aggregate readback and fail-closed coverage
+
+Every durable delta is checked for attributable verified evidence. A source-head change is covered only by evidence tied to that branch/authority; a ProjectState content change requires a verified project-state transition.
+
+If a durable change is not covered, the receipt is `UNKNOWN` with `UNATTRIBUTED_DURABLE_DELTA`. No evidence or missing evidence is never interpreted as success.
+
+A no-durable-change cycle may close without mutation evidence. Derived-only drift remains recorded in Delta but does not fabricate a mutation obligation.
+
+If the after context is `UNKNOWN`, close is `UNKNOWN`. If it is `BLOCKED`, close is `BLOCKED`.
+
+## Compatibility
+
+`AgentCycleContext 0.1` created by the earlier close foundation remains structurally valid. The validator distinguishes:
 
 ```text
-role
-+ DeclaredIntent
-+ lifecycle phase
-+ object intersection
-+ operation intersection
+AgentCycleCloseFoundation 0.1 -> implemented=false, nextSlice=M10-OS1C
+AgentCycleCloseContract 0.1   -> implemented=true, nextSlice=null
 ```
 
-Required capabilities come from an explicit SemanticFoundations policy, never from the mere presence of an intent facet.
+This permits a preserved pre-close context to be closed after the executable protocol exists without rewriting history.
 
-Required capabilities are force-visible when role/intent/lifecycle match even if the task object filter would otherwise omit them.
+## Boundary
 
-Availability rules:
+Agent Cycle owns orchestration of entry/reobservation/delta/receipt only. It does not replace ProjectState, Work, Coordination, Scheduler, Capability Lifecycle, GitMutationPlan or GitMutationBundle writers/planners.
 
-- `repository-static`: available only with complete current OperationalSemantics coverage;
-- `runtime-observed`: uses only `RuntimeCapabilityInspection 0.1`;
-- `contextual`: remains conditional;
-- missing scope: unavailable;
-- unresolved precondition: conditional.
+Provider transport is not authority. Discovery is not authorization. `UNKNOWN != PASS`.
 
-A provider failure never removes the logical capability.
+## M10 closure condition
 
-## AgentSemanticBrief 0.1
+M10 may close only when:
 
-The brief is bound to:
-
-- normalized context hash;
-- OperationalSemantics hash;
-- OperationalSemanticsCoverage inspection hash;
-- EcosystemMaxims catalog hash;
-- RuntimeCapabilityInspection hash;
-- current role pointer and target document content hashes.
-
-The brief contains no more than three maxims. Maxim selection is deterministic and cannot change capability eligibility or availability.
-
-## Freshness
-
-`CAPABILITY_DISCOVERY_FRESHNESS_GUARD` distinguishes:
-
-- `FRESH`: current inputs reproduce the brief;
-- `STALE`: one or more bound inputs changed;
-- `TAMPERED`: self-hash/derivation no longer matches.
-
-A stale brief is informative only and cannot prove capability availability.
-
-## Baseline and monitoring boundary
-
-OS1B does **not** persist an open-cycle marker. Persisting such a marker before ownership/writer semantics are closed could accidentally create another mutable state source.
-
-Instead, the AgentCycleContext embeds a hash-bound baseline containing the source heads and key artifact hashes observed at begin time.
-
-M10-OS1C will consume that baseline to reobserve the after-state and derive an `AgentCycleDelta`.
-
-The monitor should track durable effects/evidence, not attempt to spy on every tool invocation.
-
-## Closure foundation
-
-Every context declares:
-
-```text
-CLOSE_REQUIRED_AFTER_WORK
-```
-
-and lists the future closure evidence:
-
-1. baseline;
-2. after-state reobservation;
-3. deterministic before/after delta;
-4. any required mutations delegated to existing canonical writers;
-5. aggregate readback;
-6. AgentCycleReceipt.
-
-OS1B deliberately leaves `closeRequirements.implemented=false`.
-
-M10-OS1C owns the executable close protocol.
-
-## No new authority
-
-AgentCycleContext, AgentSemanticBrief, CapabilityRelevanceProjection, RuntimeCapabilityInspection, RoutineInspection, MaintenanceInspection and SchedulerPlan remain projections.
-
-The sources of truth continue to be the authorities already declared by OperationalSemantics.
-
-## Exit condition for OS1B
-
-OS1B is ready to integrate when:
-
-- one `agent begin` composes the current entry context;
-- required capabilities cannot disappear silently;
-- stale/tampered briefs are distinguishable;
-- bootstrap role docs point to the single entry facade;
-- full tests, semantic contracts and OperationalSemantics coverage pass;
-- no new authority/writer was introduced;
-- M10 remains open for OS1C.
+- `agent begin` composes the deterministic entry context;
+- `agent close` reobserves the same scope and emits deterministic Delta/Receipt/Closure;
+- required capabilities cannot silently disappear;
+- stale/tampered semantic briefs remain distinguishable;
+- baseline tampering cannot be repaired by re-hashing alone;
+- unattributed durable changes fail closed;
+- mutation evidence is delegated to and validated against existing canonical contracts;
+- full Agent Ops, semantic contracts, OperationalSemantics coverage and roadmap freshness gates pass;
+- no new authority or canonical writer is introduced.
