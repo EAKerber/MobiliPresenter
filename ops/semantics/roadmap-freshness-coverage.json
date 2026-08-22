@@ -1,8 +1,8 @@
 {
   "schemaVersion": "RoadmapFreshnessCoverage 0.1",
   "projectState": {
-    "baseHash": "526566a8aa1fbf475769477d1c6c9f4ccb24aec75a133054de13256ff228221e",
-    "currentHash": "633f7cc3149e84552213011da72be9a0d5d247d896a81fb22f295bec0e72487a",
+    "baseHash": "633f7cc3149e84552213011da72be9a0d5d247d896a81fb22f295bec0e72487a",
+    "currentHash": "4b00bcc1219f184c4a6016e02d6bb13ebdb6d1eec6c0cf31a7005015c2096638",
     "changedFields": [
       "development.checkpoint",
       "development.nextTransition"
@@ -10,14 +10,9 @@
   },
   "consumers": [
     {
-      "path": "docs/kickstarts/roles/ui-ux-current.md",
-      "disposition": "UPDATED",
-      "contentHash": "93af422d03bfacc98b98f441e4f1f0d46dd62eb25c797e847fb9f618dbbb91c3"
-    },
-    {
       "path": "docs/plans/autonomous-evolution-roadmap-2026-08.md",
       "disposition": "UPDATED",
-      "contentHash": "64f1c73075117a13c3c9a40532cc07e75f01f8c46c55d0629e2039e4987c9cfc"
+      "contentHash": "c70f81b203ec133571a1ca7b07046e1ce813966f40645423658873bbc1599831"
     }
   ],
   "readOnly": true,

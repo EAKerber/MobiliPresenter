@@ -3,7 +3,7 @@
 Status: planejamento derivado, não authority  
 Data de reconciliação: 2026-08-22
 Repositório observado: `EAKerber/MobiliPresenter`  
-Entrada desta reconciliação: `main@8685902ef7dfaf75d0ec703ca81061d6a82b3961`
+Entrada desta reconciliação: `main@4078ee2da62fef853d3c8a317f18612a716cfac2`
 
 Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
 `M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
@@ -39,10 +39,10 @@ Fontes preservadas:
 |---|---|---|
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
 | M9 | Technical Dictionary, Semantic Scope, Determinism Contract e Roadmap Freshness Guard | fechado por M9-SF1 + M9-FG1; contratos e coverage read-only integrados |
-| M10 | `OperationalSemantics 0.3` e cobertura integral | OS1A fecha o inventário 0.3; AgentSemanticBrief e freshness permanecem em OS1B |
+| M10 | `OperationalSemantics 0.3` + Agent Cycle semântico | OS1A fecha inventário/coverage 0.3; OS1B fecha AgentSemanticBrief, freshness e Agent Cycle Entry; OS1C permanece para fechamento/receipt do ciclo |
 | M11 | convergência de `lock`, aliases, triggers e resíduos | planejado; implementação não iniciada |
 | M12 | remote canonical execution e maturity proof | S1 terminou `CLOSED_DEFERRED`; bridge e novo proof estão planejados, não aprovados |
-| M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M9–M12 |
+| M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M10–M12 |
 | M14–M16 | Hypothesis, Experiment/Deathcycle, capability e prova longa | bloqueados |
 
 M12-S1 não é mais o próximo estágio. Ele terminou com:
@@ -70,43 +70,43 @@ O plano coordenado de metadata de apresentação foi aceito sem implementar
 produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
 e escolhas/acessórios configuráveis (`PCS-02`).
 
-Estado materializado pela transição M9-SF1 + M9-FG1:
+Estado materializado após M10-OS1B:
 
 ```text
-checkpoint = M9-SEMANTIC-FOUNDATIONS-0.1-CLOSED
+checkpoint = M10-OS1B-AGENT-CYCLE-ENTRY-0.1-CLOSED
 phase = between-increments
-nextTransition = implement-operational-semantics-0.3-and-agent-semantic-brief-v0.1
+nextTransition = implement-agent-cycle-close-protocol-0.1
 ```
 
 O plano PCS-01A continua recuperável e sua implementação permanece não admitida.
-O plano M9–M13 agora define slices, gates, checkpoints e blockers em
-`docs/plans/m9-m13-closure-v0.1.md`.
+O plano M9–M13 define slices, gates, checkpoints e blockers em
+`docs/plans/m9-m13-closure-v0.1.md`; o Agent Cycle detalhado em OS1B acrescenta
+OS1C como recorte obrigatório de fechamento antes da convergência M11.
 
-Ele incorpora ao Semantic Scope:
+M10-OS1B materializou:
 
-- `AgentSemanticBrief` como projeção contextual read-only;
-- `CapabilityRelevanceProjection` baseada em facetas tipadas, role, intenção,
-  fase, scope e capabilities observadas;
-- `EcosystemMaxim` como lembrete cultural explicitamente não autoritativo;
-- `CAPABILITY_DISCOVERY_FRESHNESS_GUARD`;
-- `ROADMAP_FRESHNESS_GUARD` como implementação obrigatória de M9, e não apenas
-  dívida narrativa.
+- `AgentSemanticBrief 0.1` como projeção contextual read-only;
+- `CapabilityRelevanceProjection 0.1` baseada em facetas tipadas, role,
+  intenção, fase, scope e capabilities observadas;
+- `CAPABILITY_DISCOVERY_FRESHNESS_GUARD`, distinguindo `STALE` de `TAMPERED`;
+- `AgentCycleContext 0.1` e a entrada única `python3 tools/agent.py begin`;
+- `CLOSE_REQUIRED_AFTER_WORK` como obrigação explícita sem criar nova authority;
+- `EcosystemMaxim` limitado e não autoritativo dentro do brief.
 
 ## 4. Próxima sequência deliberada
 
-O plano foi concluído. M9-SF1 e M9-FG1 estão fechados. A sequência restante é:
+M9-SF1/M9-FG1, M10-OS1A e M10-OS1B estão fechados. A sequência restante é:
 
-1. M10-OS1A promove OperationalSemantics para 0.3, fecha descriptors tipados,
-   catálogo de máximas e coverage integral sem criar authority.
-2. M10-OS1B implementa o `AgentSemanticBrief`, seleção contextual e freshness;
-   somente então M10 pode fechar.
-3. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
+1. M10-OS1C implementa `agent close`, reobservação before/after,
+   `AgentCycleDelta`, aggregate readback e `AgentCycleReceipt`, sem criar
+   authority paralela aos writers correntes.
+2. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
    consumidores.
-4. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
-5. M12-S2 repete o maturity proof somente depois dessa qualificação.
-6. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
+3. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
+4. M12-S2 repete o maturity proof somente depois dessa qualificação.
+5. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
    read-only.
-7. Só então PCS-01B pode ser reavaliado para admissão.
+6. Só então PCS-01B pode ser reavaliado para admissão.
 
 Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
 de contrato e uma qualificação manual branch-confined com planner e readback
@@ -115,12 +115,11 @@ canônicos.
 ## 5. Lacunas conhecidas cobertas pelo plano M9–M13
 
 - registry 0.3, descriptors tipados, catálogo versionado de
-  `EcosystemMaxim` e coverage integral pertencem a M10-OS1A;
-- os contratos de `AgentSemanticBrief` e `CapabilityRelevanceProjection`
-  estão fechados, mas gerador, validator runtime, seleção contextual e freshness
-  permanecem em M10-OS1B;
-- `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` está contratado e ainda depende da
-  implementação do brief em M10;
+  `EcosystemMaxim` e coverage integral foram fechados em M10-OS1A;
+- `AgentSemanticBrief`, `CapabilityRelevanceProjection`, seleção contextual,
+  freshness e entrada única do ciclo foram fechados em M10-OS1B;
+- o fechamento obrigatório do ciclo ainda não possui `agent close`,
+  `AgentCycleDelta` nem `AgentCycleReceipt`; isso pertence a M10-OS1C;
 - `tools/lock.py` ainda não convergiu para alias fino da Coordination canônica;
 - Routine Layer obrigatória cobre somente `capability-deathcircle`;
 - Reflection e OperationalQuiescence não possuem contratos/tooling correntes;
@@ -149,7 +148,7 @@ Regra imediata:
 - baseline histórico deve ser rotulado como entrada da reconciliação, nunca
   como substituto do head corrente.
 
-Estado do guard após M9-FG1:
+Estado do guard após esta reconciliação:
 
 ```text
 ROADMAP_FRESHNESS_GUARD = IMPLEMENTED
