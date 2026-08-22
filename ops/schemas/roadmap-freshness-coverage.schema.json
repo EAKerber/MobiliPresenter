@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RoadmapFreshnessCoverage 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectState",
+    "consumers",
+    "readOnly",
+    "semanticAuthority",
+    "authorizesMutation"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "RoadmapFreshnessCoverage 0.1"},
+    "projectState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseHash", "currentHash", "changedFields"],
+      "properties": {
+        "baseHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "currentHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "changedFields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["development.checkpoint", "development.nextTransition"]}
+        }
+      }
+    },
+    "consumers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "disposition", "contentHash"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "disposition": {"enum": ["UPDATED", "NO_CHANGE"]},
+          "contentHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false}
+  }
+}

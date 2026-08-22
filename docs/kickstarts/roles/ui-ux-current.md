@@ -25,11 +25,13 @@ The coordinated module-presentation metadata plan remains accepted, but its
 implementation is not admitted. The product plan is
 [`docs/plans/coordinated-module-presentation-metadata-v0.1.md`](../../plans/coordinated-module-presentation-metadata-v0.1.md).
 
-The infrastructure closure plan is accepted at checkpoint
-`M9-M13-CLOSURE-PLAN-0.1-ACCEPTED`; its implementation sequence is defined in
+The semantic foundations and roadmap freshness guard are closed at checkpoint
+`M9-SEMANTIC-FOUNDATIONS-0.1-CLOSED`; the remaining infrastructure sequence is
+defined in
 [`docs/plans/m9-m13-closure-v0.1.md`](../../plans/m9-m13-closure-v0.1.md).
 
-The next declared transition is `implement-m9-semantic-foundations-v0.1`. It is
+The next declared transition is
+`implement-operational-semantics-0.3-and-agent-semantic-brief-v0.1`. It is
 not an assignment to UI. A UI worker must not claim the infrastructure
 transition or start metadata implementation merely from `nextTransition`;
 explicit role scope, Work, continuation, handoff or routing remains required by

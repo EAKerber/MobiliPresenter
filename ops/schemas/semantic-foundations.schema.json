@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SemanticFoundations 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "readOnly",
+    "semanticAuthority",
+    "authorizesMutation",
+    "technicalDictionary",
+    "determinismPolicy",
+    "artifactContracts",
+    "freshnessContract"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "SemanticFoundations 0.1"},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "technicalDictionary": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/dictionaryEntry"}
+    },
+    "determinismPolicy": {"$ref": "#/$defs/determinismPolicy"},
+    "artifactContracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent-semantic-brief", "capability-relevance-projection", "ecosystem-maxim"],
+      "properties": {
+        "agent-semantic-brief": {"$ref": "#/$defs/artifactContract"},
+        "capability-relevance-projection": {"$ref": "#/$defs/artifactContract"},
+        "ecosystem-maxim": {"$ref": "#/$defs/artifactContract"}
+      }
+    },
+    "freshnessContract": {"$ref": "#/$defs/freshnessContract"}
+  },
+  "$defs": {
+    "nonEmptyUniqueStrings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "dictionaryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semanticId", "definition"],
+      "properties": {
+        "semanticId": {"type": "string", "minLength": 1},
+        "definition": {"type": "string", "minLength": 1}
+      }
+    },
+    "determinismPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classes", "heuristicMayInfluence", "heuristicMustNotInfluence", "unknownNeverEqualsPass"],
+      "properties": {
+        "classes": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "heuristicMayInfluence": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "heuristicMustNotInfluence": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "unknownNeverEqualsPass": {"const": true}
+      }
+    },
+    "artifactContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "fieldInventory", "fieldClassifications", "invariants"],
+      "properties": {
+        "schemaVersion": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["projection", "recommendation"]},
+        "fieldInventory": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "fieldClassifications": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["factual-deterministic", "policy-deterministic", "non-authoritative-recommendation"],
+          "properties": {
+            "factual-deterministic": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+            "policy-deterministic": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+            "non-authoritative-recommendation": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+          }
+        },
+        "invariants": {"type": "object", "minProperties": 1}
+      }
+    },
+    "freshnessContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredInputs", "invalidationTriggers", "staleRules", "guardId"],
+      "properties": {
+        "requiredInputs": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "invalidationTriggers": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "staleRules": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+        "guardId": {"const": "CAPABILITY_DISCOVERY_FRESHNESS_GUARD"}
+      }
+    }
+  }
+}

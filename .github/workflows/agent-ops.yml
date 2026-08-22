@@ -28,6 +28,21 @@ jobs:
         run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
       - name: Semantic contracts
         run: python -m tools.semantics check --json
+      - name: Roadmap freshness coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/roadmap_freshness.py inspect \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --json > /tmp/roadmap-freshness-inspection.json
+          python -m json.tool /tmp/roadmap-freshness-inspection.json > /dev/null
+      - name: Upload roadmap freshness inspection
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roadmap-freshness-inspection
+          path: /tmp/roadmap-freshness-inspection.json
+          if-no-files-found: error
       - name: Capability lifecycle guard
         if: github.event_name == 'pull_request'
         run: python tools/capability_gates_ci.py --base-sha "${{ github.event.pull_request.base.sha }}" --head-sha "${{ github.event.pull_request.head.sha }}" --json

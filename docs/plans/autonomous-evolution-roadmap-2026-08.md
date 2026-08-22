@@ -1,9 +1,9 @@
 # MobiliPresenter — mapa de maturidade para evolução autônoma
 
 Status: planejamento derivado, não authority  
-Data de reconciliação: 2026-08-21  
+Data de reconciliação: 2026-08-22
 Repositório observado: `EAKerber/MobiliPresenter`  
-Entrada desta reconciliação: `main@221d41b260250db5ed7f1072009c73346af75afd`
+Entrada desta reconciliação: `main@8685902ef7dfaf75d0ec703ca81061d6a82b3961`
 
 Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
 `M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
@@ -35,11 +35,11 @@ Fontes preservadas:
 
 ## 2. Estado reconciliado dos marcos
 
-| Faixa | Objetivo revisado | Estado reconciliado em 2026-08-21 |
+| Faixa | Objetivo revisado | Estado reconciliado em 2026-08-22 |
 |---|---|---|
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
-| M9 | Technical Dictionary, Semantic Scope e Determinism Contract | plano de fechamento aceito; implementação é a próxima transição |
-| M10 | `OperationalSemantics 0.3` e cobertura integral | planejado; registry corrente permanece 0.2 |
+| M9 | Technical Dictionary, Semantic Scope, Determinism Contract e Roadmap Freshness Guard | fechado por M9-SF1 + M9-FG1; contratos e coverage read-only integrados |
+| M10 | `OperationalSemantics 0.3` e cobertura integral | próxima transição; registry corrente permanece 0.2 |
 | M11 | convergência de `lock`, aliases, triggers e resíduos | planejado; implementação não iniciada |
 | M12 | remote canonical execution e maturity proof | S1 terminou `CLOSED_DEFERRED`; bridge e novo proof estão planejados, não aprovados |
 | M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M9–M12 |
@@ -70,12 +70,12 @@ O plano coordenado de metadata de apresentação foi aceito sem implementar
 produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
 e escolhas/acessórios configuráveis (`PCS-02`).
 
-Estado materializado pela mesma transição que integra esta reconciliação:
+Estado materializado pela transição M9-SF1 + M9-FG1:
 
 ```text
-checkpoint = M9-M13-CLOSURE-PLAN-0.1-ACCEPTED
+checkpoint = M9-SEMANTIC-FOUNDATIONS-0.1-CLOSED
 phase = between-increments
-nextTransition = implement-m9-semantic-foundations-v0.1
+nextTransition = implement-operational-semantics-0.3-and-agent-semantic-brief-v0.1
 ```
 
 O plano PCS-01A continua recuperável e sua implementação permanece não admitida.
@@ -94,19 +94,17 @@ Ele incorpora ao Semantic Scope:
 
 ## 4. Próxima sequência deliberada
 
-O plano foi concluído. A sequência de implementação é:
+O plano foi concluído. M9-SF1 e M9-FG1 estão fechados. A sequência restante é:
 
-1. M9-SF1 fecha Technical Dictionary, Semantic Scope e Determinism Contract.
-2. M9-FG1 implementa coverage determinística para roadmap e ponteiros correntes.
-3. M10-OS1 promove OperationalSemantics para 0.3 e implementa o
+1. M10-OS1 promove OperationalSemantics para 0.3 e implementa o
    `AgentSemanticBrief` sem criar authority.
-4. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
+2. M11-CV1 converge `lock`, aliases, triggers e resíduos com coverage de
    consumidores.
-5. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
-6. M12-S2 repete o maturity proof somente depois dessa qualificação.
-7. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
+3. M12-RP1 implementa e qualifica manualmente a ponte remota canônica.
+4. M12-S2 repete o maturity proof somente depois dessa qualificação.
+5. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
    read-only.
-8. Só então PCS-01B pode ser reavaliado para admissão.
+6. Só então PCS-01B pode ser reavaliado para admissão.
 
 Não se deve repetir S1/S2 apenas para produzir atividade. O retry exige mudança
 de contrato e uma qualificação manual branch-confined com planner e readback
@@ -114,11 +112,12 @@ canônicos.
 
 ## 5. Lacunas conhecidas cobertas pelo plano M9–M13
 
-- registry ainda em `OperationalSemantics 0.2`;
-- não existe ainda `AgentSemanticBrief`, projeção contextual de capabilities ou
-  catálogo semântico de máximas não autoritativas;
-- cobertura semântica, `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` e
-  `ROADMAP_FRESHNESS_GUARD` ainda não estão implementados;
+- registry permanece intencionalmente em `OperationalSemantics 0.2` até M10;
+- os contratos de `AgentSemanticBrief`, `CapabilityRelevanceProjection` e
+  `EcosystemMaxim` estão fechados, mas gerador, catálogo versionado e validator
+  runtime pertencem a M10;
+- `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` está contratado e ainda depende da
+  implementação do brief em M10;
 - `tools/lock.py` ainda não convergiu para alias fino da Coordination canônica;
 - Routine Layer obrigatória cobre somente `capability-deathcircle`;
 - Reflection e OperationalQuiescence não possuem contratos/tooling correntes;
@@ -136,7 +135,7 @@ authority semântica.
 
 Este arquivo já ficou defasado depois de S1, repetindo um padrão anterior de
 documentação narrativa que continuava anunciando o recorte recém-concluído como
-“próximo”. A correção aqui é factual, mas ainda não elimina a causa estrutural.
+“próximo”. M9-FG1 fecha a causa estrutural conhecida para checkpoint e direção.
 
 Regra imediata:
 
@@ -147,12 +146,16 @@ Regra imediata:
 - baseline histórico deve ser rotulado como entrada da reconciliação, nunca
   como substituto do head corrente.
 
-Estado do débito depois da aceitação do plano:
+Estado do guard após M9-FG1:
 
 ```text
-ROADMAP_FRESHNESS_GUARD = PLANNED_NOT_IMPLEMENTED
+ROADMAP_FRESHNESS_GUARD = IMPLEMENTED
+CURRENT_COVERAGE = PASS
 ```
 
-M9-FG1 transforma a revisão recorrente em coverage determinística. Até esse gate
-passar, este roadmap continua honestamente classificado como derivado e pode
-apresentar drift sem corromper authority.
+`tools/roadmap_freshness.py` compara o ProjectState base/head e exige uma
+disposição `UPDATED` ou `NO_CHANGE` explícita, vinculada aos hashes observados,
+para este roadmap e todo ponteiro `*-current.md` que repita checkpoint ou
+`nextTransition`. A inspection é read-only: comprova revisão de coverage, não a
+correção semântica da narrativa. Este roadmap continua derivado e nunca substitui
+ProjectState.

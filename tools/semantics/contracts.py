@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from tools import capability_gates, continuation, coordination, project_state, publication, transition_protocol
+from tools import capability_gates, continuation, coordination, project_state, publication, roadmap_freshness, transition_protocol
+from tools.semantics import foundations
 from tools.semantics.registry import ROOT, load_registry, validate_registry
 from tools.semantics.work import WorkStatus
 
@@ -114,6 +115,28 @@ def check_operational_semantics_contract()->list[str]:
     if required_component!=expected_component:errors.append("SEMANTIC_COMPONENT_SCHEMA_REQUIRED_MISMATCH")
     return errors
 
+def check_semantic_foundations_contract()->list[str]:
+    contract,errors=_contract("semantic-foundations","tools.semantics.foundations.validate_foundations")
+    if contract is None:return errors
+    schema=_schema_for(contract);properties=_properties(schema)
+    if schema.get("title")!=foundations.SCHEMA_VERSION:errors.append("SEMANTIC_FOUNDATIONS_SCHEMA_TITLE_MISMATCH")
+    if schema.get("additionalProperties") is not False:errors.append("SEMANTIC_FOUNDATIONS_SCHEMA_OPEN_ROOT")
+    if set(properties)!=foundations.TOP_FIELDS or _required(schema)!=foundations.TOP_FIELDS:errors.append("SEMANTIC_FOUNDATIONS_SCHEMA_FIELDS_MISMATCH")
+    runtime_errors=foundations.validate_foundations()
+    if runtime_errors:errors.append(f"SEMANTIC_FOUNDATIONS_RUNTIME_INVALID:{runtime_errors[0]}")
+    return errors
+
+def check_roadmap_freshness_contract()->list[str]:
+    contract,errors=_contract("roadmap-freshness-coverage","tools.roadmap_freshness.validate_coverage")
+    if contract is None:return errors
+    schema=_schema_for(contract);properties=_properties(schema)
+    if schema.get("title")!=roadmap_freshness.SCHEMA_VERSION:errors.append("SEMANTIC_ROADMAP_FRESHNESS_SCHEMA_TITLE_MISMATCH")
+    if schema.get("additionalProperties") is not False:errors.append("SEMANTIC_ROADMAP_FRESHNESS_SCHEMA_OPEN_ROOT")
+    if set(properties)!=roadmap_freshness.TOP_FIELDS or _required(schema)!=roadmap_freshness.TOP_FIELDS:errors.append("SEMANTIC_ROADMAP_FRESHNESS_SCHEMA_FIELDS_MISMATCH")
+    runtime_errors=roadmap_freshness.validate_coverage()
+    if runtime_errors:errors.append(f"SEMANTIC_ROADMAP_FRESHNESS_RUNTIME_INVALID:{runtime_errors[0]}")
+    return errors
+
 def check_source_build_contract()->list[str]:
     registry=load_registry();errors=[];contract=registry.get("contracts",{}).get("source-build")
     if not isinstance(contract,dict):return ["SEMANTIC_SOURCE_BUILD_CONTRACT_MISSING"]
@@ -194,4 +217,4 @@ def check_transition_receipt_contract()->list[str]:
     return errors
 
 def check_contracts()->list[str]:
-    errors=check_schema_registry_coverage();errors.extend(check_capability_gates_contract());errors.extend(check_continuation_state_contract());errors.extend(check_coordination_state_contract());errors.extend(check_operational_semantics_contract());errors.extend(check_source_build_contract());errors.extend(check_project_state_contract());errors.extend(check_transition_plan_contract());errors.extend(check_transition_receipt_contract());return errors
+    errors=check_schema_registry_coverage();errors.extend(check_capability_gates_contract());errors.extend(check_continuation_state_contract());errors.extend(check_coordination_state_contract());errors.extend(check_operational_semantics_contract());errors.extend(check_roadmap_freshness_contract());errors.extend(check_semantic_foundations_contract());errors.extend(check_source_build_contract());errors.extend(check_project_state_contract());errors.extend(check_transition_plan_contract());errors.extend(check_transition_receipt_contract());return errors
