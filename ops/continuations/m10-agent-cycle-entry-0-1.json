@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m10-agent-cycle-entry-0-1",
   "workerId": "manager-gitops-primary",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/m10-agent-cycle-entry-0.1",
   "prNumber": 130,
   "dependsOn": [
