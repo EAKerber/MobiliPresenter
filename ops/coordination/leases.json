@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "bee98cf436e25979be29cfbac792c30037c1637d",
+  "leases": [
+    {
+      "leaseId": "m12-rp1b2-lease-acquire:0",
+      "resource": "branch:work/operations/m12-rp1b2-hosted-agent-cycle-0.1",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "rp1b2-hosted-cycle-20260823",
+        "branch": "work/operations/m12-rp1b2-hosted-agent-cycle-0.1",
+        "pr": null
+      },
+      "reason": "implement and qualify hosted Agent Cycle before S2",
+      "acquiredAt": "2026-08-23T16:01:07Z",
+      "renewedAt": "2026-08-23T16:01:07Z",
+      "expiresAt": "2026-08-23T20:01:07Z",
+      "ttlSeconds": 14400
+    }
+  ],
+  "revision": "7eadc67bf2cf9cce00d11c6f9d3e2f1fcec85b51",
   "schemaVersion": "CoordinationState 0.1"
 }
