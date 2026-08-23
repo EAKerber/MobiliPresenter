@@ -3,27 +3,27 @@
   "id": "m11-legacy-retirement-trigger-convergence-0-1",
   "workerId": "manager-gitops-primary",
   "status": "IN_PROGRESS",
-  "branch": "work/operations/m11-cv1c-lock-retirement-0.1",
-  "prNumber": 140,
+  "branch": "work/operations/m11-cv1c-branch-trigger-convergence-0.1",
+  "prNumber": 141,
   "dependsOn": [
     "m11-canonical-coordination-surface-0-1"
   ],
   "completed": [
     "upgrade-convergence-inspection-retirement-model",
     "audit-indirect-semantic-branch-consumers",
-    "classify-legacy-trigger-residues"
+    "classify-legacy-trigger-residues",
+    "retire-lock-compatibility-surface"
   ],
   "remaining": [
-    "retire-lock-compatibility-surface",
     "retire-ops-semantic-alias",
     "converge-legacy-workflow-triggers",
     "install-post-retirement-negative-invariants",
     "validate-m11-convergence",
     "reconcile-m11-closure"
   ],
-  "nextAction": "validate-retired-lock-surface",
+  "nextAction": "validate-ops-and-trigger-retirement",
   "lastKnownGood": {
-    "sha": "a5b98e46044ff7abb8ff7a85c4e915bd96bed427",
+    "sha": "7be9917aa76f0eb2f41d6e7d0418568416755b5a",
     "checkpoint": "M11-CV1B-CANONICAL-COORDINATION-SURFACE-0.1-CLOSED"
   },
   "blockers": [],
