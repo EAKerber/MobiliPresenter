@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/remote-canonical-command.schema.json",
+  "title": "RemoteCanonicalCommand 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "executionId",
+    "kind",
+    "actor",
+    "declaredIntent",
+    "target",
+    "expected",
+    "payload",
+    "semanticAuthority",
+    "authorizesMutation"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "RemoteCanonicalCommand 0.1"},
+    "executionId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "kind": {"enum": ["domain", "git-direct"]},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "workerId", "sessionId"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "workerId": {"type": "string", "minLength": 1},
+        "sessionId": {"type": "string", "minLength": 1}
+      }
+    },
+    "declaredIntent": {"type": "object"},
+    "target": {"type": "object", "minProperties": 2},
+    "expected": {"type": "object", "minProperties": 1},
+    "payload": {"type": "object"},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false}
+  }
+}
