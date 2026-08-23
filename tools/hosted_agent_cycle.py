@@ -1,0 +1,560 @@
+#!/usr/bin/env python3
+"""Hosted carrier for the existing Agent Cycle 0.1 begin/close protocol.
+
+This module never creates an authority and never implements Agent Cycle semantics.
+It validates the issue transport envelope, invokes the canonical `tools/agent.py`
+facade, preserves begin provenance, and normalizes already-verified remote
+mutation receipts into Agent Cycle close evidence.
+"""
+from __future__ import annotations
+
+import argparse
+import copy
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools import agent_cycle
+from tools import agent_cycle_close
+from tools import remote_canonical_execution
+from tools.canonical import stable_hash
+
+REPOSITORY = "EAKerber/MobiliPresenter"
+BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
+REQUEST_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1"
+RESULT_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RESULT_V0_1"
+COMMAND_SCHEMA = "HostedAgentCycleCommand 0.1"
+BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.1"
+BEGIN_RESULT_SCHEMA = "HostedAgentCycleBeginResult 0.1"
+CLOSE_RESULT_SCHEMA = "HostedAgentCycleCloseResult 0.1"
+FAILURE_SCHEMA = "HostedAgentCycleFailure 0.1"
+ACTIONS = {"begin", "close"}
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+COMMAND_FIELDS = {
+    "schemaVersion", "requestId", "action", "actor", "declaredIntent",
+    "machineScope", "begin", "evidenceCommentIds", "semanticAuthority",
+    "authorizesMutation",
+}
+ACTOR_FIELDS = {"role", "workerId", "sessionId"}
+BEGIN_REF_FIELDS = {"runId", "sourceSha", "contextHash"}
+
+
+class HostedAgentCycleError(RuntimeError):
+    def __init__(self, code: str, detail: str = "") -> None:
+        self.code = code
+        self.detail = detail
+        super().__init__(f"{code}:{detail}" if detail else code)
+
+
+def _text(value: Any, code: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise HostedAgentCycleError(code)
+    return value.strip()
+
+
+def _actor(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict) or set(value) != ACTOR_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_INVALID")
+    return {
+        "role": _text(value.get("role"), "HOSTED_AGENT_ACTOR_INVALID"),
+        "workerId": _text(value.get("workerId"), "HOSTED_AGENT_ACTOR_INVALID"),
+        "sessionId": _text(value.get("sessionId"), "HOSTED_AGENT_ACTOR_INVALID"),
+    }
+
+
+def _begin_ref(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != BEGIN_REF_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
+    run_id = value.get("runId")
+    source_sha = value.get("sourceSha")
+    context_hash = value.get("contextHash")
+    if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id <= 0:
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
+    if not isinstance(source_sha, str) or not SHA_RE.fullmatch(source_sha):
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
+    if not isinstance(context_hash, str) or not HASH_RE.fullmatch(context_hash):
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
+    return {"runId": run_id, "sourceSha": source_sha, "contextHash": context_hash}
+
+
+def validate_command(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != COMMAND_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_FIELDS_INVALID")
+    if value.get("schemaVersion") != COMMAND_SCHEMA:
+        raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_SCHEMA_UNSUPPORTED")
+    _text(value.get("requestId"), "HOSTED_AGENT_REQUEST_ID_INVALID")
+    action = value.get("action")
+    if action not in ACTIONS:
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTION_INVALID")
+    actor = _actor(value.get("actor"))
+    if actor != value["actor"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_NOT_CANONICAL")
+    declared = _text(value.get("declaredIntent"), "HOSTED_AGENT_INTENT_INVALID")
+    if declared != value["declaredIntent"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_INTENT_NOT_CANONICAL")
+    if value.get("machineScope") != "live":
+        raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_MUST_BE_LIVE")
+    evidence = value.get("evidenceCommentIds")
+    if (
+        not isinstance(evidence, list)
+        or any(not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in evidence)
+        or len(evidence) != len(set(evidence))
+    ):
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_IDS_INVALID")
+    if action == "begin":
+        if value.get("begin") is not None or evidence:
+            raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_COMMAND_INVALID")
+    else:
+        if _begin_ref(value.get("begin")) != value["begin"]:
+            raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_NOT_CANONICAL")
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_MUST_NOT_AUTHORIZE")
+    return value
+
+
+def command_hash(command: dict[str, Any]) -> str:
+    validate_command(command)
+    return stable_hash(command)
+
+
+def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
+    if not isinstance(value, dict):
+        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_INVALID")
+    issue = value.get("issue")
+    comment = value.get("comment")
+    repository = value.get("repository")
+    if not isinstance(issue, dict) or not isinstance(comment, dict) or not isinstance(repository, dict):
+        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_INVALID")
+    if issue.get("pull_request") is not None:
+        raise HostedAgentCycleError("HOSTED_AGENT_PR_COMMENT_FORBIDDEN")
+    if issue.get("title") != BUS_TITLE:
+        raise HostedAgentCycleError("HOSTED_AGENT_BUS_MISMATCH")
+    if comment.get("author_association") != "OWNER":
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_FORBIDDEN")
+    if repository.get("full_name") != REPOSITORY:
+        raise HostedAgentCycleError("HOSTED_AGENT_REPOSITORY_MISMATCH")
+    body = comment.get("body")
+    prefix = REQUEST_MARKER + "\n"
+    if not isinstance(body, str) or not body.startswith(prefix):
+        raise HostedAgentCycleError("HOSTED_AGENT_MARKER_INVALID")
+    try:
+        command = json.loads(body[len(prefix):].strip())
+    except json.JSONDecodeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_JSON_INVALID") from exc
+    command = validate_command(command)
+    issue_number = issue.get("number")
+    comment_id = comment.get("id")
+    if (
+        not isinstance(issue_number, int) or isinstance(issue_number, bool) or issue_number <= 0
+        or not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0
+    ):
+        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_IDENTITY_INVALID")
+    return command, {"issueNumber": issue_number, "commentId": comment_id}
+
+
+def _source(meta: dict[str, int]) -> dict[str, Any]:
+    sha = os.environ.get("HOSTED_AGENT_SOURCE_SHA") or os.environ.get("GITHUB_SHA", "")
+    run = os.environ.get("GITHUB_RUN_ID", "")
+    if not SHA_RE.fullmatch(sha):
+        raise HostedAgentCycleError("HOSTED_AGENT_SOURCE_SHA_INVALID")
+    if not run.isdigit() or int(run) <= 0:
+        raise HostedAgentCycleError("HOSTED_AGENT_RUN_ID_INVALID")
+    return {
+        "workflow": "hosted-agent-cycle",
+        "sourceSha": sha,
+        "runId": int(run),
+        "issueNumber": meta["issueNumber"],
+        "commentId": meta["commentId"],
+    }
+
+
+def _write_json(path: str | Path, value: dict[str, Any]) -> None:
+    Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _load_json(path: str | Path) -> dict[str, Any]:
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_ARTIFACT_INVALID") from exc
+    if not isinstance(value, dict):
+        raise HostedAgentCycleError("HOSTED_AGENT_ARTIFACT_INVALID")
+    return value
+
+
+def _run_agent(args: list[str]) -> tuple[int, dict[str, Any]]:
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "agent.py"), *args],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    raw = proc.stdout.strip()
+    try:
+        payload = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as exc:
+        detail = (proc.stderr or raw).strip()
+        raise HostedAgentCycleError("HOSTED_AGENT_CANONICAL_OUTPUT_INVALID", detail) from exc
+    if not isinstance(payload, dict):
+        raise HostedAgentCycleError("HOSTED_AGENT_CANONICAL_OUTPUT_INVALID")
+    return proc.returncode, payload
+
+
+def _begin_manifest(command: dict[str, Any], context: dict[str, Any], meta: dict[str, int]) -> dict[str, Any]:
+    source = _source(meta)
+    artifact_name = f"agent-cycle-begin-{source['runId']}"
+    core = {
+        "schemaVersion": BEGIN_MANIFEST_SCHEMA,
+        "requestId": command["requestId"],
+        "commandHash": command_hash(command),
+        "actor": copy.deepcopy(command["actor"]),
+        "declaredIntent": command["declaredIntent"],
+        "machineScope": "live",
+        "source": source,
+        "artifactName": artifact_name,
+        "cycleId": context["cycleId"],
+        "contextHash": context["contextHash"],
+        "status": "READY",
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "manifestHash": stable_hash(core)}
+
+
+def validate_begin_manifest(value: Any, context: dict[str, Any] | None = None) -> dict[str, Any]:
+    required = {
+        "schemaVersion", "requestId", "commandHash", "actor", "declaredIntent",
+        "machineScope", "source", "artifactName", "cycleId", "contextHash",
+        "status", "semanticAuthority", "authorizesMutation", "manifestHash",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_MANIFEST_FIELDS_INVALID")
+    if value.get("schemaVersion") != BEGIN_MANIFEST_SCHEMA or value.get("status") != "READY":
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_MANIFEST_INVALID")
+    _actor(value.get("actor"))
+    _text(value.get("declaredIntent"), "HOSTED_AGENT_BEGIN_MANIFEST_INVALID")
+    if value.get("machineScope") != "live":
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_MANIFEST_INVALID")
+    source = value.get("source")
+    if not isinstance(source, dict) or set(source) != {"workflow", "sourceSha", "runId", "issueNumber", "commentId"}:
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_SOURCE_INVALID")
+    if source.get("workflow") != "hosted-agent-cycle" or not SHA_RE.fullmatch(str(source.get("sourceSha", ""))):
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_SOURCE_INVALID")
+    for key in ("runId", "issueNumber", "commentId"):
+        item = source.get(key)
+        if not isinstance(item, int) or isinstance(item, bool) or item <= 0:
+            raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_SOURCE_INVALID")
+    if value.get("artifactName") != f"agent-cycle-begin-{source['runId']}":
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_ARTIFACT_NAME_INVALID")
+    if not isinstance(value.get("contextHash"), str) or not HASH_RE.fullmatch(value["contextHash"]):
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_CONTEXT_HASH_INVALID")
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_MANIFEST_MUST_NOT_AUTHORIZE")
+    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "manifestHash"}
+    if value.get("manifestHash") != stable_hash(core):
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_MANIFEST_HASH_MISMATCH")
+    if context is not None:
+        agent_cycle.validate_context(context)
+        if context.get("status") != "READY":
+            raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_CONTEXT_NOT_READY")
+        if context.get("contextHash") != value["contextHash"] or context.get("cycleId") != value["cycleId"]:
+            raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_CONTEXT_MISMATCH")
+    return value
+
+
+def begin_from_envelope(
+    command: dict[str, Any], meta: dict[str, int], *, context_path: str, manifest_path: str
+) -> dict[str, Any]:
+    command = validate_command(command)
+    if command["action"] != "begin":
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_ACTION_REQUIRED")
+    rc, context = _run_agent([
+        "begin",
+        "--role", command["actor"]["role"],
+        "--intent", command["declaredIntent"],
+        "--machine-scope", "live",
+        "--json",
+    ])
+    if rc != 0:
+        status = context.get("status") or context.get("error") or f"exit-{rc}"
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_NOT_READY", str(status))
+    agent_cycle.validate_context(context)
+    if context["status"] != "READY":
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_NOT_READY", context["status"])
+    manifest = _begin_manifest(command, context, meta)
+    validate_begin_manifest(manifest, context)
+    _write_json(context_path, context)
+    _write_json(manifest_path, manifest)
+    core = {
+        "schemaVersion": BEGIN_RESULT_SCHEMA,
+        "requestId": command["requestId"],
+        "commandHash": command_hash(command),
+        "runId": manifest["source"]["runId"],
+        "sourceSha": manifest["source"]["sourceSha"],
+        "artifactName": manifest["artifactName"],
+        "cycleId": context["cycleId"],
+        "contextHash": context["contextHash"],
+        "manifestHash": manifest["manifestHash"],
+        "status": "READY",
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "resultHash": stable_hash(core)}
+
+
+def _gh_comment(comment_id: int) -> dict[str, Any]:
+    proc = subprocess.run(
+        ["gh", "api", f"repos/{REPOSITORY}/issues/comments/{comment_id}"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_UNAVAILABLE", str(comment_id))
+    try:
+        value = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_INVALID", str(comment_id)) from exc
+    if not isinstance(value, dict) or value.get("user", {}).get("login") != "github-actions[bot]":
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_ACTOR_INVALID", str(comment_id))
+    return value
+
+
+def _remote_result_payload(comment_id: int) -> dict[str, Any]:
+    body = _gh_comment(comment_id).get("body")
+    marker = "MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1\n"
+    if not isinstance(body, str) or not body.startswith(marker):
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_MARKER_INVALID", str(comment_id))
+    raw = body[len(marker):].strip()
+    if raw.startswith("```json") and raw.endswith("```"):
+        raw = raw[len("```json"): -len("```")].strip()
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_INVALID", str(comment_id)) from exc
+    try:
+        remote_canonical_execution.validate_receipt(value)
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_RECEIPT_INVALID", str(comment_id)) from exc
+    return value
+
+
+def normalize_remote_evidence(receipt: dict[str, Any]) -> dict[str, Any]:
+    remote_canonical_execution.validate_receipt(receipt)
+    evidence = receipt["evidence"]
+    kind = evidence.get("kind")
+    if kind == "transition-receipt":
+        return {
+            "kind": "transition-receipt",
+            "plan": copy.deepcopy(evidence["plan"]),
+            "receipt": copy.deepcopy(evidence["receipt"]),
+        }
+    if kind == "git-mutation-plan-readback":
+        return {
+            "kind": "git-mutation-plan-readback",
+            "plan": copy.deepcopy(evidence["plan"]),
+            "observed": copy.deepcopy(evidence["observed"]),
+        }
+    if kind == "git-mutation-bundle-readback":
+        return {
+            "kind": "git-mutation-bundle-readback",
+            "bundle": copy.deepcopy(evidence["bundle"]),
+            "providerReadback": copy.deepcopy(evidence["providerReadback"]),
+        }
+    raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_KIND_UNSUPPORTED")
+
+
+def _validate_close_binding(
+    command: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any]
+) -> None:
+    begin = _begin_ref(command["begin"])
+    validate_begin_manifest(manifest, context)
+    source = manifest["source"]
+    if (
+        begin["runId"] != source["runId"]
+        or begin["sourceSha"] != source["sourceSha"]
+        or begin["contextHash"] != manifest["contextHash"]
+    ):
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_MISMATCH")
+    if command["actor"] != manifest["actor"] or command["declaredIntent"] != manifest["declaredIntent"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_IDENTITY_MISMATCH")
+    if command["machineScope"] != manifest["machineScope"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_SUBSTITUTION")
+
+
+def close_from_envelope(
+    command: dict[str, Any],
+    meta: dict[str, int],
+    *,
+    begin_dir: str,
+    output_path: str,
+    evidence_dir: str,
+) -> dict[str, Any]:
+    command = validate_command(command)
+    if command["action"] != "close":
+        raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_ACTION_REQUIRED")
+    begin_root = Path(begin_dir)
+    context_path = begin_root / "context.json"
+    manifest_path = begin_root / "manifest.json"
+    context = _load_json(context_path)
+    manifest = _load_json(manifest_path)
+    _validate_close_binding(command, manifest, context)
+
+    evidence_root = Path(evidence_dir)
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    evidence_paths: list[str] = []
+    for index, comment_id in enumerate(command["evidenceCommentIds"]):
+        normalized = normalize_remote_evidence(_remote_result_payload(comment_id))
+        path = evidence_root / f"evidence-{index:03d}.json"
+        _write_json(path, normalized)
+        evidence_paths.append(str(path))
+
+    args = [
+        "close",
+        "--context", str(context_path),
+        "--machine-scope", "live",
+        "--json",
+    ]
+    for path in evidence_paths:
+        args.extend(["--evidence", path])
+    rc, closure = _run_agent(args)
+    if rc != 0:
+        status = closure.get("status") or closure.get("error") or f"exit-{rc}"
+        raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS", str(status))
+    agent_cycle_close.validate_closure(closure)
+    if closure["status"] != "PASS":
+        raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS", closure["status"])
+    _write_json(output_path, closure)
+    source = _source(meta)
+    receipt = closure["receipt"]
+    core = {
+        "schemaVersion": CLOSE_RESULT_SCHEMA,
+        "requestId": command["requestId"],
+        "commandHash": command_hash(command),
+        "runId": source["runId"],
+        "sourceSha": source["sourceSha"],
+        "beginRunId": manifest["source"]["runId"],
+        "cycleId": closure["cycleId"],
+        "contextHash": manifest["contextHash"],
+        "receiptHash": receipt["receiptHash"],
+        "closureHash": closure["closureHash"],
+        "status": "PASS",
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "resultHash": stable_hash(core)}
+
+
+def failure_payload(exc: BaseException, command: dict[str, Any] | None = None) -> dict[str, Any]:
+    code = getattr(exc, "code", None)
+    if not isinstance(code, str) or not code:
+        text = str(exc)
+        code = text.split(":", 1)[0] if text else exc.__class__.__name__
+    core = {
+        "schemaVersion": FAILURE_SCHEMA,
+        "requestId": command.get("requestId") if isinstance(command, dict) else None,
+        "commandHash": command_hash(command) if isinstance(command, dict) else None,
+        "status": "BLOCKED",
+        "blockers": [code],
+        "detail": str(exc),
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "failureHash": stable_hash(core)}
+
+
+def _emit_output(path: str, key: str, value: str) -> None:
+    with Path(path).open("a", encoding="utf-8") as handle:
+        handle.write(f"{key}={value}\n")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="hosted-agent-cycle")
+    sub = parser.add_subparsers(dest="command_name", required=True)
+
+    parse = sub.add_parser("parse-event")
+    parse.add_argument("--event", required=True)
+    parse.add_argument("--command-out", required=True)
+    parse.add_argument("--meta-out", required=True)
+    parse.add_argument("--github-output", required=True)
+
+    begin = sub.add_parser("begin")
+    begin.add_argument("--command", required=True)
+    begin.add_argument("--meta", required=True)
+    begin.add_argument("--context", required=True)
+    begin.add_argument("--manifest", required=True)
+    begin.add_argument("--result", required=True)
+
+    close = sub.add_parser("close")
+    close.add_argument("--command", required=True)
+    close.add_argument("--meta", required=True)
+    close.add_argument("--begin-dir", required=True)
+    close.add_argument("--closure", required=True)
+    close.add_argument("--evidence-dir", required=True)
+    close.add_argument("--result", required=True)
+
+    failure = sub.add_parser("failure")
+    failure.add_argument("--error", required=True)
+    failure.add_argument("--command")
+    failure.add_argument("--result", required=True)
+
+    args = parser.parse_args(argv)
+    command_value: dict[str, Any] | None = None
+    try:
+        if args.command_name == "parse-event":
+            event = json.loads(Path(args.event).read_text(encoding="utf-8"))
+            command_value, meta = parse_event(event)
+            _write_json(args.command_out, command_value)
+            _write_json(args.meta_out, meta)
+            _emit_output(args.github_output, "action", command_value["action"])
+            if command_value["action"] == "close":
+                begin = _begin_ref(command_value["begin"])
+                _emit_output(args.github_output, "begin_run_id", str(begin["runId"]))
+                _emit_output(args.github_output, "begin_source_sha", begin["sourceSha"])
+            return 0
+
+        command_value = _load_json(args.command) if getattr(args, "command", None) else None
+        if args.command_name == "begin":
+            meta = _load_json(args.meta)
+            result = begin_from_envelope(
+                command_value, meta, context_path=args.context, manifest_path=args.manifest
+            )
+        elif args.command_name == "close":
+            meta = _load_json(args.meta)
+            result = close_from_envelope(
+                command_value,
+                meta,
+                begin_dir=args.begin_dir,
+                output_path=args.closure,
+                evidence_dir=args.evidence_dir,
+            )
+        else:
+            exc = HostedAgentCycleError(args.error)
+            result = failure_payload(exc, command_value)
+        _write_json(args.result, result)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
+    except (HostedAgentCycleError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        result_path = getattr(args, "result", None)
+        if result_path:
+            payload = failure_payload(exc, command_value)
+            _write_json(result_path, payload)
+            print(json.dumps(payload, ensure_ascii=False))
+        else:
+            print(str(exc), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
