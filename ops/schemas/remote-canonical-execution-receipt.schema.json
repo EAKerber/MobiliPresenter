@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/remote-canonical-execution-receipt.schema.json",
+  "title": "RemoteCanonicalExecutionReceipt 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "executionId",
+    "command",
+    "commandHash",
+    "route",
+    "source",
+    "planHash",
+    "evidence",
+    "aggregateReadback",
+    "status",
+    "blockers",
+    "semanticAuthority",
+    "authorizesMutation",
+    "receiptHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "RemoteCanonicalExecutionReceipt 0.1"},
+    "executionId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "command": {"type": "object"},
+    "commandHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "domain", "action"],
+      "properties": {
+        "kind": {"enum": ["domain", "git-direct"]},
+        "domain": {"type": "string", "minLength": 1},
+        "action": {"type": "string", "minLength": 1}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow", "sourceSha", "runId", "issueNumber", "commentId"],
+      "properties": {
+        "workflow": {"type": "string", "minLength": 1},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+        "runId": {"type": "string", "minLength": 1},
+        "issueNumber": {"type": "integer", "minimum": 1},
+        "commentId": {"type": "integer", "minimum": 1}
+      }
+    },
+    "planHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "evidence": {"type": "object"},
+    "aggregateReadback": {"type": "object"},
+    "status": {"const": "PASS"},
+    "blockers": {"type": "array", "maxItems": 0},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "receiptHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
