@@ -67,6 +67,15 @@ def without_lock_surface(registry):
     return value
 
 
+def with_lock_surface(registry):
+    """Build explicit pre-retirement alias state independent of the live registry."""
+    value = copy.deepcopy(registry)
+    value["concepts"]["coordination.lease"]["aliases"] = [
+        {"term": "lock", "scope": "cli-name", "status": "legacy", "retireBy": "M11"}
+    ]
+    return value
+
+
 class ConvergenceInspectionTests(unittest.TestCase):
     def inputs(self):
         texts = {
@@ -104,7 +113,7 @@ class ConvergenceInspectionTests(unittest.TestCase):
             {"path": path, "contentHash": "0" * 64}
             for path in sorted(texts)
         ]
-        return load_registry(), records, texts, complete_prune_plan()
+        return with_lock_surface(load_registry()), records, texts, complete_prune_plan()
 
     def build(self, registry=None, texts=None, prune=None):
         current_registry, records, current_texts, current_prune = self.inputs()

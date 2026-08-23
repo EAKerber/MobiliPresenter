@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import unittest
 
-from tools import test_lifecycle
 from tools.semantics import registry
 
 
@@ -15,44 +14,27 @@ class SemanticRegistryTests(unittest.TestCase):
         self.assertEqual(sorted(value["owners"]), list(value["owners"]))
         self.assertEqual(sorted(value["concepts"]), list(value["concepts"]))
         self.assertEqual(sorted(value["components"]), list(value["components"]))
-        self.assertEqual(
-            sorted(value["logicalCapabilities"]), list(value["logicalCapabilities"])
-        )
-        self.assertEqual(
-            sorted(value["providerProfiles"]), list(value["providerProfiles"])
-        )
+        self.assertEqual(sorted(value["logicalCapabilities"]), list(value["logicalCapabilities"]))
+        self.assertEqual(sorted(value["providerProfiles"]), list(value["providerProfiles"]))
         self.assertEqual(sorted(value["toolSurfaces"]), list(value["toolSurfaces"]))
 
     def test_version_02_is_not_implicitly_accepted(self):
         value = registry.load_registry()
         broken = copy.deepcopy(value)
         broken["schemaVersion"] = "OperationalSemantics 0.2"
-        self.assertIn(
-            "SEMANTIC_REGISTRY_SCHEMA_UNSUPPORTED",
-            registry.validate_registry(broken),
-        )
+        self.assertIn("SEMANTIC_REGISTRY_SCHEMA_UNSUPPORTED", registry.validate_registry(broken))
 
     def test_runtime_capability_requires_observable_provider_requirements(self):
         value = registry.load_registry()
         broken = copy.deepcopy(value)
-        broken["logicalCapabilities"]["github.repository.read"][
-            "providerRequirements"
-        ] = {}
-        self.assertIn(
-            "SEMANTIC_LOGICAL_CAPABILITY_RUNTIME_REQUIREMENTS_MISSING",
-            registry.validate_registry(broken),
-        )
+        broken["logicalCapabilities"]["github.repository.read"]["providerRequirements"] = {}
+        self.assertIn("SEMANTIC_LOGICAL_CAPABILITY_RUNTIME_REQUIREMENTS_MISSING", registry.validate_registry(broken))
 
     def test_surface_binding_and_capability_descriptor_must_agree(self):
         value = registry.load_registry()
         broken = copy.deepcopy(value)
-        broken["logicalCapabilities"]["semantics.inspect"]["toolSurfaces"] = [
-            "python-module-cli"
-        ]
-        self.assertIn(
-            "SEMANTIC_LOGICAL_CAPABILITY_SURFACE_BINDING_MISMATCH:semantics.inspect",
-            registry.validate_registry(broken),
-        )
+        broken["logicalCapabilities"]["semantics.inspect"]["toolSurfaces"] = ["python-module-cli"]
+        self.assertIn("SEMANTIC_LOGICAL_CAPABILITY_SURFACE_BINDING_MISMATCH:semantics.inspect", registry.validate_registry(broken))
 
     def test_unknown_concept_fails_explicitly(self):
         with self.assertRaisesRegex(RuntimeError, "SEMANTIC_CONCEPT_UNKNOWN"):
@@ -61,8 +43,13 @@ class SemanticRegistryTests(unittest.TestCase):
     def test_legacy_alias_requires_retirement_target(self):
         value = registry.load_registry()
         broken = copy.deepcopy(value)
-        broken["concepts"]["coordination.lease"]["aliases"][0].pop("retireBy")
+        broken["concepts"]["branch.domain.operations"]["aliases"][0].pop("retireBy")
         self.assertIn("SEMANTIC_ALIAS_RETIREMENT_REQUIRED", registry.validate_registry(broken))
+
+    def test_retired_lock_term_is_unknown(self):
+        self.assertEqual([], registry.aliases_for("coordination.lease"))
+        with self.assertRaisesRegex(RuntimeError, "SEMANTIC_TERM_UNKNOWN"):
+            registry.resolve_term("lock", scope="cli-name")
 
     def test_unknown_owner_is_rejected(self):
         value = registry.load_registry()
@@ -75,18 +62,6 @@ class SemanticRegistryTests(unittest.TestCase):
         broken = copy.deepcopy(value)
         broken["concepts"]["identity.worker"]["related"].append("identity.missing")
         self.assertIn("SEMANTIC_RELATED_UNKNOWN", registry.validate_registry(broken))
-
-    @test_lifecycle.transitional_test(
-        owner="coordination",
-        reason="legacy lock CLI alias remains supported until its declared retirement",
-        retire_when=test_lifecycle.semantic_alias_absent("coordination.lease", "lock", "cli-name"),
-    )
-    def test_lock_resolves_as_legacy_alias_of_coordination_lease(self):
-        resolved = registry.resolve_term("lock", scope="cli-name")
-        self.assertEqual("coordination.lease", resolved["semanticId"])
-        self.assertTrue(resolved["alias"])
-        self.assertEqual("legacy", resolved["status"])
-        self.assertEqual("M11", resolved["retireBy"])
 
 
 if __name__ == "__main__":
