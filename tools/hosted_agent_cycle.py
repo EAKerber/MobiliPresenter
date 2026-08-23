@@ -432,7 +432,8 @@ def close_from_envelope(
     if rc != 0:
         status = closure.get("status") or closure.get("error") or f"exit-{rc}"
         raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS", str(status))
-    agent_cycle_close.validate_closure(closure)
+    evidence = agent_cycle_close.load_evidence(evidence_paths)
+    agent_cycle_close.validate_closure(closure, context, evidence=evidence)
     if closure["status"] != "PASS":
         raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS", closure["status"])
     _write_json(output_path, closure)
@@ -545,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
         _write_json(args.result, result)
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    except (HostedAgentCycleError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+    except Exception as exc:
         result_path = getattr(args, "result", None)
         if result_path:
             payload = failure_payload(exc, command_value)
