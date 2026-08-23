@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tools import test_lifecycle
+from tools.semantics import registry
 from tools.semantics.branches import parse_branch_name
 
 
@@ -31,17 +31,18 @@ class SemanticBranchTests(unittest.TestCase):
             self.assertEqual("legacy", legacy["grammar"])
             self.assertEqual("canonical", canonical["grammar"])
 
-    @test_lifecycle.transitional_test(
-        owner="git-governance",
-        reason="legacy ops branch namespace remains supported until the semantic alias is retired",
-        retire_when=test_lifecycle.semantic_alias_absent("branch.domain.operations", "ops", "legacy-branch-namespace"),
-    )
-    def test_legacy_ops_alias_resolves_to_operations(self):
-        value = parse_branch_name("ops/m3.5b-consumer-convergence")
+    def test_ops_namespace_is_historical_grammar_without_semantic_alias(self):
+        value_registry = registry.load_registry()
+        namespaces = value_registry["branchGrammar"]["legacyNamespaces"]
+        self.assertIn("ops", namespaces)
+        legacy_name = next(name for name in namespaces if name == "ops")
+        value = parse_branch_name(f"{legacy_name}/historical-slice")
         self.assertEqual("legacy", value["grammar"])
         self.assertEqual("ops", value["namespace"])
-        self.assertEqual("operations", value["semanticDomain"])
-        self.assertTrue(value["legacyAlias"])
+        self.assertIsNone(value["semanticDomain"])
+        self.assertFalse(value["legacyAlias"])
+        with self.assertRaisesRegex(RuntimeError, "SEMANTIC_TERM_UNKNOWN"):
+            registry.resolve_term("ops", scope="legacy-branch-namespace")
 
     def test_unknown_canonical_domain_is_syntactically_valid_but_not_semantically_invented(self):
         value = parse_branch_name("work/ops/project-state-v2")
@@ -58,9 +59,9 @@ class SemanticBranchTests(unittest.TestCase):
         self.assertEqual("authority", authority["declaredClass"])
         self.assertIsNone(authority["semanticDomain"])
 
-    def test_current_namespaces_remain_legacy(self):
-        for name in ("ops/m3.5a-semantic-core", "ui/style-guide-v0.1", "archive/v7.0-i5-recovery", "coordination/leases"):
-            value = parse_branch_name(name)
+    def test_registered_legacy_namespaces_remain_legacy_grammar(self):
+        for name in registry.load_registry()["branchGrammar"]["legacyNamespaces"]:
+            value = parse_branch_name(f"{name}/historical-slice")
             self.assertEqual("legacy", value["grammar"], name)
             self.assertIsNone(value["declaredClass"], name)
 

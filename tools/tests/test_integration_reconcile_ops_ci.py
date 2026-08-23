@@ -4,17 +4,17 @@ import unittest
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "integration_reconcile.py"
-spec = importlib.util.spec_from_file_location("integration_reconcile_ops_ci", MODULE_PATH)
+spec = importlib.util.spec_from_file_location("integration_reconcile_operations_ci", MODULE_PATH)
 planner = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 sys.modules[spec.name] = planner
 spec.loader.exec_module(planner)
 
 
-class IntegrationReconcileOpsCiTests(unittest.TestCase):
-    def test_ops_branch_uses_agent_ops_as_relevant_ci(self):
+class IntegrationReconcileOperationsCiTests(unittest.TestCase):
+    def test_canonical_operations_branch_uses_agent_ops_as_relevant_ci(self):
         runs = [{"name": "Agent Ops", "status": "completed", "conclusion": "success", "id": 9}]
-        result = planner.aggregate_ci(runs, "a" * 40, "ops/test")
+        result = planner.aggregate_ci(runs, "a" * 40, "work/operations/test")
         self.assertEqual(result["status"], "green")
         self.assertEqual(result["runs"][0]["name"], "Agent Ops")
 

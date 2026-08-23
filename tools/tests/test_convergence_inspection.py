@@ -68,10 +68,24 @@ def without_lock_surface(registry):
 
 
 def with_lock_surface(registry):
-    """Build explicit pre-retirement alias state independent of the live registry."""
+    """Build explicit pre-retirement lock alias state independent of the live registry."""
     value = copy.deepcopy(registry)
     value["concepts"]["coordination.lease"]["aliases"] = [
         {"term": "lock", "scope": "cli-name", "status": "legacy", "retireBy": "M11"}
+    ]
+    return value
+
+
+def with_ops_alias(registry):
+    """Build explicit pre-retirement ops alias state independent of the live registry."""
+    value = copy.deepcopy(registry)
+    value["concepts"]["branch.domain.operations"]["aliases"] = [
+        {
+            "term": "ops",
+            "scope": "legacy-branch-namespace",
+            "status": "legacy",
+            "retireBy": "M11",
+        }
     ]
     return value
 
@@ -113,7 +127,8 @@ class ConvergenceInspectionTests(unittest.TestCase):
             {"path": path, "contentHash": "0" * 64}
             for path in sorted(texts)
         ]
-        return with_lock_surface(load_registry()), records, texts, complete_prune_plan()
+        registry = with_ops_alias(with_lock_surface(load_registry()))
+        return registry, records, texts, complete_prune_plan()
 
     def build(self, registry=None, texts=None, prune=None):
         current_registry, records, current_texts, current_prune = self.inputs()
@@ -163,6 +178,25 @@ class ConvergenceInspectionTests(unittest.TestCase):
         lock = next(item for item in inspection["subjects"] if item["alias"]["term"] == "lock")
         self.assertEqual("ABSENT", lock["aliasPresence"])
         self.assertEqual("RETIRED", lock["retirementReadiness"])
+
+    def test_absent_ops_alias_without_blockers_is_retired(self):
+        registry, _, texts, prune = self.inputs()
+        registry = without_alias(
+            registry,
+            "branch.domain.operations",
+            "ops",
+            "legacy-branch-namespace",
+        )
+        for path in (
+            "tools/tests/test_semantic_branches.py",
+            "tools/tests/test_integration_reconcile_ops_ci.py",
+            ".github/workflows/agent-ops.yml",
+        ):
+            texts.pop(path)
+        inspection = self.build(registry=registry, texts=texts, prune=prune)
+        ops = next(item for item in inspection["subjects"] if item["alias"]["term"] == "ops")
+        self.assertEqual("ABSENT", ops["aliasPresence"])
+        self.assertEqual("RETIRED", ops["retirementReadiness"])
 
     def test_absent_alias_with_consumer_is_invalid(self):
         registry, _, texts, prune = self.inputs()

@@ -27,7 +27,7 @@
     "branch.class.experiment": {"term":"experiment","kind":"branch-class","owner":"git-governance","definition":"Branch class for bounded experimental work; the name does not imply retention or promotion."},
     "branch.class.work": {"term":"work","kind":"branch-class","owner":"git-governance","definition":"Branch class for transient implementation work; the name does not imply deletion eligibility."},
     "branch.domain.engine": {"term":"engine","kind":"branch-domain","owner":"git-governance","definition":"Semantic branch domain for Engine/runtime implementation work."},
-    "branch.domain.operations": {"term":"operations","kind":"branch-domain","owner":"git-governance","definition":"Semantic branch domain for operational framework and GitOps work.","aliases":[{"term":"ops","scope":"legacy-branch-namespace","status":"legacy","retireBy":"M11"}]},
+    "branch.domain.operations": {"term":"operations","kind":"branch-domain","owner":"git-governance","definition":"Semantic branch domain for operational framework and GitOps work."},
     "branch.domain.ui": {"term":"ui","kind":"branch-domain","owner":"git-governance","definition":"Semantic branch domain for UI implementation work."},
     "capability.ecosystem": {"term":"EcosystemCapability","kind":"domain-concept","owner":"capability","definition":"Governed ecosystem feature whose lifecycle is represented by Capability Policy and gates."},
     "capability.logical": {"term":"LogicalCapability","kind":"domain-concept","owner":"operations-core","definition":"Provider-neutral operational ability defined by required invariants rather than a concrete executable."},
