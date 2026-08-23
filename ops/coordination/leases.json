@@ -2,22 +2,22 @@
   "intents": [],
   "leases": [
     {
-      "leaseId": "m12-rp1b2-lease-acquire:0",
-      "resource": "branch:work/operations/m12-rp1b2-hosted-agent-cycle-0.1",
+      "leaseId": "m12-s2-manager-gitops-a-lease-acquire:0",
+      "resource": "branch:experiment/operations/m12-s2-manager-gitops",
       "mode": "exclusive-write",
       "owner": {
         "role": "manager-gitops",
-        "session": "rp1b2-hosted-cycle-20260823",
-        "branch": "work/operations/m12-rp1b2-hosted-agent-cycle-0.1",
+        "session": "m12-s2-manager-gitops-a-20260823T180242",
+        "branch": "experiment/operations/m12-s2-manager-gitops",
         "pr": null
       },
-      "reason": "implement and qualify hosted Agent Cycle before S2",
-      "acquiredAt": "2026-08-23T16:01:07Z",
-      "renewedAt": "2026-08-23T16:01:07Z",
-      "expiresAt": "2026-08-23T20:01:07Z",
-      "ttlSeconds": 14400
+      "reason": "M12-S2 ACTIVATION phase ownership",
+      "acquiredAt": "2026-08-23T21:07:46Z",
+      "renewedAt": "2026-08-23T21:07:46Z",
+      "expiresAt": "2026-08-23T21:52:46Z",
+      "ttlSeconds": 2700
     }
   ],
-  "revision": "7eadc67bf2cf9cce00d11c6f9d3e2f1fcec85b51",
+  "revision": "8c19ef3cd2be616d86b3a6c893afbe139a11f3bc",
   "schemaVersion": "CoordinationState 0.1"
 }
