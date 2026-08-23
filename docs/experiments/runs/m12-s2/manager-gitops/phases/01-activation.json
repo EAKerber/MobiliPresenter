@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "M12S2ManagerGitOpsPhaseRecord 0.1",
+  "experimentId": "m12-s2-scheduled-cycle-maturity",
+  "role": "manager-gitops",
+  "phase": "ACTIVATION",
+  "ordinal": 1,
+  "writerWorkerId": "manager-gitops-a",
+  "writerSessionId": "m12-s2-manager-gitops-a-20260823T180242",
+  "cycleId": "cycle-d32529a40b81d7cab27f",
+  "executionId": "m12-s2-manager-gitops-activation",
+  "observedMainHead": "b4eb4ec3ceab2ba1a61cea2e7cfdcdc17d8f42b8",
+  "expectedParentHead": "b4eb4ec3ceab2ba1a61cea2e7cfdcdc17d8f42b8",
+  "predecessor": null,
+  "leaseResource": "branch:experiment/operations/m12-s2-manager-gitops",
+  "outcome": "ACTIVATED",
+  "semanticAuthority": false,
+  "authorizesMutation": false
+}
