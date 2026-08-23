@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - "architecture/**"
-      - "renderer/**"
     paths:
       - "scene-core/**"
       - "scene-source/**"
