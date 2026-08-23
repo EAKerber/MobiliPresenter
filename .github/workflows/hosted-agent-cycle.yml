@@ -1,0 +1,176 @@
+name: Hosted Agent Cycle
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  cycle:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.title == 'MobiliPresenter Remote Canonical Execution Bus' &&
+      github.event.comment.author_association == 'OWNER' &&
+      startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hosted-cycle carrier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Parse closed hosted-cycle request
+        id: parse
+        continue-on-error: true
+        run: |
+          python tools/hosted_agent_cycle.py parse-event \
+            --event "$GITHUB_EVENT_PATH" \
+            --command-out /tmp/hosted-command.json \
+            --meta-out /tmp/hosted-meta.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Materialize parse failure
+        if: steps.parse.outcome != 'success'
+        run: |
+          python tools/hosted_agent_cycle.py failure \
+            --error HOSTED_AGENT_PARSE_FAILED \
+            --result /tmp/hosted-result.json
+
+      - name: Run canonical begin
+        id: begin
+        if: steps.parse.outcome == 'success' && steps.parse.outputs.action == 'begin'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/agent-cycle-begin
+          python tools/hosted_agent_cycle.py begin \
+            --command /tmp/hosted-command.json \
+            --meta /tmp/hosted-meta.json \
+            --context /tmp/agent-cycle-begin/context.json \
+            --manifest /tmp/agent-cycle-begin/manifest.json \
+            --result /tmp/hosted-result.json
+
+      - name: Upload begin context
+        id: begin_artifact
+        if: steps.begin.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-cycle-begin-${{ github.run_id }}
+          path: /tmp/agent-cycle-begin
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail begin if artifact was not preserved
+        if: steps.begin.outcome == 'success' && steps.begin_artifact.outcome != 'success'
+        run: |
+          python tools/hosted_agent_cycle.py failure \
+            --error HOSTED_AGENT_BEGIN_ARTIFACT_UPLOAD_FAILED \
+            --command /tmp/hosted-command.json \
+            --result /tmp/hosted-result.json
+
+      - name: Download exact begin context
+        id: download_begin
+        if: steps.parse.outcome == 'success' && steps.parse.outputs.action == 'close'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-cycle-begin-${{ steps.parse.outputs.begin_run_id }}
+          path: /tmp/agent-cycle-begin
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.parse.outputs.begin_run_id }}
+
+      - name: Checkout exact begin semantic host
+        id: checkout_begin
+        if: steps.download_begin.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.parse.outputs.begin_source_sha }}
+
+      - name: Materialize close carrier failure
+        if: >-
+          steps.parse.outcome == 'success' &&
+          steps.parse.outputs.action == 'close' &&
+          (steps.download_begin.outcome != 'success' || steps.checkout_begin.outcome != 'success')
+        run: |
+          python tools/hosted_agent_cycle.py failure \
+            --error HOSTED_AGENT_BEGIN_ARTIFACT_UNAVAILABLE \
+            --command /tmp/hosted-command.json \
+            --result /tmp/hosted-result.json
+
+      - name: Run canonical close
+        id: close
+        if: steps.checkout_begin.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOSTED_AGENT_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
+        run: |
+          mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
+          python tools/hosted_agent_cycle.py close \
+            --command /tmp/hosted-command.json \
+            --meta /tmp/hosted-meta.json \
+            --begin-dir /tmp/agent-cycle-begin \
+            --closure /tmp/agent-cycle-close/closure.json \
+            --evidence-dir /tmp/hosted-evidence \
+            --result /tmp/hosted-result.json
+          cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
+
+      - name: Upload close proof
+        id: close_artifact
+        if: steps.close.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-cycle-close-${{ github.run_id }}
+          path: /tmp/agent-cycle-close
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail close if proof was not preserved
+        if: steps.close.outcome == 'success' && steps.close_artifact.outcome != 'success'
+        env:
+          HOSTED_AGENT_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
+        run: |
+          python tools/hosted_agent_cycle.py failure \
+            --error HOSTED_AGENT_CLOSE_ARTIFACT_UPLOAD_FAILED \
+            --command /tmp/hosted-command.json \
+            --result /tmp/hosted-result.json
+
+      - name: Post compact hosted-cycle result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ ! -f /tmp/hosted-result.json ]; then
+            exit 0
+          fi
+          BODY="$(cat /tmp/hosted-result.json)"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+            -f body="MOBILIPRESENTER_AGENT_CYCLE_RESULT_V0_1
+          ${BODY}"
+
+      - name: Require operational result
+        if: always()
+        run: |
+          test -f /tmp/hosted-result.json
+          python - <<'PY'
+          import json
+          value=json.load(open('/tmp/hosted-result.json', encoding='utf-8'))
+          if value.get('status') not in {'READY','PASS'}:
+              raise SystemExit(2)
+          PY
