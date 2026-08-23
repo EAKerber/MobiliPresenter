@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m11-legacy-retirement-trigger-convergence-0-1",
   "workerId": "manager-gitops-primary",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/m11-convergence-closure-0.1",
   "prNumber": 142,
   "dependsOn": [
@@ -16,15 +16,14 @@
     "retire-ops-semantic-alias",
     "converge-legacy-workflow-triggers",
     "install-post-retirement-negative-invariants",
-    "validate-m11-convergence"
-  ],
-  "remaining": [
+    "validate-m11-convergence",
     "reconcile-m11-closure"
   ],
-  "nextAction": "validate-and-integrate-m11-closure",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "32d3bc1336eb310186302a3858f871ab970d6222",
-    "checkpoint": "M11-CV1B-CANONICAL-COORDINATION-SURFACE-0.1-CLOSED"
+    "sha": "f774c40af1d11d14dfd919b97ebec77ab2e9315d",
+    "checkpoint": "M11-CONVERGENCE-0.1-CLOSED"
   },
   "blockers": [],
   "handoffToWorkerId": null
