@@ -3,7 +3,7 @@ on:
   pull_request:
     paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
   push:
-    branches: ['renderer/**','architecture/**','ops/**','work/**','experiment/**']
+    branches: ['work/**','experiment/**']
     paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
   workflow_dispatch:
 jobs:
