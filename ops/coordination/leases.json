@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "m12-s2-manager-gitops-a-lease-acquire:0",
-      "resource": "branch:experiment/operations/m12-s2-manager-gitops",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m12-s2-manager-gitops-a-20260823T180242",
-        "branch": "experiment/operations/m12-s2-manager-gitops",
-        "pr": null
-      },
-      "reason": "M12-S2 ACTIVATION phase ownership",
-      "acquiredAt": "2026-08-23T21:07:46Z",
-      "renewedAt": "2026-08-23T21:07:46Z",
-      "expiresAt": "2026-08-23T21:52:46Z",
-      "ttlSeconds": 2700
-    }
-  ],
-  "revision": "8c19ef3cd2be616d86b3a6c893afbe139a11f3bc",
+  "leases": [],
+  "revision": "f7de0ad5f337e0c5130f1291ba44e68fae330d4e",
   "schemaVersion": "CoordinationState 0.1"
 }
