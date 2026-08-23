@@ -1,98 +1,58 @@
 # M11-CV1A — Convergence Coverage & Residue Inventory 0.1
 
-Status: implementation slice for M11 convergence. Read-only inspection; no alias retirement.
+Status: **historical evidence. CV1A/CV1C fulfilled the closed `lock`/`ops` convergence objective in M11; the runtime ConvergenceInspection surface was retired after the final proof.**
 
 ## Purpose
 
-CV1A establishes the evidence boundary required before compatibility surfaces can be migrated or retired. It does not make a legacy alias disappear merely because the M11 milestone has been reached.
+CV1A established the evidence boundary required before compatibility surfaces could be migrated or retired. It deliberately separated:
 
-The inspection separates:
+- `coverageStatus`: whether required consumer classes were observed;
+- `retirementReadiness`: whether a fully observed alias had no supported consumers requiring migration.
 
-- `coverageStatus`: whether the required consumer classes were observed;
-- `retirementReadiness`: whether a fully observed alias has no supported consumers that still require migration.
-
-A valid result may therefore be:
+A healthy pre-retirement result could therefore be:
 
 ```text
 coverageStatus = PASS
 retirementReadiness = MIGRATION_REQUIRED
 ```
 
-That is a healthy result, not a failed inspection.
+## Closed subjects
 
-## Subjects
-
-The 0.1 inspection tracks the two explicit M11 aliases already declared by OperationalSemantics:
+The inspection tracked exactly two M11 aliases:
 
 1. `coordination.lease` alias `lock`, scope `cli-name`;
 2. `branch.domain.operations` alias `ops`, scope `legacy-branch-namespace`.
 
-The subject set is closed in 0.1. New aliases require an explicit contract revision rather than silently entering the scan.
+The set was intentionally closed. It was never a general-purpose semantic lint framework.
 
-## Consumer classes
+## Coverage boundary
 
-Coverage is complete only when all of these classes are observed:
+Coverage combined tracked repository consumers with validated live branch/PR/Work evidence reused from `GitPrunePlan 0.4`. It distinguished workflow branch listeners from repository path filters, so retiring the branch listener `ops/**` never implied deleting repository path filters for `ops/**`.
 
-- repository tracked files;
-- workflow branch triggers;
-- current role pointers;
-- OperationalSemantics alias declarations;
-- live branch inventory;
-- open PR branch relations;
-- Work authority branch relations.
+It also distinguished historical grammar recognition from semantic projection: `ops` may remain in `branchGrammar.legacyNamespaces` while no longer resolving to semantic domain `operations`.
 
-Repository coverage is derived from the checked-out tracked tree. Runtime Git/PR/Work coverage is reused from a validated `GitPrunePlan 0.4`; CV1A does not create another branch/PR/Work observer.
+## Final M11 result
 
-## `lock`
-
-`tools/lock.py` is treated as an active legacy implementation, not as a cosmetic alias. Registered components, real Python imports, executable invocations and transitional tests remain visible as consumers.
-
-Documentation and historical evidence that merely mention `tools/lock.py` remain visible as non-blocking references; they must be reconciled during retirement, but they do not prove runtime dependency. The convergence detector and its own fixture tests are excluded from retirement readiness so the proof cannot create a self-dependency by naming the subject it inspects.
-
-`LOCK_OWNERSHIP_VIOLATION` is not considered use of the `lock` CLI merely because the token contains the word "LOCK". Error-code retirement is a separate compatibility decision.
-
-## `ops`
-
-The legacy branch namespace is distinct from the repository directory `ops/`.
-
-In workflow YAML:
-
-```yaml
-push:
-  branches: ['ops/**']  # legacy branch consumer
-
-  paths: ['ops/**']     # repository path filter, not the legacy branch alias
-```
-
-CV1A parses branch filters specifically so path filters are never retired by textual substitution.
-
-Keeping `ops` in `branchGrammar.legacyNamespaces` is also distinct from keeping the semantic alias `ops -> operations`: grammar recognition may remain after semantic projection is retired.
-
-## Current role pointers
-
-`docs/kickstarts/roles/*-current.md` files locate the current versioned role contract. They must not copy mutable infrastructure direction from ProjectState.
-
-This closes the known failure mode where an already-stale pointer stops matching the current ProjectState value and therefore disappears from value-based freshness discovery.
-
-## Trigger inventory
-
-The inspection records branch trigger patterns and classifies legacy namespace triggers without automatically retiring them. `renderer/**` and `architecture/**` are therefore visible adjacent residues, but CV1A does not assume that they share the same death condition as `ops/**`.
-
-## Runtime limitations
-
-The inspection proves coverage over:
+The final CV1C proof observed complete coverage and reported:
 
 ```text
-tracked repository consumers
-+ live branch/PR/Work evidence represented by GitPrunePlan
-+ declared current operational contracts
+lock = ABSENT / PASS / RETIRED
+ops  = ABSENT / PASS / RETIRED
+triggerRetirement = []
+residues = []
 ```
 
-It cannot prove the absence of an undocumented external script on an arbitrary operator machine. Later retirement still requires a compatibility migration path, not an assertion of global omniscience.
+The legacy `lock` compatibility surface, the semantic alias `ops`, and the retired `ops/**`, `renderer/**`, and `architecture/**` branch listeners were removed only after their live relations were proven absent. Repository path filters remained intact.
+
+## Runtime retirement
+
+Because the inspection subject set was exhausted by M11, keeping `tools/semantics/convergence.py`, its dedicated tests, and Agent Ops prune/convergence artifact generation would turn temporary migration scaffolding into permanent runtime surface.
+
+After the final proof was captured, M11 closure therefore retired that runtime scaffolding. Branch lifecycle planning remains owned by Branch Hygiene and its canonical `GitPrunePlan` path; normal Agent Ops continues to run OperationalSemantics coverage, ProjectMachine, Routine, Maintenance, Scheduler, and integration evidence.
 
 ## Authority boundaries
 
-`ConvergenceInspection 0.1` is:
+The historical inspection was always:
 
 ```text
 readOnly = true
@@ -100,6 +60,4 @@ semanticAuthority = false
 authorizesMutation = false
 ```
 
-It does not mutate Coordination, change Work, retire aliases, change writer topology, change ProjectState, or authorize M12.
-
-CV1B owns migration to a canonical Coordination surface. CV1C owns retirement only after coverage is rebuilt over the migrated state.
+It never mutated Coordination, Work, ProjectState, aliases, branch refs, or writer topology. This document remains as the design/evidence record; it is not a current invocable contract.

@@ -20,12 +20,17 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertEqual(missing,[])
     def test_viewer_validation_has_no_repository_write_path(self):
         text=self.text("viewer-next.yml");self.assertIn("contents: read",text);self.assertNotIn("contents: write",text);self.assertNotIn("persist-viewer-artifacts.py",text);self.assertNotIn("artifact/viewer-next-",text)
-    def test_workflows_do_not_encode_git_prune_plan_internals(self):
+    def test_branch_hygiene_owns_prune_plan_validation(self):
+        hygiene=self.text("branch-hygiene.yml");agent=self.text("agent-ops.yml")
         forbidden=("GitPrunePlan","branchInventoryComplete","prHistoryComplete","ancestryComplete","requiresPlanFile","requiresExpectedPlan","requiresExplicitAuthorization","autoDeleteEligible")
-        for name in ("agent-ops.yml","branch-hygiene.yml"):
-            text=self.text(name)
+        for name,text in (("agent-ops.yml",agent),("branch-hygiene.yml",hygiene)):
             for token in forbidden:self.assertNotIn(token,text,f"{name} encodes prune-plan internals: {token}")
-            self.assertIn("tools/prune_plan.py validate",text)
+        self.assertIn("tools/prune_plan.py validate",hygiene)
+        self.assertNotIn("tools/prune_plan.py",agent)
+    def test_agent_ops_does_not_reintroduce_m11_convergence_pipeline(self):
+        text=self.text("agent-ops.yml")
+        for token in ("tools.semantics convergence","convergence-inspection","Generate branch prune audit","git-prune-plan"):
+            self.assertNotIn(token,text)
     def test_branch_hygiene_does_not_duplicate_cleanup_for_merged_prs(self):
         text=self.text("branch-hygiene.yml")
         self.assertIn("push:\n    branches: [main]",text)
