@@ -43,13 +43,21 @@ class SemanticRegistryTests(unittest.TestCase):
     def test_legacy_alias_requires_retirement_target(self):
         value = registry.load_registry()
         broken = copy.deepcopy(value)
-        broken["concepts"]["branch.domain.operations"]["aliases"][0].pop("retireBy")
+        broken["concepts"]["coordination.lease"]["aliases"] = [
+            {"term": "synthetic-legacy", "scope": "test-scope", "status": "legacy"}
+        ]
         self.assertIn("SEMANTIC_ALIAS_RETIREMENT_REQUIRED", registry.validate_registry(broken))
 
     def test_retired_lock_term_is_unknown(self):
         self.assertEqual([], registry.aliases_for("coordination.lease"))
         with self.assertRaisesRegex(RuntimeError, "SEMANTIC_TERM_UNKNOWN"):
             registry.resolve_term("lock", scope="cli-name")
+
+    def test_retired_ops_term_is_unknown_but_historical_grammar_remains(self):
+        self.assertEqual([], registry.aliases_for("branch.domain.operations"))
+        self.assertIn("ops", registry.load_registry()["branchGrammar"]["legacyNamespaces"])
+        with self.assertRaisesRegex(RuntimeError, "SEMANTIC_TERM_UNKNOWN"):
+            registry.resolve_term("ops", scope="legacy-branch-namespace")
 
     def test_unknown_owner_is_rejected(self):
         value = registry.load_registry()
