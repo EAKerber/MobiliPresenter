@@ -61,34 +61,6 @@ jobs:
         run: python tools/agent.py doctor --json
       - name: Verify local coherence
         run: python tools/agent.py verify --json
-      - name: Generate branch prune audit
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python tools/prune_plan.py --json > /tmp/git-prune-plan.json
-          python tools/prune_plan.py validate /tmp/git-prune-plan.json --json > /tmp/git-prune-plan-validation.json
-      - name: Generate convergence inspection
-        if: github.event_name == 'pull_request'
-        run: |
-          python -m tools.semantics convergence --prune-plan /tmp/git-prune-plan.json --json > /tmp/convergence-inspection.json
-          python -m json.tool /tmp/convergence-inspection.json > /dev/null
-      - name: Upload convergence inspection
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: convergence-inspection
-          path: /tmp/convergence-inspection.json
-          if-no-files-found: error
-      - name: Upload branch prune audit
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: git-prune-plan
-          path: |
-            /tmp/git-prune-plan.json
-            /tmp/git-prune-plan-validation.json
-          if-no-files-found: error
       - name: Generate Project Machine inspection
         if: github.event_name == 'pull_request'
         env:

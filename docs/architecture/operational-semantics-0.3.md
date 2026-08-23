@@ -1,6 +1,6 @@
 # OperationalSemantics 0.3 — typed inventory and contextual entry
 
-Status: **M10 closed. OperationalSemantics 0.3, Agent Cycle Entry and Agent Cycle Close/receipt are integrated; M11 convergence is the next infrastructure stage.**
+Status: **M10 OperationalSemantics and Agent Cycle are integrated; M11 convergence is closed. M12 remote canonical execution is the next infrastructure stage.**
 
 ## Purpose
 
@@ -22,21 +22,17 @@ Only runtime-observed descriptors are resolved by `RuntimeCapabilityInspection 0
 
 An intent facet says that a capability is semantically relevant to an intent; it does not by itself mean the capability is mandatory.
 
-Required capabilities are recorded explicitly in the SemanticFoundations contract. Unlisted matching capabilities use the closed default `relevant`.
+Required capabilities are recorded explicitly in the SemanticFoundations contract. Unlisted matching capabilities use the closed default `relevant`. Required capabilities remain visible even when provider observation or scope is insufficient.
 
-Required capabilities remain visible even when provider observation or scope is insufficient.
+## Semantic context and AgentSemanticBrief
 
-## Semantic context
+`AgentSemanticContext 0.1` adds role, declaredIntent, lifecyclePhase, objects[], operations[] and scope[] so relevance is not inferred from a broad role+intent projection. Objects and operations are policy inputs, not authorization. Scope constrains availability but never grants authority.
 
-`AgentSemanticContext 0.1` adds the typed fields needed to avoid a broad role+intent projection: role, declaredIntent, lifecyclePhase, objects[], operations[] and scope[]. Objects and operations are policy inputs, not authorization. Scope constrains availability but never grants authority.
-
-## AgentSemanticBrief
-
-`AgentSemanticBrief 0.1` composes `CapabilityRelevanceProjection 0.1` and at most three EcosystemMaxims. Inputs are hash-bound to current context, registry, semantic coverage, maxims catalog, runtime capability inspection and role contracts. The brief is always read-only, non-authoritative and non-mutating.
+`AgentSemanticBrief 0.1` composes `CapabilityRelevanceProjection 0.1` and at most three EcosystemMaxims. Inputs are hash-bound to current context, registry, semantic coverage, maxims catalog, runtime capability inspection and role contracts. The brief is read-only, non-authoritative and non-mutating.
 
 ## EcosystemMaxims
 
-The eight maxims remain versioned in `ops/semantics/maxims.json`. Selection is deterministic. Maxims may influence recommendation ordering only; they never alter availability, eligibility, scope, authority or permission.
+The versioned maxims in `ops/semantics/maxims.json` are deterministic guidance. They may influence recommendation ordering only; they never alter availability, eligibility, scope, authority or permission.
 
 ## Agent Cycle
 
@@ -50,21 +46,28 @@ See `docs/architecture/agent-cycle-0.1.md`.
 
 `CAPABILITY_DISCOVERY_FRESHNESS_GUARD` binds the brief to context, OperationalSemantics, semantic coverage, EcosystemMaxims, role contract content and runtime capability observation. `STALE != FRESH` and `TAMPERED != STALE`.
 
-Role `*-current.md` files are locators for the current versioned role contract. Mutable infrastructure direction belongs to ProjectState and must not be copied into those pointers. This prevents an already-stale pointer from disappearing from value-based freshness discovery merely because it no longer contains the current value.
+Role `*-current.md` files are locators for the current versioned role contract. Mutable infrastructure direction belongs to ProjectState and must not be copied into those pointers.
 
 ## Coverage
 
-OperationalSemantics coverage scans policy-declared Python entrypoints and workflows, registered contracts/schemas, runtime capability descriptors and provider profiles. Internal pure composition modules do not become new invocable surfaces merely because they are Python modules. The existing `semantic-cli` and `agent-cli` remain the public composition surfaces.
+OperationalSemantics coverage scans policy-declared Python entrypoints and workflows, registered contracts/schemas, runtime capability descriptors and provider profiles. Internal pure composition modules do not become invocable surfaces merely because they are Python modules. The existing `semantic-cli` and `agent-cli` remain public composition surfaces.
 
-M11-CV1A adds `ConvergenceInspection 0.1` as an internal read-only inspection exposed through the already registered semantic CLI. It separates two questions:
+M11 temporarily added `ConvergenceInspection` to prove migration and retirement readiness for the closed aliases `lock` and `ops`. After the final CV1C proof reported both aliases `ABSENT/PASS/RETIRED`, that migration-only inspection and its Agent Ops artifact pipeline were retired. Its historical design record remains in `docs/architecture/convergence-coverage-0.1.md`.
 
-- `coverageStatus`: whether all required consumer classes were observed;
-- `retirementReadiness`: whether a legacy alias is actually ready to be retired.
+## M11 convergence result
 
-`coverageStatus=PASS` therefore does not imply `retirementReadiness=READY`. A fully observed alias may correctly remain `MIGRATION_REQUIRED`.
+M11 preserved the single-writer rule while converging the operator and branch surfaces:
+
+- `tools/coordination_cli.py` is the canonical Coordination operator adapter;
+- `coordination-executor` remains the single writer for `coordination-leases`;
+- `tools/lock.py` and the semantic alias `lock` are retired;
+- semantic alias `ops -> operations` is retired;
+- `ops` remains only as historical branch grammar recognition, not semantic projection;
+- legacy branch listeners `ops/**`, `renderer/**`, and `architecture/**` were retired only after live branch/PR/Work relations were absent;
+- repository path filters such as `ops/**` remain unchanged where they refer to repository paths.
 
 ## Boundaries preserved
 
-OperationalSemantics does not become a mutation authority. `ConvergenceInspection 0.1` does not retire aliases, rewrite Coordination, alter writer topology, infer external consumers from absence of repository matches, or authorize future milestones.
+OperationalSemantics does not become a mutation authority. Historical convergence evidence does not authorize future milestones. Branch lifecycle planning remains under Branch Hygiene; ProjectState remains the mutable infrastructure direction authority.
 
-M11 convergence must preserve the existing single-writer rule. `tools/lock.py` and the `lock`/`ops` aliases remain until their supported consumers are migrated and a later convergence slice proves retirement admissible.
+M12 must preserve these boundaries while introducing the remote canonical execution bridge: provider/carrier availability may expose a path, but it cannot acquire semantic authority or bypass plan validation, expected heads, allowlists, readback, or receipts.
