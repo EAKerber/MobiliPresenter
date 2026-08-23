@@ -25,6 +25,35 @@ RESULT_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1"
 BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
 FAILURE_SCHEMA = "RemoteCanonicalExecutionFailure 0.1"
 
+MANAGER_ROLE = "manager-gitops"
+UI_ROLE = "ui-ux"
+UI_ALLOWED_BRANCH_PREFIXES = ("experiment/ui/", "work/ui/")
+UI_ALLOWED_PATH_PREFIXES = ("viewer-next/src/ui/", "docs/ui/")
+UI_ALLOWED_OPERATIONS = {"create-file", "update-file", "delete-file"}
+
+
+def authorize_role_route(command: dict[str, Any]) -> dict[str, Any]:
+    """Fail closed when a hosted actor asks the bridge for a route outside its role boundary."""
+    command = validate_command(command)
+    role = command["actor"]["role"]
+    if role == MANAGER_ROLE:
+        return command
+    if role != UI_ROLE:
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_UNSUPPORTED")
+    if command["kind"] != "git-direct":
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_ROUTE_FORBIDDEN")
+
+    target = command["target"]
+    if target["operation"] not in UI_ALLOWED_OPERATIONS:
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_OPERATION_FORBIDDEN")
+    branch = target["branch"]
+    if not any(branch.startswith(prefix) and len(branch) > len(prefix) for prefix in UI_ALLOWED_BRANCH_PREFIXES):
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_BRANCH_FORBIDDEN")
+    path = target.get("path")
+    if not isinstance(path, str) or not any(path.startswith(prefix) and len(path) > len(prefix) for prefix in UI_ALLOWED_PATH_PREFIXES):
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_PATH_FORBIDDEN")
+    return command
+
 
 def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(value, dict):
@@ -53,7 +82,7 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         command = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_JSON_INVALID") from exc
-    command = validate_command(command)
+    command = authorize_role_route(validate_command(command))
     issue_number = issue.get("number")
     comment_id = comment.get("id")
     if (
