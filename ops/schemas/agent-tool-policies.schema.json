@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-policies-0.1.json",
+  "title": "AgentToolPolicyCatalog 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entryProfiles", "targetPolicies", "tools"],
+  "properties": {
+    "schemaVersion": {"const": "AgentToolPolicyCatalog 0.1"},
+    "entryProfiles": {"type": "object", "minProperties": 1},
+    "targetPolicies": {"type": "object", "minProperties": 1},
+    "tools": {"type": "object", "minProperties": 1}
+  }
+}
