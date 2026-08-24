@@ -153,6 +153,10 @@ def entry_profile(role: str, declared_intent: str, *, policy: dict[str, Any] | N
     return deepcopy(profile)
 
 
-def policy_hash(value: dict[str, Any] | None = None) -> str:
-    policy = load_policy() if value is None else validate_policy(value)
+def policy_hash(
+    value: dict[str, Any] | None = None,
+    *,
+    registry: dict[str, Any] | None = None,
+) -> str:
+    policy = load_policy() if value is None else validate_policy(value, registry=registry)
     return stable_hash(policy)
