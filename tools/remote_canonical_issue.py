@@ -13,10 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tools.agent_commands.agent_owned_git import execute_agent_owned_git
 from tools.canonical import stable_hash
 from tools.remote_canonical_execution import (
     RemoteCanonicalExecutionError,
-    execute_command,
+    execute_command as execute_remote_command,
     validate_command,
 )
 
@@ -53,6 +54,26 @@ def authorize_role_route(command: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(path, str) or not any(path.startswith(prefix) and len(path) > len(prefix) for prefix in UI_ALLOWED_PATH_PREFIXES):
         raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_PATH_FORBIDDEN")
     return command
+
+
+def execute_command(
+    command: dict[str, Any],
+    *,
+    source: dict[str, Any],
+    transport: Any | None = None,
+) -> dict[str, Any]:
+    """Execute one hosted command through its role-specific canonical path.
+
+    Manager/GitOps direct-Git writes use the agent-owned lease guard.  Domain
+    routes retain their canonical writers, and the current UI role-scoped path
+    remains unchanged until a lease-acquire facade can expose its Coordination
+    receipts to Agent Cycle close without hidden durable mutations.
+    """
+
+    command = authorize_role_route(validate_command(command))
+    if command["kind"] == "git-direct" and command["actor"]["role"] == MANAGER_ROLE:
+        return execute_agent_owned_git(command, source=source, transport=transport)
+    return execute_remote_command(command, source=source, transport=transport)
 
 
 def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
