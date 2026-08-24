@@ -30,15 +30,16 @@
       }
     },
     "conditionalEntry": {
-      "allOf": [
-        {"$ref": "#/$defs/entry"},
-        {
-          "type": "object",
-          "required": ["reasonCode"],
-          "properties": {"reasonCode": {"type": "string", "minLength": 1}}
-        }
-      ],
-      "unevaluatedProperties": false
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolId", "effectClass", "mode", "requiredCapabilities", "reasonCode"],
+      "properties": {
+        "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
+        "mode": {"enum": ["plan-only", "read-only-execute"]},
+        "requiredCapabilities": {"$ref": "#/$defs/capabilityList"},
+        "reasonCode": {"type": "string", "minLength": 1}
+      }
     }
   }
 }
