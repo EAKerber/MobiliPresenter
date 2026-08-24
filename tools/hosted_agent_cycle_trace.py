@@ -1,16 +1,15 @@
-#!/usr/bin/env python3
-"""Read-only trace gate and evidence discovery for Hosted Agent Cycle close."""
+"""Read-only trace gate and evidence discovery for Hosted Agent Cycle close.
+
+This module is an internal helper of the already-registered hosted Agent Cycle
+surface.  It deliberately has no standalone CLI entrypoint; the hosted workflow
+invokes it from its registered workflow surface.
+"""
 from __future__ import annotations
 
 import copy
 import json
-import sys
 from pathlib import Path
 from typing import Any
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from tools import hosted_agent_cycle
 from tools.agent_tools import trace as trace_contract
@@ -69,40 +68,29 @@ def prepare_close(
     return amended, trace_value
 
 
-def main(argv: list[str] | None = None) -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(prog="hosted-agent-cycle-trace")
-    parser.add_argument("--command", required=True)
-    parser.add_argument("--meta", required=True)
-    parser.add_argument("--begin-dir", required=True)
-    parser.add_argument("--command-out", required=True)
-    parser.add_argument("--trace-out", required=True)
-    args = parser.parse_args(argv)
-    try:
-        command = _load(args.command)
-        meta = _load(args.meta)
-        root = Path(args.begin_dir)
-        context = _load(root / "context.json")
-        manifest = _load(root / "manifest.json")
-        comments = trace_collect.fetch_issue_comments(
-            hosted_agent_cycle.REPOSITORY,
-            manifest["source"]["issueNumber"],
-        )
-        amended, trace_value = prepare_close(command, meta, manifest, context, comments)
-        _write(args.command_out, amended)
-        _write(args.trace_out, trace_value)
-        print(json.dumps({
-            "status": "PASS",
-            "traceHash": trace_value["traceHash"],
-            "attemptCount": trace_value["summary"]["attemptCount"],
-            "evidenceCommentIds": amended["evidenceCommentIds"],
-        }, ensure_ascii=False))
-        return 0
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+def prepare_close_from_files(
+    *,
+    command_path: str | Path,
+    meta_path: str | Path,
+    begin_dir: str | Path,
+    command_out: str | Path,
+    trace_out: str | Path,
+) -> dict[str, Any]:
+    command = _load(command_path)
+    meta = _load(meta_path)
+    root = Path(begin_dir)
+    context = _load(root / "context.json")
+    manifest = _load(root / "manifest.json")
+    comments = trace_collect.fetch_issue_comments(
+        hosted_agent_cycle.REPOSITORY,
+        manifest["source"]["issueNumber"],
+    )
+    amended, trace_value = prepare_close(command, meta, manifest, context, comments)
+    _write(command_out, amended)
+    _write(trace_out, trace_value)
+    return {
+        "status": "PASS",
+        "traceHash": trace_value["traceHash"],
+        "attemptCount": trace_value["summary"]["attemptCount"],
+        "evidenceCommentIds": amended["evidenceCommentIds"],
+    }
