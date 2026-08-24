@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "TransitionPlan 0.1",
+  "domain": "project-state",
+  "action": "checkpoint",
+  "subject": {
+    "kind": "project-state",
+    "id": "mobilipresenter"
+  },
+  "authority": {
+    "kind": "repository-file",
+    "locator": {
+      "path": "ops/state/project.json"
+    }
+  },
+  "beforeStateHash": "eebbe797d6149d6eefecb66d3783402e2014be7c858d2a84ba7761765bafd03d",
+  "afterStateHash": "eea878c14e3d464399f264982097c61127922d05d2a4006d8dfa05f8a677d0ed",
+  "intent": {
+    "checkpoint": "M12-AT1-AGENT-TOOL-FOUNDATIONS-CLOSED",
+    "nextTransition": "implement-m12-at2-registered-agent-tool-interface-v0.1",
+    "phase": "between-increments"
+  },
+  "candidate": {
+    "schemaVersion": "ProjectState 2.1",
+    "project": {
+      "id": "mobilipresenter",
+      "repository": "EAKerber/MobiliPresenter"
+    },
+    "git": {
+      "controlBranch": "main",
+      "protectedBranches": []
+    },
+    "published": {
+      "url": "https://mobilipresenter.netlify.app/",
+      "artifactManifest": "ops/published/viewer-next-current.json"
+    },
+    "development": {
+      "initiative": "Viewer Next — Responsive Fixed-Frame",
+      "phase": "between-increments",
+      "checkpoint": "M12-AT1-AGENT-TOOL-FOUNDATIONS-CLOSED",
+      "nextTransition": "implement-m12-at2-registered-agent-tool-interface-v0.1"
+    }
+  },
+  "reversibility": "revertible",
+  "planHash": "08c72724bbe79d8b73e99a4f1d3f4c83c4824aaa7abcbb7ba24739e2f1f7dafc"
+}
