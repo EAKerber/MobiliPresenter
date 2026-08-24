@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "TransitionReceipt 0.1",
+  "planHash": "08c72724bbe79d8b73e99a4f1d3f4c83c4824aaa7abcbb7ba24739e2f1f7dafc",
+  "domain": "project-state",
+  "action": "checkpoint",
+  "subject": {
+    "kind": "project-state",
+    "id": "mobilipresenter"
+  },
+  "authority": {
+    "kind": "repository-file",
+    "locator": {
+      "path": "ops/state/project.json"
+    }
+  },
+  "beforeStateHash": "eebbe797d6149d6eefecb66d3783402e2014be7c858d2a84ba7761765bafd03d",
+  "afterStateHash": "eea878c14e3d464399f264982097c61127922d05d2a4006d8dfa05f8a677d0ed",
+  "readbackStateHash": "eea878c14e3d464399f264982097c61127922d05d2a4006d8dfa05f8a677d0ed",
+  "authorityRevision": "2dd67b28a7eb5f54074488146def3bf9e8535bbe",
+  "verified": true,
+  "receiptHash": "391cd5b74837fb700f691fa1c0ba932660ed20c5e5747f5426941b2c7e57bd5d"
+}
