@@ -1,0 +1,156 @@
+name: Hosted Agent Tool
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: hosted-agent-tool-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  tool:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.title == 'MobiliPresenter Remote Canonical Execution Bus' &&
+      github.event.comment.author_association == 'OWNER' &&
+      startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Preserve raw request when possible
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
+          body=event.get('comment',{}).get('body')
+          marker='MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1\n'
+          if isinstance(body,str) and body.startswith(marker):
+              try:
+                  value=json.loads(body[len(marker):].strip())
+              except json.JSONDecodeError:
+                  value=None
+              if isinstance(value,dict):
+                  Path('/tmp/agent-tool-raw-request.json').write_text(json.dumps(value),encoding='utf-8')
+          PY
+
+      - name: Parse closed Agent Tool request
+        id: parse
+        continue-on-error: true
+        run: |
+          python tools/hosted_agent_tool.py parse-event \
+            --event "$GITHUB_EVENT_PATH" \
+            --request-out /tmp/agent-tool-request.json \
+            --meta-out /tmp/agent-tool-meta.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Materialize parse failure
+        if: steps.parse.outcome != 'success'
+        run: |
+          if [ -f /tmp/agent-tool-raw-request.json ]; then
+            python tools/hosted_agent_tool.py failure \
+              --error HOSTED_AGENT_TOOL_PARSE_FAILED \
+              --request /tmp/agent-tool-raw-request.json \
+              --result /tmp/agent-tool-result.json || true
+          else
+            python tools/hosted_agent_tool.py failure \
+              --error HOSTED_AGENT_TOOL_PARSE_FAILED \
+              --result /tmp/agent-tool-result.json || true
+          fi
+
+      - name: Download exact begin context
+        id: download_begin
+        if: steps.parse.outcome == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-cycle-begin-${{ steps.parse.outputs.begin_run_id }}
+          path: /tmp/agent-cycle-begin
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.parse.outputs.begin_run_id }}
+
+      - name: Checkout exact begin semantic host
+        id: checkout_begin
+        if: steps.download_begin.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.parse.outputs.begin_source_sha }}
+
+      - name: Materialize begin binding failure
+        if: steps.parse.outcome == 'success' && (steps.download_begin.outcome != 'success' || steps.checkout_begin.outcome != 'success')
+        run: |
+          python tools/hosted_agent_tool.py failure \
+            --error HOSTED_AGENT_TOOL_BEGIN_ARTIFACT_UNAVAILABLE \
+            --request /tmp/agent-tool-request.json \
+            --result /tmp/agent-tool-result.json || true
+
+      - name: Resolve or execute Agent Tool
+        id: execute
+        if: steps.checkout_begin.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/hosted_agent_tool.py execute \
+            --request /tmp/agent-tool-request.json \
+            --begin-dir /tmp/agent-cycle-begin \
+            --plan /tmp/agent-tool-plan.json \
+            --result /tmp/agent-tool-result.json
+
+      - name: Upload Agent Tool proof
+        if: steps.execute.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-tool-${{ github.run_id }}
+          path: |
+            /tmp/agent-tool-request.json
+            /tmp/agent-tool-plan.json
+            /tmp/agent-tool-result.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish Agent Tool result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ ! -f /tmp/agent-tool-result.json ]; then
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads(Path('/tmp/agent-tool-result.json').read_text(encoding='utf-8'))
+          body='MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1\n```json\n'+json.dumps(result,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/agent-tool-comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --input /tmp/agent-tool-comment.json
+
+      - name: Require operational result
+        if: always()
+        run: |
+          test -f /tmp/agent-tool-result.json
+          python - <<'PY'
+          import json
+          value=json.load(open('/tmp/agent-tool-result.json',encoding='utf-8'))
+          if value.get('status') not in {'PASS','PLANNED'}:
+              raise SystemExit(2)
+          PY
