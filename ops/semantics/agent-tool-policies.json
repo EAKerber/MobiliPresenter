@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "AgentToolPolicyCatalog 0.1",
+  "entryProfiles": {
+    "manager-gitops": {
+      "bootstrap-discovery": {
+        "lifecyclePhase": "bootstrap",
+        "objects": ["capability", "project-state", "repository"],
+        "operations": ["bootstrap", "inspection", "repository-discovery"],
+        "scope": ["repository:read"]
+      },
+      "inspect-and-plan": {
+        "lifecyclePhase": "bootstrap",
+        "objects": ["artifact", "branch", "capability", "coordination", "project-state", "pull-request", "repository", "work-item", "workflow"],
+        "operations": ["bootstrap", "inspection", "planning", "readback", "repository-discovery", "validation"],
+        "scope": ["repository:read", "workflow:read"]
+      }
+    },
+    "ui-ux": {
+      "bootstrap-discovery": {
+        "lifecyclePhase": "bootstrap",
+        "objects": ["artifact", "project-state", "repository"],
+        "operations": ["bootstrap", "inspection", "repository-discovery"],
+        "scope": ["repository:read"]
+      },
+      "inspect-and-plan": {
+        "lifecyclePhase": "bootstrap",
+        "objects": ["artifact", "branch", "pull-request", "repository", "workflow"],
+        "operations": ["inspection", "repository-discovery", "validation"],
+        "scope": ["repository:read", "workflow:read"]
+      }
+    }
+  },
+  "targetPolicies": {
+    "manager-non-control-git": {
+      "kind": "git-file",
+      "branchPrefixes": [],
+      "forbiddenBranches": ["main"],
+      "pathPrefixes": []
+    },
+    "none": {
+      "kind": "none",
+      "branchPrefixes": [],
+      "forbiddenBranches": [],
+      "pathPrefixes": []
+    },
+    "ui-owned-git": {
+      "kind": "git-file",
+      "branchPrefixes": ["experiment/ui/", "work/ui/"],
+      "forbiddenBranches": ["main"],
+      "pathPrefixes": ["docs/ui/", "viewer-next/src/ui/"]
+    }
+  },
+  "tools": {
+    "git.file.create": {
+      "adapter": "remote-git-file",
+      "effectClass": "shared-durable-mutation",
+      "mode": "plan-only",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": ["coordination-lease-owned", "git-cas"],
+          "requiredCapabilities": ["remote.canonical.execute"],
+          "targetPolicy": "manager-non-control-git"
+        },
+        "ui-ux": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": ["git-cas"],
+          "requiredCapabilities": ["remote.git.role-scoped-mutate"],
+          "targetPolicy": "ui-owned-git"
+        }
+      }
+    },
+    "git.file.delete": {
+      "adapter": "remote-git-file",
+      "effectClass": "shared-durable-mutation",
+      "mode": "plan-only",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": ["coordination-lease-owned", "git-cas"],
+          "requiredCapabilities": ["remote.canonical.execute"],
+          "targetPolicy": "manager-non-control-git"
+        },
+        "ui-ux": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": ["git-cas"],
+          "requiredCapabilities": ["remote.git.role-scoped-mutate"],
+          "targetPolicy": "ui-owned-git"
+        }
+      }
+    },
+    "git.file.update": {
+      "adapter": "remote-git-file",
+      "effectClass": "shared-durable-mutation",
+      "mode": "plan-only",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": ["coordination-lease-owned", "git-cas"],
+          "requiredCapabilities": ["remote.canonical.execute"],
+          "targetPolicy": "manager-non-control-git"
+        },
+        "ui-ux": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": ["git-cas"],
+          "requiredCapabilities": ["remote.git.role-scoped-mutate"],
+          "targetPolicy": "ui-owned-git"
+        }
+      }
+    },
+    "project.inspect": {
+      "adapter": "project-inspect",
+      "effectClass": "read-only",
+      "mode": "read-only-execute",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": [],
+          "requiredCapabilities": ["project.inspect"],
+          "targetPolicy": "none"
+        },
+        "ui-ux": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": [],
+          "requiredCapabilities": ["project.inspect"],
+          "targetPolicy": "none"
+        }
+      }
+    },
+    "routine.inspect": {
+      "adapter": "routine-inspect",
+      "effectClass": "read-only",
+      "mode": "read-only-execute",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": [],
+          "requiredCapabilities": ["routine.inspect"],
+          "targetPolicy": "none"
+        }
+      }
+    }
+  }
+}

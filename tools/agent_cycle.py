@@ -4,10 +4,13 @@ from copy import deepcopy
 from typing import Any, Callable
 
 from tools import maintenance_inspect, project_machine, routines, runtime_capabilities, scheduler_plan
+from tools.agent_tools import policy as agent_tool_policy
+from tools.agent_tools import projection as agent_tool_projection
 from tools.canonical import stable_hash
 from tools.semantics import brief as semantic_brief
 
-SCHEMA_VERSION = "AgentCycleContext 0.1"
+SCHEMA_VERSION = "AgentCycleContext 0.2"
+LEGACY_SCHEMA_VERSION = "AgentCycleContext 0.1"
 LEGACY_CLOSE_VERSION = "AgentCycleCloseFoundation 0.1"
 CLOSE_VERSION = "AgentCycleCloseContract 0.1"
 STATUSES = {"READY", "UNKNOWN", "BLOCKED"}
@@ -21,54 +24,19 @@ CLOSE_EVIDENCE = [
     "emit-agent-cycle-receipt",
 ]
 
-ENTRY_PROFILES = {
-    ("manager-gitops", "bootstrap-discovery"): {
-        "lifecyclePhase": "bootstrap",
-        "objects": ["capability", "project-state", "repository"],
-        "operations": ["bootstrap", "inspection", "repository-discovery"],
-        "scope": ["repository:read"],
-    },
-    ("manager-gitops", "inspect-and-plan"): {
-        "lifecyclePhase": "bootstrap",
-        "objects": [
-            "artifact", "branch", "capability", "coordination", "project-state",
-            "pull-request", "repository", "work-item", "workflow",
-        ],
-        "operations": [
-            "bootstrap", "inspection", "planning", "readback",
-            "repository-discovery", "validation",
-        ],
-        "scope": ["repository:read", "workflow:read"],
-    },
-    ("ui-ux", "bootstrap-discovery"): {
-        "lifecyclePhase": "bootstrap",
-        "objects": ["artifact", "project-state", "repository"],
-        "operations": ["bootstrap", "inspection", "repository-discovery"],
-        "scope": ["repository:read"],
-    },
-    ("ui-ux", "inspect-and-plan"): {
-        "lifecyclePhase": "bootstrap",
-        "objects": ["artifact", "branch", "pull-request", "repository", "workflow"],
-        "operations": ["inspection", "repository-discovery", "validation"],
-        "scope": ["repository:read", "workflow:read"],
-    },
-}
-
 
 def entry_profile(role: str, declared_intent: str) -> dict[str, Any]:
-    value = ENTRY_PROFILES.get((role, declared_intent))
-    if value is None:
-        raise RuntimeError("AGENT_CYCLE_ENTRY_PROFILE_REQUIRED")
-    return deepcopy(value)
+    return agent_tool_policy.entry_profile(role, declared_intent)
 
 
 FIELDS = {
     "schemaVersion", "cycleId", "status", "repository", "semanticContext",
     "projectMachine", "runtimeCapabilities", "routineInspection",
-    "maintenanceInspection", "schedulerPlan", "semanticBrief", "baseline",
+    "maintenanceInspection", "schedulerPlan", "semanticBrief", "agentTools", "baseline",
     "blockingUnknowns", "closeRequirements", "readOnly", "semanticAuthority",
     "authorizesMutation", "contextHash",
 }
+LEGACY_FIELDS = FIELDS - {"agentTools"}
 
 
 def _slot_pass(value: dict[str, Any]) -> dict[str, Any]:
@@ -181,6 +149,7 @@ def build_context(*, role, declared_intent, lifecycle_phase, objects, operations
     maintenance_slot = _derive_maintenance(machine, routine_slot)
     scheduler_slot = _derive_scheduler(maintenance_slot)
     brief = semantic_brief.build_brief(semantic_context, runtime_inspection)
+    tools = agent_tool_projection.build_projection(semantic_context, brief)
     status, blockers = _aggregate_status(machine, routine_slot, maintenance_slot, scheduler_slot, brief)
     baseline = {
         "projectMachineInspectionHash": machine["inspectionHash"],
@@ -190,6 +159,7 @@ def build_context(*, role, declared_intent, lifecycle_phase, objects, operations
         "maintenanceInspectionHash": maintenance_slot["value"]["inspectionHash"] if maintenance_slot["status"] == "PASS" else None,
         "schedulerPlanHash": scheduler_slot["value"]["planHash"] if scheduler_slot["status"] == "PASS" else None,
         "semanticBriefHash": brief["briefHash"],
+        "agentToolProjectionHash": tools["projectionHash"],
         "sourceHeads": deepcopy(machine["sourceHeads"]),
     }
     baseline_hash = stable_hash(baseline); baseline["baselineHash"] = baseline_hash
@@ -205,6 +175,7 @@ def build_context(*, role, declared_intent, lifecycle_phase, objects, operations
         "maintenanceInspection": maintenance_slot,
         "schedulerPlan": scheduler_slot,
         "semanticBrief": brief,
+        "agentTools": tools,
         "baseline": baseline,
         "blockingUnknowns": blockers,
         "closeRequirements": _close_requirements(),
@@ -229,8 +200,10 @@ def _expected_baseline(value: dict[str, Any]) -> dict[str, Any]:
         "maintenanceInspectionHash": maintenance_slot["value"]["inspectionHash"] if maintenance_slot["status"] == "PASS" else None,
         "schedulerPlanHash": scheduler_slot["value"]["planHash"] if scheduler_slot["status"] == "PASS" else None,
         "semanticBriefHash": value["semanticBrief"]["briefHash"],
-        "sourceHeads": deepcopy(value["projectMachine"]["sourceHeads"]),
     }
+    if value.get("schemaVersion") == SCHEMA_VERSION:
+        body["agentToolProjectionHash"] = value["agentTools"]["projectionHash"]
+    body["sourceHeads"] = deepcopy(value["projectMachine"]["sourceHeads"])
     return {**body, "baselineHash": stable_hash(body)}
 
 
@@ -256,10 +229,14 @@ def _validate_close(close: Any) -> None:
 
 
 def validate_context(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != FIELDS:
+    if not isinstance(value, dict):
         raise RuntimeError("AGENT_CYCLE_CONTEXT_FIELDS_INVALID")
-    if value.get("schemaVersion") != SCHEMA_VERSION:
+    version = value.get("schemaVersion")
+    expected_fields = FIELDS if version == SCHEMA_VERSION else LEGACY_FIELDS if version == LEGACY_SCHEMA_VERSION else None
+    if expected_fields is None:
         raise RuntimeError("AGENT_CYCLE_CONTEXT_SCHEMA_UNSUPPORTED")
+    if set(value) != expected_fields:
+        raise RuntimeError("AGENT_CYCLE_CONTEXT_FIELDS_INVALID")
     if value.get("status") not in STATUSES:
         raise RuntimeError("AGENT_CYCLE_CONTEXT_STATUS_INVALID")
     cycle_id = value.get("cycleId")
@@ -275,6 +252,10 @@ def validate_context(value: Any) -> dict[str, Any]:
     semantic_brief.validate_brief(value.get("semanticBrief")); semantic_brief.validate_context(value.get("semanticContext"))
     if value["semanticBrief"]["context"] != value["semanticContext"]:
         raise RuntimeError("AGENT_CYCLE_SEMANTIC_CONTEXT_MISMATCH")
+    if version == SCHEMA_VERSION:
+        agent_tool_projection.validate_projection(value.get("agentTools"))
+        if value["agentTools"]["role"] != value["semanticContext"]["role"] or value["agentTools"]["declaredIntent"] != value["semanticContext"]["declaredIntent"]:
+            raise RuntimeError("AGENT_CYCLE_AGENT_TOOL_CONTEXT_MISMATCH")
     baseline = value.get("baseline")
     if not isinstance(baseline, dict) or "baselineHash" not in baseline:
         raise RuntimeError("AGENT_CYCLE_BASELINE_INVALID")
