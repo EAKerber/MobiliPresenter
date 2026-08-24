@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-execution-result-0.1.json",
+  "title": "AgentToolExecutionResult 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestHash", "planHash", "toolId", "status", "value", "blockers", "readOnly", "semanticAuthority", "authorizesMutation", "resultHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentToolExecutionResult 0.1"},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "planHash": {"$ref": "#/$defs/hash"},
+    "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+    "status": {"enum": ["PASS", "PLANNED", "BLOCKED", "UNKNOWN"]},
+    "value": {},
+    "blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "resultHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
