@@ -1,9 +1,9 @@
 # MobiliPresenter — mapa de maturidade para evolução autônoma
 
 Status: planejamento derivado, não authority  
-Data de reconciliação: 2026-08-22
+Data de reconciliação: 2026-08-24  
 Repositório observado: `EAKerber/MobiliPresenter`  
-Entrada desta reconciliação: `main@32d3bc1336eb310186302a3858f871ab970d6222`
+Entrada desta reconciliação: `main@c3a2cb4966abd196b3c36d85182f80f3a3408f65`
 
 Este documento reconcilia o plano original `M0`–`M12` com a evolução posterior
 `M9`–`M16`. Ele não substitui ProjectState, Work, Coordination, capabilities,
@@ -16,7 +16,10 @@ Fontes preservadas:
 - `docs/plans/autonomous-evolution-architecture-v0.1.md`;
 - `docs/plans/m9-m13-closure-v0.1.md`;
 - `docs/experiments/scheduled-cycle-maturity-s1-closure-v0.1.md`;
-- `docs/experiments/scheduled-cycle-maturity-s1-result-v0.1.json`.
+- `docs/experiments/scheduled-cycle-maturity-s1-result-v0.1.json`;
+- evidências do M12-RP1, M12-S2 e dos PRs de Agent Cycle/Remote Canonical;
+- PR #149 (`Agent-Owned Direct Git 0.1`);
+- PR #150 (`M12-AT1 — Agent Tool Interface Foundations 0.1`).
 
 ## 1. Invariantes herdados
 
@@ -32,18 +35,28 @@ Fontes preservadas:
 8. Autonomia nasce em shadow, passa por isolamento e limites e só então pode
    receber authority estreita.
 9. Superfícies constitucionais nunca são promovidas automaticamente.
+10. O agente deve declarar intenção e contexto de alto nível; providers,
+    envelopes, CAS tokens, guards e evidence binding devem ser derivados
+    deterministicamente quando o contrato permitir.
 
 ## 2. Estado reconciliado dos marcos
 
-| Faixa | Objetivo revisado | Estado reconciliado em 2026-08-22 |
+| Faixa | Objetivo revisado | Estado reconciliado em 2026-08-24 |
 |---|---|---|
 | M0–M8 original | Project Machine, authorities e writers básicos | fundação substancialmente presente; não recertificada aqui |
 | M9 | Technical Dictionary, Semantic Scope, Determinism Contract e Roadmap Freshness Guard | fechado por M9-SF1 + M9-FG1 |
 | M10 | `OperationalSemantics 0.3` + Agent Cycle semântico | fechado por OS1A + OS1B + OS1C |
-| M11 | convergência de `lock`, aliases, triggers e resíduos | fechado por CV1A + CV1B + CV1C; superfícies legacy retiradas após coverage e prova live |
-| M12 | remote canonical execution e maturity proof | S1 `CLOSED_DEFERRED`; M12-RP1 é a próxima transição; S2 continua não admitido até qualificação |
+| M11 | convergência de `lock`, aliases, triggers e resíduos | fechado por CV1A + CV1B + CV1C |
+| M12-RP1 | Remote Canonical Execution | implementado e qualificado; carrier continua transporte, nunca authority |
+| M12-S2 | maturity proof agendado | executado; `NOT PASSED / HIGH-VALUE FAILURE`, sem escape de escopo ou falso write |
+| M12 lease hardening | Agent-owned direct Git | PR #149 fechado; Manager direct-Git exige lease ativa da mesma session no hosted path |
+| M12-AT1 | Agent Tool Interface Foundations | PR #150 fechado; interface genérica por role/capability, read-only execute + mutation plan-only |
+| M12-AT2 | Registered Agent Tool Interface + exhaustive trace | próxima transição |
+| M12-AT3 | Managed mutation via Agent Tool Interface | planejado após AT2; ainda não admitido |
 | M13 | Reflection + OperationalQuiescence | planejado como read-only; bloqueado pelo fechamento M12 |
 | M14–M16 | Hypothesis, Experiment/Deathcycle, capability e prova longa | bloqueados |
+
+### S1
 
 M12-S1 terminou com:
 
@@ -54,95 +67,114 @@ M12-S1 terminou com:
 - disposition `DEFERRED`, retry `ON_CONTRACT_CHANGE`;
 - tasks desabilitadas e branches coletadas com cleanup readback `PASS`.
 
-O protocolo futuro corrige dois pontos de S1, mas ainda não está admitido:
+### RP1 e S2
 
-- branches por role, não por worker;
-- preferência verificável por ChatGPT web standalone fora de Work, falhando
-  fechado quando o contexto não puder ser selecionado ou observado.
+Após a condição `ON_CONTRACT_CHANGE`, RP1 materializou Remote Canonical Execution
+e Hosted Agent Cycle. S2 foi então efetivamente executado sobre branches por
+role.
 
-Essas correções vivem em
-`docs/experiments/scheduled-cycle-maturity-next-protocol-v0.1.md`. Não existe
-S2 ativo, task ativa ou branch experimental reservada.
+O resultado de S2 foi útil, porém não uma prova de maturidade completa:
 
-## 3. Estado materializado após M11
+- Manager/GitOps A conseguiu materializar a fase `ACTIVATION`, mas somente após
+  tentativas bloqueadas anteriores;
+- Manager/GitOps B falhou fechado em `REMOTE_AUTHORITY_DRIFT` ao tratar o
+  `state.revision` da Coordination authority como current authority head;
+- UI não alcançou a role-scoped Git write porque suas runs foram bloqueadas
+  antes da mutation por erros de envelope/profile;
+- nenhuma mutação indevida foi materializada;
+- nenhuma lease residual permaneceu;
+- a bridge UI ficou `UNTESTED`, não `FAILED`;
+- o close atual mostrou uma lacuna de exhaustividade: receipts escolhidos pelo
+  caller podem omitir attempts anteriores.
 
-O plano coordenado de metadata de apresentação foi aceito sem implementar
-produto. A issue #22 foi separada logicamente em metadata de módulos (`PCS-01`)
-e escolhas/acessórios configuráveis (`PCS-02`).
+Essa execução motivou a biópsia operacional pós-S2 e os recortes posteriores.
 
-Estado materializado pelo fechamento de M11:
+### Agent-owned direct Git e AT1
+
+PR #149 adicionou um hard gate estreito ao hosted Manager direct-Git:
+
+- active same-session branch lease obrigatória;
+- conflito file/path estrangeiro bloqueia;
+- Coordination é reobservada antes das mutable provider calls;
+- `coordination.can_write()` global não foi alterado;
+- Branch Hygiene e writers de domínio não foram migrados para mandatory lease.
+
+PR #150 implementou `Agent Tool Interface Foundations 0.1`:
+
+- policy declarativa por role/tool;
+- resolver genérico sem branches procedurais por role;
+- `AgentToolRequest/Plan/ExecutionResult 0.1`;
+- `AgentToolProjection 0.1`;
+- `AgentCycleContext 0.2` com tools available/plannable;
+- `project.inspect` / `routine.inspect` executáveis read-only;
+- `git.file.create|update|delete` plan-only com zero nova write surface;
+- prova com terceira role sintética via policy/registry fixtures.
+
+## 3. Estado materializado após AT1
+
+O checkpoint corrente de direção é:
 
 ```text
-checkpoint = M11-CONVERGENCE-0.1-CLOSED
+checkpoint = M12-AT1-AGENT-TOOL-FOUNDATIONS-CLOSED
 phase = between-increments
-nextTransition = implement-m12-remote-canonical-execution-bridge-v0.1
+nextTransition = implement-m12-at2-registered-agent-tool-interface-v0.1
 ```
 
-O plano PCS-01A continua recuperável e sua implementação permanece não admitida.
-O plano M9–M13 define slices, gates, checkpoints e blockers em
-`docs/plans/m9-m13-closure-v0.1.md`.
+A implementação de produto PCS-01 continua não admitida.
 
-M10 materializou:
+O estado operacional relevante para AT2 é:
 
-- `OperationalSemantics 0.3` com inventário/coverage integral;
-- `AgentSemanticBrief 0.1` e `CapabilityRelevanceProjection 0.1`;
-- `CAPABILITY_DISCOVERY_FRESHNESS_GUARD`;
-- `AgentCycleContext 0.1`, `python3 tools/agent.py begin` e obrigação explícita
-  `CLOSE_REQUIRED_AFTER_WORK`;
-- `agent close`, `AgentCycleDelta 0.1`, aggregate readback,
-  `AgentCycleReceipt 0.1` e `AgentCycleClosure 0.1`;
-- durable delta sem evidência atribuível como `UNKNOWN`, nunca falso `PASS`.
-
-M11 materializou:
-
-- CV1A: consumer/trigger coverage determinística, separando coverage de
-  retirement readiness e branch trigger `ops/**` de repository path filter
-  `ops/**`;
-- CV1B: `TransitionPlan 0.1` para Coordination, rebuild semântico, expected
-  authority head, segurança temporal, `tools/coordination_cli.py`, explicit
-  apply com `--expected-plan` e `TransitionReceipt 0.1`;
-- CV1C: retirement comprovado de `tools/lock.py`, alias `lock`, alias semântico
-  `ops`, e listeners legacy `ops/**`, `renderer/**`, `architecture/**`;
-- `ops` permanece em `branchGrammar.legacyNamespaces` apenas para reconhecer
-  sintaxe histórica; não resolve mais para `semanticDomain=operations`;
-- final ConvergenceInspection: `lock` e `ops` =
-  `ABSENT / PASS / RETIRED`, `triggerRetirement=[]`, `residues=[]`;
-- após essa prova fechada, a própria ConvergenceInspection de M11 foi aposentada
-  do runtime/Agent Ops; Branch Hygiene continua como owner do prune lifecycle;
-- ADR-0008 registra a superfície Coordination canônica, corrigindo a identidade
-  duplicada que existia sob ADR-0006.
+- Agent Cycle begin/close existe e permanece non-authoritative;
+- Remote Canonical Execution existe e possui readback/hash binding;
+- Manager hosted direct-Git possui gate de lease-owned;
+- UI role-scoped bridge continua com sua policy existente;
+- Agent Tool Interface já resolve role -> tool -> capability -> tool surface ->
+  adapter;
+- Agent Tool mutations continuam `plan-only`;
+- Agent Tool policy ainda não foi promovida a standalone registered
+  OperationalSemantics contract;
+- Hosted Agent Tool carrier ainda não existe;
+- close ainda depende de `evidenceCommentIds` fornecidos pelo caller e não
+  reconstrói todas as attempts automaticamente.
 
 ## 4. Próxima sequência deliberada
 
-M9, M10 e M11 estão fechados. A sequência restante é:
+A sequência corrente é:
 
-1. M12-RP1 implementa e qualifica manualmente a ponte remota canônica:
-   request envelope fechado -> domain planner -> plan validation + expected
-   heads + allowlist -> canonical executor -> aggregate readback -> receipt.
-2. M12-S2 repete o maturity proof somente depois dessa qualificação e somente
-   se a mudança de contrato satisfizer a condição `ON_CONTRACT_CHANGE`.
-3. M13-RQ1/RQ2 implementa ReflectionEligibility e OperationalQuiescence em modo
-   read-only.
-4. Só então PCS-01B pode ser reavaliado para admissão.
+1. **M12-AT2** registra formalmente os contratos/surfaces da Agent Tool Interface,
+   adiciona Hosted Agent Tool em modo read-only/plan-only e materializa
+   `AgentCycleExecutionTrace 0.1` como projection exaustiva e non-authoritative.
+2. AT2 integra o trace ao close para que attempts bloqueadas ou omitidas pelo
+   caller não possam desaparecer de uma closure aparentemente limpa.
+3. **M12-AT3** somente depois de AT2 pode admitir managed mutation por tool:
+   derive ownership -> acquire -> reobserve -> apply -> readback -> release,
+   usando writers canônicos existentes.
+4. Depois da qualificação AT2/AT3, roles adicionais como Engine/API podem ser
+   onboardadas por policy/capability sem criar bridges role-specific.
+5. Só após o fechamento M12 é reavaliada a entrada em M13-RQ1/RQ2
+   (`ReflectionEligibility` e `OperationalQuiescence`).
+6. PCS-01B permanece não admitido até a transição formal correspondente.
 
 Não se deve repetir S1/S2 apenas para produzir atividade.
 
-## 5. Lacunas conhecidas após M11
+## 5. Lacunas conhecidas após AT1
 
-- Routine Layer obrigatória cobre somente `capability-deathcircle`;
+- `AgentToolPolicyCatalog 0.1` é strict-validated em runtime, mas ainda não é um
+  contract/schema registrado no OperationalSemantics;
+- não existe Hosted Agent Tool carrier;
+- Agent Tool mutations são `plan-only`;
+- Agent Cycle close não possui execution trace exaustivo;
+- `cycleId` atual funciona como fingerprint do baseline e não como identidade
+  temporal única de uma occurrence;
+- Routine Layer obrigatória ainda cobre um conjunto estreito de obrigações;
 - Reflection e OperationalQuiescence não possuem contratos/tooling correntes;
-- o runtime de Scheduled Tasks observado em S1 não executou o planner canônico;
-- lifecycle/deathcycle persistível do experimento ainda não foi provado;
-- execution context normal versus Work não é provider-verified na superfície
-  observada;
-- a inexistência de consumidores externos não documentados nunca é provada por
-  busca de repositório; M11 aposentou apenas superfícies suportadas com coverage
-  observável e caminho canônico substituto.
-
-Uma lacuna de provider e uma lacuna de implementação interna podem coexistir.
-M12-RP1 fecha a parte interna: contract, planner, validator, executor e readback
-pertencem ao repositório; provider/carrier apenas expõe o caminho e não ganha
-authority semântica.
+- Agent Bus possui envelopes de peer health/recovery, mas não um provider Gmail
+  canônico integrado ao paved path;
+- o valor operacional de dois Manager/GitOps writers em steady state ainda não
+  foi qualificado;
+- ProjectState apresentou staleness histórico antes e durante a transição para o
+  regime begin/close; novas ocorrências pós-AT2 devem ser observadas antes de
+  criar auto-reconciliation.
 
 ## 6. Freshness deste roadmap
 
@@ -155,16 +187,13 @@ Regra imediata:
 - baseline histórico deve ser rotulado como entrada da reconciliação, nunca
   como substituto do head corrente.
 
-Estado do guard após esta reconciliação:
+O `RoadmapFreshnessGuard` continua sendo uma inspection read-only. Ele prova
+coverage da revisão quando ProjectState muda; não infere sozinho que uma
+transição omitida deveria ter acontecido.
+
+Estado esperado desta reconciliação:
 
 ```text
 ROADMAP_FRESHNESS_GUARD = IMPLEMENTED
 CURRENT_COVERAGE = PASS
 ```
-
-`tools/roadmap_freshness.py` compara o ProjectState base/head e exige uma
-disposição `UPDATED` ou `NO_CHANGE` explícita, vinculada aos hashes observados,
-para este roadmap e todo ponteiro `*-current.md` que repita checkpoint ou
-`nextTransition`. A inspection é read-only: comprova revisão de coverage, não a
-correção semântica da narrativa. Este roadmap continua derivado e nunca substitui
-ProjectState.
