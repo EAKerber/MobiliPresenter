@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-projection-0.1.json",
+  "title": "AgentToolProjection 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "role", "declaredIntent", "available", "plannable", "conditional", "policyHash", "projectionHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentToolProjection 0.1"},
+    "role": {"type": "string", "minLength": 1},
+    "declaredIntent": {"type": "string", "minLength": 1},
+    "available": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+    "plannable": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+    "conditional": {"type": "array", "items": {"$ref": "#/$defs/conditionalEntry"}},
+    "policyHash": {"$ref": "#/$defs/hash"},
+    "projectionHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "capabilityList": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolId", "effectClass", "mode", "requiredCapabilities"],
+      "properties": {
+        "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
+        "mode": {"enum": ["plan-only", "read-only-execute"]},
+        "requiredCapabilities": {"$ref": "#/$defs/capabilityList"}
+      }
+    },
+    "conditionalEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolId", "effectClass", "mode", "requiredCapabilities", "reasonCode"],
+      "properties": {
+        "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
+        "mode": {"enum": ["plan-only", "read-only-execute"]},
+        "requiredCapabilities": {"$ref": "#/$defs/capabilityList"},
+        "reasonCode": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-policy-catalog-0.1.json",
+  "title": "AgentToolPolicyCatalog 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entryProfiles", "targetPolicies", "tools"],
+  "properties": {
+    "schemaVersion": {"const": "AgentToolPolicyCatalog 0.1"},
+    "entryProfiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {"$ref": "#/$defs/entryProfile"}
+      }
+    },
+    "targetPolicies": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/targetPolicy"}
+    },
+    "tools": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/toolPolicy"}
+    }
+  },
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "nonEmptyStringList": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "entryProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lifecyclePhase", "objects", "operations", "scope"],
+      "properties": {
+        "lifecyclePhase": {"type": "string", "minLength": 1},
+        "objects": {"$ref": "#/$defs/nonEmptyStringList"},
+        "operations": {"$ref": "#/$defs/nonEmptyStringList"},
+        "scope": {"$ref": "#/$defs/nonEmptyStringList"}
+      }
+    },
+    "targetPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "branchPrefixes", "forbiddenBranches", "pathPrefixes"],
+      "properties": {
+        "kind": {"enum": ["none", "git-file"]},
+        "branchPrefixes": {"$ref": "#/$defs/stringList"},
+        "forbiddenBranches": {"$ref": "#/$defs/stringList"},
+        "pathPrefixes": {"$ref": "#/$defs/stringList"}
+      }
+    },
+    "rolePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedIntents", "guards", "requiredCapabilities", "targetPolicy"],
+      "properties": {
+        "allowedIntents": {"$ref": "#/$defs/nonEmptyStringList"},
+        "guards": {"$ref": "#/$defs/stringList"},
+        "requiredCapabilities": {"$ref": "#/$defs/nonEmptyStringList"},
+        "targetPolicy": {"type": "string", "minLength": 1}
+      }
+    },
+    "toolPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "effectClass", "mode", "roles"],
+      "properties": {
+        "adapter": {"type": "string", "minLength": 1},
+        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
+        "mode": {"enum": ["plan-only", "read-only-execute"]},
+        "roles": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"$ref": "#/$defs/rolePolicy"}
+        }
+      }
+    }
+  }
+}

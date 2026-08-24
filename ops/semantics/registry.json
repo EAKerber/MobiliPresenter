@@ -11,7 +11,13 @@
   },
   "concepts": {
     "action.operational": {"term":"OperationalAction","kind":"action-vocabulary","owner":"operations-core","definition":"Cross-domain operational action vocabulary: CONTINUE, RECONCILE, HANDOFF, PAUSE, NEEDS_HUMAN."},
+    "artifact.agent-cycle-execution-trace": {"term":"AgentCycleExecutionTrace","kind":"artifact","owner":"operations-core","definition":"Read-only hash-bound projection of all traceable execution attempts belonging to one hosted Agent Cycle instance; it records completeness without authorizing or judging mutation."},
     "artifact.agent-semantic-brief": {"term":"AgentSemanticBrief","kind":"artifact","owner":"operations-core","definition":"Read-only contextual projection of relevant capabilities and a bounded selection of non-authoritative maxims."},
+    "artifact.agent-tool-execution-result": {"term":"AgentToolExecutionResult","kind":"artifact","owner":"operations-core","definition":"Hash-bound non-authoritative result of resolving or read-only executing one Agent Tool request."},
+    "artifact.agent-tool-plan": {"term":"AgentToolPlan","kind":"artifact","owner":"operations-core","definition":"Read-only deterministic resolution of an Agent Tool request into capabilities, surfaces, guards, target policy and a concrete underlying operation."},
+    "artifact.agent-tool-policy-catalog": {"term":"AgentToolPolicyCatalog","kind":"artifact","owner":"operations-core","definition":"Declarative non-authoritative policy mapping roles and intents to Agent Tools, target scopes, required logical capabilities and execution guards."},
+    "artifact.agent-tool-projection": {"term":"AgentToolProjection","kind":"artifact","owner":"operations-core","definition":"Read-only begin-time projection of tools that are available, plannable or conditional for the current role and declared intent."},
+    "artifact.agent-tool-request": {"term":"AgentToolRequest","kind":"artifact","owner":"operations-core","definition":"Closed non-authoritative request for one logical Agent Tool bound to an exact hosted begin and actor identity."},
     "artifact.capability-relevance-projection": {"term":"CapabilityRelevanceProjection","kind":"artifact","owner":"operations-core","definition":"Deterministic coverage projection that keeps required, available, conditional and unavailable capabilities explicit."},
     "artifact.ecosystem-maxim": {"term":"EcosystemMaxim","kind":"artifact","owner":"operations-core","definition":"Non-authoritative cultural recommendation with an owner, justification, misread risk and death condition."},
     "artifact.git-mutation-bundle": {"term":"GitMutationBundle","kind":"artifact","owner":"git-governance","definition":"Read-only exact-content Git mutation intent and tree/readback proof; it never authorizes mutation."},
@@ -55,6 +61,12 @@
     "work.item": {"term":"WorkItem","kind":"domain-concept","owner":"work","definition":"Persistent unit of executable work stored in the existing continuations authority."}
   },
   "contracts": {
+    "agent-cycle-execution-trace": {"owner":"operations-core","semanticValidator":"tools.agent_tools.trace.validate_trace","structuralSchema":"ops/schemas/agent-cycle-execution-trace.schema.json"},
+    "agent-tool-execution-result": {"owner":"operations-core","semanticValidator":"tools.agent_tools.contracts.validate_result","structuralSchema":"ops/schemas/agent-tool-execution-result.schema.json"},
+    "agent-tool-plan": {"owner":"operations-core","semanticValidator":"tools.agent_tools.contracts.validate_plan","structuralSchema":"ops/schemas/agent-tool-plan.schema.json"},
+    "agent-tool-policy-catalog": {"owner":"operations-core","semanticValidator":"tools.agent_tools.policy.validate_policy","structuralSchema":"ops/schemas/agent-tool-policy-catalog.schema.json"},
+    "agent-tool-projection": {"owner":"operations-core","semanticValidator":"tools.agent_tools.projection.validate_projection","structuralSchema":"ops/schemas/agent-tool-projection.schema.json"},
+    "agent-tool-request": {"owner":"operations-core","semanticValidator":"tools.agent_tools.contracts.validate_request","structuralSchema":"ops/schemas/agent-tool-request.schema.json"},
     "capability-gates": {"owner":"capability","semanticValidator":"tools.capability_gates.validate_capability","structuralSchema":"ops/schemas/capability-gates.schema.json"},
     "continuation-state": {"owner":"work","semanticValidator":"tools.continuation.validate_current","structuralSchema":"ops/schemas/continuation-state.schema.json"},
     "coordination-state": {"owner":"coordination","semanticValidator":"tools.coordination.validate_state","structuralSchema":"ops/schemas/coordination-state.schema.json"},
@@ -79,6 +91,7 @@
     "project-state": {"owner":"operations-core","mutable":true,"locator":{"kind":"repository-file","path":"ops/state/project.json"},"requiresCanonicalWriter":true}
   },
   "resources": {
+    "agent-tool-policy-catalog": {"owner":"operations-core","locator":{"kind":"repository-file","path":"ops/semantics/agent-tool-policies.json"}},
     "capability-transition-evidence": {"owner":"capability","locator":{"kind":"repository-directory","path":"ops/evidence/capability-gates"}},
     "ecosystem-maxims-catalog": {"owner":"operations-core","locator":{"kind":"repository-file","path":"ops/semantics/maxims.json"}},
     "git-branch-refs": {"owner":"git-governance","locator":{"kind":"github-git-refs","repository":"EAKerber/MobiliPresenter"}},
@@ -88,6 +101,7 @@
   },
   "components": {
     "agent-cli": {"module":"tools.agent","owner":"operations-core","kind":"cli-adapter","sideEffects":true,"readsAuthorities":["project-state"],"writesAuthorities":[],"readsResources":[],"writesResources":[],"produces":[],"canonicalWriterFor":[],"delegatesTo":["project-state-executor","runtime-capability-inspection"]},
+    "agent-tool-resolver": {"module":"tools.agent_tools.resolver","owner":"operations-core","kind":"inspection","sideEffects":false,"readsAuthorities":[],"writesAuthorities":[],"readsResources":["agent-tool-policy-catalog","git-branch-refs"],"writesResources":[],"produces":["artifact.agent-tool-execution-result","artifact.agent-tool-plan","artifact.agent-tool-projection"],"canonicalWriterFor":[],"delegatesTo":[]},
     "capability-executor": {"module":"tools.capability_apply","owner":"capability","kind":"authority-executor","sideEffects":true,"readsAuthorities":["capability-gates"],"writesAuthorities":["capability-gates"],"readsResources":["capability-transition-evidence"],"writesResources":["capability-transition-evidence"],"produces":[],"canonicalWriterFor":["capability-gates"],"delegatesTo":[]},
     "capability-gates-ci": {"module":"tools.capability_gates_ci","owner":"capability","kind":"inspection","sideEffects":false,"readsAuthorities":["capability-gates"],"writesAuthorities":[],"readsResources":[],"writesResources":[],"produces":[],"canonicalWriterFor":[],"delegatesTo":[]},
     "capability-gates-cli": {"module":"tools.capability_gates","owner":"capability","kind":"inspection","sideEffects":false,"readsAuthorities":["capability-gates"],"writesAuthorities":[],"readsResources":[],"writesResources":[],"produces":["artifact.recommendation"],"canonicalWriterFor":[],"delegatesTo":[]},
