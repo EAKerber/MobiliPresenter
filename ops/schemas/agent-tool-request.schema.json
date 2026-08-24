@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-request-0.1.json",
+  "title": "AgentToolRequest 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "begin", "actor", "toolId", "target", "input", "semanticAuthority", "authorizesMutation"],
+  "properties": {
+    "schemaVersion": {"const": "AgentToolRequest 0.1"},
+    "requestId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "begin": {"$ref": "#/$defs/begin"},
+    "actor": {"$ref": "#/$defs/actor"},
+    "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+    "target": {"type": "object"},
+    "input": {"type": "object"},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false}
+  },
+  "$defs": {
+    "begin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "sourceSha", "contextHash"],
+      "properties": {
+        "runId": {"type": "integer", "minimum": 1},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "contextHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "workerId", "sessionId"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "workerId": {"type": "string", "minLength": 1},
+        "sessionId": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
