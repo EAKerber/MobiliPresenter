@@ -31,8 +31,8 @@ def build_projection(
     policy: dict[str, Any] | None = None,
     registry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    catalog = tool_policy.load_policy() if policy is None else tool_policy.validate_policy(policy, registry=registry)
     semantic = load_registry() if registry is None else registry
+    catalog = tool_policy.load_policy() if policy is None else tool_policy.validate_policy(policy, registry=semantic)
     errors = validate_registry(semantic)
     if errors:
         raise RuntimeError(errors[0])
@@ -71,7 +71,7 @@ def build_projection(
         "available": available,
         "plannable": plannable,
         "conditional": conditional,
-        "policyHash": tool_policy.policy_hash(catalog),
+        "policyHash": tool_policy.policy_hash(catalog, registry=semantic),
     }
     result = {**core, "projectionHash": stable_hash(core)}
     validate_projection(result)
