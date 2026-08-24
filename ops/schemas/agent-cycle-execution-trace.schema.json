@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-cycle-execution-trace-0.1.json",
+  "title": "AgentCycleExecutionTrace 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cycleInstanceId", "begin", "actor", "window", "attempts", "summary", "traceStatus", "readOnly", "semanticAuthority", "authorizesMutation", "traceHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentCycleExecutionTrace 0.1"},
+    "cycleInstanceId": {"type": "string", "minLength": 1},
+    "begin": {"$ref": "#/$defs/begin"},
+    "actor": {"$ref": "#/$defs/actor"},
+    "window": {"$ref": "#/$defs/window"},
+    "attempts": {"type": "array", "items": {"$ref": "#/$defs/attempt"}},
+    "summary": {"$ref": "#/$defs/summary"},
+    "traceStatus": {"enum": ["PASS", "INCOMPLETE"]},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "traceHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "begin": {
+      "type": "object", "additionalProperties": false,
+      "required": ["runId", "sourceSha", "contextHash"],
+      "properties": {
+        "runId": {"type": "integer", "minimum": 1},
+        "sourceSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "contextHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "actor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role", "workerId", "sessionId"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "workerId": {"type": "string", "minLength": 1},
+        "sessionId": {"type": "string", "minLength": 1}
+      }
+    },
+    "window": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issueNumber", "beginCommentId", "closeCommentId"],
+      "properties": {
+        "issueNumber": {"type": "integer", "minimum": 1},
+        "beginCommentId": {"type": "integer", "minimum": 1},
+        "closeCommentId": {"type": "integer", "minimum": 1}
+      }
+    },
+    "attempt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "requestCommentId", "resultCommentId", "requestHash", "operationId", "status", "blockers", "matched"],
+      "properties": {
+        "kind": {"enum": ["agent-tool", "remote-canonical"]},
+        "requestCommentId": {"type": "integer", "minimum": 1},
+        "resultCommentId": {"type": ["integer", "null"], "minimum": 1},
+        "requestHash": {"$ref": "#/$defs/hash"},
+        "operationId": {"type": "string", "minLength": 1},
+        "status": {"enum": ["PASS", "PLANNED", "BLOCKED", "UNKNOWN"]},
+        "blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "matched": {"type": "boolean"}
+      }
+    },
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attemptCount", "matchedCount", "passCount", "blockedCount", "unknownCount"],
+      "properties": {
+        "attemptCount": {"type": "integer", "minimum": 0},
+        "matchedCount": {"type": "integer", "minimum": 0},
+        "passCount": {"type": "integer", "minimum": 0},
+        "blockedCount": {"type": "integer", "minimum": 0},
+        "unknownCount": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
