@@ -122,6 +122,16 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         self.assertEqual([item["status"] for item in value["attempts"]], ["BLOCKED", "PASS"])
         self.assertEqual(trace_collect.remote_evidence_comment_ids(value), [104])
 
+    def test_declared_cycle_instance_is_consumed_and_mismatch_blocks(self):
+        current = manifest()
+        expected = trace_collect.cycle_instance_id(current)
+        current["cycleInstanceId"] = expected
+        value = trace_collect.build_trace(complete_comments(), current, close_comment_id=200)
+        self.assertEqual(value["cycleInstanceId"], expected)
+        current["cycleInstanceId"] = "cycle-instance-" + "0" * 24
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_CYCLE_INSTANCE_MISMATCH"):
+            trace_collect.build_trace(complete_comments(), current, close_comment_id=200)
+
     def test_missing_result_makes_trace_incomplete(self):
         comments = complete_comments()
         comments = [comment for comment in comments if comment["id"] != 102]
