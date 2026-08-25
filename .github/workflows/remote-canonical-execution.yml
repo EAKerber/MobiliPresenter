@@ -84,7 +84,8 @@ jobs:
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'issue_comment' &&
-      github.event.workflow_run.repository.full_name == github.repository
+      github.event.workflow_run.repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -118,6 +119,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HOST_SHA: ${{ github.event.workflow_run.head_sha }}
+          HOSTED_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           if [ ! -f /tmp/agent-tool/agent-tool-dispatch.json ]; then
             echo "has_dispatch=false" >> "$GITHUB_OUTPUT"
@@ -129,6 +131,7 @@ jobs:
           python -m tools.agent_tools.dispatch_host inspect \
             --artifact-dir /tmp/agent-tool \
             --host-sha "$HOST_SHA" \
+            --hosted-run-id "$HOSTED_RUN_ID" \
             --run-id "$GITHUB_RUN_ID" \
             --output /tmp/agent-tool-dispatch-inspection.json
           code=$?
@@ -205,11 +208,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HOST_SHA: ${{ github.event.workflow_run.head_sha }}
+          HOSTED_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set +e
           python -m tools.agent_tools.dispatch_host execute \
             --artifact-dir /tmp/agent-tool \
             --host-sha "$HOST_SHA" \
+            --hosted-run-id "$HOSTED_RUN_ID" \
             --run-id "$GITHUB_RUN_ID" \
             --attempt-comment-id "${{ steps.attempt.outputs.comment_id }}" \
             --output /tmp/agent-tool-terminal.json
