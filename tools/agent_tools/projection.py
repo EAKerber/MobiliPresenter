@@ -40,7 +40,7 @@ def build_projection(
     intent = semantic_context.get("declaredIntent")
     if role not in semantic["facetVocabulary"]["roles"] or intent not in semantic["facetVocabulary"]["intentClasses"]:
         raise RuntimeError("AGENT_TOOL_PROJECTION_CONTEXT_INVALID")
-    available_caps, unavailable_caps = _capability_sets(semantic_brief)
+    available_caps, _ = _capability_sets(semantic_brief)
     available: list[dict[str, Any]] = []
     plannable: list[dict[str, Any]] = []
     conditional: list[dict[str, Any]] = []
@@ -48,13 +48,14 @@ def build_projection(
         role_policy = item["roles"].get(role)
         if not isinstance(role_policy, dict) or intent not in role_policy["allowedIntents"]:
             continue
+        mode = tool_policy.effective_mode(item, role_policy)
         entry = {
             "toolId": tool_id,
             "effectClass": item["effectClass"],
-            "mode": item["mode"],
+            "mode": mode,
             "requiredCapabilities": copy.deepcopy(role_policy["requiredCapabilities"]),
         }
-        if item["mode"] == "plan-only":
+        if mode == "plan-only":
             plannable.append(entry)
             continue
         missing = sorted(set(role_policy["requiredCapabilities"]) - available_caps)
