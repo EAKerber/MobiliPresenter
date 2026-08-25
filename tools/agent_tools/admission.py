@@ -9,9 +9,10 @@ from tools.canonical import stable_hash
 
 MUTATION_EFFECT = "shared-durable-mutation"
 
-# AT3A registers read-only proof providers, but AgentToolPolicyCatalog 0.1 still
-# has no mutation execution mode.  Proof availability therefore cannot by
-# itself create a write path.
+# Proof providers materialize admission evidence only. Their availability does
+# not authorize a write: mutation-execute still requires an intent-scoped plan,
+# a positive proof set, dispatch to the canonical host, and execution-time
+# guard revalidation before the existing writer is invoked.
 GUARD_PROOF_PROVIDERS: dict[str, Callable[..., dict[str, Any]]] = {
     "coordination-lease-owned": guard_proofs.prove_coordination_lease_owned,
     "git-cas": guard_proofs.prove_git_cas,
@@ -81,8 +82,7 @@ def assert_execution_admitted(
     if proof_set is None:
         raise RuntimeError("AGENT_TOOL_GUARD_PROOFS_REQUIRED")
     guard_proofs.validate_proof_set(proof_set, plan=plan)
-    # AT3A deliberately stops here.  A later contract must add a distinct
-    # mutation-execute mode and a dispatch route to the existing canonical
-    # write-capable host.  Hosted Agent Tool itself remains read-only.
+    # Admission proves only that this plan is eligible to be dispatched. The
+    # canonical host must re-observe the guards immediately before mutation.
     if plan["mode"] != "mutation-execute":
         raise RuntimeError("AGENT_TOOL_MUTATION_EXECUTION_NOT_ADMITTED")
