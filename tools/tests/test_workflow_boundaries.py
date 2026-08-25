@@ -63,6 +63,13 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertIn("actions/download-artifact@v4",remote)
         self.assertIn("tools.agent_tools.dispatch_host",remote)
         self.assertIn("MOBILIPRESENTER_AGENT_TOOL_MUTATION_ATTEMPT_V0_1",remote)
+    def test_privileged_workflow_run_is_bound_to_default_branch_and_exact_origin_run(self):
+        remote=self.text("remote-canonical-execution.yml")
+        self.assertIn("github.event.workflow_run.event == 'issue_comment'",remote)
+        self.assertIn("github.event.workflow_run.head_branch == github.event.repository.default_branch",remote)
+        self.assertIn("name: agent-tool-${{ github.event.workflow_run.id }}",remote)
+        self.assertIn("run-id: ${{ github.event.workflow_run.id }}",remote)
+        self.assertGreaterEqual(remote.count('--hosted-run-id "$HOSTED_RUN_ID"'),2)
     def test_operational_workflows_do_not_implement_domain_hashing_or_direct_ref_writes(self):
         for name in ("agent-ops.yml","branch-hygiene.yml","coordination-guard.yml","supervisor-snapshot.yml"):
             text=self.text(name);self.assertNotIn("stable_hash",text);self.assertNotIn("git update-ref",text);self.assertNotIn("git push",text);self.assertNotRegex(text,r"gh\s+api[^\n]*(?:--method|-X)\s+(?:POST|PATCH|PUT|DELETE)")
