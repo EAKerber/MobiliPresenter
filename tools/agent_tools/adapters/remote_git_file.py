@@ -3,24 +3,15 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+from tools import git_observation
 from tools import remote_canonical_execution as remote
 from tools.agent_tools.contracts import request_hash
-from tools.coordination_remote import GhApiTransport
 
 TOOL_TO_OPERATION = {
     "git.file.create": "create-file",
     "git.file.update": "update-file",
     "git.file.delete": "delete-file",
 }
-
-
-def _observe_blob(transport: Any, branch: str, path: str) -> tuple[str, str | None]:
-    head = remote._ref_head(transport, branch)
-    if not isinstance(head, str):
-        raise RuntimeError("AGENT_TOOL_GIT_BRANCH_UNAVAILABLE")
-    commit = remote._commit(transport, head)
-    entries = remote._tree_entries(transport, commit["treeSha"])
-    return head, remote._blob_at(entries, path)
 
 
 def build_concrete(
@@ -37,8 +28,9 @@ def build_concrete(
     target = request["target"]
     branch = target["branch"]
     path = target["path"]
-    carrier = transport or GhApiTransport()
-    head, blob = _observe_blob(carrier, branch, path)
+    observed = git_observation.observe_file(branch, path, transport=transport)
+    head = observed["branchHead"]
+    blob = observed["blobSha"]
     input_value = request["input"]
     if operation in {"create-file", "update-file"}:
         if set(input_value) != {"content", "message"}:

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/git-cas-guard-proof-0.1.json",
+  "title": "GitCasGuardProof 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestHash", "planHash", "commandHash", "actor", "target", "expected", "observed", "status", "readOnly", "semanticAuthority", "authorizesMutation", "proofHash"],
+  "properties": {
+    "schemaVersion": {"const": "GitCasGuardProof 0.1"},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "planHash": {"$ref": "#/$defs/hash"},
+    "commandHash": {"$ref": "#/$defs/hash"},
+    "actor": {"$ref": "#/$defs/actor"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "path"],
+      "properties": {
+        "branch": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1}
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branchHead"],
+      "properties": {
+        "branchHead": {"$ref": "#/$defs/gitSha"},
+        "blobSha": {"$ref": "#/$defs/gitSha"}
+      }
+    },
+    "observed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branchHead", "blobSha"],
+      "properties": {
+        "branchHead": {"$ref": "#/$defs/gitSha"},
+        "blobSha": {"oneOf": [{"$ref": "#/$defs/gitSha"}, {"type": "null"}]}
+      }
+    },
+    "status": {"const": "PASS"},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "proofHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "workerId", "sessionId"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "workerId": {"type": "string", "minLength": 1},
+        "sessionId": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
