@@ -101,7 +101,7 @@ jobs:
             --request /tmp/agent-tool-request.json \
             --result /tmp/agent-tool-result.json || true
 
-      - name: Resolve or execute Agent Tool
+      - name: Resolve, execute read-only, or prepare mutation dispatch
         id: execute
         if: steps.checkout_begin.outcome == 'success'
         continue-on-error: true
@@ -110,23 +110,23 @@ jobs:
         run: |
           python tools/hosted_agent_tool.py execute \
             --request /tmp/agent-tool-request.json \
+            --meta /tmp/agent-tool-meta.json \
             --begin-dir /tmp/agent-cycle-begin \
             --plan /tmp/agent-tool-plan.json \
+            --proof-set /tmp/agent-tool-proof-set.json \
+            --dispatch /tmp/agent-tool-dispatch.json \
             --result /tmp/agent-tool-result.json
 
-      - name: Upload Agent Tool proof
-        if: steps.execute.outcome == 'success'
+      - name: Upload Agent Tool evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agent-tool-${{ github.run_id }}
-          path: |
-            /tmp/agent-tool-request.json
-            /tmp/agent-tool-plan.json
-            /tmp/agent-tool-result.json
+          path: /tmp/agent-tool-*.json
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Agent Tool result
+      - name: Publish terminal Agent Tool result
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -144,13 +144,42 @@ jobs:
           PY
           gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --input /tmp/agent-tool-comment.json
 
-      - name: Require operational result
+      - name: Publish non-terminal Agent Tool dispatch
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          test -f /tmp/agent-tool-result.json
+          if [ ! -f /tmp/agent-tool-dispatch.json ]; then
+            exit 0
+          fi
           python - <<'PY'
           import json
-          value=json.load(open('/tmp/agent-tool-result.json',encoding='utf-8'))
+          from pathlib import Path
+          dispatch=json.loads(Path('/tmp/agent-tool-dispatch.json').read_text(encoding='utf-8'))
+          body='MOBILIPRESENTER_AGENT_TOOL_DISPATCH_V0_1\n```json\n'+json.dumps(dispatch,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/agent-tool-dispatch-comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --input /tmp/agent-tool-dispatch-comment.json
+
+      - name: Require operational outcome
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from tools.agent_tools import mutation_dispatch
+
+          result_path=Path('/tmp/agent-tool-result.json')
+          dispatch_path=Path('/tmp/agent-tool-dispatch.json')
+          if dispatch_path.is_file():
+              if result_path.is_file():
+                  raise SystemExit('dispatch and terminal result must not coexist')
+              mutation_dispatch.validate_dispatch(json.loads(dispatch_path.read_text(encoding='utf-8')))
+              raise SystemExit(0)
+          if not result_path.is_file():
+              raise SystemExit(2)
+          value=json.loads(result_path.read_text(encoding='utf-8'))
           if value.get('status') not in {'PASS','PLANNED'}:
               raise SystemExit(2)
           PY
