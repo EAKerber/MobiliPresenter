@@ -108,6 +108,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cp /tmp/agent-cycle-begin/context.json /tmp/agent-tool-begin-context.json
+          cp /tmp/agent-cycle-begin/manifest.json /tmp/agent-tool-begin-manifest.json
           python tools/hosted_agent_tool.py execute \
             --request /tmp/agent-tool-request.json \
             --meta /tmp/agent-tool-meta.json \
