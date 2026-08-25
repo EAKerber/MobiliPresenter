@@ -75,9 +75,9 @@ class AgentToolPolicyTests(unittest.TestCase):
         self.assertEqual(
             agent_cycle.entry_profile("manager-gitops", "governed-mutation"),
             {
-                "lifecyclePhase": "implementation",
+                "lifecyclePhase": "execution",
                 "objects": ["branch", "coordination", "repository", "work-item"],
-                "operations": ["implementation", "inspection", "repository-discovery"],
+                "operations": ["authority-mutation", "inspection", "readback"],
                 "scope": ["repository:read", "workflow:read"],
             },
         )

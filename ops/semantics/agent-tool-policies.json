@@ -9,9 +9,9 @@
         "scope": ["repository:read"]
       },
       "governed-mutation": {
-        "lifecyclePhase": "implementation",
+        "lifecyclePhase": "execution",
         "objects": ["branch", "coordination", "repository", "work-item"],
-        "operations": ["implementation", "inspection", "repository-discovery"],
+        "operations": ["authority-mutation", "inspection", "readback"],
         "scope": ["repository:read", "workflow:read"]
       },
       "inspect-and-plan": {
