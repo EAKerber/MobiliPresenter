@@ -217,7 +217,7 @@
       {"targetKind":"component","target":"hosted-agent-tool-cli","capabilities":["agent.tools.hosted"]},
       {"targetKind":"component","target":"integration-reconcile-plan","capabilities":["integration.reconcile.plan"]},
       {"targetKind":"component","target":"maintenance-inspection","capabilities":["maintenance.inspect"]},
-      {"targetKind":"peer-recovery-bus","target":"peer-recovery-bus","capabilities":["peer.recovery.plan"]},
+      {"targetKind":"component","target":"peer-recovery-bus","capabilities":["peer.recovery.plan"]},
       {"targetKind":"component","target":"peer-recovery-plan","capabilities":["peer.recovery.plan"]},
       {"targetKind":"component","target":"project-machine","capabilities":["project.inspect"]},
       {"targetKind":"component","target":"prune-apply","capabilities":["git.branch-governance.apply"]},
