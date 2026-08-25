@@ -120,7 +120,19 @@ class AgentToolPolicyTests(unittest.TestCase):
 
 
 class AgentToolResolverTests(unittest.TestCase):
-    @patch("tools.agent_tools.adapters.remote_git_file._observe_blob", return_value=("c" * 40, None))
+    @patch(
+        "tools.agent_tools.adapters.remote_git_file.git_observation.observe_file",
+        return_value={
+            "repository": "EAKerber/MobiliPresenter",
+            "branch": "work/ui/at1",
+            "path": "docs/ui/at1.json",
+            "branchHead": "c" * 40,
+            "blobSha": None,
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        },
+    )
     def test_ui_git_create_builds_valid_plan_without_writing(self, observe):
         value = request(
             "git.file.create",
@@ -136,7 +148,7 @@ class AgentToolResolverTests(unittest.TestCase):
         self.assertFalse(resolved["plan"]["concrete"]["mutationEnabled"])
         observe.assert_called_once()
 
-    @patch("tools.agent_tools.adapters.remote_git_file._observe_blob")
+    @patch("tools.agent_tools.adapters.remote_git_file.git_observation.observe_file")
     def test_ui_scope_blocks_before_git_observation(self, observe):
         value = request(
             "git.file.create",
