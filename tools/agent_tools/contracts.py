@@ -29,6 +29,10 @@ RESULT_FIELDS = {
     "schemaVersion", "requestHash", "planHash", "toolId", "status", "value", "blockers",
     "readOnly", "semanticAuthority", "authorizesMutation", "resultHash",
 }
+PLAN_EFFECT_CLASSES = {
+    "read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect",
+}
+PLAN_MODES = {"mutation-execute", "plan-only", "read-only-execute"}
 
 
 def _text(value: Any, code: str) -> str:
@@ -106,8 +110,21 @@ def validate_plan(value: Any) -> dict[str, Any]:
     _begin(value.get("begin")); _actor(value.get("actor"))
     if not isinstance(value.get("toolId"), str) or not ID_RE.fullmatch(value["toolId"]):
         raise RuntimeError("AGENT_TOOL_PLAN_ID_INVALID")
-    if value.get("status") not in {"PLANNED", "READY"}:
+    effect_class = value.get("effectClass")
+    mode = value.get("mode")
+    status = value.get("status")
+    if effect_class not in PLAN_EFFECT_CLASSES:
+        raise RuntimeError("AGENT_TOOL_PLAN_EFFECT_INVALID")
+    if mode not in PLAN_MODES:
+        raise RuntimeError("AGENT_TOOL_PLAN_MODE_INVALID")
+    if status not in {"PLANNED", "READY"}:
         raise RuntimeError("AGENT_TOOL_PLAN_STATUS_INVALID")
+    if mode == "plan-only" and status != "PLANNED":
+        raise RuntimeError("AGENT_TOOL_PLAN_MODE_STATUS_MISMATCH")
+    if mode in {"read-only-execute", "mutation-execute"} and status != "READY":
+        raise RuntimeError("AGENT_TOOL_PLAN_MODE_STATUS_MISMATCH")
+    if mode == "mutation-execute" and effect_class != "shared-durable-mutation":
+        raise RuntimeError("AGENT_TOOL_PLAN_MUTATION_MODE_INVALID")
     for field in ("requiredCapabilities", "eligibleToolSurfaces", "guards"):
         items = value.get(field)
         if not isinstance(items, list) or any(not isinstance(item, str) or not item for item in items):
