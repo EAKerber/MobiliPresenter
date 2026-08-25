@@ -182,7 +182,7 @@ def _validate_current_policy(
     role_policy = tool["roles"].get(role)
     if not isinstance(role_policy, dict) or intent not in role_policy["allowedIntents"]:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_CURRENT_POLICY_FORBIDDEN")
-    if tool_policy.effective_mode(tool, role_policy) != "mutation-execute":
+    if tool_policy.effective_mode(tool, role_policy, intent) != "mutation-execute":
         raise DispatchHostError("AGENT_TOOL_DISPATCH_CURRENT_MODE_FORBIDDEN")
     if (
         plan["effectClass"] != tool["effectClass"]
