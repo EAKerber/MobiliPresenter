@@ -11,6 +11,7 @@ from tools.canonical import stable_hash
 
 
 HOST_SHA = "a" * 40
+HOSTED_RUN_ID = 456
 REQUEST_HASH = "b" * 64
 DISPATCH_HASH = "c" * 64
 EXPECTED_HEAD = "d" * 40
@@ -40,7 +41,7 @@ def bundle():
         "source": {
             "issueNumber": 145,
             "requestCommentId": 101,
-            "hostedRunId": 456,
+            "hostedRunId": HOSTED_RUN_ID,
             "semanticHostSha": HOST_SHA,
         },
         "command": {
@@ -107,7 +108,11 @@ class AgentToolDispatchHostTests(unittest.TestCase):
         }
         with patch("tools.agent_tools.dispatch_host._hosted_terminal", return_value={"status": "UNKNOWN"}):
             result = dispatch_host.inspect_protocol(
-                value, host_sha=HOST_SHA, run_id=901, transport=FakeTransport()
+                value,
+                host_sha=HOST_SHA,
+                hosted_run_id=HOSTED_RUN_ID,
+                run_id=901,
+                transport=FakeTransport(),
             )
         self.assertEqual(result["state"], "PRIOR_ATTEMPT_UNKNOWN")
         self.assertEqual(result["terminal"]["status"], "UNKNOWN")
@@ -131,11 +136,39 @@ class AgentToolDispatchHostTests(unittest.TestCase):
             bot_comment("MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1", terminal)
         ]
         result = dispatch_host.inspect_protocol(
-            value, host_sha=HOST_SHA, run_id=901, transport=FakeTransport()
+            value,
+            host_sha=HOST_SHA,
+            hosted_run_id=HOSTED_RUN_ID,
+            run_id=901,
+            transport=FakeTransport(),
         )
         self.assertEqual(result["state"], "TERMINAL_EXISTS")
         self.assertEqual(result["terminal"], terminal)
         collect.assert_not_called()
+
+    @patch("tools.agent_tools.dispatch_host.contracts.validate_request", return_value={})
+    @patch("tools.agent_tools.dispatch_host.contracts.validate_plan", return_value={})
+    @patch("tools.agent_tools.dispatch_host.admission.guard_proofs.validate_proof_set", return_value={})
+    @patch("tools.agent_tools.dispatch_host.mutation_dispatch.validate_dispatch")
+    @patch("tools.agent_tools.dispatch_host.hosted_agent_tool.validate_begin_binding")
+    @patch("tools.agent_tools.dispatch_host.contracts.request_hash", return_value=REQUEST_HASH)
+    def test_originating_hosted_run_id_is_part_of_bundle_provenance(
+        self, request_hash, begin_binding, validate_dispatch, validate_proofs,
+        validate_plan, validate_request
+    ):
+        value = bundle()
+        value["dispatch"].update({
+            "cycleInstanceId": "cycle-instance-test",
+        })
+        value["manifest"] = {"cycleInstanceId": "cycle-instance-test"}
+        validate_dispatch.return_value = value["dispatch"]
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TOOL_DISPATCH_HOSTED_RUN_MISMATCH"):
+            dispatch_host.validate_bundle(
+                value,
+                host_sha=HOST_SHA,
+                hosted_run_id=HOSTED_RUN_ID + 1,
+                transport=FakeTransport(),
+            )
 
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
     @patch("tools.agent_tools.dispatch_host._comment")
@@ -159,6 +192,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
         result = dispatch_host.execute_dispatch(
             value,
             host_sha=HOST_SHA,
+            hosted_run_id=HOSTED_RUN_ID,
             run_id=900,
             attempt_comment_id=500,
             transport=transport,
@@ -206,6 +240,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
             result = dispatch_host.execute_dispatch(
                 value,
                 host_sha=HOST_SHA,
+                hosted_run_id=HOSTED_RUN_ID,
                 run_id=900,
                 attempt_comment_id=500,
                 transport=transport,
