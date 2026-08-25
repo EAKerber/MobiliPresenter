@@ -38,6 +38,7 @@ OUTCOME_FIELDS = {
     "commandHash",
     "executionProofSetHash",
     "remoteReceiptHash",
+    "remoteReceipt",
     "aggregateReadback",
     "mutationState",
     "mutableCallCount",
@@ -213,6 +214,15 @@ def validate_execution_result(
     receipt_hash = outcome.get("remoteReceiptHash")
     if receipt_hash is not None:
         _hash(receipt_hash, "AGENT_TOOL_MUTATION_RESULT_RECEIPT_INVALID")
+    receipt_value = outcome.get("remoteReceipt")
+    if receipt_value is not None:
+        remote.validate_receipt(receipt_value)
+        if (
+            receipt_value["commandHash"] != dispatch["commandHash"]
+            or receipt_value["command"] != dispatch["command"]
+            or receipt_value["receiptHash"] != receipt_hash
+        ):
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_RECEIPT_MISMATCH")
     mutable_count = _nonnegative_int(
         outcome.get("mutableCallCount"), "AGENT_TOOL_MUTATION_RESULT_MUTABLE_COUNT_INVALID"
     )
@@ -228,16 +238,20 @@ def validate_execution_result(
             value["blockers"]
             or mutation_state != "APPLIED"
             or receipt_hash is None
+            or receipt_value is None
             or execution_hash is None
             or mutable_count <= 0
             or not isinstance(outcome.get("aggregateReadback"), dict)
         ):
             raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_PASS_INVALID")
+        if outcome["aggregateReadback"] != receipt_value["aggregateReadback"]:
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_RECEIPT_MISMATCH")
     elif status == "BLOCKED":
         if (
             not value["blockers"]
             or mutation_state != "NOT_APPLIED"
             or receipt_hash is not None
+            or receipt_value is not None
             or outcome.get("aggregateReadback") is not None
         ):
             raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_BLOCKED_INVALID")
@@ -246,6 +260,7 @@ def validate_execution_result(
             not value["blockers"]
             or mutation_state != "UNKNOWN"
             or receipt_hash is not None
+            or receipt_value is not None
             or outcome.get("aggregateReadback") is not None
         ):
             raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_UNKNOWN_INVALID")
@@ -274,6 +289,7 @@ def build_execution_result(
         execution_hash = execution_proof_set["proofSetHash"]
     receipt_hash: str | None = None
     aggregate: dict[str, Any] | None = None
+    receipt_value: dict[str, Any] | None = None
     if receipt is not None:
         remote.validate_receipt(receipt)
         if (
@@ -282,6 +298,7 @@ def build_execution_result(
         ):
             raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_RECEIPT_MISMATCH")
         receipt_hash = receipt["receiptHash"]
+        receipt_value = copy.deepcopy(receipt)
         aggregate = copy.deepcopy(receipt["aggregateReadback"])
     if status == "PASS":
         mutation_state = "APPLIED"
@@ -298,6 +315,7 @@ def build_execution_result(
         "commandHash": dispatch["commandHash"],
         "executionProofSetHash": execution_hash,
         "remoteReceiptHash": receipt_hash,
+        "remoteReceipt": receipt_value,
         "aggregateReadback": aggregate,
         "mutationState": mutation_state,
         "mutableCallCount": _nonnegative_int(
@@ -319,3 +337,17 @@ def build_execution_result(
     }
     result = {**core, "resultHash": stable_hash(core)}
     return validate_execution_result(result, plan=plan, dispatch=dispatch)
+
+
+def remote_receipt_from_execution_result(value: dict[str, Any]) -> dict[str, Any] | None:
+    contracts.validate_result(value)
+    outcome = value.get("value")
+    if not isinstance(outcome, dict) or outcome.get("kind") != OUTCOME_KIND:
+        return None
+    receipt = outcome.get("remoteReceipt")
+    if receipt is None:
+        return None
+    remote.validate_receipt(receipt)
+    if value["status"] != "PASS" or outcome.get("remoteReceiptHash") != receipt["receiptHash"]:
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_RECEIPT_INVALID")
+    return receipt
