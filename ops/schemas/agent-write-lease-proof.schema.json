@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lease-proof-0.1.json",
+  "title": "AgentWriteLeaseProof 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "policy", "actor", "branch", "requiredOwnedResources", "conflictCheckedResources", "authorityHead", "authorityNow", "matchedLeases", "status", "readOnly", "semanticAuthority", "authorizesMutation", "proofHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLeaseProof 0.1"},
+    "policy": {"const": "manager-gitops-direct-git-branch-owned"},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "workerId", "sessionId"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "workerId": {"type": "string", "minLength": 1},
+        "sessionId": {"type": "string", "minLength": 1}
+      }
+    },
+    "branch": {"type": "string", "minLength": 1},
+    "requiredOwnedResources": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "conflictCheckedResources": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "authorityHead": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "authorityNow": {"type": "string", "minLength": 1},
+    "matchedLeases": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "status": {"const": "PASS"},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "proofHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
