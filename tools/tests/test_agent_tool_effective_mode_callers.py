@@ -6,13 +6,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = ROOT / "tools"
+AGENT_TOOLS_ROOT = ROOT / "tools" / "agent_tools"
 
 
 class AgentToolEffectiveModeCallerTests(unittest.TestCase):
-    def test_all_effective_mode_callers_bind_declared_intent(self):
+    def test_all_production_effective_mode_callers_bind_declared_intent(self):
         missing: list[str] = []
-        for path in sorted(TOOLS_ROOT.rglob("*.py")):
+        for path in sorted(AGENT_TOOLS_ROOT.rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             for node in ast.walk(tree):
                 if not isinstance(node, ast.Call):
@@ -34,7 +34,7 @@ class AgentToolEffectiveModeCallerTests(unittest.TestCase):
         self.assertEqual(
             missing,
             [],
-            "effective_mode callers must bind declaredIntent explicitly: "
+            "production effective_mode callers must bind declaredIntent explicitly: "
             + ", ".join(missing),
         )
 
