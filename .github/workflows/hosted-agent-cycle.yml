@@ -111,48 +111,9 @@ jobs:
             --command /tmp/hosted-command.json \
             --result /tmp/hosted-result.json
 
-      - name: Detect trace-capable begin
-        id: trace_mode
-        if: steps.checkout_begin.outcome == 'success'
-        run: |
-          if [ -f tools/hosted_agent_cycle_trace.py ]; then
-            echo "supported=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "supported=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Prepare exhaustive execution trace
-        id: trace
-        if: steps.trace_mode.outputs.supported == 'true'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p /tmp/agent-cycle-close
-          python tools/hosted_agent_cycle_trace.py \
-            --command /tmp/hosted-command.json \
-            --meta /tmp/hosted-meta.json \
-            --begin-dir /tmp/agent-cycle-begin \
-            --command-out /tmp/hosted-command-traced.json \
-            --trace-out /tmp/agent-cycle-close/execution-trace.json
-
-      - name: Preserve legacy close compatibility
-        if: steps.trace_mode.outputs.supported == 'false'
-        run: cp /tmp/hosted-command.json /tmp/hosted-command-traced.json
-
-      - name: Materialize trace failure
-        if: steps.trace_mode.outputs.supported == 'true' && steps.trace.outcome != 'success'
-        run: |
-          python tools/hosted_agent_cycle.py failure \
-            --error HOSTED_AGENT_EXECUTION_TRACE_INCOMPLETE \
-            --command /tmp/hosted-command.json \
-            --result /tmp/hosted-result.json
-
       - name: Run canonical close
         id: close
-        if: >-
-          steps.checkout_begin.outcome == 'success' &&
-          (steps.trace_mode.outputs.supported == 'false' || steps.trace.outcome == 'success')
+        if: steps.checkout_begin.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -160,7 +121,7 @@ jobs:
         run: |
           mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
           python tools/hosted_agent_cycle.py close \
-            --command /tmp/hosted-command-traced.json \
+            --command /tmp/hosted-command.json \
             --meta /tmp/hosted-meta.json \
             --begin-dir /tmp/agent-cycle-begin \
             --closure /tmp/agent-cycle-close/closure.json \
@@ -186,7 +147,7 @@ jobs:
         run: |
           python tools/hosted_agent_cycle.py failure \
             --error HOSTED_AGENT_CLOSE_ARTIFACT_UPLOAD_FAILED \
-            --command /tmp/hosted-command-traced.json \
+            --command /tmp/hosted-command.json \
             --result /tmp/hosted-result.json
 
       - name: Post compact hosted-cycle result
