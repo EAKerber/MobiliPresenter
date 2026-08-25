@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "AgentToolPolicyCatalog 0.1",
+  "schemaVersion": "AgentToolPolicyCatalog 0.2",
   "entryProfiles": {
     "manager-gitops": {
       "bootstrap-discovery": {
@@ -59,6 +59,7 @@
         "manager-gitops": {
           "allowedIntents": ["inspect-and-plan"],
           "guards": ["coordination-lease-owned", "git-cas"],
+          "mode": "mutation-execute",
           "requiredCapabilities": ["remote.canonical.execute"],
           "targetPolicy": "manager-non-control-git"
         },
@@ -78,6 +79,7 @@
         "manager-gitops": {
           "allowedIntents": ["inspect-and-plan"],
           "guards": ["coordination-lease-owned", "git-cas"],
+          "mode": "mutation-execute",
           "requiredCapabilities": ["remote.canonical.execute"],
           "targetPolicy": "manager-non-control-git"
         },
@@ -97,6 +99,7 @@
         "manager-gitops": {
           "allowedIntents": ["inspect-and-plan"],
           "guards": ["coordination-lease-owned", "git-cas"],
+          "mode": "mutation-execute",
           "requiredCapabilities": ["remote.canonical.execute"],
           "targetPolicy": "manager-non-control-git"
         },
