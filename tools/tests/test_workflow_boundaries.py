@@ -46,6 +46,23 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertNotIn("python tools/hosted_agent_cycle_trace.py",text)
         self.assertNotIn("Detect trace-capable begin",text)
         self.assertNotIn("-f tools/hosted_agent_cycle_trace.py",text)
+    def test_hosted_agent_tool_remains_repository_read_only(self):
+        text=self.text("hosted-agent-tool.yml")
+        self.assertIn("contents: read",text)
+        self.assertNotIn("contents: write",text)
+        self.assertNotIn("actions: write",text)
+        self.assertNotIn("repository_dispatch",text)
+        self.assertNotIn("workflow_dispatch",text)
+    def test_remote_canonical_workflow_owns_write_permission_and_consumes_hosted_artifact(self):
+        hosted=self.text("hosted-agent-tool.yml");remote=self.text("remote-canonical-execution.yml")
+        self.assertNotIn("contents: write",hosted)
+        self.assertIn("contents: write",remote)
+        self.assertIn("workflow_run:",remote)
+        self.assertIn("workflows: [\"Hosted Agent Tool\"]",remote)
+        self.assertIn("types: [completed]",remote)
+        self.assertIn("actions/download-artifact@v4",remote)
+        self.assertIn("tools.agent_tools.dispatch_host",remote)
+        self.assertIn("MOBILIPRESENTER_AGENT_TOOL_MUTATION_ATTEMPT_V0_1",remote)
     def test_operational_workflows_do_not_implement_domain_hashing_or_direct_ref_writes(self):
         for name in ("agent-ops.yml","branch-hygiene.yml","coordination-guard.yml","supervisor-snapshot.yml"):
             text=self.text(name);self.assertNotIn("stable_hash",text);self.assertNotIn("git update-ref",text);self.assertNotIn("git push",text);self.assertNotRegex(text,r"gh\s+api[^\n]*(?:--method|-X)\s+(?:POST|PATCH|PUT|DELETE)")
