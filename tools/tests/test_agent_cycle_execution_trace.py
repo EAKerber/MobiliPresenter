@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock
 
 from tools import hosted_agent_cycle_trace
-from tools.agent_tools import contracts, trace_collect
+from tools.agent_tools import contracts, mutation_dispatch, trace_collect
 from tools.canonical import stable_hash
 
 
@@ -67,6 +67,33 @@ def remote_request():
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
+
+
+def mutation_dispatch_payload(tool=None):
+    tool = tool_request() if tool is None else tool
+    command = remote_request()
+    core = {
+        "schemaVersion": mutation_dispatch.DISPATCH_SCHEMA,
+        "cycleInstanceId": trace_collect.cycle_instance_id(manifest()),
+        "requestHash": stable_hash(tool),
+        "planHash": "d" * 64,
+        "proofSetHash": "e" * 64,
+        "begin": copy.deepcopy(BEGIN),
+        "actor": copy.deepcopy(ACTOR),
+        "toolId": tool["toolId"],
+        "targetPolicy": "manager-non-control-git",
+        "command": command,
+        "commandHash": stable_hash(command),
+        "source": {
+            "issueNumber": 145,
+            "requestCommentId": 101,
+            "hostedRunId": 456,
+            "semanticHostSha": BEGIN["sourceSha"],
+        },
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "dispatchHash": stable_hash(core)}
 
 
 def complete_comments():
@@ -139,6 +166,47 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         self.assertEqual(value["traceStatus"], "INCOMPLETE")
         self.assertEqual(value["summary"]["unknownCount"], 1)
         self.assertFalse(value["attempts"][0]["matched"])
+
+    def test_dispatch_is_non_terminal_and_does_not_add_an_attempt(self):
+        comments = complete_comments()
+        dispatch = mutation_dispatch_payload()
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        value = trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+        self.assertEqual(value["summary"]["attemptCount"], 2)
+        self.assertEqual(value["attempts"][0]["status"], "BLOCKED")
+
+    def test_dispatch_without_terminal_result_is_unknown_not_pass(self):
+        comments = [comment for comment in complete_comments() if comment["id"] != 102]
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, mutation_dispatch_payload()))
+        value = trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+        self.assertEqual(value["traceStatus"], "INCOMPLETE")
+        self.assertEqual(value["attempts"][0]["status"], "UNKNOWN")
+        self.assertEqual(value["attempts"][0]["blockers"], ["EXECUTION_RESULT_MISSING_AFTER_DISPATCH"])
+
+    def test_duplicate_dispatch_fails_closed(self):
+        comments = complete_comments()
+        dispatch = mutation_dispatch_payload()
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        comments.insert(3, bot_comment(106, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_DISPATCH_DUPLICATE"):
+            trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+
+    def test_dispatched_request_cannot_finish_as_planned(self):
+        comments = complete_comments()
+        dispatch = mutation_dispatch_payload()
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        tool = tool_request()
+        for comment in comments:
+            if comment["id"] == 102:
+                comment["body"] = trace_collect.AGENT_TOOL_RESULT_MARKER + "\n```json\n" + json.dumps({
+                    "requestHash": stable_hash(tool),
+                    "begin": copy.deepcopy(BEGIN),
+                    "actor": copy.deepcopy(ACTOR),
+                    "status": "PLANNED",
+                    "blockers": [],
+                }) + "\n```"
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_DISPATCH_TERMINAL_INVALID"):
+            trace_collect.build_trace(comments, manifest(), close_comment_id=200)
 
     def test_other_session_does_not_contaminate_trace(self):
         comments = complete_comments()
