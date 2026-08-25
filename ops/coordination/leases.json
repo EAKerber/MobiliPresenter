@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "m12-at3b-live2-acquire:0",
-      "resource": "branch:work/operations/m12-at3b-live-qualification-2",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m12-at3b-live-qualification-2-20260825",
-        "branch": "work/operations/m12-at3b-live-qualification-2",
-        "pr": null
-      },
-      "reason": "M12-AT3B final bounded live qualification",
-      "acquiredAt": "2026-08-25T16:55:32Z",
-      "renewedAt": "2026-08-25T16:55:32Z",
-      "expiresAt": "2026-08-25T17:55:32Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "1883c8f450ac0ea7552715ed98bee3bc8a08b136",
+  "leases": [],
+  "revision": "25435dd63aa3a055e3d32e37fc521735780b910b",
   "schemaVersion": "CoordinationState 0.1"
 }
