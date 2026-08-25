@@ -9,7 +9,9 @@ from tools.agent_tools import contracts, guard_proofs
 from tools.canonical import stable_hash
 
 DISPATCH_SCHEMA = "AgentToolMutationDispatch 0.1"
+OUTCOME_KIND = "agent-tool-mutation-dispatch-outcome"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+GIT_SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
 CYCLE_RE = re.compile(r"^cycle-instance-[0-9a-f]{24}$")
 FIELDS = {
     "schemaVersion",
@@ -29,10 +31,28 @@ FIELDS = {
     "dispatchHash",
 }
 SOURCE_FIELDS = {"issueNumber", "requestCommentId", "hostedRunId", "semanticHostSha"}
+OUTCOME_FIELDS = {
+    "kind",
+    "admissionProofSetHash",
+    "dispatchHash",
+    "commandHash",
+    "executionProofSetHash",
+    "remoteReceiptHash",
+    "aggregateReadback",
+    "mutationState",
+    "mutableCallCount",
+    "observedBranchHead",
+}
 
 
 def _positive_int(value: Any, code: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise RuntimeError(code)
+    return value
+
+
+def _nonnegative_int(value: Any, code: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise RuntimeError(code)
     return value
 
@@ -158,3 +178,144 @@ def build_dispatch(
     }
     value = {**core, "dispatchHash": stable_hash(core)}
     return validate_dispatch(value, plan=plan, proof_set=proof_set)
+
+
+def validate_execution_result(
+    value: Any,
+    *,
+    plan: dict[str, Any],
+    dispatch: dict[str, Any],
+) -> dict[str, Any]:
+    contracts.validate_plan(plan)
+    validate_dispatch(dispatch, plan=plan)
+    contracts.validate_result(value)
+    if (
+        value["requestHash"] != dispatch["requestHash"]
+        or value["planHash"] != dispatch["planHash"]
+        or value["toolId"] != dispatch["toolId"]
+    ):
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_LINEAGE_MISMATCH")
+    outcome = value.get("value")
+    if not isinstance(outcome, dict) or set(outcome) != OUTCOME_FIELDS:
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_VALUE_INVALID")
+    if outcome.get("kind") != OUTCOME_KIND:
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_VALUE_INVALID")
+    for field, expected in (
+        ("admissionProofSetHash", dispatch["proofSetHash"]),
+        ("dispatchHash", dispatch["dispatchHash"]),
+        ("commandHash", dispatch["commandHash"]),
+    ):
+        if outcome.get(field) != expected:
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_LINEAGE_MISMATCH")
+    execution_hash = outcome.get("executionProofSetHash")
+    if execution_hash is not None:
+        _hash(execution_hash, "AGENT_TOOL_MUTATION_RESULT_EXECUTION_PROOF_INVALID")
+    receipt_hash = outcome.get("remoteReceiptHash")
+    if receipt_hash is not None:
+        _hash(receipt_hash, "AGENT_TOOL_MUTATION_RESULT_RECEIPT_INVALID")
+    mutable_count = _nonnegative_int(
+        outcome.get("mutableCallCount"), "AGENT_TOOL_MUTATION_RESULT_MUTABLE_COUNT_INVALID"
+    )
+    observed_head = outcome.get("observedBranchHead")
+    if observed_head is not None and (
+        not isinstance(observed_head, str) or not GIT_SHA_RE.fullmatch(observed_head)
+    ):
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_BRANCH_HEAD_INVALID")
+    status = value["status"]
+    mutation_state = outcome.get("mutationState")
+    if status == "PASS":
+        if (
+            value["blockers"]
+            or mutation_state != "APPLIED"
+            or receipt_hash is None
+            or execution_hash is None
+            or mutable_count <= 0
+            or not isinstance(outcome.get("aggregateReadback"), dict)
+        ):
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_PASS_INVALID")
+    elif status == "BLOCKED":
+        if (
+            not value["blockers"]
+            or mutation_state != "NOT_APPLIED"
+            or receipt_hash is not None
+            or outcome.get("aggregateReadback") is not None
+        ):
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_BLOCKED_INVALID")
+    elif status == "UNKNOWN":
+        if (
+            not value["blockers"]
+            or mutation_state != "UNKNOWN"
+            or receipt_hash is not None
+            or outcome.get("aggregateReadback") is not None
+        ):
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_UNKNOWN_INVALID")
+    else:
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_STATUS_INVALID")
+    return value
+
+
+def build_execution_result(
+    plan: dict[str, Any],
+    dispatch: dict[str, Any],
+    *,
+    status: str,
+    blockers: list[str],
+    execution_proof_set: dict[str, Any] | None = None,
+    receipt: dict[str, Any] | None = None,
+    mutable_call_count: int = 0,
+    observed_branch_head: str | None = None,
+) -> dict[str, Any]:
+    contracts.validate_plan(plan)
+    validate_dispatch(dispatch, plan=plan)
+    blockers = sorted(set(blockers))
+    execution_hash: str | None = None
+    if execution_proof_set is not None:
+        guard_proofs.validate_proof_set(execution_proof_set, plan=plan)
+        execution_hash = execution_proof_set["proofSetHash"]
+    receipt_hash: str | None = None
+    aggregate: dict[str, Any] | None = None
+    if receipt is not None:
+        remote.validate_receipt(receipt)
+        if (
+            receipt["commandHash"] != dispatch["commandHash"]
+            or receipt["command"] != dispatch["command"]
+        ):
+            raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_RECEIPT_MISMATCH")
+        receipt_hash = receipt["receiptHash"]
+        aggregate = copy.deepcopy(receipt["aggregateReadback"])
+    if status == "PASS":
+        mutation_state = "APPLIED"
+    elif status == "BLOCKED":
+        mutation_state = "NOT_APPLIED"
+    elif status == "UNKNOWN":
+        mutation_state = "UNKNOWN"
+    else:
+        raise RuntimeError("AGENT_TOOL_MUTATION_RESULT_STATUS_INVALID")
+    outcome = {
+        "kind": OUTCOME_KIND,
+        "admissionProofSetHash": dispatch["proofSetHash"],
+        "dispatchHash": dispatch["dispatchHash"],
+        "commandHash": dispatch["commandHash"],
+        "executionProofSetHash": execution_hash,
+        "remoteReceiptHash": receipt_hash,
+        "aggregateReadback": aggregate,
+        "mutationState": mutation_state,
+        "mutableCallCount": _nonnegative_int(
+            mutable_call_count, "AGENT_TOOL_MUTATION_RESULT_MUTABLE_COUNT_INVALID"
+        ),
+        "observedBranchHead": observed_branch_head,
+    }
+    core = {
+        "schemaVersion": contracts.RESULT_SCHEMA,
+        "requestHash": dispatch["requestHash"],
+        "planHash": dispatch["planHash"],
+        "toolId": dispatch["toolId"],
+        "status": status,
+        "value": outcome,
+        "blockers": blockers,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    result = {**core, "resultHash": stable_hash(core)}
+    return validate_execution_result(result, plan=plan, dispatch=dispatch)
