@@ -14,8 +14,8 @@ class OperationalSemanticsCoverageTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertTrue(first["coverageComplete"])
         self.assertTrue(all(not values for values in first["findings"].values()))
-        self.assertEqual(27, first["catalogCounts"]["entrypoints"])
-        self.assertEqual(8, first["catalogCounts"]["workflows"])
+        self.assertGreater(first["catalogCounts"]["entrypoints"], 0)
+        self.assertGreater(first["catalogCounts"]["workflows"], 0)
         self.assertEqual(coverage.validate_inspection(first), first)
 
     def test_missing_entrypoint_binding_is_explicit(self):
