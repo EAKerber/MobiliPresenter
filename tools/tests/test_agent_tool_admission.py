@@ -69,9 +69,12 @@ class AgentToolAdmissionTests(unittest.TestCase):
             target={"branch": "work/operations/at2d", "path": "docs/at2d.txt"},
             input_value={"content": "x", "message": "AT2D plan"},
         )
-        resolved = resolver.resolve_request(request, _context("remote.canonical.execute"))
+        resolved = resolver.resolve_request(
+            request, _context("remote.canonical.execute"), execute=False
+        )
         plan = resolved["plan"]
-        self.assertEqual(plan["status"], "PLANNED")
+        self.assertEqual(plan["status"], "READY")
+        self.assertEqual(plan["mode"], "mutation-execute")
         self.assertEqual(admission.missing_guard_proof_providers(plan), [])
         with self.assertRaisesRegex(RuntimeError, "AGENT_TOOL_GUARD_PROOFS_REQUIRED"):
             admission.assert_execution_admitted(plan)
