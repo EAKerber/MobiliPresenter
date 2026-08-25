@@ -58,14 +58,15 @@ def resolve_request(
     intent = context["semanticContext"].get("declaredIntent")
     if intent not in role_policy["allowedIntents"]:
         raise RuntimeError("AGENT_TOOL_INTENT_FORBIDDEN")
+    mode = tool_policy.effective_mode(tool, role_policy)
     projection = tool_projection.build_projection(
         context["semanticContext"], context["semanticBrief"], policy=catalog, registry=semantic
     )
     available_ids = {item["toolId"] for item in projection["available"]}
     plannable_ids = {item["toolId"] for item in projection["plannable"]}
-    if tool["mode"] == "read-only-execute" and request["toolId"] not in available_ids:
+    if mode in {"read-only-execute", "mutation-execute"} and request["toolId"] not in available_ids:
         raise RuntimeError("AGENT_TOOL_NOT_AVAILABLE")
-    if tool["mode"] == "plan-only" and request["toolId"] not in plannable_ids:
+    if mode == "plan-only" and request["toolId"] not in plannable_ids:
         raise RuntimeError("AGENT_TOOL_NOT_PLANNABLE")
     target_policy_id = role_policy["targetPolicy"]
     validate_target(catalog["targetPolicies"][target_policy_id], request["target"])
@@ -87,7 +88,7 @@ def resolve_request(
         "actor": copy.deepcopy(request["actor"]),
         "toolId": request["toolId"],
         "effectClass": tool["effectClass"],
-        "mode": tool["mode"],
+        "mode": mode,
         "adapter": tool["adapter"],
         "requiredCapabilities": copy.deepcopy(role_policy["requiredCapabilities"]),
         "eligibleToolSurfaces": _eligible_surfaces(role_policy["requiredCapabilities"], semantic),
@@ -96,20 +97,20 @@ def resolve_request(
         "target": copy.deepcopy(request["target"]),
         "input": copy.deepcopy(request["input"]),
         "concrete": concrete,
-        "status": "PLANNED" if tool["mode"] == "plan-only" else "READY",
+        "status": "PLANNED" if mode == "plan-only" else "READY",
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
     plan = {**plan_core, "planHash": stable_hash(plan_core)}
     contracts.validate_plan(plan)
-    if tool["mode"] == "plan-only" or not execute:
+    if mode == "plan-only" or not execute:
         value: Any = copy.deepcopy(concrete)
         status = "PLANNED"
     else:
-        # This gate is deliberately between planning and adapter execution.
-        # Read-only tools pass; shared durable mutations cannot pass until AT3
-        # registers guard proof providers and an explicit execution mode.
+        # The resolver never manufactures mutation proofing. Hosted mutation
+        # execution is an orchestration boundary: it resolves with execute=False,
+        # collects proofs, then dispatches to the canonical write-capable host.
         admission.assert_execution_admitted(plan)
         value = adapter.execute(
             request,

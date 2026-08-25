@@ -9,7 +9,7 @@ from typing import Any
 from tools.canonical import stable_hash
 from tools.semantics.registry import ROOT, load_registry, validate_registry
 
-POLICY_SCHEMA = "AgentToolPolicyCatalog 0.1"
+POLICY_SCHEMA = "AgentToolPolicyCatalog 0.2"
 POLICY_PATH = ROOT / "ops" / "semantics" / "agent-tool-policies.json"
 TOOL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
 EFFECT_CLASSES = {
@@ -18,7 +18,7 @@ EFFECT_CLASSES = {
     "shared-durable-mutation",
     "specialized-maintenance",
 }
-MODES = {"read-only-execute", "plan-only"}
+MODES = {"read-only-execute", "plan-only", "mutation-execute"}
 GUARDS = {
     "coordination-conflict-guarded",
     "coordination-lease-owned",
@@ -32,6 +32,7 @@ TOOL_FIELDS = {"adapter", "effectClass", "mode", "roles"}
 ROLE_POLICY_FIELDS = {
     "allowedIntents", "guards", "requiredCapabilities", "targetPolicy",
 }
+ROLE_POLICY_OPTIONAL_FIELDS = {"mode"}
 
 
 def _strings(value: Any, code: str, *, allow_empty: bool = False) -> list[str]:
@@ -52,6 +53,13 @@ def load_policy(path: Path = POLICY_PATH) -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         raise RuntimeError("AGENT_TOOL_POLICY_JSON_INVALID") from exc
     return validate_policy(value)
+
+
+def effective_mode(tool: dict[str, Any], role_policy: dict[str, Any]) -> str:
+    mode = role_policy.get("mode", tool.get("mode"))
+    if mode not in MODES:
+        raise RuntimeError("AGENT_TOOL_MODE_INVALID")
+    return mode
 
 
 def validate_policy(
@@ -96,16 +104,16 @@ def validate_policy(
     targets = value.get("targetPolicies")
     if not isinstance(targets, dict) or not targets or list(targets) != sorted(targets):
         raise RuntimeError("AGENT_TOOL_TARGET_POLICIES_INVALID")
-    for policy_id, policy in targets.items():
+    for policy_id, target_policy in targets.items():
         if not TOOL_ID_RE.fullmatch(str(policy_id)):
             raise RuntimeError("AGENT_TOOL_TARGET_POLICY_ID_INVALID")
-        if not isinstance(policy, dict) or set(policy) != TARGET_POLICY_FIELDS:
+        if not isinstance(target_policy, dict) or set(target_policy) != TARGET_POLICY_FIELDS:
             raise RuntimeError("AGENT_TOOL_TARGET_POLICY_FIELDS_INVALID")
-        if policy.get("kind") not in {"none", "git-file"}:
+        if target_policy.get("kind") not in {"none", "git-file"}:
             raise RuntimeError("AGENT_TOOL_TARGET_POLICY_KIND_INVALID")
-        _strings(policy["branchPrefixes"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
-        _strings(policy["forbiddenBranches"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
-        _strings(policy["pathPrefixes"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
+        _strings(target_policy["branchPrefixes"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
+        _strings(target_policy["forbiddenBranches"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
+        _strings(target_policy["pathPrefixes"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
 
     tools = value.get("tools")
     if not isinstance(tools, dict) or not tools or list(tools) != sorted(tools):
@@ -118,13 +126,16 @@ def validate_policy(
             raise RuntimeError("AGENT_TOOL_FIELDS_INVALID")
         if not isinstance(tool.get("adapter"), str) or not tool["adapter"]:
             raise RuntimeError("AGENT_TOOL_ADAPTER_INVALID")
-        if tool.get("effectClass") not in EFFECT_CLASSES or tool.get("mode") not in MODES:
+        if tool.get("effectClass") not in EFFECT_CLASSES or tool.get("mode") not in MODES - {"mutation-execute"}:
             raise RuntimeError("AGENT_TOOL_EFFECT_INVALID")
         role_map = tool.get("roles")
         if not isinstance(role_map, dict) or not role_map or list(role_map) != sorted(role_map):
             raise RuntimeError("AGENT_TOOL_ROLE_POLICY_INVALID")
         for role, role_policy in role_map.items():
-            if role not in roles or not isinstance(role_policy, dict) or set(role_policy) != ROLE_POLICY_FIELDS:
+            if role not in roles or not isinstance(role_policy, dict):
+                raise RuntimeError("AGENT_TOOL_ROLE_POLICY_FIELDS_INVALID")
+            fields = set(role_policy)
+            if not ROLE_POLICY_FIELDS.issubset(fields) or not fields.issubset(ROLE_POLICY_FIELDS | ROLE_POLICY_OPTIONAL_FIELDS):
                 raise RuntimeError("AGENT_TOOL_ROLE_POLICY_FIELDS_INVALID")
             allowed_intents = _strings(role_policy["allowedIntents"], "AGENT_TOOL_ALLOWED_INTENTS_INVALID")
             if not set(allowed_intents).issubset(intents):
@@ -141,6 +152,18 @@ def validate_policy(
                     raise RuntimeError("AGENT_TOOL_CAPABILITY_ROLE_MISMATCH")
             if role_policy["targetPolicy"] not in targets:
                 raise RuntimeError("AGENT_TOOL_TARGET_POLICY_UNKNOWN")
+
+            mode = effective_mode(tool, role_policy)
+            if tool["effectClass"] == "read-only" and mode != "read-only-execute":
+                raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
+            if tool["effectClass"] == "shared-durable-mutation" and mode not in {"plan-only", "mutation-execute"}:
+                raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
+            if mode == "mutation-execute":
+                required_guards = {"coordination-lease-owned", "git-cas"}
+                if not required_guards.issubset(set(guards)):
+                    raise RuntimeError("AGENT_TOOL_MUTATION_GUARDS_REQUIRED")
+                if "remote.canonical.execute" not in required:
+                    raise RuntimeError("AGENT_TOOL_MUTATION_CANONICAL_HOST_REQUIRED")
     return value
 
 

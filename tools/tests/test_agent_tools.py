@@ -76,21 +76,57 @@ class AgentToolPolicyTests(unittest.TestCase):
             },
         )
         self.assertEqual(catalog["schemaVersion"], policy.POLICY_SCHEMA)
+        manager = catalog["tools"]["git.file.update"]["roles"]["manager-gitops"]
+        ui = catalog["tools"]["git.file.update"]["roles"]["ui-ux"]
+        self.assertEqual(policy.effective_mode(catalog["tools"]["git.file.update"], manager), "mutation-execute")
+        self.assertEqual(policy.effective_mode(catalog["tools"]["git.file.update"], ui), "plan-only")
 
     def test_projection_is_role_specific_without_resolver_role_branches(self):
         manager = projection.build_projection(
             {"role": "manager-gitops", "declaredIntent": "inspect-and-plan"}, brief("project.inspect", "routine.inspect")
         )
         self.assertEqual([item["toolId"] for item in manager["available"]], ["project.inspect", "routine.inspect"])
+        self.assertEqual([item["toolId"] for item in manager["plannable"]], [])
         self.assertEqual(
-            [item["toolId"] for item in manager["plannable"]],
+            [item["toolId"] for item in manager["conditional"]],
             ["git.file.create", "git.file.delete", "git.file.update"],
+        )
+        manager_ready = projection.build_projection(
+            {"role": "manager-gitops", "declaredIntent": "inspect-and-plan"},
+            brief("project.inspect", "remote.canonical.execute", "routine.inspect"),
+        )
+        self.assertEqual(
+            [item["toolId"] for item in manager_ready["available"]],
+            ["git.file.create", "git.file.delete", "git.file.update", "project.inspect", "routine.inspect"],
+        )
+        self.assertTrue(
+            all(
+                item["mode"] == "mutation-execute"
+                for item in manager_ready["available"]
+                if item["toolId"].startswith("git.file.")
+            )
         )
         ui = projection.build_projection(
             {"role": "ui-ux", "declaredIntent": "inspect-and-plan"}, brief("project.inspect")
         )
         self.assertEqual([item["toolId"] for item in ui["available"]], ["project.inspect"])
+        self.assertEqual(
+            [item["toolId"] for item in ui["plannable"]],
+            ["git.file.create", "git.file.delete", "git.file.update"],
+        )
         self.assertNotIn("routine.inspect", [item["toolId"] for item in ui["available"]])
+
+    def test_mutation_execute_requires_positive_guards_and_canonical_host(self):
+        catalog = copy.deepcopy(policy.load_policy())
+        role_policy = catalog["tools"]["git.file.update"]["roles"]["manager-gitops"]
+        role_policy["guards"] = ["git-cas"]
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TOOL_MUTATION_GUARDS_REQUIRED"):
+            policy.validate_policy(catalog)
+        catalog = copy.deepcopy(policy.load_policy())
+        role_policy = catalog["tools"]["git.file.update"]["roles"]["manager-gitops"]
+        role_policy["requiredCapabilities"] = ["project.inspect"]
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TOOL_MUTATION_CANONICAL_HOST_REQUIRED"):
+            policy.validate_policy(catalog)
 
     def test_third_role_can_be_added_by_policy_and_registry_data_only(self):
         registry = copy.deepcopy(load_registry())
@@ -142,9 +178,40 @@ class AgentToolResolverTests(unittest.TestCase):
         )
         resolved = resolver.resolve_request(value, context("ui-ux", available=("project.inspect",)))
         self.assertEqual(resolved["result"]["status"], "PLANNED")
+        self.assertEqual(resolved["plan"]["mode"], "plan-only")
         command = resolved["plan"]["concrete"]["command"]
         self.assertEqual(command["target"]["operation"], "create-file")
         self.assertEqual(command["expected"]["branchHead"], "c" * 40)
+        self.assertFalse(resolved["plan"]["concrete"]["mutationEnabled"])
+        observe.assert_called_once()
+
+    @patch(
+        "tools.agent_tools.adapters.remote_git_file.git_observation.observe_file",
+        return_value={
+            "repository": "EAKerber/MobiliPresenter",
+            "branch": "work/operations/at3b",
+            "path": "docs/at3b.json",
+            "branchHead": "c" * 40,
+            "blobSha": "d" * 40,
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        },
+    )
+    def test_manager_git_update_resolves_ready_mutation_without_local_execution(self, observe):
+        value = request(
+            "git.file.update",
+            target={"branch": "work/operations/at3b", "path": "docs/at3b.json"},
+            input_value={"content": "{}\n", "message": "AT3B update"},
+        )
+        resolved = resolver.resolve_request(
+            value,
+            context(available=("project.inspect", "remote.canonical.execute", "routine.inspect")),
+            execute=False,
+        )
+        self.assertEqual(resolved["plan"]["mode"], "mutation-execute")
+        self.assertEqual(resolved["plan"]["status"], "READY")
+        self.assertEqual(resolved["result"]["status"], "PLANNED")
         self.assertFalse(resolved["plan"]["concrete"]["mutationEnabled"])
         observe.assert_called_once()
 

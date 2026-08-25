@@ -3,10 +3,10 @@ from __future__ import annotations
 import copy
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from tools import hosted_agent_cycle_trace
-from tools.agent_tools import contracts, trace_collect
+from tools.agent_tools import contracts, mutation_dispatch, trace_collect
 from tools.canonical import stable_hash
 
 
@@ -67,6 +67,33 @@ def remote_request():
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
+
+
+def mutation_dispatch_payload(tool=None):
+    tool = tool_request() if tool is None else tool
+    command = remote_request()
+    core = {
+        "schemaVersion": mutation_dispatch.DISPATCH_SCHEMA,
+        "cycleInstanceId": trace_collect.cycle_instance_id(manifest()),
+        "requestHash": stable_hash(tool),
+        "planHash": "d" * 64,
+        "proofSetHash": "e" * 64,
+        "begin": copy.deepcopy(BEGIN),
+        "actor": copy.deepcopy(ACTOR),
+        "toolId": tool["toolId"],
+        "targetPolicy": "manager-non-control-git",
+        "command": command,
+        "commandHash": stable_hash(command),
+        "source": {
+            "issueNumber": 145,
+            "requestCommentId": 101,
+            "hostedRunId": 456,
+            "semanticHostSha": BEGIN["sourceSha"],
+        },
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "dispatchHash": stable_hash(core)}
 
 
 def complete_comments():
@@ -140,6 +167,47 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         self.assertEqual(value["summary"]["unknownCount"], 1)
         self.assertFalse(value["attempts"][0]["matched"])
 
+    def test_dispatch_is_non_terminal_and_does_not_add_an_attempt(self):
+        comments = complete_comments()
+        dispatch = mutation_dispatch_payload()
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        value = trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+        self.assertEqual(value["summary"]["attemptCount"], 2)
+        self.assertEqual(value["attempts"][0]["status"], "BLOCKED")
+
+    def test_dispatch_without_terminal_result_is_unknown_not_pass(self):
+        comments = [comment for comment in complete_comments() if comment["id"] != 102]
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, mutation_dispatch_payload()))
+        value = trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+        self.assertEqual(value["traceStatus"], "INCOMPLETE")
+        self.assertEqual(value["attempts"][0]["status"], "UNKNOWN")
+        self.assertEqual(value["attempts"][0]["blockers"], ["EXECUTION_RESULT_MISSING_AFTER_DISPATCH"])
+
+    def test_duplicate_dispatch_fails_closed(self):
+        comments = complete_comments()
+        dispatch = mutation_dispatch_payload()
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        comments.insert(3, bot_comment(106, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_DISPATCH_DUPLICATE"):
+            trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+
+    def test_dispatched_request_cannot_finish_as_planned(self):
+        comments = complete_comments()
+        dispatch = mutation_dispatch_payload()
+        comments.insert(2, bot_comment(105, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch))
+        tool = tool_request()
+        for comment in comments:
+            if comment["id"] == 102:
+                comment["body"] = trace_collect.AGENT_TOOL_RESULT_MARKER + "\n```json\n" + json.dumps({
+                    "requestHash": stable_hash(tool),
+                    "begin": copy.deepcopy(BEGIN),
+                    "actor": copy.deepcopy(ACTOR),
+                    "status": "PLANNED",
+                    "blockers": [],
+                }) + "\n```"
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_DISPATCH_TERMINAL_INVALID"):
+            trace_collect.build_trace(comments, manifest(), close_comment_id=200)
+
     def test_other_session_does_not_contaminate_trace(self):
         comments = complete_comments()
         other = remote_request()
@@ -159,6 +227,23 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         )
         self.assertEqual(value["summary"]["attemptCount"], 2)
         self.assertEqual(amended["evidenceCommentIds"], [104])
+
+    @patch(
+        "tools.hosted_agent_cycle_trace.trace_collect.agent_tool_mutation_evidence_comment_ids",
+        return_value=[105],
+    )
+    def test_close_preparation_includes_dispatched_mutation_receipt_evidence(self, discover):
+        comments = complete_comments()
+        amended, value = hosted_agent_cycle_trace.prepare_close(
+            close_command([]),
+            {"issueNumber": 145, "commentId": 200},
+            manifest(),
+            {},
+            comments,
+        )
+        self.assertEqual(value["traceStatus"], "PASS")
+        self.assertEqual(amended["evidenceCommentIds"], [104, 105])
+        discover.assert_called_once_with(comments, manifest(), close_comment_id=200)
 
     def test_close_preparation_blocks_incomplete_trace_even_if_caller_omits_attempt(self):
         comments = [comment for comment in complete_comments() if comment["id"] != 102]
@@ -193,6 +278,56 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         self.assertEqual(fetch.call_count, 2)
         sleep.assert_called_once_with(0.0)
         self.assertEqual(hosted_agent_cycle_trace.TRACE_COMPLETENESS_SCOPE, "same-cycle-attributable-events")
+
+    @patch(
+        "tools.hosted_agent_cycle_trace.trace_collect.agent_tool_mutation_evidence_comment_ids"
+    )
+    def test_transport_stabilization_reobserves_delayed_mutation_receipt_without_replay(self, discover):
+        discover.side_effect = [
+            trace_collect.AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_MISSING"),
+            [105],
+        ]
+        fetch = Mock(return_value=complete_comments())
+        sleep = Mock()
+        amended, value = hosted_agent_cycle_trace.prepare_close_stabilized(
+            close_command([]),
+            {"issueNumber": 145, "commentId": 200},
+            manifest(),
+            {},
+            repository="EAKerber/MobiliPresenter",
+            fetch_comments=fetch,
+            sleep=sleep,
+            attempts=2,
+            delay_seconds=0,
+        )
+        self.assertEqual(value["traceStatus"], "PASS")
+        self.assertEqual(amended["evidenceCommentIds"], [104, 105])
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual(discover.call_count, 2)
+        sleep.assert_called_once_with(0.0)
+
+    @patch(
+        "tools.hosted_agent_cycle_trace.trace_collect.agent_tool_mutation_evidence_comment_ids",
+        side_effect=trace_collect.AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_MISMATCH"),
+    )
+    def test_mutation_receipt_mismatch_fails_closed_without_stabilization_retry(self, discover):
+        fetch = Mock(return_value=complete_comments())
+        sleep = Mock()
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_MUTATION_RECEIPT_MISMATCH"):
+            hosted_agent_cycle_trace.prepare_close_stabilized(
+                close_command([]),
+                {"issueNumber": 145, "commentId": 200},
+                manifest(),
+                {},
+                repository="EAKerber/MobiliPresenter",
+                fetch_comments=fetch,
+                sleep=sleep,
+                attempts=3,
+                delay_seconds=0,
+            )
+        self.assertEqual(fetch.call_count, 1)
+        self.assertEqual(discover.call_count, 1)
+        sleep.assert_not_called()
 
     def test_agent_tool_orphan_result_is_not_silently_ignored(self):
         comments = complete_comments()

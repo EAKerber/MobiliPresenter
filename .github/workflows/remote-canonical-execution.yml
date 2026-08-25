@@ -3,14 +3,18 @@ name: Remote Canonical Execution
 on:
   issue_comment:
     types: [created]
+  workflow_run:
+    workflows: ["Hosted Agent Tool"]
+    types: [completed]
 
 concurrency:
-  group: remote-canonical-execution-${{ github.event.issue.number }}
+  group: remote-canonical-execution-${{ github.event_name }}-${{ github.event.issue.number || github.event.workflow_run.id }}
   cancel-in-progress: false
 
 jobs:
   execute:
     if: >-
+      github.event_name == 'issue_comment' &&
       github.event.issue.pull_request == null &&
       github.event.issue.title == 'MobiliPresenter Remote Canonical Execution Bus' &&
       github.event.comment.author_association == 'OWNER' &&
@@ -74,3 +78,272 @@ jobs:
       - name: Fail closed on blocked execution
         if: always()
         run: test "${{ steps.execute.outputs.exit_code }}" = "0"
+
+  agent-tool-dispatch:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'issue_comment' &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout canonical dispatch host
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download Hosted Agent Tool evidence
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-tool-${{ github.event.workflow_run.id }}
+          path: /tmp/agent-tool
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Inspect dispatch and replay state
+        id: protocol
+        if: steps.download.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOST_SHA: ${{ github.event.workflow_run.head_sha }}
+          HOSTED_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          if [ ! -f /tmp/agent-tool/agent-tool-dispatch.json ]; then
+            echo "has_dispatch=false" >> "$GITHUB_OUTPUT"
+            echo "state=NO_DISPATCH" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_dispatch=true" >> "$GITHUB_OUTPUT"
+          set +e
+          python -m tools.agent_tools.dispatch_host inspect \
+            --artifact-dir /tmp/agent-tool \
+            --host-sha "$HOST_SHA" \
+            --hosted-run-id "$HOSTED_RUN_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --output /tmp/agent-tool-dispatch-inspection.json
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] || [ ! -f /tmp/agent-tool-dispatch-inspection.json ]; then
+            python tools/hosted_agent_tool.py failure \
+              --error AGENT_TOOL_DISPATCH_HOST_VALIDATION_FAILED \
+              --request /tmp/agent-tool/agent-tool-request.json \
+              --result /tmp/agent-tool-terminal.json || true
+            echo "state=VALIDATION_BLOCKED" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          value=json.loads(Path('/tmp/agent-tool-dispatch-inspection.json').read_text(encoding='utf-8'))
+          state=value.get('state')
+          print(f"state={state}")
+          if state in {'TERMINAL_EXISTS','PRIOR_ATTEMPT_UNKNOWN'}:
+              Path('/tmp/agent-tool-terminal.json').write_text(
+                  json.dumps(value['terminal'],indent=2,ensure_ascii=False)+'\n',encoding='utf-8'
+              )
+          if state == 'CLEAR':
+              Path('/tmp/agent-tool-attempt.json').write_text(
+                  json.dumps(value['attempt'],indent=2,ensure_ascii=False)+'\n',encoding='utf-8'
+              )
+          PY
+
+      - name: Require readable Hosted evidence
+        if: steps.download.outcome != 'success'
+        run: exit 2
+
+      - name: Publish replay fence before mutation
+        id: attempt
+        if: steps.protocol.outputs.state == 'CLEAR'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_NUMBER=$(python - <<'PY'
+          import json
+          print(json.load(open('/tmp/agent-tool/agent-tool-dispatch.json',encoding='utf-8'))['source']['issueNumber'])
+          PY
+          )
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          attempt=json.load(open('/tmp/agent-tool-attempt.json',encoding='utf-8'))
+          body='MOBILIPRESENTER_AGENT_TOOL_MUTATION_ATTEMPT_V0_1\n```json\n'+json.dumps(attempt,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/agent-tool-attempt-comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+            --input /tmp/agent-tool-attempt-comment.json > /tmp/agent-tool-attempt-response.json
+          ATTEMPT_COMMENT_ID=$(python - <<'PY'
+          import json
+          print(json.load(open('/tmp/agent-tool-attempt-response.json',encoding='utf-8'))['id'])
+          PY
+          )
+          echo "comment_id=$ATTEMPT_COMMENT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Materialize replay-fence failure before write
+        if: steps.protocol.outputs.state == 'CLEAR' && steps.attempt.outcome != 'success'
+        run: |
+          python tools/hosted_agent_tool.py failure \
+            --error AGENT_TOOL_DISPATCH_ATTEMPT_MARKER_FAILED \
+            --request /tmp/agent-tool/agent-tool-request.json \
+            --result /tmp/agent-tool-terminal.json || true
+
+      - name: Execute dispatch through canonical writer
+        id: dispatch_execute
+        if: steps.protocol.outputs.state == 'CLEAR' && steps.attempt.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOST_SHA: ${{ github.event.workflow_run.head_sha }}
+          HOSTED_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set +e
+          python -m tools.agent_tools.dispatch_host execute \
+            --artifact-dir /tmp/agent-tool \
+            --host-sha "$HOST_SHA" \
+            --hosted-run-id "$HOSTED_RUN_ID" \
+            --run-id "$GITHUB_RUN_ID" \
+            --attempt-comment-id "${{ steps.attempt.outputs.comment_id }}" \
+            --output /tmp/agent-tool-terminal.json
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ ! -f /tmp/agent-tool-terminal.json ]; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          from tools.agent_tools import mutation_dispatch
+          from tools.canonical import stable_hash
+          request=json.load(open('/tmp/agent-tool/agent-tool-request.json',encoding='utf-8'))
+          plan=json.load(open('/tmp/agent-tool/agent-tool-plan.json',encoding='utf-8'))
+          dispatch=json.load(open('/tmp/agent-tool/agent-tool-dispatch.json',encoding='utf-8'))
+          result=mutation_dispatch.build_execution_result(
+              plan,dispatch,status='UNKNOWN',
+              blockers=['AGENT_TOOL_DISPATCH_HOST_EXECUTION_FAILED'],
+              mutable_call_count=0,
+          )
+          core={
+              'schemaVersion':'HostedAgentToolResult 0.1',
+              'requestId':request['requestId'],
+              'requestHash':dispatch['requestHash'],
+              'begin':request['begin'],
+              'actor':request['actor'],
+              'toolId':request['toolId'],
+              'plan':plan,
+              'result':result,
+              'status':result['status'],
+              'blockers':result['blockers'],
+              'semanticAuthority':False,
+              'authorizesMutation':False,
+          }
+          value={**core,'hostedResultHash':stable_hash(core)}
+          Path('/tmp/agent-tool-terminal.json').write_text(json.dumps(value,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+          PY
+          fi
+          exit 0
+
+      - name: Publish terminal Agent Tool result once
+        id: terminal_publish
+        if: >-
+          steps.protocol.outputs.has_dispatch == 'true' &&
+          steps.protocol.outputs.state != 'NO_DISPATCH' &&
+          steps.protocol.outputs.state != 'TERMINAL_EXISTS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -f /tmp/agent-tool-terminal.json
+          ISSUE_NUMBER=$(python - <<'PY'
+          import json
+          print(json.load(open('/tmp/agent-tool/agent-tool-dispatch.json',encoding='utf-8'))['source']['issueNumber'])
+          PY
+          )
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          terminal=json.load(open('/tmp/agent-tool-terminal.json',encoding='utf-8'))
+          body='MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1\n```json\n'+json.dumps(terminal,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/agent-tool-terminal-comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+            --input /tmp/agent-tool-terminal-comment.json
+
+      - name: Ensure canonical receipt evidence for successful mutation
+        if: steps.protocol.outputs.has_dispatch == 'true' && steps.protocol.outputs.state != 'NO_DISPATCH'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/agent-tool-terminal.json ]; then
+            exit 0
+          fi
+          ISSUE_NUMBER=$(python - <<'PY'
+          import json
+          print(json.load(open('/tmp/agent-tool/agent-tool-dispatch.json',encoding='utf-8'))['source']['issueNumber'])
+          PY
+          )
+          gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments?per_page=100" \
+            > /tmp/agent-tool-comments.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          terminal=json.load(open('/tmp/agent-tool-terminal.json',encoding='utf-8'))
+          inner=terminal.get('result') if isinstance(terminal,dict) else None
+          outcome=inner.get('value') if isinstance(inner,dict) else None
+          receipt=outcome.get('remoteReceipt') if isinstance(outcome,dict) else None
+          if not isinstance(receipt,dict) or terminal.get('status') != 'PASS':
+              raise SystemExit(0)
+          pages=json.load(open('/tmp/agent-tool-comments.json',encoding='utf-8'))
+          comments=[]
+          for page in pages:
+              if isinstance(page,list): comments.extend(page)
+              elif isinstance(page,dict): comments.append(page)
+          marker='MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1\n'
+          for comment in comments:
+              body=comment.get('body') if isinstance(comment,dict) else None
+              if not isinstance(body,str) or not body.startswith(marker): continue
+              raw=body[len(marker):].strip()
+              if raw.startswith('```json') and raw.endswith('```'):
+                  raw=raw[len('```json'):-len('```')].strip()
+              try: existing=json.loads(raw)
+              except json.JSONDecodeError: continue
+              if existing.get('receiptHash') == receipt.get('receiptHash'):
+                  raise SystemExit(0)
+          body=marker+'```json\n'+json.dumps(receipt,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/agent-tool-receipt-comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          if [ -f /tmp/agent-tool-receipt-comment.json ]; then
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+              --input /tmp/agent-tool-receipt-comment.json
+          fi
+
+      - name: Require terminal dispatch outcome
+        if: always()
+        run: |
+          if [ "${{ steps.protocol.outputs.has_dispatch }}" != "true" ]; then
+            exit 0
+          fi
+          if [ "${{ steps.protocol.outputs.state }}" = "TERMINAL_EXISTS" ]; then
+            exit 0
+          fi
+          test -f /tmp/agent-tool-terminal.json
+          python - <<'PY'
+          import json
+          value=json.load(open('/tmp/agent-tool-terminal.json',encoding='utf-8'))
+          if value.get('status') != 'PASS':
+              raise SystemExit(2)
+          PY
