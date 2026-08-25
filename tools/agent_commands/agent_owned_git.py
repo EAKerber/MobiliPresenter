@@ -10,11 +10,6 @@ hosted Remote Canonical carrier:
 * ownership is re-observed from the canonical Coordination authority before
   every mutable provider call made by the direct-Git executor;
 * the guard never acquires, renews, or releases leases itself.
-
-The final point is deliberate for 0.1: hidden acquire/release mutations would
-create durable Coordination deltas that the current Agent Cycle close cannot
-account for exhaustively.  A later session facade may automate that choreography
-once its transition receipts are part of the cycle trace.
 """
 from __future__ import annotations
 
@@ -22,6 +17,7 @@ import copy
 from typing import Any, Callable
 
 from tools import coordination
+from tools import coordination_ownership
 from tools import remote_canonical_execution as bridge
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
@@ -63,18 +59,23 @@ def _coordination_owner(command: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _owned_lease_metadata_matches(
-    lease: dict[str, Any],
-    *,
-    owner: dict[str, Any],
-) -> bool:
-    observed = coordination.validate_owner(lease["owner"])
-    return (
-        observed["session"] == owner["session"]
-        and observed["role"] == owner["role"]
-        and observed["branch"] == owner["branch"]
-        and observed["pr"] is None
-    )
+def _translate_positive_ownership_error(
+    exc: coordination.CoordinationError,
+    resource: str,
+) -> bridge.RemoteCanonicalExecutionError:
+    if exc.code == "LEASE_REQUIRED":
+        return bridge.RemoteCanonicalExecutionError(
+            "REMOTE_AGENT_WRITE_LEASE_REQUIRED", resource
+        )
+    if exc.code == "LEASE_OWNER_MISMATCH":
+        return bridge.RemoteCanonicalExecutionError(
+            "REMOTE_AGENT_WRITE_LEASE_OWNER_MISMATCH", resource
+        )
+    if exc.code == "LEASE_CONFLICT":
+        return bridge.RemoteCanonicalExecutionError(
+            "REMOTE_AGENT_WRITE_LEASE_CONFLICT", resource
+        )
+    return bridge.RemoteCanonicalExecutionError(exc.code, exc.detail)
 
 
 def require_agent_write_ownership(
@@ -96,24 +97,12 @@ def require_agent_write_ownership(
 
     matched: list[dict[str, Any]] = []
     for resource in owned_resources:
-        allowed, lease = coordination.can_write(state, resource, owner, authority_now)
-        if not allowed:
-            foreign = (lease or {}).get("owner") if isinstance(lease, dict) else None
-            foreign_session = foreign.get("session") if isinstance(foreign, dict) else None
-            raise bridge.RemoteCanonicalExecutionError(
-                "REMOTE_AGENT_WRITE_LEASE_CONFLICT",
-                f"{resource}:{foreign_session or 'unknown-owner'}",
+        try:
+            lease = coordination_ownership.require_owned_lease(
+                state, resource, owner, authority_now
             )
-        if lease is None:
-            raise bridge.RemoteCanonicalExecutionError(
-                "REMOTE_AGENT_WRITE_LEASE_REQUIRED",
-                resource,
-            )
-        if not _owned_lease_metadata_matches(lease, owner=owner):
-            raise bridge.RemoteCanonicalExecutionError(
-                "REMOTE_AGENT_WRITE_LEASE_OWNER_MISMATCH",
-                resource,
-            )
+        except coordination.CoordinationError as exc:
+            raise _translate_positive_ownership_error(exc, resource) from exc
         matched.append(copy.deepcopy(lease))
 
     for resource in conflict_resources:
@@ -194,14 +183,7 @@ def execute_agent_owned_git(
     transport: Any | None = None,
     authority_factory: Callable[[Any], Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute one Manager/GitOps direct-Git command under the lease-owned guard.
-
-    The returned object remains the canonical RemoteCanonicalExecutionReceipt;
-    no wrapper schema is introduced in 0.1, preserving Hosted Agent Cycle close
-    compatibility.  Ownership proofs remain reconstructible from the canonical
-    Coordination authority and are exposed on LeaseEnforcingTransport for tests
-    and future execution-trace integration.
-    """
+    """Execute one Manager/GitOps direct-Git command under the lease-owned guard."""
 
     command = bridge.validate_command(command)
     if command["kind"] != "git-direct":
