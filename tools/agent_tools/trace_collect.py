@@ -6,11 +6,12 @@ import subprocess
 from typing import Any
 
 from tools import remote_canonical_execution
-from tools.agent_tools import contracts, trace
+from tools.agent_tools import contracts, mutation_dispatch, trace
 from tools.canonical import stable_hash
 
 AGENT_TOOL_REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
 AGENT_TOOL_RESULT_MARKER = "MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1"
+AGENT_TOOL_DISPATCH_MARKER = "MOBILIPRESENTER_AGENT_TOOL_DISPATCH_V0_1"
 REMOTE_REQUEST_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_REQUEST_V0_1"
 REMOTE_RESULT_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1"
 
@@ -104,6 +105,7 @@ def _agent_tool_requests(
     window: list[dict[str, Any]], begin: dict[str, Any], actor: dict[str, str]
 ) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
+    hashes: set[str] = set()
     for comment in window:
         if not _request_comment_allowed(comment):
             continue
@@ -113,6 +115,9 @@ def _agent_tool_requests(
         if _canonical_begin(payload.get("begin")) != begin or _canonical_actor(payload.get("actor")) != actor:
             continue
         digest = stable_hash(payload)
+        if digest in hashes:
+            raise AgentTraceCollectionError("AGENT_TRACE_REQUEST_HASH_DUPLICATE")
+        hashes.add(digest)
         operation = payload.get("requestId")
         if not isinstance(operation, str) or not operation:
             operation = "invalid-agent-tool-" + digest[:16]
@@ -143,6 +148,37 @@ def _remote_requests(window: list[dict[str, Any]], actor: dict[str, str]) -> lis
             "requestHash": digest,
             "operationId": operation,
         })
+    return found
+
+
+def _agent_tool_dispatches(
+    window: list[dict[str, Any]],
+    begin: dict[str, Any],
+    actor: dict[str, str],
+    expected_cycle_instance_id: str,
+) -> dict[str, dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
+    for comment in window:
+        if not _result_comment_allowed(comment):
+            continue
+        payload = _json_after_marker(comment.get("body"), AGENT_TOOL_DISPATCH_MARKER)
+        if not isinstance(payload, dict):
+            continue
+        if _canonical_begin(payload.get("begin")) != begin or _canonical_actor(payload.get("actor")) != actor:
+            continue
+        try:
+            mutation_dispatch.validate_dispatch(payload)
+        except RuntimeError as exc:
+            raise AgentTraceCollectionError("AGENT_TRACE_DISPATCH_INVALID") from exc
+        if payload.get("cycleInstanceId") != expected_cycle_instance_id:
+            raise AgentTraceCollectionError("AGENT_TRACE_DISPATCH_CYCLE_MISMATCH")
+        digest = payload["requestHash"]
+        if digest in found:
+            raise AgentTraceCollectionError("AGENT_TRACE_DISPATCH_DUPLICATE")
+        found[digest] = {
+            "commentId": _comment_id(comment),
+            "dispatchHash": payload["dispatchHash"],
+        }
     return found
 
 
@@ -192,27 +228,40 @@ def build_trace(
         "contextHash": manifest["contextHash"],
     }
     actor = copy.deepcopy(manifest["actor"])
+    cycle_id = cycle_instance_id(manifest)
     window = _window(comments, source["commentId"], close_comment_id)
     requests = _agent_tool_requests(window, begin, actor) + _remote_requests(window, actor)
     requests.sort(key=lambda item: item["requestCommentId"])
     agent_results, remote_results, agent_orphans = _result_indexes(window, begin, actor)
+    dispatches = _agent_tool_dispatches(window, begin, actor, cycle_id)
 
     attempts: list[dict[str, Any]] = []
     consumed_agent: set[str] = set()
     consumed_remote: set[str] = set()
+    consumed_dispatches: set[str] = set()
     for request in requests:
         index = agent_results if request["kind"] == "agent-tool" else remote_results
         match = index.get(request["requestHash"])
+        dispatch = dispatches.get(request["requestHash"]) if request["kind"] == "agent-tool" else None
         if request["kind"] == "agent-tool":
             consumed_agent.add(request["requestHash"])
+            if dispatch is not None:
+                consumed_dispatches.add(request["requestHash"])
         else:
             consumed_remote.add(request["requestHash"])
         if match is None:
-            status, blockers = "UNKNOWN", ["EXECUTION_RESULT_MISSING"]
+            status = "UNKNOWN"
+            blockers = [
+                "EXECUTION_RESULT_MISSING_AFTER_DISPATCH"
+                if dispatch is not None
+                else "EXECUTION_RESULT_MISSING"
+            ]
             result_comment_id = None
         else:
             status, blockers = _result_status(match["payload"])
             result_comment_id = match["commentId"]
+            if dispatch is not None and status == "PLANNED":
+                raise AgentTraceCollectionError("AGENT_TRACE_DISPATCH_TERMINAL_INVALID")
         attempts.append({
             **request,
             "resultCommentId": result_comment_id,
@@ -222,8 +271,11 @@ def build_trace(
         })
 
     unmatched_agent_results = sorted(set(agent_results) - consumed_agent)
+    unmatched_dispatches = sorted(set(dispatches) - consumed_dispatches)
     if agent_orphans or unmatched_agent_results:
         raise AgentTraceCollectionError("AGENT_TRACE_ORPHAN_AGENT_TOOL_RESULT")
+    if unmatched_dispatches:
+        raise AgentTraceCollectionError("AGENT_TRACE_ORPHAN_AGENT_TOOL_DISPATCH")
     # Remote results cannot be safely assigned to this cycle without a matching
     # same-session request because the legacy result envelope carries no actor.
     # They are therefore ignored unless paired by commandHash.
@@ -237,7 +289,7 @@ def build_trace(
     }
     core = {
         "schemaVersion": trace.TRACE_SCHEMA,
-        "cycleInstanceId": cycle_instance_id(manifest),
+        "cycleInstanceId": cycle_id,
         "begin": begin,
         "actor": actor,
         "window": {
