@@ -320,6 +320,81 @@ def remote_evidence_comment_ids(trace_value: dict[str, Any]) -> list[int]:
     )
 
 
+def agent_tool_mutation_evidence_comment_ids(
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    *,
+    close_comment_id: int,
+) -> list[int]:
+    """Discover canonical receipt comments for successful dispatched Agent Tool mutations."""
+
+    source = manifest["source"]
+    begin = {
+        "runId": source["runId"],
+        "sourceSha": source["sourceSha"],
+        "contextHash": manifest["contextHash"],
+    }
+    actor = copy.deepcopy(manifest["actor"])
+    window = _window(comments, source["commentId"], close_comment_id)
+    expected: dict[str, dict[str, Any]] = {}
+    for comment in window:
+        if not _result_comment_allowed(comment):
+            continue
+        payload = _json_after_marker(comment.get("body"), AGENT_TOOL_RESULT_MARKER)
+        if not isinstance(payload, dict):
+            continue
+        if (
+            _canonical_begin(payload.get("begin")) != begin
+            or _canonical_actor(payload.get("actor")) != actor
+            or payload.get("status") != "PASS"
+        ):
+            continue
+        inner = payload.get("result")
+        if not isinstance(inner, dict):
+            continue
+        try:
+            receipt = mutation_dispatch.remote_receipt_from_execution_result(inner)
+        except RuntimeError as exc:
+            raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_INVALID") from exc
+        if receipt is None:
+            continue
+        receipt_hash = receipt["receiptHash"]
+        if receipt_hash in expected:
+            raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_DUPLICATE_EXPECTATION")
+        expected[receipt_hash] = receipt
+
+    if not expected:
+        return []
+
+    found: dict[str, int] = {}
+    for comment in window:
+        if not _result_comment_allowed(comment):
+            continue
+        payload = _json_after_marker(comment.get("body"), REMOTE_RESULT_MARKER)
+        if not isinstance(payload, dict):
+            continue
+        receipt_hash = payload.get("receiptHash")
+        if receipt_hash not in expected:
+            continue
+        try:
+            remote_canonical_execution.validate_receipt(payload)
+        except RuntimeError as exc:
+            raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_INVALID") from exc
+        if payload != expected[receipt_hash]:
+            raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_MISMATCH")
+        if receipt_hash in found:
+            raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_COMMENT_DUPLICATE")
+        comment_id = _comment_id(comment)
+        if comment_id is None:
+            raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_COMMENT_INVALID")
+        found[receipt_hash] = comment_id
+
+    missing = sorted(set(expected) - set(found))
+    if missing:
+        raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_MISSING")
+    return sorted(found.values())
+
+
 def fetch_issue_comments(repository: str, issue_number: int) -> list[dict[str, Any]]:
     proc = subprocess.run(
         [
