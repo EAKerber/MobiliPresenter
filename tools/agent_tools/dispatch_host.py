@@ -199,11 +199,15 @@ def validate_bundle(
     bundle: dict[str, dict[str, Any]],
     *,
     host_sha: str,
+    hosted_run_id: int,
     transport: Any | None = None,
 ) -> dict[str, dict[str, Any]]:
     carrier = transport or GhApiTransport()
     if not isinstance(host_sha, str) or not SHA_RE.fullmatch(host_sha):
         raise DispatchHostError("AGENT_TOOL_DISPATCH_HOST_SHA_INVALID")
+    hosted_run_id = _positive_int(
+        hosted_run_id, "AGENT_TOOL_DISPATCH_HOSTED_RUN_ID_INVALID"
+    )
     request = contracts.validate_request(bundle["request"])
     plan = contracts.validate_plan(bundle["plan"])
     proof_set = admission.guard_proofs.validate_proof_set(bundle["proofSet"], plan=plan)
@@ -219,6 +223,8 @@ def validate_bundle(
         raise DispatchHostError("AGENT_TOOL_DISPATCH_CYCLE_MISMATCH")
     if dispatch["source"]["semanticHostSha"] != host_sha:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_SEMANTIC_HOST_DRIFT")
+    if dispatch["source"]["hostedRunId"] != hosted_run_id:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_HOSTED_RUN_MISMATCH")
     _validate_original_request(request, dispatch, transport=carrier)
     _validate_current_policy(plan, context)
     return bundle
@@ -298,11 +304,17 @@ def inspect_protocol(
     bundle: dict[str, dict[str, Any]],
     *,
     host_sha: str,
+    hosted_run_id: int,
     run_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
     carrier = transport or GhApiTransport()
-    validate_bundle(bundle, host_sha=host_sha, transport=carrier)
+    validate_bundle(
+        bundle,
+        host_sha=host_sha,
+        hosted_run_id=hosted_run_id,
+        transport=carrier,
+    )
     dispatch = bundle["dispatch"]
     comments = _comments(carrier, dispatch["source"]["issueNumber"])
     terminals: list[dict[str, Any]] = []
@@ -370,12 +382,18 @@ def execute_dispatch(
     bundle: dict[str, dict[str, Any]],
     *,
     host_sha: str,
+    hosted_run_id: int,
     run_id: int,
     attempt_comment_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
     base = transport or GhApiTransport()
-    validate_bundle(bundle, host_sha=host_sha, transport=base)
+    validate_bundle(
+        bundle,
+        host_sha=host_sha,
+        hosted_run_id=hosted_run_id,
+        transport=base,
+    )
     dispatch = bundle["dispatch"]
     attempt_comment = _comment(
         base, _positive_int(attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID")
@@ -451,27 +469,34 @@ def main(argv: list[str] | None = None) -> int:
     inspect = sub.add_parser("inspect")
     inspect.add_argument("--artifact-dir", required=True)
     inspect.add_argument("--host-sha", required=True)
+    inspect.add_argument("--hosted-run-id", required=True)
     inspect.add_argument("--run-id", required=True)
     inspect.add_argument("--output", required=True)
     execute = sub.add_parser("execute")
     execute.add_argument("--artifact-dir", required=True)
     execute.add_argument("--host-sha", required=True)
+    execute.add_argument("--hosted-run-id", required=True)
     execute.add_argument("--run-id", required=True)
     execute.add_argument("--attempt-comment-id", required=True)
     execute.add_argument("--output", required=True)
     args = parser.parse_args(argv)
 
     bundle = load_bundle(args.artifact_dir)
+    hosted_run_id = _positive_int(
+        args.hosted_run_id, "AGENT_TOOL_DISPATCH_HOSTED_RUN_ID_INVALID"
+    )
     if args.action == "inspect":
         value = inspect_protocol(
             bundle,
             host_sha=args.host_sha,
+            hosted_run_id=hosted_run_id,
             run_id=_positive_int(args.run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID"),
         )
     else:
         value = execute_dispatch(
             bundle,
             host_sha=args.host_sha,
+            hosted_run_id=hosted_run_id,
             run_id=_positive_int(args.run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID"),
             attempt_comment_id=_positive_int(
                 args.attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID"
