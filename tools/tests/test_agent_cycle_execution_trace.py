@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock
 
 from tools import hosted_agent_cycle_trace
 from tools.agent_tools import contracts, trace_collect
@@ -122,6 +122,16 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         self.assertEqual([item["status"] for item in value["attempts"]], ["BLOCKED", "PASS"])
         self.assertEqual(trace_collect.remote_evidence_comment_ids(value), [104])
 
+    def test_declared_cycle_instance_is_consumed_and_mismatch_blocks(self):
+        current = manifest()
+        expected = trace_collect.cycle_instance_id(current)
+        current["cycleInstanceId"] = expected
+        value = trace_collect.build_trace(complete_comments(), current, close_comment_id=200)
+        self.assertEqual(value["cycleInstanceId"], expected)
+        current["cycleInstanceId"] = "cycle-instance-" + "0" * 24
+        with self.assertRaisesRegex(RuntimeError, "AGENT_TRACE_CYCLE_INSTANCE_MISMATCH"):
+            trace_collect.build_trace(complete_comments(), current, close_comment_id=200)
+
     def test_missing_result_makes_trace_incomplete(self):
         comments = complete_comments()
         comments = [comment for comment in comments if comment["id"] != 102]
@@ -139,8 +149,7 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         value = trace_collect.build_trace(comments, manifest(), close_comment_id=200)
         self.assertEqual(value["summary"]["attemptCount"], 2)
 
-    @patch("tools.hosted_agent_cycle_trace.hosted_agent_cycle._validate_close_binding")
-    def test_close_preparation_uses_trace_as_source_of_remote_evidence(self, validate_binding):
+    def test_close_preparation_uses_trace_as_source_of_remote_evidence(self):
         amended, value = hosted_agent_cycle_trace.prepare_close(
             close_command([]),
             {"issueNumber": 145, "commentId": 200},
@@ -151,8 +160,7 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
         self.assertEqual(value["summary"]["attemptCount"], 2)
         self.assertEqual(amended["evidenceCommentIds"], [104])
 
-    @patch("tools.hosted_agent_cycle_trace.hosted_agent_cycle._validate_close_binding")
-    def test_close_preparation_blocks_incomplete_trace_even_if_caller_omits_attempt(self, validate_binding):
+    def test_close_preparation_blocks_incomplete_trace_even_if_caller_omits_attempt(self):
         comments = [comment for comment in complete_comments() if comment["id"] != 102]
         with self.assertRaisesRegex(RuntimeError, "EXECUTION_TRACE_INCOMPLETE"):
             hosted_agent_cycle_trace.prepare_close(
@@ -162,6 +170,29 @@ class AgentCycleExecutionTraceTests(unittest.TestCase):
                 {},
                 comments,
             )
+
+    def test_transport_stabilization_reobserves_without_replaying_work(self):
+        incomplete = [comment for comment in complete_comments() if comment["id"] != 102]
+        complete = complete_comments()
+        observations = [incomplete, complete]
+        fetch = Mock(side_effect=lambda repository, issue: observations.pop(0))
+        sleep = Mock()
+        amended, value = hosted_agent_cycle_trace.prepare_close_stabilized(
+            close_command([]),
+            {"issueNumber": 145, "commentId": 200},
+            manifest(),
+            {},
+            repository="EAKerber/MobiliPresenter",
+            fetch_comments=fetch,
+            sleep=sleep,
+            attempts=2,
+            delay_seconds=0,
+        )
+        self.assertEqual(value["traceStatus"], "PASS")
+        self.assertEqual(amended["evidenceCommentIds"], [104])
+        self.assertEqual(fetch.call_count, 2)
+        sleep.assert_called_once_with(0.0)
+        self.assertEqual(hosted_agent_cycle_trace.TRACE_COMPLETENESS_SCOPE, "same-cycle-attributable-events")
 
     def test_agent_tool_orphan_result_is_not_silently_ignored(self):
         comments = complete_comments()

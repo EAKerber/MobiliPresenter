@@ -40,6 +40,12 @@ class WorkflowBoundaryTests(unittest.TestCase):
         text=self.text("agent-ops.yml");self.assertNotIn("Verify remote PR identity",text);self.assertNotIn("agent.py verify --remote",text);self.assertIn("project_machine.py inspect --live",text)
     def test_agent_ops_does_not_reintroduce_local_work_authority_gate(self):
         text=self.text("agent-ops.yml");self.assertNotIn("Verify continuation state",text);self.assertNotIn("continuation.py verify",text);self.assertIn("docs/kickstarts/**",text)
+    def test_hosted_cycle_owns_trace_lifecycle_internally(self):
+        text=self.text("hosted-agent-cycle.yml")
+        self.assertIn("python tools/hosted_agent_cycle.py close",text)
+        self.assertNotIn("python tools/hosted_agent_cycle_trace.py",text)
+        self.assertNotIn("Detect trace-capable begin",text)
+        self.assertNotIn("-f tools/hosted_agent_cycle_trace.py",text)
     def test_operational_workflows_do_not_implement_domain_hashing_or_direct_ref_writes(self):
         for name in ("agent-ops.yml","branch-hygiene.yml","coordination-guard.yml","supervisor-snapshot.yml"):
             text=self.text(name);self.assertNotIn("stable_hash",text);self.assertNotIn("git update-ref",text);self.assertNotIn("git push",text);self.assertNotRegex(text,r"gh\s+api[^\n]*(?:--method|-X)\s+(?:POST|PATCH|PUT|DELETE)")

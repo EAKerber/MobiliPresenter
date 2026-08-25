@@ -120,12 +120,45 @@ class HostedAgentCycleTests(unittest.TestCase):
             self.assertIn("--machine-scope", args)
             self.assertEqual(args[args.index("--machine-scope") + 1], "live")
             manifest = json.loads(Path(f"{tmp}/manifest.json").read_text())
+            self.assertEqual(manifest["schemaVersion"], hosted.BEGIN_MANIFEST_SCHEMA)
             self.assertEqual(manifest["contextHash"], context["contextHash"])
             self.assertEqual(manifest["source"]["sourceSha"], "a" * 40)
             self.assertEqual(manifest["artifactName"], "agent-cycle-begin-123")
+            self.assertEqual(manifest["carrierFeatures"], [hosted.TRACE_FEATURE])
+            self.assertTrue(manifest["cycleInstanceId"].startswith("cycle-instance-"))
+            self.assertTrue(hosted._manifest_requires_trace(manifest))
+            self.assertEqual(result["cycleInstanceId"], manifest["cycleInstanceId"])
+            self.assertEqual(result["carrierFeatures"], [hosted.TRACE_FEATURE])
             self.assertEqual(result["status"], "READY")
             self.assertFalse(result["authorizesMutation"])
             validate_context.assert_called()
+
+    def test_legacy_begin_manifest_remains_valid_without_trace_requirement(self):
+        source = {
+            "workflow": "hosted-agent-cycle",
+            "sourceSha": "a" * 40,
+            "runId": 123,
+            "issueNumber": 145,
+            "commentId": 9001,
+        }
+        core = {
+            "schemaVersion": hosted.LEGACY_BEGIN_MANIFEST_SCHEMA,
+            "requestId": "legacy-begin",
+            "commandHash": "b" * 64,
+            "actor": copy.deepcopy(begin_command()["actor"]),
+            "declaredIntent": "inspect-and-plan",
+            "machineScope": "live",
+            "source": source,
+            "artifactName": "agent-cycle-begin-123",
+            "cycleId": "cycle-" + "c" * 20,
+            "contextHash": "d" * 64,
+            "status": "READY",
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        manifest = {**core, "manifestHash": stable_hash(core)}
+        self.assertEqual(hosted.validate_begin_manifest(manifest), manifest)
+        self.assertFalse(hosted._manifest_requires_trace(manifest))
 
     @patch("tools.hosted_agent_cycle.remote_canonical_execution.validate_receipt")
     def test_remote_receipt_normalization_keeps_only_agent_close_evidence(self, validate):

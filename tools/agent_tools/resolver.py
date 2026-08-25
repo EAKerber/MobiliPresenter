@@ -4,6 +4,7 @@ import copy
 from typing import Any
 
 from tools.canonical import stable_hash
+from tools.agent_tools import admission
 from tools.agent_tools import contracts
 from tools.agent_tools import policy as tool_policy
 from tools.agent_tools import projection as tool_projection
@@ -106,6 +107,10 @@ def resolve_request(
         value: Any = copy.deepcopy(concrete)
         status = "PLANNED"
     else:
+        # This gate is deliberately between planning and adapter execution.
+        # Read-only tools pass; shared durable mutations cannot pass until AT3
+        # registers guard proof providers and an explicit execution mode.
+        admission.assert_execution_admitted(plan)
         value = adapter.execute(
             request,
             context,

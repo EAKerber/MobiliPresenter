@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import tempfile
 import unittest
@@ -7,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools import hosted_agent_cycle as hosted
+from tools.canonical import stable_hash
 
 
 def close_command():
@@ -32,6 +34,32 @@ def close_command():
     }
 
 
+def legacy_manifest():
+    command = close_command()
+    core = {
+        "schemaVersion": hosted.LEGACY_BEGIN_MANIFEST_SCHEMA,
+        "requestId": "hosted-cycle-begin-regression",
+        "commandHash": "e" * 64,
+        "actor": copy.deepcopy(command["actor"]),
+        "declaredIntent": command["declaredIntent"],
+        "machineScope": "live",
+        "source": {
+            "workflow": "hosted-agent-cycle",
+            "sourceSha": "a" * 40,
+            "runId": 123,
+            "issueNumber": 145,
+            "commentId": 100,
+        },
+        "artifactName": "agent-cycle-begin-123",
+        "cycleId": "cycle-" + "c" * 20,
+        "contextHash": "b" * 64,
+        "status": "READY",
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "manifestHash": stable_hash(core)}
+
+
 class HostedAgentCycleCloseRegressionTests(unittest.TestCase):
     @patch("tools.hosted_agent_cycle._source")
     @patch("tools.hosted_agent_cycle.agent_cycle_close.validate_closure")
@@ -47,7 +75,7 @@ class HostedAgentCycleCloseRegressionTests(unittest.TestCase):
         source,
     ):
         context = {"context": "before"}
-        manifest = {"source": {"runId": 123}, "contextHash": "b" * 64}
+        manifest = legacy_manifest()
         closure = {
             "status": "PASS",
             "cycleId": "cycle-regression",

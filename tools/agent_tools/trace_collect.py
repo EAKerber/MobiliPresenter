@@ -72,7 +72,13 @@ def cycle_instance_id(manifest: dict[str, Any]) -> str:
         "issueNumber": source["issueNumber"],
         "beginCommentId": source["commentId"],
     }
-    return "cycle-instance-" + stable_hash(body)[:24]
+    computed = "cycle-instance-" + stable_hash(body)[:24]
+    declared = manifest.get("cycleInstanceId")
+    if declared is not None:
+        if declared != computed:
+            raise AgentTraceCollectionError("AGENT_TRACE_CYCLE_INSTANCE_MISMATCH")
+        return declared
+    return computed
 
 
 def _window(comments: list[dict[str, Any]], begin_id: int, close_id: int) -> list[dict[str, Any]]:
