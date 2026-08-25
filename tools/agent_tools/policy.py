@@ -32,7 +32,7 @@ TOOL_FIELDS = {"adapter", "effectClass", "mode", "roles"}
 ROLE_POLICY_FIELDS = {
     "allowedIntents", "guards", "requiredCapabilities", "targetPolicy",
 }
-ROLE_POLICY_OPTIONAL_FIELDS = {"mode"}
+ROLE_POLICY_OPTIONAL_FIELDS = {"mode", "modesByIntent"}
 
 
 def _strings(value: Any, code: str, *, allow_empty: bool = False) -> list[str]:
@@ -55,8 +55,20 @@ def load_policy(path: Path = POLICY_PATH) -> dict[str, Any]:
     return validate_policy(value)
 
 
-def effective_mode(tool: dict[str, Any], role_policy: dict[str, Any]) -> str:
-    mode = role_policy.get("mode", tool.get("mode"))
+def effective_mode(
+    tool: dict[str, Any],
+    role_policy: dict[str, Any],
+    declared_intent: str | None = None,
+) -> str:
+    modes_by_intent = role_policy.get("modesByIntent")
+    if modes_by_intent is not None:
+        if declared_intent is None:
+            raise RuntimeError("AGENT_TOOL_MODE_INTENT_REQUIRED")
+        if not isinstance(modes_by_intent, dict):
+            raise RuntimeError("AGENT_TOOL_MODE_BY_INTENT_INVALID")
+        mode = modes_by_intent.get(declared_intent, tool.get("mode"))
+    else:
+        mode = role_policy.get("mode", tool.get("mode"))
     if mode not in MODES:
         raise RuntimeError("AGENT_TOOL_MODE_INVALID")
     return mode
@@ -137,9 +149,21 @@ def validate_policy(
             fields = set(role_policy)
             if not ROLE_POLICY_FIELDS.issubset(fields) or not fields.issubset(ROLE_POLICY_FIELDS | ROLE_POLICY_OPTIONAL_FIELDS):
                 raise RuntimeError("AGENT_TOOL_ROLE_POLICY_FIELDS_INVALID")
+            if "mode" in role_policy and "modesByIntent" in role_policy:
+                raise RuntimeError("AGENT_TOOL_ROLE_MODE_AMBIGUOUS")
             allowed_intents = _strings(role_policy["allowedIntents"], "AGENT_TOOL_ALLOWED_INTENTS_INVALID")
             if not set(allowed_intents).issubset(intents):
                 raise RuntimeError("AGENT_TOOL_ALLOWED_INTENT_UNKNOWN")
+            modes_by_intent = role_policy.get("modesByIntent")
+            if modes_by_intent is not None:
+                if (
+                    not isinstance(modes_by_intent, dict)
+                    or not modes_by_intent
+                    or list(modes_by_intent) != sorted(modes_by_intent)
+                    or not set(modes_by_intent).issubset(set(allowed_intents))
+                    or any(mode not in MODES for mode in modes_by_intent.values())
+                ):
+                    raise RuntimeError("AGENT_TOOL_MODE_BY_INTENT_INVALID")
             guards = _strings(role_policy["guards"], "AGENT_TOOL_GUARDS_INVALID", allow_empty=True)
             if not set(guards).issubset(GUARDS):
                 raise RuntimeError("AGENT_TOOL_GUARD_UNKNOWN")
@@ -153,17 +177,18 @@ def validate_policy(
             if role_policy["targetPolicy"] not in targets:
                 raise RuntimeError("AGENT_TOOL_TARGET_POLICY_UNKNOWN")
 
-            mode = effective_mode(tool, role_policy)
-            if tool["effectClass"] == "read-only" and mode != "read-only-execute":
-                raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
-            if tool["effectClass"] == "shared-durable-mutation" and mode not in {"plan-only", "mutation-execute"}:
-                raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
-            if mode == "mutation-execute":
-                required_guards = {"coordination-lease-owned", "git-cas"}
-                if not required_guards.issubset(set(guards)):
-                    raise RuntimeError("AGENT_TOOL_MUTATION_GUARDS_REQUIRED")
-                if "remote.canonical.execute" not in required:
-                    raise RuntimeError("AGENT_TOOL_MUTATION_CANONICAL_HOST_REQUIRED")
+            for declared_intent in allowed_intents:
+                mode = effective_mode(tool, role_policy, declared_intent)
+                if tool["effectClass"] == "read-only" and mode != "read-only-execute":
+                    raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
+                if tool["effectClass"] == "shared-durable-mutation" and mode not in {"plan-only", "mutation-execute"}:
+                    raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
+                if mode == "mutation-execute":
+                    required_guards = {"coordination-lease-owned", "git-cas"}
+                    if not required_guards.issubset(set(guards)):
+                        raise RuntimeError("AGENT_TOOL_MUTATION_GUARDS_REQUIRED")
+                    if "remote.canonical.execute" not in required:
+                        raise RuntimeError("AGENT_TOOL_MUTATION_CANONICAL_HOST_REQUIRED")
     return value
 
 

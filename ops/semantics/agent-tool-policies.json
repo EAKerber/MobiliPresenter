@@ -8,6 +8,12 @@
         "operations": ["bootstrap", "inspection", "repository-discovery"],
         "scope": ["repository:read"]
       },
+      "governed-mutation": {
+        "lifecyclePhase": "execution",
+        "objects": ["branch", "coordination", "repository", "work-item"],
+        "operations": ["authority-mutation", "inspection", "readback"],
+        "scope": ["repository:read", "workflow:read"]
+      },
       "inspect-and-plan": {
         "lifecyclePhase": "bootstrap",
         "objects": ["artifact", "branch", "capability", "coordination", "project-state", "pull-request", "repository", "work-item", "workflow"],
@@ -57,9 +63,11 @@
       "mode": "plan-only",
       "roles": {
         "manager-gitops": {
-          "allowedIntents": ["inspect-and-plan"],
+          "allowedIntents": ["governed-mutation", "inspect-and-plan"],
           "guards": ["coordination-lease-owned", "git-cas"],
-          "mode": "mutation-execute",
+          "modesByIntent": {
+            "governed-mutation": "mutation-execute"
+          },
           "requiredCapabilities": ["remote.canonical.execute"],
           "targetPolicy": "manager-non-control-git"
         },
@@ -77,9 +85,11 @@
       "mode": "plan-only",
       "roles": {
         "manager-gitops": {
-          "allowedIntents": ["inspect-and-plan"],
+          "allowedIntents": ["governed-mutation", "inspect-and-plan"],
           "guards": ["coordination-lease-owned", "git-cas"],
-          "mode": "mutation-execute",
+          "modesByIntent": {
+            "governed-mutation": "mutation-execute"
+          },
           "requiredCapabilities": ["remote.canonical.execute"],
           "targetPolicy": "manager-non-control-git"
         },
@@ -97,9 +107,11 @@
       "mode": "plan-only",
       "roles": {
         "manager-gitops": {
-          "allowedIntents": ["inspect-and-plan"],
+          "allowedIntents": ["governed-mutation", "inspect-and-plan"],
           "guards": ["coordination-lease-owned", "git-cas"],
-          "mode": "mutation-execute",
+          "modesByIntent": {
+            "governed-mutation": "mutation-execute"
+          },
           "requiredCapabilities": ["remote.canonical.execute"],
           "targetPolicy": "manager-non-control-git"
         },

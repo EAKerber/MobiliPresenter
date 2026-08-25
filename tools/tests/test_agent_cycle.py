@@ -5,10 +5,18 @@ from tools import agent_cycle, project_machine, runtime_capabilities
 
 class AgentCycleTests(unittest.TestCase):
     def test_entry_profiles_are_closed_and_non_mutating(self):
-        profile = agent_cycle.entry_profile("manager-gitops", "inspect-and-plan")
-        self.assertEqual(profile["lifecyclePhase"], "bootstrap")
-        self.assertIn("repository:read", profile["scope"])
-        self.assertNotIn("repository:write", profile["scope"])
+        for intent in ("inspect-and-plan", "governed-mutation"):
+            profile = agent_cycle.entry_profile("manager-gitops", intent)
+            self.assertIn("repository:read", profile["scope"])
+            self.assertNotIn("repository:write", profile["scope"])
+        self.assertEqual(
+            agent_cycle.entry_profile("manager-gitops", "inspect-and-plan")["lifecyclePhase"],
+            "bootstrap",
+        )
+        self.assertEqual(
+            agent_cycle.entry_profile("manager-gitops", "governed-mutation")["lifecyclePhase"],
+            "execution",
+        )
 
     def test_local_cycle_has_hash_bound_baseline_and_executable_close_obligation(self):
         machine = project_machine.inspect_local()
@@ -37,7 +45,7 @@ class AgentCycleTests(unittest.TestCase):
 
     def test_unknown_entry_profile_fails_closed(self):
         with self.assertRaisesRegex(RuntimeError, "AGENT_CYCLE_ENTRY_PROFILE_REQUIRED"):
-            agent_cycle.entry_profile("manager-gitops", "governed-mutation")
+            agent_cycle.entry_profile("manager-gitops", "validate-and-integrate")
 
 
 if __name__ == "__main__":

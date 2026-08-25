@@ -58,16 +58,19 @@ def resolve_request(
     intent = context["semanticContext"].get("declaredIntent")
     if intent not in role_policy["allowedIntents"]:
         raise RuntimeError("AGENT_TOOL_INTENT_FORBIDDEN")
-    mode = tool_policy.effective_mode(tool, role_policy)
+    mode = tool_policy.effective_mode(tool, role_policy, intent)
     projection = tool_projection.build_projection(
         context["semanticContext"], context["semanticBrief"], policy=catalog, registry=semantic
     )
     available_ids = {item["toolId"] for item in projection["available"]}
     plannable_ids = {item["toolId"] for item in projection["plannable"]}
-    if mode in {"read-only-execute", "mutation-execute"} and request["toolId"] not in available_ids:
+    conditional_ids = {item["toolId"] for item in projection["conditional"]}
+    if mode == "read-only-execute" and request["toolId"] not in available_ids:
         raise RuntimeError("AGENT_TOOL_NOT_AVAILABLE")
     if mode == "plan-only" and request["toolId"] not in plannable_ids:
         raise RuntimeError("AGENT_TOOL_NOT_PLANNABLE")
+    if mode == "mutation-execute" and request["toolId"] not in available_ids | conditional_ids:
+        raise RuntimeError("AGENT_TOOL_NOT_AVAILABLE")
     target_policy_id = role_policy["targetPolicy"]
     validate_target(catalog["targetPolicies"][target_policy_id], request["target"])
     adapter = ADAPTERS.get(tool["adapter"])
@@ -104,13 +107,12 @@ def resolve_request(
     }
     plan = {**plan_core, "planHash": stable_hash(plan_core)}
     contracts.validate_plan(plan)
+    if mode == "mutation-execute" and execute:
+        raise RuntimeError("AGENT_TOOL_MUTATION_REQUIRES_HOSTED_ADMISSION")
     if mode == "plan-only" or not execute:
         value: Any = copy.deepcopy(concrete)
         status = "PLANNED"
     else:
-        # The resolver never manufactures mutation proofing. Hosted mutation
-        # execution is an orchestration boundary: it resolves with execute=False,
-        # collects proofs, then dispatches to the canonical write-capable host.
         admission.assert_execution_admitted(plan)
         value = adapter.execute(
             request,

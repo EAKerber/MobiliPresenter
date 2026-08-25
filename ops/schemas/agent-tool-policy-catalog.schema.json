@@ -69,6 +69,11 @@
         "allowedIntents": {"$ref": "#/$defs/nonEmptyStringList"},
         "guards": {"$ref": "#/$defs/stringList"},
         "mode": {"enum": ["mutation-execute", "plan-only", "read-only-execute"]},
+        "modesByIntent": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"enum": ["mutation-execute", "plan-only", "read-only-execute"]}
+        },
         "requiredCapabilities": {"$ref": "#/$defs/nonEmptyStringList"},
         "targetPolicy": {"type": "string", "minLength": 1}
       }

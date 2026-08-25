@@ -6,22 +6,22 @@ from unittest.mock import patch
 from tools.agent_tools import admission, contracts, resolver
 
 
-def _brief(*available: str):
+def _brief(*available: str, conditional=()):
     return {
         "capabilityProjection": {
             "required": [],
             "relevantAvailable": sorted(available),
-            "conditional": [],
+            "conditional": sorted(conditional),
             "requiredUnavailable": [],
         }
     }
 
 
-def _context(*available: str):
+def _context(*available: str, intent="inspect-and-plan", conditional=()):
     return {
         "contextHash": "b" * 64,
-        "semanticContext": {"role": "manager-gitops", "declaredIntent": "inspect-and-plan"},
-        "semanticBrief": _brief(*available),
+        "semanticContext": {"role": "manager-gitops", "declaredIntent": intent},
+        "semanticBrief": _brief(*available, conditional=conditional),
         "projectMachine": {"schemaVersion": "test-project-machine", "scope": "live"},
         "routineInspection": {"status": "PASS", "value": {"schemaVersion": "test-routine"}, "reasonCode": None},
     }
@@ -70,7 +70,12 @@ class AgentToolAdmissionTests(unittest.TestCase):
             input_value={"content": "x", "message": "AT2D plan"},
         )
         resolved = resolver.resolve_request(
-            request, _context("remote.canonical.execute"), execute=False
+            request,
+            _context(
+                intent="governed-mutation",
+                conditional=("remote.canonical.execute",),
+            ),
+            execute=False,
         )
         plan = resolved["plan"]
         self.assertEqual(plan["status"], "READY")

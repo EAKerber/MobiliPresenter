@@ -40,7 +40,7 @@ def build_projection(
     intent = semantic_context.get("declaredIntent")
     if role not in semantic["facetVocabulary"]["roles"] or intent not in semantic["facetVocabulary"]["intentClasses"]:
         raise RuntimeError("AGENT_TOOL_PROJECTION_CONTEXT_INVALID")
-    available_caps, _ = _capability_sets(semantic_brief)
+    available_caps, unavailable_caps = _capability_sets(semantic_brief)
     available: list[dict[str, Any]] = []
     plannable: list[dict[str, Any]] = []
     conditional: list[dict[str, Any]] = []
@@ -48,7 +48,7 @@ def build_projection(
         role_policy = item["roles"].get(role)
         if not isinstance(role_policy, dict) or intent not in role_policy["allowedIntents"]:
             continue
-        mode = tool_policy.effective_mode(item, role_policy)
+        mode = tool_policy.effective_mode(item, role_policy, intent)
         entry = {
             "toolId": tool_id,
             "effectClass": item["effectClass"],
@@ -58,11 +58,14 @@ def build_projection(
         if mode == "plan-only":
             plannable.append(entry)
             continue
-        missing = sorted(set(role_policy["requiredCapabilities"]) - available_caps)
+        required = set(role_policy["requiredCapabilities"])
+        missing = sorted(required - available_caps)
         if not missing:
             available.append(entry)
-        else:
-            conditional.append({**entry, "reasonCode": f"CAPABILITY_NOT_AVAILABLE:{missing[0]}"})
+            continue
+        conditional_missing = sorted(required & unavailable_caps)
+        reason_capability = conditional_missing[0] if conditional_missing else missing[0]
+        conditional.append({**entry, "reasonCode": f"CAPABILITY_NOT_AVAILABLE:{reason_capability}"})
     for values in (available, plannable, conditional):
         values.sort(key=lambda entry: entry["toolId"])
     core = {
