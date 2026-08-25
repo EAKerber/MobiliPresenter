@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/agent-tool-policy-catalog-0.1.json",
-  "title": "AgentToolPolicyCatalog 0.1",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-policy-catalog-0.2.json",
+  "title": "AgentToolPolicyCatalog 0.2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "entryProfiles", "targetPolicies", "tools"],
   "properties": {
-    "schemaVersion": {"const": "AgentToolPolicyCatalog 0.1"},
+    "schemaVersion": {"const": "AgentToolPolicyCatalog 0.2"},
     "entryProfiles": {
       "type": "object",
       "minProperties": 1,
@@ -68,6 +68,7 @@
       "properties": {
         "allowedIntents": {"$ref": "#/$defs/nonEmptyStringList"},
         "guards": {"$ref": "#/$defs/stringList"},
+        "mode": {"enum": ["mutation-execute", "plan-only", "read-only-execute"]},
         "requiredCapabilities": {"$ref": "#/$defs/nonEmptyStringList"},
         "targetPolicy": {"type": "string", "minLength": 1}
       }
