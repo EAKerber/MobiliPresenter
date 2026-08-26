@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "m12-kf1-convergence-acquire:0",
-      "resource": "branch:work/operations/m12-kf1-convergence-subtraction-v0.1",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m12-kf1-convergence-20260826",
-        "branch": "work/operations/m12-kf1-convergence-subtraction-v0.1",
-        "pr": null
-      },
-      "reason": "M12-KF1 convergence/subtraction implementation",
-      "acquiredAt": "2026-08-26T05:51:47Z",
-      "renewedAt": "2026-08-26T05:51:47Z",
-      "expiresAt": "2026-08-26T06:51:47Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "beaed8fccd83b734a9d671054052ea5246bd2643",
+  "leases": [],
+  "revision": "d44c46ede6cb303ccedf1edde5e90161670a68fd",
   "schemaVersion": "CoordinationState 0.1"
 }
