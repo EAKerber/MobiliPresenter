@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M12-AT1-AGENT-TOOL-FOUNDATIONS-CLOSED",
-    "nextTransition": "implement-m12-at2-registered-agent-tool-interface-v0.1"
+    "checkpoint": "M12-KF1-OPERATIONAL-SINGLE-SOURCE-CONVERGENCE-CLOSED",
+    "nextTransition": "redesign-m12-at3d-from-converged-primitives-v0.1"
   }
 }
