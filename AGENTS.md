@@ -64,4 +64,4 @@ python3 tools/agent.py status
 
 Use `python3 tools/agent.py doctor` quando a capacidade do ambiente importar. `doctor` diferencia executables/providers locais de capabilities lógicas; uma capability `UNKNOWN` pode exigir observação explícita de provider externo por `tools/runtime_capabilities.py`. Contratos semânticos transversais vivem em `ops/semantics/registry.json`.
 
-Regras específicas de papel pertencem aos Kickstarts correntes em `docs/kickstarts/roles/*-current.md`. Versões antigas são história, salvo referência explícita do documento corrente.
+Contratos específicos de papel vivem diretamente em `docs/kickstarts/roles/<role>.md`. O Git preserva sua evolução histórica; não mantenha pointers `*-current.md` ou cópias versionadas como fontes operacionais paralelas. Estado, capabilities, tools e procedimento corrente continuam sendo descobertos pelas authorities e tooling canônicos, não copiados para o contrato da role.
