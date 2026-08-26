@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lease-dispatch-0.1.json",
+  "title": "AgentWriteLeaseDispatch 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cycleInstanceId", "requestHash", "action", "begin", "actor", "branch", "expectedBranchHead", "authorityHead", "previousBindingHash", "previousLeaseId", "command", "commandHash", "source", "semanticAuthority", "authorizesMutation", "dispatchHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLeaseDispatch 0.1"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "action": {"enum": ["acquire", "renew", "release"]},
+    "begin": {"type": "object"},
+    "actor": {"type": "object"},
+    "branch": {"type": "string", "minLength": 1},
+    "expectedBranchHead": {"$ref": "#/$defs/gitSha"},
+    "authorityHead": {"$ref": "#/$defs/gitSha"},
+    "previousBindingHash": {"anyOf": [{"$ref": "#/$defs/hash"}, {"type": "null"}]},
+    "previousLeaseId": {"type": ["string", "null"], "minLength": 1},
+    "command": {"type": "object"},
+    "commandHash": {"$ref": "#/$defs/hash"},
+    "source": {"type": "object"},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "dispatchHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {"hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}
+}

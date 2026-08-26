@@ -20,6 +20,7 @@ EFFECT_CLASSES = {
 }
 MODES = {"read-only-execute", "plan-only", "mutation-execute"}
 GUARDS = {
+    "agent-write-lifecycle-bound",
     "coordination-conflict-guarded",
     "coordination-lease-owned",
     "git-cas",
@@ -184,7 +185,7 @@ def validate_policy(
                 if tool["effectClass"] == "shared-durable-mutation" and mode not in {"plan-only", "mutation-execute"}:
                     raise RuntimeError("AGENT_TOOL_MODE_EFFECT_MISMATCH")
                 if mode == "mutation-execute":
-                    required_guards = {"coordination-lease-owned", "git-cas"}
+                    required_guards = {"agent-write-lifecycle-bound", "coordination-lease-owned", "git-cas"}
                     if not required_guards.issubset(set(guards)):
                         raise RuntimeError("AGENT_TOOL_MUTATION_GUARDS_REQUIRED")
                     if "remote.canonical.execute" not in required:

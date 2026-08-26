@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lease-result-0.1.json",
+  "title": "AgentWriteLeaseResult 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "requestHash", "action", "begin", "cycleInstanceId", "actor", "branch", "dispatchHash", "binding", "remoteReceipt", "remoteReceiptHash", "status", "blockers", "semanticAuthority", "authorizesMutation", "resultHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLeaseResult 0.1"},
+    "requestId": {"type": "string", "minLength": 1},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "action": {"enum": ["acquire", "renew", "release"]},
+    "begin": {"type": "object"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "actor": {"type": "object"},
+    "branch": {"type": "string", "minLength": 1},
+    "dispatchHash": {"$ref": "#/$defs/hash"},
+    "binding": {"type": "object"},
+    "remoteReceipt": {"type": "object"},
+    "remoteReceiptHash": {"$ref": "#/$defs/hash"},
+    "status": {"const": "PASS"},
+    "blockers": {"type": "array", "maxItems": 0},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "resultHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {"hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

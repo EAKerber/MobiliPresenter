@@ -15,6 +15,7 @@ HOSTED_RUN_ID = 456
 REQUEST_HASH = "b" * 64
 DISPATCH_HASH = "c" * 64
 EXPECTED_HEAD = "d" * 40
+CYCLE_INSTANCE_ID = "cycle-instance-" + "1" * 24
 ACTOR = {
     "role": "manager-gitops",
     "workerId": "manager-gitops-a",
@@ -34,6 +35,7 @@ def bundle():
         "target": {"branch": "work/operations/test", "path": "docs/test.txt"},
     }
     dispatch = {
+        "cycleInstanceId": CYCLE_INSTANCE_ID,
         "dispatchHash": DISPATCH_HASH,
         "requestHash": REQUEST_HASH,
         "begin": copy.deepcopy(BEGIN),
@@ -148,7 +150,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
 
     @patch("tools.agent_tools.dispatch_host.contracts.validate_request", return_value={})
     @patch("tools.agent_tools.dispatch_host.contracts.validate_plan", return_value={})
-    @patch("tools.agent_tools.dispatch_host.admission.guard_proofs.validate_proof_set", return_value={})
+    @patch("tools.agent_tools.dispatch_host.admission.guard_proofs.validate_proof_set")
     @patch("tools.agent_tools.dispatch_host.mutation_dispatch.validate_dispatch")
     @patch("tools.agent_tools.dispatch_host.hosted_agent_tool.validate_begin_binding")
     @patch("tools.agent_tools.dispatch_host.contracts.request_hash", return_value=REQUEST_HASH)
@@ -157,11 +159,15 @@ class AgentToolDispatchHostTests(unittest.TestCase):
         validate_plan, validate_request
     ):
         value = bundle()
-        value["dispatch"].update({
-            "cycleInstanceId": "cycle-instance-test",
-        })
-        value["manifest"] = {"cycleInstanceId": "cycle-instance-test"}
+        value["manifest"] = {"cycleInstanceId": CYCLE_INSTANCE_ID}
         validate_dispatch.return_value = value["dispatch"]
+        validate_proofs.return_value = {
+            "proofs": {
+                "agent-write-lifecycle-bound": {
+                    "cycleInstanceId": CYCLE_INSTANCE_ID,
+                }
+            }
+        }
         with self.assertRaisesRegex(RuntimeError, "AGENT_TOOL_DISPATCH_HOSTED_RUN_MISMATCH"):
             dispatch_host.validate_bundle(
                 value,

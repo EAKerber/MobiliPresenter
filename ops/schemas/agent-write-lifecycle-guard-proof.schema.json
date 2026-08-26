@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lifecycle-guard-proof-0.1.json",
+  "title": "AgentWriteLifecycleGuardProof 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cycleInstanceId", "requestHash", "planHash", "actor", "branch", "bindingHash", "lifecycleResultHash", "lifecycleResultCommentId", "leaseId", "authorityHead", "authorityNow", "status", "readOnly", "semanticAuthority", "authorizesMutation", "proofHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLifecycleGuardProof 0.1"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "planHash": {"$ref": "#/$defs/hash"},
+    "actor": {"type": "object"},
+    "branch": {"type": "string", "minLength": 1},
+    "bindingHash": {"$ref": "#/$defs/hash"},
+    "lifecycleResultHash": {"$ref": "#/$defs/hash"},
+    "lifecycleResultCommentId": {"type": "integer", "minimum": 1},
+    "leaseId": {"type": "string", "minLength": 1},
+    "authorityHead": {"$ref": "#/$defs/gitSha"},
+    "authorityNow": {"type": "string", "minLength": 1},
+    "status": {"const": "PASS"},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "proofHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {"hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}
+}

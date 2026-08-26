@@ -64,7 +64,7 @@
       "roles": {
         "manager-gitops": {
           "allowedIntents": ["governed-mutation", "inspect-and-plan"],
-          "guards": ["coordination-lease-owned", "git-cas"],
+          "guards": ["agent-write-lifecycle-bound", "coordination-lease-owned", "git-cas"],
           "modesByIntent": {
             "governed-mutation": "mutation-execute"
           },
@@ -86,7 +86,7 @@
       "roles": {
         "manager-gitops": {
           "allowedIntents": ["governed-mutation", "inspect-and-plan"],
-          "guards": ["coordination-lease-owned", "git-cas"],
+          "guards": ["agent-write-lifecycle-bound", "coordination-lease-owned", "git-cas"],
           "modesByIntent": {
             "governed-mutation": "mutation-execute"
           },
@@ -108,7 +108,7 @@
       "roles": {
         "manager-gitops": {
           "allowedIntents": ["governed-mutation", "inspect-and-plan"],
-          "guards": ["coordination-lease-owned", "git-cas"],
+          "guards": ["agent-write-lifecycle-bound", "coordination-lease-owned", "git-cas"],
           "modesByIntent": {
             "governed-mutation": "mutation-execute"
           },

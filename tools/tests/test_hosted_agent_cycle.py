@@ -124,11 +124,12 @@ class HostedAgentCycleTests(unittest.TestCase):
             self.assertEqual(manifest["contextHash"], context["contextHash"])
             self.assertEqual(manifest["source"]["sourceSha"], "a" * 40)
             self.assertEqual(manifest["artifactName"], "agent-cycle-begin-123")
-            self.assertEqual(manifest["carrierFeatures"], [hosted.TRACE_FEATURE])
+            self.assertEqual(manifest["carrierFeatures"], hosted.CURRENT_FEATURES)
             self.assertTrue(manifest["cycleInstanceId"].startswith("cycle-instance-"))
             self.assertTrue(hosted._manifest_requires_trace(manifest))
+            self.assertTrue(hosted._manifest_requires_write_lifecycle(manifest))
             self.assertEqual(result["cycleInstanceId"], manifest["cycleInstanceId"])
-            self.assertEqual(result["carrierFeatures"], [hosted.TRACE_FEATURE])
+            self.assertEqual(result["carrierFeatures"], hosted.CURRENT_FEATURES)
             self.assertEqual(result["status"], "READY")
             self.assertFalse(result["authorizesMutation"])
             validate_context.assert_called()
@@ -159,6 +160,7 @@ class HostedAgentCycleTests(unittest.TestCase):
         manifest = {**core, "manifestHash": stable_hash(core)}
         self.assertEqual(hosted.validate_begin_manifest(manifest), manifest)
         self.assertFalse(hosted._manifest_requires_trace(manifest))
+        self.assertFalse(hosted._manifest_requires_write_lifecycle(manifest))
 
     @patch("tools.hosted_agent_cycle.remote_canonical_execution.validate_receipt")
     def test_remote_receipt_normalization_keeps_only_agent_close_evidence(self, validate):

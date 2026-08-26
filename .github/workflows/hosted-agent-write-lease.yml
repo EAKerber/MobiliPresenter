@@ -1,0 +1,153 @@
+name: Hosted Agent Write Lease
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: hosted-agent-write-lease-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  lease:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.title == 'MobiliPresenter Remote Canonical Execution Bus' &&
+      github.event.comment.author_association == 'OWNER' &&
+      startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_WRITE_LEASE_REQUEST_V0_1')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Parse lifecycle request
+        id: parse
+        continue-on-error: true
+        run: |
+          python tools/hosted_agent_write_lease.py parse-event \
+            --event "$GITHUB_EVENT_PATH" \
+            --request-out /tmp/agent-write-lease-request.json \
+            --meta-out /tmp/agent-write-lease-meta.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Materialize parse failure
+        if: steps.parse.outcome != 'success'
+        run: |
+          python tools/hosted_agent_write_lease.py failure \
+            --error HOSTED_AGENT_WRITE_LEASE_PARSE_FAILED \
+            --result /tmp/agent-write-lease-result.json || true
+
+      - name: Download exact begin context
+        id: download_begin
+        if: steps.parse.outcome == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: agent-cycle-begin-${{ steps.parse.outputs.begin_run_id }}
+          path: /tmp/agent-cycle-begin
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.parse.outputs.begin_run_id }}
+
+      - name: Checkout exact begin semantic host
+        id: checkout_begin
+        if: steps.download_begin.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.parse.outputs.begin_source_sha }}
+
+      - name: Materialize begin failure
+        if: steps.parse.outcome == 'success' && (steps.download_begin.outcome != 'success' || steps.checkout_begin.outcome != 'success')
+        run: |
+          python tools/hosted_agent_write_lease.py failure \
+            --error HOSTED_AGENT_WRITE_LEASE_BEGIN_ARTIFACT_UNAVAILABLE \
+            --request /tmp/agent-write-lease-request.json \
+            --result /tmp/agent-write-lease-result.json || true
+
+      - name: Prepare lifecycle dispatch
+        id: prepare
+        if: steps.checkout_begin.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp /tmp/agent-cycle-begin/context.json /tmp/agent-write-lease-begin-context.json
+          cp /tmp/agent-cycle-begin/manifest.json /tmp/agent-write-lease-begin-manifest.json
+          python tools/hosted_agent_write_lease.py prepare \
+            --request /tmp/agent-write-lease-request.json \
+            --meta /tmp/agent-write-lease-meta.json \
+            --begin-dir /tmp/agent-cycle-begin \
+            --dispatch /tmp/agent-write-lease-dispatch.json
+
+      - name: Materialize prepare failure
+        if: steps.checkout_begin.outcome == 'success' && steps.prepare.outcome != 'success'
+        run: |
+          python tools/hosted_agent_write_lease.py failure \
+            --error HOSTED_AGENT_WRITE_LEASE_PREPARE_FAILED \
+            --request /tmp/agent-write-lease-request.json \
+            --result /tmp/agent-write-lease-result.json || true
+
+      - name: Upload lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-write-lease-${{ github.run_id }}
+          path: /tmp/agent-write-lease-*.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish non-terminal lifecycle dispatch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ ! -f /tmp/agent-write-lease-dispatch.json ]; then exit 0; fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          value=json.load(open('/tmp/agent-write-lease-dispatch.json', encoding='utf-8'))
+          body='MOBILIPRESENTER_AGENT_WRITE_LEASE_DISPATCH_V0_1\n```json\n'+json.dumps(value,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --input /tmp/comment.json
+
+      - name: Publish lifecycle failure
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ ! -f /tmp/agent-write-lease-result.json ]; then exit 0; fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          value=json.load(open('/tmp/agent-write-lease-result.json', encoding='utf-8'))
+          body='MOBILIPRESENTER_AGENT_WRITE_LEASE_RESULT_V0_1\n```json\n'+json.dumps(value,indent=2,ensure_ascii=False)+'\n```'
+          Path('/tmp/result-comment.json').write_text(json.dumps({'body':body},ensure_ascii=False),encoding='utf-8')
+          PY
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" --input /tmp/result-comment.json
+
+      - name: Require dispatch
+        if: always()
+        run: |
+          test -f /tmp/agent-write-lease-dispatch.json
+          python - <<'PY'
+          import json
+          from tools import agent_write_lifecycle as lifecycle
+          lifecycle.validate_dispatch(json.load(open('/tmp/agent-write-lease-dispatch.json', encoding='utf-8')))
+          PY

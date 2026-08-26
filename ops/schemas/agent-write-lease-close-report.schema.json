@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lease-close-report-0.1.json",
+  "title": "AgentWriteLeaseCloseReport 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cycleInstanceId", "actor", "state", "latestBindingHash", "authorityHead", "authorityNow", "matchingLeaseIds", "blockers", "readOnly", "semanticAuthority", "authorizesMutation", "reportHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLeaseCloseReport 0.1"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "actor": {"type": "object"},
+    "state": {"enum": ["NONE", "ACTIVE", "RELEASED", "EXPIRED", "UNKNOWN"]},
+    "latestBindingHash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "authorityHead": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "authorityNow": {"type": "string", "minLength": 1},
+    "matchingLeaseIds": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "reportHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
