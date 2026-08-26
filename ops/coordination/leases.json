@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "m12-at3d-lease-acquire-v0-2:0",
-      "resource": "branch:work/operations/m12-at3d-converged-git-mutation-v0.1",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m12-at3d-converged-git-mutation-v0-1",
-        "branch": "work/operations/m12-at3d-converged-git-mutation-v0.1",
-        "pr": 163
-      },
-      "reason": "integrate and qualify the AT3-D cardinality-neutral Agent Tool slice",
-      "acquiredAt": "2026-08-26T22:44:30Z",
-      "renewedAt": "2026-08-26T22:44:30Z",
-      "expiresAt": "2026-08-26T23:44:30Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "afb43a98a5d82a2fb3fe2fce55d00fcea2fae629",
+  "leases": [],
+  "revision": "7f716e6461f076883125fc557cb612a6468e0dcf",
   "schemaVersion": "CoordinationState 0.1"
 }
