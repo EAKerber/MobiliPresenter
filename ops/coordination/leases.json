@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "m12-at3c-live1-bootstrap-acquire:0",
-      "resource": "branch:work/operations/m12-at3c-live-qualification-1",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m12-at3c-live1-bootstrap",
-        "branch": "work/operations/m12-at3c-live-qualification-1",
-        "pr": null
-      },
-      "reason": "AT3-C live qualification fixture bootstrap",
-      "acquiredAt": "2026-08-26T04:09:41Z",
-      "renewedAt": "2026-08-26T04:09:41Z",
-      "expiresAt": "2026-08-26T04:39:41Z",
-      "ttlSeconds": 1800
-    }
-  ],
-  "revision": "a3f50c6991b3d11847cb5fa7503c575e546633ac",
+  "leases": [],
+  "revision": "c1d9ecabe9689d107ff2838912fa81004ed48b58",
   "schemaVersion": "CoordinationState 0.1"
 }
