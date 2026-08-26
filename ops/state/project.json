@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M12-AT3D-D2-CONVERGED-GIT-MUTATION-IMPLEMENTED",
-    "nextTransition": "qualify-m12-at3d-d2-converged-git-mutation-live-v0.1"
+    "checkpoint": "M12-AT3D-D2-CONVERGED-GIT-MUTATION-LIVE-QUALIFIED",
+    "nextTransition": "resolve-m12-at3d-d3-provider-capability-scope-v0.1"
   }
 }
