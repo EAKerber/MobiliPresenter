@@ -5,11 +5,13 @@ import json
 from typing import Any
 
 from tools import agent_write_lifecycle as lifecycle, coordination
+from tools.agent_tools import contracts as agent_tool_contracts
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
 REPORT_SCHEMA = "AgentWriteLeaseCloseReport 0.1"
 PROOF_SCHEMA = "AgentWriteLifecycleGuardProof 0.1"
+AGENT_TOOL_REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
 STATES = {"NONE", "ACTIVE", "RELEASED", "EXPIRED", "UNKNOWN"}
 
 
@@ -171,6 +173,38 @@ def _request_count(
     return count
 
 
+def _bound_agent_tool_branches(
+    window: list[dict[str, Any]],
+    manifest: dict[str, Any],
+) -> set[str]:
+    begin = {
+        "runId": manifest["source"]["runId"],
+        "sourceSha": manifest["source"]["sourceSha"],
+        "contextHash": manifest["contextHash"],
+    }
+    actor = manifest["actor"]
+    branches: set[str] = set()
+    for comment in window:
+        if (
+            not isinstance(comment, dict)
+            or comment.get("author_association") != "OWNER"
+        ):
+            continue
+        value = _payload(comment.get("body"), AGENT_TOOL_REQUEST_MARKER)
+        if not isinstance(value, dict):
+            continue
+        try:
+            request = agent_tool_contracts.validate_request(value)
+        except Exception:
+            continue
+        if request["begin"] != begin or request["actor"] != actor:
+            continue
+        branch = request["target"].get("branch")
+        if isinstance(branch, str) and branch:
+            branches.add(branch)
+    return branches
+
+
 def _expected_owner(actor: dict[str, Any], branch: str) -> dict[str, Any]:
     return {
         "role": actor["role"],
@@ -194,6 +228,27 @@ def _matching_exact_leases(
         and lease.get("resource") == resource
         and lease.get("owner") == expected_owner
     ]
+
+
+def _unbound_target_leases(
+    active: list[dict[str, Any]],
+    *,
+    manifest: dict[str, Any],
+    branches: set[str],
+    bound_lease_id: str | None,
+) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    for branch in sorted(branches):
+        expected_owner = _expected_owner(manifest["actor"], branch)
+        resource = f"branch:{branch}"
+        for lease in active:
+            if (
+                lease.get("leaseId") != bound_lease_id
+                and lease.get("resource") == resource
+                and lease.get("owner") == expected_owner
+            ):
+                found.append(lease)
+    return found
 
 
 def prove_active_binding(
@@ -368,6 +423,7 @@ def inspect_cycle(
     )
     results = _bound_results(window, manifest)
     request_count = _request_count(window, manifest)
+    target_branches = _bound_agent_tool_branches(window, manifest)
 
     authority = GitHubCoordinationAuthority(transport=carrier)
     observation = authority.observe()
@@ -417,6 +473,21 @@ def inspect_cycle(
         blockers.append(
             "AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL"
         )
+
+    bound_lease_id = (
+        latest_binding["leaseId"]
+        if latest_binding is not None
+        else None
+    )
+    unbound = _unbound_target_leases(
+        active,
+        manifest=manifest,
+        branches=target_branches,
+        bound_lease_id=bound_lease_id,
+    )
+    if unbound and state in {"NONE", "RELEASED"}:
+        state = "UNKNOWN"
+        blockers.append("AGENT_WRITE_LIFECYCLE_UNBOUND_ACTIVE_LEASE")
 
     core = {
         "schemaVersion": REPORT_SCHEMA,
