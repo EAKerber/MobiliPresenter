@@ -58,7 +58,7 @@ jobs:
             exit 0
           fi
           echo "has_dispatch=true" >> "$GITHUB_OUTPUT"
-          python tools/agent_write_lifecycle_host.py inspect \
+          python -m tools.agent_write_lifecycle_host inspect \
             --artifact-dir /tmp/agent-write-lease \
             --host-sha "$HOST_SHA" \
             --hosted-run-id "$HOSTED_RUN_ID" \
@@ -157,7 +157,7 @@ jobs:
           HOST_SHA: ${{ github.event.workflow_run.head_sha }}
           HOSTED_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
-          python tools/agent_write_lifecycle_host.py execute \
+          python -m tools.agent_write_lifecycle_host execute \
             --artifact-dir /tmp/agent-write-lease \
             --host-sha "$HOST_SHA" \
             --hosted-run-id "$HOSTED_RUN_ID" \
