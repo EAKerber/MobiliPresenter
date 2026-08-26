@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lease-request-0.1.json",
+  "title": "AgentWriteLeaseRequest 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "action", "begin", "actor", "branch", "expectedAuthorityHead", "expectedBranchHead", "ttlSeconds", "semanticAuthority", "authorizesMutation"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLeaseRequest 0.1"},
+    "requestId": {"type": "string", "minLength": 1},
+    "action": {"enum": ["acquire", "renew", "release"]},
+    "begin": {"$ref": "#/$defs/begin"},
+    "actor": {"$ref": "#/$defs/actor"},
+    "branch": {"type": "string", "minLength": 1, "not": {"const": "main"}},
+    "expectedAuthorityHead": {"$ref": "#/$defs/gitSha"},
+    "expectedBranchHead": {"$ref": "#/$defs/gitSha"},
+    "ttlSeconds": {"type": ["integer", "null"], "minimum": 1},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "begin": {"type": "object", "additionalProperties": false, "required": ["runId", "sourceSha", "contextHash"], "properties": {"runId": {"type": "integer", "minimum": 1}, "sourceSha": {"$ref": "#/$defs/gitSha"}, "contextHash": {"$ref": "#/$defs/hash"}}},
+    "actor": {"type": "object", "additionalProperties": false, "required": ["role", "sessionId", "workerId"], "properties": {"role": {"type": "string", "minLength": 1}, "sessionId": {"type": "string", "minLength": 1}, "workerId": {"type": "string", "minLength": 1}}}
+  }
+}
