@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "bc1d53c795d11582c6f1ca082db29367d1353491",
+  "leases": [
+    {
+      "leaseId": "m12-at3d-d2-state-lease-acquire-v0-1:0",
+      "resource": "branch:work/operations/m12-at3d-d2-live-qualified-state-v0.1",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m12-at3d-d2-state-finalize-v0-1",
+        "branch": "work/operations/m12-at3d-d2-live-qualified-state-v0.1",
+        "pr": null
+      },
+      "reason": "publish the live-qualified AT3-D D2 ProjectState transition",
+      "acquiredAt": "2026-08-26T23:04:30Z",
+      "renewedAt": "2026-08-26T23:04:30Z",
+      "expiresAt": "2026-08-26T23:34:30Z",
+      "ttlSeconds": 1800
+    }
+  ],
+  "revision": "ec7dadad8518078d0d7677ee15d90b8052d4b173",
   "schemaVersion": "CoordinationState 0.1"
 }
