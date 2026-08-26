@@ -1,4 +1,4 @@
-name: AT3C Registry Preview
+name: AT3C Registry Migration
 
 on:
   push:
@@ -8,19 +8,20 @@ on:
       - .github/workflows/at3c-registry-preview.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  preview:
+  migrate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build semantic registry preview
+      - name: Build and validate semantic registry migration
         run: |
           python - <<'PY'
           import json
@@ -30,13 +31,12 @@ jobs:
           path=Path('ops/semantics/registry.json')
           r=json.loads(path.read_text(encoding='utf-8'))
 
-          concepts={
+          r['concepts'].update({
             'artifact.agent-write-lease-binding': {'term':'AgentWriteLeaseBinding','kind':'artifact','owner':'coordination','definition':'Hash-bound non-authoritative binding of one hosted Agent Cycle to the exact Coordination lease materialized by a canonical lifecycle transition.'},
             'artifact.agent-write-lease-close-report': {'term':'AgentWriteLeaseCloseReport','kind':'artifact','owner':'coordination','definition':'Read-only close-time projection classifying a cycle write lease lifecycle as NONE, ACTIVE, RELEASED, EXPIRED, or UNKNOWN without mutating Coordination.'},
             'artifact.agent-write-lease-dispatch': {'term':'AgentWriteLeaseDispatch','kind':'artifact','owner':'coordination','definition':'Hash-bound non-authoritative dispatch that binds an acquire, renew, or release request to an exact hosted cycle and expected Coordination/Git heads.'},
             'artifact.agent-write-lifecycle-guard-proof': {'term':'AgentWriteLifecycleGuardProof','kind':'artifact','owner':'coordination','definition':'Read-only proof that an Agent Tool mutation is bound to an ACTIVE non-expired lease result from the same hosted cycle and current Coordination authority.'},
-          }
-          r['concepts'].update(concepts)
+          })
           r['concepts']=dict(sorted(r['concepts'].items()))
 
           r['contracts'].update({
@@ -116,13 +116,20 @@ jobs:
           errors=validate_registry(r)
           if errors:
             raise SystemExit('\n'.join(errors))
-          out=Path('/tmp/at3c-registry')
-          out.mkdir()
-          (out/'registry.json').write_text(json.dumps(r,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+          path.write_text(json.dumps(r,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
           PY
-      - name: Upload validated registry preview
-        uses: actions/upload-artifact@v4
-        with:
-          name: at3c-registry-preview
-          path: /tmp/at3c-registry/registry.json
-          if-no-files-found: error
+      - name: Commit validated registry with exact-head fence
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          BEFORE=$(git ls-remote origin "refs/heads/${BRANCH}" | cut -f1)
+          test "$BEFORE" = "$EXPECTED_HEAD"
+          git config user.name "MobiliPresenter AT3C migration"
+          git config user.email "actions@users.noreply.github.com"
+          git add ops/semantics/registry.json
+          git diff --cached --quiet && { echo 'registry migration produced no change'; exit 2; }
+          git commit -m "M12-AT3C: register write lease lifecycle semantics"
+          CHECK=$(git ls-remote origin "refs/heads/${BRANCH}" | cut -f1)
+          test "$CHECK" = "$EXPECTED_HEAD"
+          git push origin "HEAD:refs/heads/${BRANCH}"
