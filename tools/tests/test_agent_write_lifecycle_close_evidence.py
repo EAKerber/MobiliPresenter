@@ -126,6 +126,38 @@ class AgentWriteLifecycleCloseEvidenceTests(unittest.TestCase):
 
     @patch("tools.remote_canonical_execution.validate_receipt", side_effect=lambda value: value)
     @patch("tools.agent_write_lifecycle.validate_result", side_effect=lambda value: value)
+    def test_discovers_acquire_and_release_receipts_for_same_cycle(
+        self, validate_result, validate_receipt
+    ):
+        current = manifest()
+        cycle_id = trace_collect.cycle_instance_id(current)
+        acquire_receipt = lifecycle_receipt(cycle_id, "acquire", "a" * 64)
+        release_receipt = lifecycle_receipt(cycle_id, "release", "b" * 64)
+        comments = [
+            boundary_comment(100),
+            bot_comment(
+                110,
+                "MOBILIPRESENTER_AGENT_WRITE_LEASE_RESULT_V0_1",
+                lifecycle_result(cycle_id, "acquire", acquire_receipt),
+            ),
+            bot_comment(111, trace_collect.REMOTE_RESULT_MARKER, acquire_receipt),
+            bot_comment(
+                120,
+                "MOBILIPRESENTER_AGENT_WRITE_LEASE_RESULT_V0_1",
+                lifecycle_result(cycle_id, "release", release_receipt),
+            ),
+            bot_comment(121, trace_collect.REMOTE_RESULT_MARKER, release_receipt),
+            boundary_comment(200),
+        ]
+        ids = hosted_agent_cycle_trace._agent_write_lifecycle_evidence_comment_ids(
+            comments, current, close_comment_id=200
+        )
+        self.assertEqual(ids, [111, 121])
+        self.assertEqual(validate_result.call_count, 2)
+        self.assertEqual(validate_receipt.call_count, 2)
+
+    @patch("tools.remote_canonical_execution.validate_receipt", side_effect=lambda value: value)
+    @patch("tools.agent_write_lifecycle.validate_result", side_effect=lambda value: value)
     def test_other_cycle_lifecycle_result_is_ignored(self, validate_result, validate_receipt):
         ids = hosted_agent_cycle_trace._agent_write_lifecycle_evidence_comment_ids(
             lifecycle_comments(
@@ -205,14 +237,6 @@ class AgentWriteLifecycleCloseEvidenceTests(unittest.TestCase):
     ):
         trace_value = {"traceStatus": "PASS"}
         bound_trace.return_value = trace_value
-        amend.side_effect = [
-            hosted_agent_cycle_trace.HostedAgentCycleTraceError(
-                hosted_agent_cycle_trace.LIFECYCLE_RECEIPT_MISSING
-            ),
-            ({"evidenceCommentIds": [111]}, trace_value),
-        ]
-        # _amend_command normally returns only the command, so make the second
-        # observation use the real return shape expected by prepare_close_stabilized.
         amend.side_effect = [
             hosted_agent_cycle_trace.HostedAgentCycleTraceError(
                 hosted_agent_cycle_trace.LIFECYCLE_RECEIPT_MISSING
