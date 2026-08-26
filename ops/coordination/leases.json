@@ -13,11 +13,11 @@
       },
       "reason": "M12-AT3C implementation branch bootstrap",
       "acquiredAt": "2026-08-26T01:42:03Z",
-      "renewedAt": "2026-08-26T03:25:35Z",
-      "expiresAt": "2026-08-26T04:25:35Z",
+      "renewedAt": "2026-08-26T04:01:46Z",
+      "expiresAt": "2026-08-26T05:01:46Z",
       "ttlSeconds": 3600
     }
   ],
-  "revision": "8ddcdc3829c40e537dac1bcb3e2d7ff967e31e0f",
+  "revision": "67e6538d97441a7b62a5509a49da83edbfe9b06a",
   "schemaVersion": "CoordinationState 0.1"
 }
