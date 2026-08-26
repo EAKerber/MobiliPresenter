@@ -2,20 +2,20 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m12-rp1b2-hosted-agent-cycle-0-1",
   "workerId": "interactive-manager-gitops",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/m12-rp1b2-hosted-agent-cycle-0.1",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "implement-hosted-cycle",
     "qualify-hosted-begin-close",
     "integrate"
   ],
-  "nextAction": "implement-hosted-cycle",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "0ccbfdff7d5d31cc1adb109104db65b0369d2425",
+    "checkpoint": "M12-AT3C-AGENT-WRITE-LEASE-LIFECYCLE-CLOSED"
   },
   "blockers": [],
   "handoffToWorkerId": null
