@@ -9,7 +9,7 @@ from typing import Any
 from tools.canonical import stable_hash
 from tools.semantics.registry import ROOT, load_registry, validate_registry
 
-POLICY_SCHEMA = "AgentToolPolicyCatalog 0.2"
+POLICY_SCHEMA = "AgentToolPolicyCatalog 0.3"
 POLICY_PATH = ROOT / "ops" / "semantics" / "agent-tool-policies.json"
 TOOL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9.-]*$")
 EFFECT_CLASSES = {
@@ -122,7 +122,7 @@ def validate_policy(
             raise RuntimeError("AGENT_TOOL_TARGET_POLICY_ID_INVALID")
         if not isinstance(target_policy, dict) or set(target_policy) != TARGET_POLICY_FIELDS:
             raise RuntimeError("AGENT_TOOL_TARGET_POLICY_FIELDS_INVALID")
-        if target_policy.get("kind") not in {"none", "git-file"}:
+        if target_policy.get("kind") not in {"none", "git-files"}:
             raise RuntimeError("AGENT_TOOL_TARGET_POLICY_KIND_INVALID")
         _strings(target_policy["branchPrefixes"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)
         _strings(target_policy["forbiddenBranches"], "AGENT_TOOL_TARGET_POLICY_LIST_INVALID", allow_empty=True)

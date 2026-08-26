@@ -72,7 +72,9 @@ def resolve_request(
     if mode == "mutation-execute" and request["toolId"] not in available_ids | conditional_ids:
         raise RuntimeError("AGENT_TOOL_NOT_AVAILABLE")
     target_policy_id = role_policy["targetPolicy"]
-    validate_target(catalog["targetPolicies"][target_policy_id], request["target"])
+    validate_target(
+        catalog["targetPolicies"][target_policy_id], request["target"], request["input"]
+    )
     adapter = ADAPTERS.get(tool["adapter"])
     if adapter is None:
         raise RuntimeError("AGENT_TOOL_ADAPTER_UNAVAILABLE")

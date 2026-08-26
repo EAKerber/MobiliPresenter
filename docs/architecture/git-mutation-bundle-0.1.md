@@ -87,7 +87,11 @@ The resulting `GitMutationBundleReadback 0.1` is a derived proof, not an authori
 
 ## Relationship to GitMutationPlan
 
-`GitMutationPlan 0.1` remains the operation-level read-only planner for branch, file, PR, merge and ref actions. `GitMutationBundle 0.1` specializes multi-path content materialization. Neither contract grants authorization by itself.
+`GitMutationPlan 0.1` remains the operation-level read-only planner for branch, file, multi-path, PR, merge and ref actions. Its `mutate-files` operation binds one branch-head precondition and one canonical path set to the existing bundle readback contract.
+
+The Agent Tool edge exposes that same cardinality-neutral operation as `git.files.mutate`. A request contains one or more canonical, path-unique writes/deletes and resolves to one `RemoteCanonicalCommand` `mutate-files` operation. Execution reuses the existing write lifecycle, coordination ownership, CAS proof, remote canonical host and `GitMutationBundle`; it does not introduce a file-at-a-time fallback, second writer, session authority or bundle type.
+
+`GitMutationBundle 0.1` specializes multi-path content materialization. Neither contract nor the Agent Tool grants authorization by itself.
 
 ## Fail-closed rules
 

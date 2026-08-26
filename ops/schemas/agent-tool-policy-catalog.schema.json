@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/agent-tool-policy-catalog-0.2.json",
-  "title": "AgentToolPolicyCatalog 0.2",
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-policy-catalog-0.3.json",
+  "title": "AgentToolPolicyCatalog 0.3",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "entryProfiles", "targetPolicies", "tools"],
   "properties": {
-    "schemaVersion": {"const": "AgentToolPolicyCatalog 0.2"},
+    "schemaVersion": {"const": "AgentToolPolicyCatalog 0.3"},
     "entryProfiles": {
       "type": "object",
       "minProperties": 1,
@@ -55,7 +55,7 @@
       "additionalProperties": false,
       "required": ["kind", "branchPrefixes", "forbiddenBranches", "pathPrefixes"],
       "properties": {
-        "kind": {"enum": ["none", "git-file"]},
+        "kind": {"enum": ["none", "git-files"]},
         "branchPrefixes": {"$ref": "#/$defs/stringList"},
         "forbiddenBranches": {"$ref": "#/$defs/stringList"},
         "pathPrefixes": {"$ref": "#/$defs/stringList"}

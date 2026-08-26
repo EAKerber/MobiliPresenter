@@ -14,10 +14,20 @@
     "target": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["branch", "path"],
+      "required": ["branch"],
+      "oneOf": [
+        {"required": ["path"]},
+        {"required": ["paths"]}
+      ],
       "properties": {
         "branch": {"type": "string", "minLength": 1},
-        "path": {"type": "string", "minLength": 1}
+        "path": {"type": "string", "minLength": 1},
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
       }
     },
     "expected": {
@@ -32,7 +42,7 @@
     "observed": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["branchHead", "blobSha"],
+      "required": ["branchHead"],
       "properties": {
         "branchHead": {"$ref": "#/$defs/gitSha"},
         "blobSha": {"oneOf": [{"$ref": "#/$defs/gitSha"}, {"type": "null"}]}

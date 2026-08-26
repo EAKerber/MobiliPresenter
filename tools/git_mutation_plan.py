@@ -7,6 +7,7 @@ required readback so an agent can reason about a write before entering apply.
 from __future__ import annotations
 
 import copy
+import hashlib
 import re
 from typing import Any
 
@@ -21,6 +22,7 @@ OPERATIONS = {
     "create-file",
     "update-file",
     "delete-file",
+    "mutate-files",
     "create-pr",
     "merge-pr",
     "update-ref",
@@ -30,6 +32,7 @@ RISK_CLASS = {
     "create-file": "content-write",
     "update-file": "content-write",
     "delete-file": "content-delete",
+    "mutate-files": "content-mutation",
     "create-pr": "pr-write",
     "merge-pr": "integration-write",
     "update-ref": "ref-write",
@@ -39,6 +42,7 @@ CONNECTOR_ACTION = {
     "create-file": "create_file",
     "update-file": "update_file",
     "delete-file": "delete_file",
+    "mutate-files": "create_tree_commit_update_ref",
     "create-pr": "create_pull_request",
     "merge-pr": "merge_pull_request",
     "update-ref": "update_ref",
@@ -183,6 +187,53 @@ def delete_file(*, branch: str, path: str, branch_head: str, blob_sha: str, cont
     )
 
 
+def mutate_files(
+    *,
+    branch: str,
+    branch_head: str,
+    changes: list[dict[str, Any]],
+    control_branch: str,
+) -> dict[str, Any]:
+    branch = _branch(branch, control_branch=control_branch)
+    branch_head = _git_sha(branch_head, "GIT_MUTATION_BRANCH_HEAD_INVALID")
+    if not isinstance(changes, list) or not changes:
+        raise RuntimeError("GIT_MUTATION_CHANGES_REQUIRED")
+    entries: list[dict[str, Any]] = []
+    for change in changes:
+        if not isinstance(change, dict):
+            raise RuntimeError("GIT_MUTATION_CHANGE_INVALID")
+        path = _path(change.get("path"))
+        if set(change) == {"path", "content"} and isinstance(change.get("content"), str):
+            digest = hashlib.sha256(change["content"].encode("utf-8")).hexdigest()
+            entries.append({"path": path, "operation": "write", "contentSha256": digest})
+        elif set(change) == {"path", "delete"} and change.get("delete") is True:
+            entries.append({"path": path, "operation": "delete", "contentSha256": None})
+        else:
+            raise RuntimeError("GIT_MUTATION_CHANGE_INVALID")
+    paths = [entry["path"] for entry in entries]
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise RuntimeError("GIT_MUTATION_CHANGES_NOT_CANONICAL")
+    content_hashes = {
+        entry["path"]: entry["contentSha256"]
+        for entry in entries
+        if entry["operation"] == "write"
+    }
+    return _finish(
+        "mutate-files",
+        control_branch=control_branch,
+        target={"branch": branch},
+        preconditions={"branchHead": branch_head},
+        mutation={"entries": entries},
+        readback={
+            "kind": "git-bundle",
+            "branch": branch,
+            "expectedParentHead": branch_head,
+            "expectedChangedPaths": paths,
+            "expectedContentSha256": content_hashes,
+        },
+    )
+
+
 def create_pr(*, head: str, base: str, head_sha: str, title: str, body_sha256: str, control_branch: str) -> dict[str, Any]:
     head = _branch(head, control_branch=control_branch);base = _nonempty(base, "GIT_MUTATION_PR_BASE_REQUIRED")
     head_sha = _git_sha(head_sha, "GIT_MUTATION_PR_HEAD_SHA_INVALID");title = _nonempty(title, "GIT_MUTATION_PR_TITLE_REQUIRED");body_sha256 = _sha256(body_sha256, "GIT_MUTATION_PR_BODY_HASH_INVALID")
@@ -239,6 +290,24 @@ def _validate_semantics(plan: dict[str, Any]) -> None:
             _exact(pre,{"branchHead","blobSha"},"GIT_MUTATION_PRECONDITIONS_INVALID");_exact(mutation,{"delete"},"GIT_MUTATION_PAYLOAD_INVALID");_exact(readback,{"kind","branch","path","expectedParentHead"},"GIT_MUTATION_READBACK_INVALID")
             head=_git_sha(pre["branchHead"],"GIT_MUTATION_BRANCH_HEAD_INVALID");_git_sha(pre["blobSha"],"GIT_MUTATION_BLOB_SHA_INVALID")
             if mutation["delete"] is not True or readback!={"kind":"file-absent","branch":branch,"path":path,"expectedParentHead":head}:raise RuntimeError("GIT_MUTATION_PLAN_SEMANTICS_INVALID")
+    elif operation=="mutate-files":
+        _exact(target,{"branch"},"GIT_MUTATION_TARGET_INVALID");branch=_branch(target["branch"],control_branch=control)
+        _exact(pre,{"branchHead"},"GIT_MUTATION_PRECONDITIONS_INVALID");head=_git_sha(pre["branchHead"],"GIT_MUTATION_BRANCH_HEAD_INVALID")
+        _exact(mutation,{"entries"},"GIT_MUTATION_PAYLOAD_INVALID");entries=mutation["entries"]
+        if not isinstance(entries,list) or not entries:raise RuntimeError("GIT_MUTATION_CHANGES_REQUIRED")
+        canonical=[]
+        for entry in entries:
+            _exact(entry,{"path","operation","contentSha256"},"GIT_MUTATION_CHANGE_INVALID");path=_path(entry["path"]);kind=entry["operation"]
+            if kind=="write":digest=_sha256(entry["contentSha256"],"GIT_MUTATION_CONTENT_HASH_INVALID")
+            elif kind=="delete" and entry["contentSha256"] is None:digest=None
+            else:raise RuntimeError("GIT_MUTATION_CHANGE_INVALID")
+            canonical.append({"path":path,"operation":kind,"contentSha256":digest})
+        paths=[item["path"] for item in canonical]
+        if paths!=sorted(paths) or len(paths)!=len(set(paths)):raise RuntimeError("GIT_MUTATION_CHANGES_NOT_CANONICAL")
+        hashes={item["path"]:item["contentSha256"] for item in canonical if item["operation"]=="write"}
+        expected={"kind":"git-bundle","branch":branch,"expectedParentHead":head,"expectedChangedPaths":paths,"expectedContentSha256":hashes}
+        _exact(readback,set(expected),"GIT_MUTATION_READBACK_INVALID")
+        if entries!=canonical or readback!=expected:raise RuntimeError("GIT_MUTATION_PLAN_SEMANTICS_INVALID")
     elif operation=="create-pr":
         _exact(target,{"head","base"},"GIT_MUTATION_TARGET_INVALID");_exact(pre,{"headSha","openPrForHeadMustBeAbsent"},"GIT_MUTATION_PRECONDITIONS_INVALID");_exact(mutation,{"title","bodySha256"},"GIT_MUTATION_PAYLOAD_INVALID");_exact(readback,{"kind","head","base","expectedHeadSha"},"GIT_MUTATION_READBACK_INVALID")
         head=_branch(target["head"],control_branch=control);base=_nonempty(target["base"],"GIT_MUTATION_PR_BASE_REQUIRED");head_sha=_git_sha(pre["headSha"],"GIT_MUTATION_PR_HEAD_SHA_INVALID");_nonempty(mutation["title"],"GIT_MUTATION_PR_TITLE_REQUIRED");_sha256(mutation["bodySha256"],"GIT_MUTATION_PR_BODY_HASH_INVALID")

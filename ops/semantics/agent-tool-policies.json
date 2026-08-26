@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "AgentToolPolicyCatalog 0.2",
+  "schemaVersion": "AgentToolPolicyCatalog 0.3",
   "entryProfiles": {
     "manager-gitops": {
       "bootstrap-discovery": {
@@ -38,7 +38,7 @@
   },
   "targetPolicies": {
     "manager-non-control-git": {
-      "kind": "git-file",
+      "kind": "git-files",
       "branchPrefixes": [],
       "forbiddenBranches": ["main"],
       "pathPrefixes": []
@@ -50,59 +50,15 @@
       "pathPrefixes": []
     },
     "ui-owned-git": {
-      "kind": "git-file",
+      "kind": "git-files",
       "branchPrefixes": ["experiment/ui/", "work/ui/"],
       "forbiddenBranches": ["main"],
       "pathPrefixes": ["docs/ui/", "viewer-next/src/ui/"]
     }
   },
   "tools": {
-    "git.file.create": {
-      "adapter": "remote-git-file",
-      "effectClass": "shared-durable-mutation",
-      "mode": "plan-only",
-      "roles": {
-        "manager-gitops": {
-          "allowedIntents": ["governed-mutation", "inspect-and-plan"],
-          "guards": ["agent-write-lifecycle-bound", "coordination-lease-owned", "git-cas"],
-          "modesByIntent": {
-            "governed-mutation": "mutation-execute"
-          },
-          "requiredCapabilities": ["remote.canonical.execute"],
-          "targetPolicy": "manager-non-control-git"
-        },
-        "ui-ux": {
-          "allowedIntents": ["inspect-and-plan"],
-          "guards": ["git-cas"],
-          "requiredCapabilities": ["remote.git.role-scoped-mutate"],
-          "targetPolicy": "ui-owned-git"
-        }
-      }
-    },
-    "git.file.delete": {
-      "adapter": "remote-git-file",
-      "effectClass": "shared-durable-mutation",
-      "mode": "plan-only",
-      "roles": {
-        "manager-gitops": {
-          "allowedIntents": ["governed-mutation", "inspect-and-plan"],
-          "guards": ["agent-write-lifecycle-bound", "coordination-lease-owned", "git-cas"],
-          "modesByIntent": {
-            "governed-mutation": "mutation-execute"
-          },
-          "requiredCapabilities": ["remote.canonical.execute"],
-          "targetPolicy": "manager-non-control-git"
-        },
-        "ui-ux": {
-          "allowedIntents": ["inspect-and-plan"],
-          "guards": ["git-cas"],
-          "requiredCapabilities": ["remote.git.role-scoped-mutate"],
-          "targetPolicy": "ui-owned-git"
-        }
-      }
-    },
-    "git.file.update": {
-      "adapter": "remote-git-file",
+    "git.files.mutate": {
+      "adapter": "remote-git-files",
       "effectClass": "shared-durable-mutation",
       "mode": "plan-only",
       "roles": {

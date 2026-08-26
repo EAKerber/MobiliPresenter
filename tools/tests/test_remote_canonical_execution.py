@@ -93,6 +93,30 @@ def continuation_command():
     }
 
 
+def multi_path_command(*, expected_head=HEAD):
+    return {
+        "schemaVersion": bridge.COMMAND_SCHEMA,
+        "executionId": "rp1b-mutate-files",
+        "kind": "git-direct",
+        "actor": ACTOR,
+        "declaredIntent": {"goal": "qualify atomic multi-path execution"},
+        "target": {
+            "operation": "mutate-files",
+            "branch": "work/operations/rp1b-test",
+        },
+        "expected": {"branchHead": expected_head},
+        "payload": {
+            "changes": [
+                {"path": "a.txt", "content": "added\n"},
+                {"path": "probe.txt", "delete": True},
+            ],
+            "message": "atomic multi-path mutation",
+        },
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
 class FakeGitTransport:
     def __init__(self):
         self.refs = {"work/operations/rp1b-test": HEAD}
@@ -296,6 +320,25 @@ class RemoteCanonicalExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "REMOTE_GIT_PLAN_STALE"):
             bridge.execute_command(command, source=SOURCE, transport=transport)
         self.assertEqual(len(transport.mutable_calls), mutable_count)
+
+    def test_multi_path_uses_one_bundle_tree_commit_ref_update_and_aggregate_readback(self):
+        transport = FakeGitTransport()
+        receipt = bridge.execute_command(
+            multi_path_command(), source=SOURCE, transport=transport
+        )
+        bridge.validate_receipt(receipt)
+        self.assertEqual(receipt["route"]["action"], "mutate-files")
+        self.assertEqual(
+            receipt["aggregateReadback"]["changedPaths"],
+            ["a.txt", "probe.txt"],
+        )
+        self.assertEqual(receipt["evidence"]["plan"]["operation"], "mutate-files")
+        methods = [item[0] for item in transport.mutable_calls]
+        self.assertEqual(methods, ["POST", "POST", "POST", "PATCH"])
+        tree_calls = [item for item in transport.mutable_calls if item[1].endswith("git/trees")]
+        self.assertEqual(len(tree_calls), 1)
+        self.assertEqual(len(tree_calls[0][2]["tree"]), 2)
+        self.assertIs(tree_calls[0][2]["tree"][1]["sha"], None)
 
     def test_create_branch_requires_absence_and_reads_back_exact_sha(self):
         transport = FakeGitTransport()

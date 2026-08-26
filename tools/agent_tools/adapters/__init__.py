@@ -1,7 +1,7 @@
-from . import project_inspect, remote_git_file, routine_inspect
+from . import project_inspect, remote_git_files, routine_inspect
 
 ADAPTERS = {
     "project-inspect": project_inspect,
-    "remote-git-file": remote_git_file,
+    "remote-git-files": remote_git_files,
     "routine-inspect": routine_inspect,
 }

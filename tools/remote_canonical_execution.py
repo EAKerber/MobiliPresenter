@@ -66,7 +66,13 @@ RECEIPT_FIELDS = {
     "authorizesMutation",
     "receiptHash",
 }
-GIT_ACTIONS = {"create-branch", "create-file", "update-file", "delete-file"}
+GIT_ACTIONS = {
+    "create-branch",
+    "create-file",
+    "update-file",
+    "delete-file",
+    "mutate-files",
+}
 DOMAIN_ACTIONS = {
     "coordination": {"intent", "acquire", "renew", "release"},
     "continuation": {
@@ -144,6 +150,26 @@ def _path(value: Any) -> str:
     return path
 
 
+def _changes(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not value:
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_CHANGES_REQUIRED")
+    result: list[dict[str, Any]] = []
+    for change in value:
+        if not isinstance(change, dict):
+            raise RemoteCanonicalExecutionError("REMOTE_COMMAND_CHANGE_INVALID")
+        path = _path(change.get("path"))
+        if set(change) == {"path", "content"} and isinstance(change.get("content"), str):
+            result.append({"path": path, "content": change["content"]})
+        elif set(change) == {"path", "delete"} and change.get("delete") is True:
+            result.append({"path": path, "delete": True})
+        else:
+            raise RemoteCanonicalExecutionError("REMOTE_COMMAND_CHANGE_INVALID")
+    paths = [change["path"] for change in result]
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise RemoteCanonicalExecutionError("REMOTE_COMMAND_CHANGES_NOT_CANONICAL")
+    return result
+
+
 def _target(value: Any, kind: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RemoteCanonicalExecutionError("REMOTE_COMMAND_TARGET_INVALID")
@@ -163,11 +189,15 @@ def _target(value: Any, kind: str) -> dict[str, Any]:
     branch = _nonempty(value.get("branch"), "REMOTE_COMMAND_BRANCH_INVALID")
     if branch == CONTROL_BRANCH:
         raise RemoteCanonicalExecutionError("REMOTE_COMMAND_CONTROL_BRANCH_FORBIDDEN")
-    expected_fields = {"operation", "branch"} if operation == "create-branch" else {"operation", "branch", "path"}
+    expected_fields = (
+        {"operation", "branch"}
+        if operation in {"create-branch", "mutate-files"}
+        else {"operation", "branch", "path"}
+    )
     if set(value) != expected_fields:
         raise RemoteCanonicalExecutionError("REMOTE_COMMAND_TARGET_INVALID")
     result: dict[str, Any] = {"operation": operation, "branch": branch}
-    if operation != "create-branch":
+    if operation not in {"create-branch", "mutate-files"}:
         result["path"] = _path(value.get("path"))
     return result
 
@@ -189,6 +219,14 @@ def _expected(value: Any, kind: str, target: dict[str, Any]) -> dict[str, Any]:
             raise RemoteCanonicalExecutionError("REMOTE_COMMAND_EXPECTED_INVALID")
         return {"baseSha": _git_sha(value.get("baseSha"), "REMOTE_COMMAND_BASE_SHA_INVALID")}
     if operation == "create-file":
+        if set(value) != {"branchHead"}:
+            raise RemoteCanonicalExecutionError("REMOTE_COMMAND_EXPECTED_INVALID")
+        return {
+            "branchHead": _git_sha(
+                value.get("branchHead"), "REMOTE_COMMAND_BRANCH_HEAD_INVALID"
+            )
+        }
+    if operation == "mutate-files":
         if set(value) != {"branchHead"}:
             raise RemoteCanonicalExecutionError("REMOTE_COMMAND_EXPECTED_INVALID")
         return {
@@ -223,6 +261,13 @@ def _payload(value: Any, kind: str, target: dict[str, Any]) -> dict[str, Any]:
             raise RemoteCanonicalExecutionError("REMOTE_COMMAND_CONTENT_INVALID")
         return {
             "content": value["content"],
+            "message": _nonempty(value.get("message"), "REMOTE_COMMAND_MESSAGE_INVALID"),
+        }
+    if operation == "mutate-files":
+        if set(value) != {"changes", "message"}:
+            raise RemoteCanonicalExecutionError("REMOTE_COMMAND_PAYLOAD_INVALID")
+        return {
+            "changes": _changes(value.get("changes")),
             "message": _nonempty(value.get("message"), "REMOTE_COMMAND_MESSAGE_INVALID"),
         }
     if set(value) != {"message"}:
@@ -388,16 +433,16 @@ def _create_tree(
     transport: Any,
     base_tree_sha: str,
     *,
-    path: str,
-    blob_sha: str | None,
+    entries: list[dict[str, Any]],
 ) -> str:
-    entry = {"path": path, "mode": "100644", "type": "blob", "sha": blob_sha}
+    if not isinstance(entries, list) or not entries:
+        raise RemoteCanonicalExecutionError("REMOTE_GIT_TREE_ENTRIES_INVALID")
     try:
         payload = _json(
             transport.request(
                 "POST",
                 f"repos/{REPOSITORY}/git/trees",
-                payload={"base_tree": base_tree_sha, "tree": [entry]},
+                payload={"base_tree": base_tree_sha, "tree": entries},
             ),
             "REMOTE_GIT_TREE_CREATE_INVALID",
         )
@@ -484,6 +529,14 @@ def _verify_git_plan_observed(plan: dict[str, Any], observed: Any) -> dict[str, 
             or observed.get("absent") is not True
         ):
             raise RemoteCanonicalExecutionError("REMOTE_GIT_PLAN_READBACK_MISMATCH")
+    elif kind == "git-bundle":
+        if (
+            observed.get("branch") != expected["branch"]
+            or observed.get("parentHead") != expected["expectedParentHead"]
+            or observed.get("changedPaths") != expected["expectedChangedPaths"]
+            or observed.get("contentSha256") != expected["expectedContentSha256"]
+        ):
+            raise RemoteCanonicalExecutionError("REMOTE_GIT_PLAN_READBACK_MISMATCH")
     else:
         raise RemoteCanonicalExecutionError("REMOTE_GIT_PLAN_READBACK_KIND_UNSUPPORTED")
     return observed
@@ -518,7 +571,7 @@ def _build_git_plan(command: dict[str, Any]) -> dict[str, Any]:
             content_sha256=digest,
             control_branch=CONTROL_BRANCH,
         )
-    else:
+    elif operation == "delete-file":
         plan = git_mutation_plan.delete_file(
             branch=target["branch"],
             path=target["path"],
@@ -526,7 +579,133 @@ def _build_git_plan(command: dict[str, Any]) -> dict[str, Any]:
             blob_sha=expected["blobSha"],
             control_branch=CONTROL_BRANCH,
         )
+    else:
+        plan = git_mutation_plan.mutate_files(
+            branch=target["branch"],
+            branch_head=expected["branchHead"],
+            changes=command["payload"]["changes"],
+            control_branch=CONTROL_BRANCH,
+        )
     return git_mutation_plan.validate(plan)
+
+
+def _path_absent(transport: Any, path: str, ref: str) -> bool:
+    endpoint = (
+        f"repos/{REPOSITORY}/contents/{quote(path, safe='/')}"
+        f"?ref={quote(ref, safe='')}"
+    )
+    try:
+        transport.request("GET", endpoint)
+    except ApiError as exc:
+        if exc.status == 404:
+            return True
+        raise RemoteCanonicalExecutionError("REMOTE_GIT_CONTENT_UNAVAILABLE", exc.detail) from exc
+    return False
+
+
+def _execute_multi_path(
+    command: dict[str, Any],
+    transport: Any,
+    plan: dict[str, Any],
+    *,
+    observed_head: str,
+    base_commit: dict[str, Any],
+    base_tree_entries: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    changes = command["payload"]["changes"]
+    bundle = git_mutation_bundle.build_bundle(
+        repository=REPOSITORY,
+        branch=plan["target"]["branch"],
+        base_head=observed_head,
+        base_tree_sha=base_commit["treeSha"],
+        changes=changes,
+        current_branch_head=observed_head,
+    )
+    content_by_path = {
+        change["path"]: change["content"]
+        for change in changes
+        if "content" in change
+    }
+    git_mutation_bundle.verify_materialized_content(bundle, content_by_path)
+    bundle_entries = {entry["path"]: entry for entry in bundle["entries"]}
+    tree_entries: list[dict[str, Any]] = []
+    for change in changes:
+        path = change["path"]
+        if "content" in change:
+            blob_sha = _create_blob(transport, change["content"])
+            if blob_sha != bundle_entries[path]["gitBlobSha"]:
+                raise RemoteCanonicalExecutionError("REMOTE_GIT_BLOB_HASH_MISMATCH")
+        else:
+            blob_sha = None
+        tree_entries.append(
+            {"path": path, "mode": "100644", "type": "blob", "sha": blob_sha}
+        )
+    candidate_tree_sha = _create_tree(
+        transport,
+        base_commit["treeSha"],
+        entries=tree_entries,
+    )
+    candidate_tree_entries = _tree_entries(transport, candidate_tree_sha)
+    tree_proof = git_mutation_bundle.verify_tree(
+        bundle,
+        base_tree_entries=base_tree_entries,
+        candidate_tree_entries=candidate_tree_entries,
+        candidate_tree_sha=candidate_tree_sha,
+    )
+    commit_sha = _create_commit(
+        transport,
+        message=command["payload"]["message"],
+        tree_sha=candidate_tree_sha,
+        parent_sha=observed_head,
+    )
+    created_commit = _commit(transport, commit_sha)
+    if created_commit["treeSha"] != candidate_tree_sha or created_commit["parents"] != [observed_head]:
+        raise RemoteCanonicalExecutionError("REMOTE_GIT_COMMIT_READBACK_MISMATCH")
+    _publish_ref(transport, plan["target"]["branch"], commit_sha, observed_head)
+    content_hashes: dict[str, str] = {}
+    for change in changes:
+        path = change["path"]
+        if "content" in change:
+            content_hashes[path] = _content_sha256(transport, path, commit_sha)
+        elif not _path_absent(transport, path, commit_sha):
+            raise RemoteCanonicalExecutionError("REMOTE_GIT_DELETE_READBACK_MISMATCH")
+    observed = {
+        "kind": "git-bundle",
+        "branch": plan["target"]["branch"],
+        "parentHead": observed_head,
+        "branchHead": _ref_head(transport, plan["target"]["branch"]),
+        "changedPaths": bundle["expectedChangedPaths"],
+        "contentSha256": content_hashes,
+        "status": "PASS",
+    }
+    _verify_git_plan_observed(plan, observed)
+    provider_readback = {
+        "branchHead": observed["branchHead"],
+        "commitSha": commit_sha,
+        "parentSha": observed_head,
+        "treeSha": candidate_tree_sha,
+        "changedPaths": bundle["expectedChangedPaths"],
+        "contentSha256": content_hashes,
+        "treeProof": tree_proof,
+    }
+    bundle_readback = git_mutation_bundle.verify_readback(bundle, provider_readback)
+    evidence = {
+        "kind": "git-mutation-bundle-readback",
+        "plan": plan,
+        "observed": observed,
+        "bundle": bundle,
+        "providerReadback": provider_readback,
+        "bundleReadback": bundle_readback,
+    }
+    aggregate = {
+        "kind": "git-bundle",
+        "branch": bundle_readback["branch"],
+        "branchHead": bundle_readback["branchHead"],
+        "changedPaths": bundle_readback["changedPaths"],
+        "readbackHash": bundle_readback["readbackHash"],
+        "status": "PASS",
+    }
+    return plan, evidence, aggregate
 
 
 def _execute_git_direct(
@@ -562,6 +741,15 @@ def _execute_git_direct(
         raise RemoteCanonicalExecutionError("REMOTE_GIT_PLAN_STALE")
     base_commit = _commit(transport, observed_head)
     base_tree_entries = _tree_entries(transport, base_commit["treeSha"])
+    if operation == "mutate-files":
+        return _execute_multi_path(
+            command,
+            transport,
+            plan,
+            observed_head=observed_head,
+            base_commit=base_commit,
+            base_tree_entries=base_tree_entries,
+        )
     path = plan["target"]["path"]
     current_blob = _blob_at(base_tree_entries, path)
     if operation == "create-file":
@@ -599,8 +787,7 @@ def _execute_git_direct(
     candidate_tree_sha = _create_tree(
         transport,
         base_commit["treeSha"],
-        path=path,
-        blob_sha=blob_sha,
+        entries=[{"path": path, "mode": "100644", "type": "blob", "sha": blob_sha}],
     )
     candidate_tree_entries = _tree_entries(transport, candidate_tree_sha)
     tree_proof = git_mutation_bundle.verify_tree(
@@ -631,16 +818,7 @@ def _execute_git_direct(
         }
         content_hashes = {path: content_digest}
     else:
-        endpoint = (
-            f"repos/{REPOSITORY}/contents/{quote(path, safe='/')}"
-            f"?ref={quote(commit_sha, safe='')}"
-        )
-        try:
-            transport.request("GET", endpoint)
-        except ApiError as exc:
-            if exc.status != 404:
-                raise RemoteCanonicalExecutionError("REMOTE_GIT_CONTENT_UNAVAILABLE", exc.detail) from exc
-        else:
+        if not _path_absent(transport, path, commit_sha):
             raise RemoteCanonicalExecutionError("REMOTE_GIT_DELETE_READBACK_MISMATCH")
         observed = {
             "kind": "file-absent",

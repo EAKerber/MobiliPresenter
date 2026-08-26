@@ -38,20 +38,42 @@ def owner(session: str = "at3a-session", *, branch: str = BRANCH) -> dict:
 
 def make_plan(*, operation: str = "create-file") -> dict:
     expected = {"branchHead": HEAD}
+    if operation == "mutate-files":
+        payload = {
+            "changes": [
+                {"path": "docs/at3a-proof-a.json", "content": "{}\n"},
+                {"path": "docs/at3a-proof-b.json", "delete": True},
+            ],
+            "message": "AT3A proof test",
+        }
+        target = {"operation": operation, "branch": BRANCH}
+        plan_target = {"branch": BRANCH}
+        tool_id = "git.files.mutate"
+        adapter = "remote-git-files"
+    else:
+        target = {"operation": operation, "branch": BRANCH, "path": PATH}
+        plan_target = {"branch": BRANCH, "path": PATH}
+        tool_id = {
+            "create-file": "git.file.create",
+            "update-file": "git.file.update",
+            "delete-file": "git.file.delete",
+        }[operation]
+        adapter = "remote-git-file"
     if operation in {"update-file", "delete-file"}:
         expected["blobSha"] = BLOB
-    payload = (
-        {"content": "{}\n", "message": "AT3A proof test"}
-        if operation in {"create-file", "update-file"}
-        else {"message": "AT3A proof test"}
-    )
+    if operation != "mutate-files":
+        payload = (
+            {"content": "{}\n", "message": "AT3A proof test"}
+            if operation in {"create-file", "update-file"}
+            else {"message": "AT3A proof test"}
+        )
     command = {
         "schemaVersion": remote.COMMAND_SCHEMA,
         "executionId": "agent-tool-at3a-proof-test",
         "kind": "git-direct",
         "actor": actor(),
         "declaredIntent": {"goal": "agent-tool:git.file.create", "agentToolRequestId": "at3a-proof-test"},
-        "target": {"operation": operation, "branch": BRANCH, "path": PATH},
+        "target": target,
         "expected": expected,
         "payload": payload,
         "semanticAuthority": False,
@@ -69,19 +91,15 @@ def make_plan(*, operation: str = "create-file") -> dict:
         "requestHash": "1" * 64,
         "begin": {"runId": 1, "sourceSha": "c" * 40, "contextHash": "2" * 64},
         "actor": actor(),
-        "toolId": {
-            "create-file": "git.file.create",
-            "update-file": "git.file.update",
-            "delete-file": "git.file.delete",
-        }[operation],
+        "toolId": tool_id,
         "effectClass": "shared-durable-mutation",
         "mode": "plan-only",
-        "adapter": "remote-git-file",
+        "adapter": adapter,
         "requiredCapabilities": ["remote.canonical.execute"],
         "eligibleToolSurfaces": ["github-actions-workflows", "python-module-cli"],
         "targetPolicy": "manager-non-control-git",
         "guards": ["coordination-lease-owned", "git-cas"],
-        "target": {"branch": BRANCH, "path": PATH},
+        "target": plan_target,
         "input": copy.deepcopy(payload),
         "concrete": concrete,
         "status": "PLANNED",
@@ -194,6 +212,20 @@ class GuardProofTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(RuntimeError, "AGENT_TOOL_GIT_CAS_BLOB_DRIFT"):
             guard_proofs.prove_git_cas(update, transport=object())
+
+    @mock.patch("tools.agent_tools.guard_proofs.git_observation.observe_branch")
+    def test_multi_path_git_cas_binds_branch_head_and_all_paths(self, observe_branch):
+        observe_branch.return_value = {"branchHead": HEAD}
+        plan = make_plan(operation="mutate-files")
+        proof = guard_proofs.prove_git_cas(plan, transport=object())
+        self.assertEqual(
+            proof["target"],
+            {
+                "branch": BRANCH,
+                "paths": ["docs/at3a-proof-a.json", "docs/at3a-proof-b.json"],
+            },
+        )
+        self.assertEqual(proof["observed"], {"branchHead": HEAD})
 
     @mock.patch("tools.agent_tools.guard_proofs.git_observation.observe_file")
     def test_guard_proof_set_is_complete_but_mutation_remains_not_admitted(self, observe_file):

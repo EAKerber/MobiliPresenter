@@ -1,8 +1,8 @@
 {
   "schemaVersion": "RoadmapFreshnessCoverage 0.1",
   "projectState": {
-    "baseHash": "eea878c14e3d464399f264982097c61127922d05d2a4006d8dfa05f8a677d0ed",
-    "currentHash": "e25c5704c04333e57e3dfc19669cc087a762146ca96d242129c22d23035c9426",
+    "baseHash": "e25c5704c04333e57e3dfc19669cc087a762146ca96d242129c22d23035c9426",
+    "currentHash": "3471b3f3a1cd6863bf3ea3a08a56cb465eab51cef9f39f1e2eea1a7329d5215d",
     "changedFields": [
       "development.checkpoint",
       "development.nextTransition"
@@ -11,7 +11,7 @@
   "consumers": [
     {
       "path": "docs/plans/autonomous-evolution-roadmap-2026-08.md",
-      "disposition": "UPDATED",
+      "disposition": "NO_CHANGE",
       "contentHash": "1906d91c0cd7caa232831d218cba8f10b025e9883d37975d872396a1e5c5f9f5"
     }
   ],
