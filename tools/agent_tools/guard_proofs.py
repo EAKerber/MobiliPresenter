@@ -4,6 +4,7 @@ import copy
 import re
 from typing import Any, Callable
 
+from tools import agent_write_lifecycle_guard
 from tools import agent_write_ownership
 from tools import git_observation
 from tools import remote_canonical_execution as remote
@@ -283,7 +284,9 @@ def validate_proof_set(
     if not isinstance(proofs, dict):
         raise RuntimeError("AGENT_TOOL_GUARD_PROOF_SET_PROOFS_INVALID")
     for guard, proof in proofs.items():
-        if guard == "git-cas":
+        if guard == "agent-write-lifecycle-bound":
+            agent_write_lifecycle_guard.validate_active_binding_proof(proof)
+        elif guard == "git-cas":
             validate_git_cas_proof(proof)
         elif guard == "coordination-lease-owned":
             validate_agent_write_lease_proof(proof)
@@ -329,6 +332,15 @@ def validate_proof_set(
             if (
                 lease["actor"] != plan["actor"]
                 or lease["branch"] != plan["target"].get("branch")
+            ):
+                raise RuntimeError("AGENT_TOOL_GUARD_PROOF_SET_PLAN_MISMATCH")
+        if "agent-write-lifecycle-bound" in proofs:
+            lifecycle_proof = proofs["agent-write-lifecycle-bound"]
+            if (
+                lifecycle_proof["requestHash"] != plan["requestHash"]
+                or lifecycle_proof["planHash"] != plan["planHash"]
+                or lifecycle_proof["actor"] != plan["actor"]
+                or lifecycle_proof["branch"] != plan["target"].get("branch")
             ):
                 raise RuntimeError("AGENT_TOOL_GUARD_PROOF_SET_PLAN_MISMATCH")
     return value
