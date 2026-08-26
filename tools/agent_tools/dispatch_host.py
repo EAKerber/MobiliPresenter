@@ -195,6 +195,16 @@ def _validate_current_policy(
     validate_target(catalog["targetPolicies"][role_policy["targetPolicy"]], plan["target"])
 
 
+def _lifecycle_context(
+    dispatch: dict[str, Any], *, before_comment_id: int | None
+) -> dict[str, Any]:
+    return {
+        "cycleInstanceId": dispatch["cycleInstanceId"],
+        "issueNumber": dispatch["source"]["issueNumber"],
+        "beforeCommentId": before_comment_id,
+    }
+
+
 def validate_bundle(
     bundle: dict[str, dict[str, Any]],
     *,
@@ -221,6 +231,9 @@ def validate_bundle(
         raise DispatchHostError("AGENT_TOOL_DISPATCH_REQUEST_HASH_MISMATCH")
     if manifest.get("cycleInstanceId") != dispatch["cycleInstanceId"]:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_CYCLE_MISMATCH")
+    lifecycle_proof = proof_set["proofs"].get("agent-write-lifecycle-bound")
+    if not isinstance(lifecycle_proof, dict) or lifecycle_proof.get("cycleInstanceId") != dispatch["cycleInstanceId"]:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_LIFECYCLE_PROOF_MISMATCH")
     if dispatch["source"]["semanticHostSha"] != host_sha:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_SEMANTIC_HOST_DRIFT")
     if dispatch["source"]["hostedRunId"] != hosted_run_id:
@@ -356,7 +369,11 @@ def inspect_protocol(
             "semanticAuthority": False,
             "authorizesMutation": False,
         }
-    preflight = admission.collect_guard_proofs(bundle["plan"], transport=carrier)
+    preflight = admission.collect_guard_proofs(
+        bundle["plan"],
+        transport=carrier,
+        lifecycle_context=_lifecycle_context(dispatch, before_comment_id=None),
+    )
     admission.assert_execution_admitted(bundle["plan"], preflight)
     return {
         "state": "CLEAR",
@@ -412,7 +429,9 @@ def execute_dispatch(
     observed_head: str | None = None
     try:
         execution_proofs = admission.collect_guard_proofs(
-            bundle["plan"], transport=tracked
+            bundle["plan"],
+            transport=tracked,
+            lifecycle_context=_lifecycle_context(dispatch, before_comment_id=None),
         )
         admission.assert_execution_admitted(bundle["plan"], execution_proofs)
         source = {
