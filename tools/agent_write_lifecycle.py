@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -30,8 +31,8 @@ ACTOR_FIELDS = {"role", "workerId", "sessionId"}
 BEGIN_FIELDS = {"runId", "sourceSha", "contextHash"}
 REQUEST_FIELDS = {
     "schemaVersion", "requestId", "action", "begin", "actor", "branch",
-    "expectedAuthorityHead", "expectedBranchHead", "ttlSeconds",
-    "semanticAuthority", "authorizesMutation",
+    "expectedAuthorityHead", "expectedBranchHead", "expectedBindingHash",
+    "ttlSeconds", "semanticAuthority", "authorizesMutation",
 }
 SOURCE_FIELDS = {"issueNumber", "requestCommentId", "hostedRunId", "semanticHostSha"}
 
@@ -72,7 +73,10 @@ def _positive_int(value: Any, code: str) -> int:
 def _actor(value: Any) -> dict[str, str]:
     if not isinstance(value, dict) or set(value) != ACTOR_FIELDS:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ACTOR_INVALID")
-    return {key: _text(value[key], "AGENT_WRITE_LIFECYCLE_ACTOR_INVALID") for key in sorted(ACTOR_FIELDS)}
+    return {
+        key: _text(value[key], "AGENT_WRITE_LIFECYCLE_ACTOR_INVALID")
+        for key in sorted(ACTOR_FIELDS)
+    }
 
 
 def _begin(value: Any) -> dict[str, Any]:
@@ -91,21 +95,36 @@ def validate_request(value: Any) -> dict[str, Any]:
     if value.get("schemaVersion") != REQUEST_SCHEMA:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_REQUEST_SCHEMA_UNSUPPORTED")
     _text(value.get("requestId"), "AGENT_WRITE_LIFECYCLE_REQUEST_ID_INVALID")
-    if value.get("action") not in ACTIONS:
+    action = value.get("action")
+    if action not in ACTIONS:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ACTION_INVALID")
     if _begin(value.get("begin")) != value["begin"] or _actor(value.get("actor")) != value["actor"]:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_REQUEST_NOT_CANONICAL")
-    branch = git_observation.canonical_branch(_text(value.get("branch"), "AGENT_WRITE_LIFECYCLE_BRANCH_INVALID"))
+    branch = git_observation.canonical_branch(
+        _text(value.get("branch"), "AGENT_WRITE_LIFECYCLE_BRANCH_INVALID")
+    )
     if branch != value["branch"] or branch == "main":
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BRANCH_FORBIDDEN")
     _sha(value.get("expectedAuthorityHead"), "AGENT_WRITE_LIFECYCLE_AUTHORITY_HEAD_INVALID")
     _sha(value.get("expectedBranchHead"), "AGENT_WRITE_LIFECYCLE_BRANCH_HEAD_INVALID")
+
+    expected_binding = value.get("expectedBindingHash")
     ttl = value.get("ttlSeconds")
-    if value["action"] == "acquire":
-        if not isinstance(ttl, int) or isinstance(ttl, bool) or ttl <= 0 or ttl > coordination.MAX_TTL_SECONDS:
+    if action == "acquire":
+        if expected_binding is not None:
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_PRIOR_BINDING_FORBIDDEN")
+        if (
+            not isinstance(ttl, int)
+            or isinstance(ttl, bool)
+            or ttl <= 0
+            or ttl > coordination.MAX_TTL_SECONDS
+        ):
             raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_TTL_INVALID")
-    elif ttl is not None:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_TTL_FORBIDDEN")
+    else:
+        _hash(expected_binding, "AGENT_WRITE_LIFECYCLE_PRIOR_BINDING_REQUIRED")
+        if ttl is not None:
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_TTL_FORBIDDEN")
+
     if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_REQUEST_MUST_NOT_AUTHORIZE")
     return value
@@ -115,12 +134,20 @@ def request_hash(value: dict[str, Any]) -> str:
     return stable_hash(validate_request(value))
 
 
-def validate_begin_binding(request: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any]) -> None:
+def validate_begin_binding(
+    request: dict[str, Any],
+    manifest: dict[str, Any],
+    context: dict[str, Any],
+) -> None:
     validate_request(request)
     hosted_agent_cycle.validate_begin_manifest(manifest, context)
     begin = request["begin"]
     source = manifest["source"]
-    if begin["runId"] != source["runId"] or begin["sourceSha"] != source["sourceSha"] or begin["contextHash"] != manifest["contextHash"]:
+    if (
+        begin["runId"] != source["runId"]
+        or begin["sourceSha"] != source["sourceSha"]
+        or begin["contextHash"] != manifest["contextHash"]
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BEGIN_MISMATCH")
     if request["actor"] != manifest["actor"]:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_IDENTITY_MISMATCH")
@@ -130,71 +157,241 @@ def validate_begin_binding(request: dict[str, Any], manifest: dict[str, Any], co
 
 
 def _owner(request: dict[str, Any]) -> dict[str, Any]:
-    return {"role": request["actor"]["role"], "session": request["actor"]["sessionId"], "branch": request["branch"], "pr": None}
+    return {
+        "role": request["actor"]["role"],
+        "session": request["actor"]["sessionId"],
+        "branch": request["branch"],
+        "pr": None,
+    }
+
+
+def _json_response(response: Any, code: str) -> Any:
+    try:
+        return json.loads(response.body)
+    except (AttributeError, json.JSONDecodeError) as exc:
+        raise AgentWriteLifecycleError(code) from exc
+
+
+def _payload(body: Any, marker: str) -> Any | None:
+    prefix = marker + "\n"
+    if not isinstance(body, str) or not body.startswith(prefix):
+        return None
+    raw = body[len(prefix):].strip()
+    if raw.startswith("```json") and raw.endswith("```"):
+        raw = raw[len("```json"):-len("```")].strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+def _comments_before(
+    transport: Any,
+    issue_number: int,
+    request_comment_id: int,
+) -> list[dict[str, Any]]:
+    comments: list[dict[str, Any]] = []
+    for page in range(1, 101):
+        value = _json_response(
+            transport.request(
+                "GET",
+                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
+            ),
+            "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID",
+        )
+        if not isinstance(value, list):
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID")
+        comments.extend(item for item in value if isinstance(item, dict))
+        if any(item.get("id") == request_comment_id for item in value if isinstance(item, dict)):
+            break
+        if len(value) < 100:
+            break
+    for index, item in enumerate(comments):
+        if item.get("id") == request_comment_id:
+            return comments[:index]
+    raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_REQUEST_COMMENT_NOT_FOUND")
+
+
+def _latest_binding_before(
+    transport: Any,
+    *,
+    issue_number: int,
+    request_comment_id: int,
+    request: dict[str, Any],
+    manifest: dict[str, Any],
+) -> dict[str, Any] | None:
+    expected_begin = request["begin"]
+    expected_actor = request["actor"]
+    expected_cycle = manifest["cycleInstanceId"]
+    candidates: list[dict[str, Any]] = []
+    for comment in _comments_before(transport, issue_number, request_comment_id):
+        user = comment.get("user")
+        if not isinstance(user, dict) or user.get("login") != "github-actions[bot]":
+            continue
+        value = _payload(comment.get("body"), RESULT_MARKER)
+        if not isinstance(value, dict) or value.get("schemaVersion") != RESULT_SCHEMA:
+            continue
+        validate_result(value)
+        if (
+            value["begin"] == expected_begin
+            and value["actor"] == expected_actor
+            and value["cycleInstanceId"] == expected_cycle
+            and value["branch"] == request["branch"]
+        ):
+            candidates.append(value["binding"])
+    if not candidates:
+        return None
+    return candidates[-1]
 
 
 def _active_session_leases(observation: Any, session_id: str) -> list[dict[str, Any]]:
     return [
-        lease for lease in coordination.active_leases(observation.state, observation.authority_now)
-        if isinstance(lease.get("owner"), dict) and lease["owner"].get("session") == session_id
+        lease
+        for lease in coordination.active_leases(observation.state, observation.authority_now)
+        if isinstance(lease.get("owner"), dict)
+        and lease["owner"].get("session") == session_id
     ]
 
 
-def _check_session_scope(request: dict[str, Any], observation: Any) -> list[dict[str, Any]]:
+def _exact_active_lease(
+    request: dict[str, Any],
+    observation: Any,
+    *,
+    lease_id: str,
+) -> dict[str, Any]:
     resource = f"branch:{request['branch']}"
-    session_leases = _active_session_leases(observation, request["actor"]["sessionId"])
-    if request["action"] == "acquire":
-        if session_leases:
-            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_SESSION_ALREADY_OWNS_LEASE")
-        return []
-    matching = [lease for lease in session_leases if lease.get("resource") == resource]
-    if len(matching) != 1:
+    expected_owner = _owner(request)
+    matches = [
+        lease
+        for lease in coordination.active_leases(observation.state, observation.authority_now)
+        if lease.get("leaseId") == lease_id
+        and lease.get("resource") == resource
+        and lease.get("owner") == expected_owner
+    ]
+    if len(matches) != 1:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BOUND_LEASE_NOT_FOUND")
-    if request["action"] == "renew" and len(session_leases) != 1:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RENEW_SCOPE_AMBIGUOUS")
-    return matching
+    return matches[0]
+
+
+def _prepare_previous_binding(
+    request: dict[str, Any],
+    manifest: dict[str, Any],
+    observation: Any,
+    *,
+    issue_number: int,
+    request_comment_id: int,
+    transport: Any,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    action = request["action"]
+    latest = _latest_binding_before(
+        transport,
+        issue_number=issue_number,
+        request_comment_id=request_comment_id,
+        request=request,
+        manifest=manifest,
+    )
+    if action == "acquire":
+        if latest is not None:
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ALREADY_STARTED")
+        return None, None
+
+    if latest is None:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_REQUIRED")
+    if latest["bindingHash"] != request["expectedBindingHash"]:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_DRIFT")
+    if latest["state"] != "ACTIVE":
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_NOT_ACTIVE")
+
+    bound_lease = _exact_active_lease(
+        request,
+        observation,
+        lease_id=latest["leaseId"],
+    )
+    if action == "renew":
+        session_leases = _active_session_leases(
+            observation,
+            request["actor"]["sessionId"],
+        )
+        if len(session_leases) != 1 or session_leases[0].get("leaseId") != latest["leaseId"]:
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RENEW_SCOPE_AMBIGUOUS")
+    return latest, bound_lease
 
 
 def prepare_dispatch(
-    request: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any], *,
-    issue_number: int, request_comment_id: int, hosted_run_id: int, transport: Any | None = None,
+    request: dict[str, Any],
+    manifest: dict[str, Any],
+    context: dict[str, Any],
+    *,
+    issue_number: int,
+    request_comment_id: int,
+    hosted_run_id: int,
+    transport: Any | None = None,
 ) -> dict[str, Any]:
     validate_begin_binding(request, manifest, context)
     carrier = transport or GhApiTransport()
+
     observed_branch = git_observation.observe_branch(request["branch"], transport=carrier)
     if observed_branch["branchHead"] != request["expectedBranchHead"]:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BRANCH_DRIFT")
+
     authority = GitHubCoordinationAuthority(transport=carrier)
     authority_observation = authority.observe()
     if authority_observation.head_sha != request["expectedAuthorityHead"]:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_AUTHORITY_DRIFT")
-    matching_before = _check_session_scope(request, authority_observation)
+
+    previous_binding, bound_lease = _prepare_previous_binding(
+        request,
+        manifest,
+        authority_observation,
+        issue_number=issue_number,
+        request_comment_id=request_comment_id,
+        transport=carrier,
+    )
 
     action = request["action"]
     transition_id = f"agent-write-{request['requestId']}"
-    payload: dict[str, Any] = {"owner": _owner(request), "transitionId": transition_id}
+    payload: dict[str, Any] = {
+        "owner": _owner(request),
+        "transitionId": transition_id,
+    }
     if action == "acquire":
-        payload.update({
-            "resources": [f"branch:{request['branch']}"],
-            "reason": f"Agent write lifecycle {manifest['cycleInstanceId']}",
-            "ttlSeconds": request["ttlSeconds"],
-        })
+        payload.update(
+            {
+                "resources": [f"branch:{request['branch']}"],
+                "reason": f"Agent write lifecycle {manifest['cycleInstanceId']}",
+                "ttlSeconds": request["ttlSeconds"],
+            }
+        )
     elif action == "release":
-        payload.update({"resources": [f"branch:{request['branch']}"], "mine": False})
+        payload.update(
+            {
+                "resources": [f"branch:{request['branch']}"],
+                "mine": False,
+            }
+        )
 
     command = {
         "schemaVersion": "RemoteCanonicalCommand 0.1",
         "executionId": transition_id,
         "kind": "domain",
         "actor": copy.deepcopy(request["actor"]),
-        "declaredIntent": {"intent": "agent-write-lease-lifecycle", "cycleInstanceId": manifest["cycleInstanceId"], "action": action},
-        "target": {"domain": "coordination", "action": action, "subject": {"kind": "coordination", "id": "leases"}},
+        "declaredIntent": {
+            "intent": "agent-write-lease-lifecycle",
+            "cycleInstanceId": manifest["cycleInstanceId"],
+            "action": action,
+        },
+        "target": {
+            "domain": "coordination",
+            "action": action,
+            "subject": {"kind": "coordination", "id": "leases"},
+        },
         "expected": {"authorityRevision": authority_observation.head_sha},
         "payload": payload,
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
     remote.validate_command(command)
+
     core = {
         "schemaVersion": DISPATCH_SCHEMA,
         "cycleInstanceId": manifest["cycleInstanceId"],
@@ -205,13 +402,24 @@ def prepare_dispatch(
         "branch": request["branch"],
         "expectedBranchHead": request["expectedBranchHead"],
         "authorityHead": authority_observation.head_sha,
-        "leaseIdsBefore": sorted(lease["leaseId"] for lease in matching_before),
+        "previousBindingHash": (
+            None if previous_binding is None else previous_binding["bindingHash"]
+        ),
+        "previousLeaseId": (
+            None if bound_lease is None else bound_lease["leaseId"]
+        ),
         "command": command,
         "commandHash": remote.command_hash(command),
         "source": {
-            "issueNumber": _positive_int(issue_number, "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID"),
-            "requestCommentId": _positive_int(request_comment_id, "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID"),
-            "hostedRunId": _positive_int(hosted_run_id, "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID"),
+            "issueNumber": _positive_int(
+                issue_number, "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID"
+            ),
+            "requestCommentId": _positive_int(
+                request_comment_id, "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID"
+            ),
+            "hostedRunId": _positive_int(
+                hosted_run_id, "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID"
+            ),
             "semanticHostSha": request["begin"]["sourceSha"],
         },
         "semanticAuthority": False,
@@ -222,50 +430,99 @@ def prepare_dispatch(
 
 def validate_dispatch(value: Any) -> dict[str, Any]:
     fields = {
-        "schemaVersion", "cycleInstanceId", "requestHash", "action", "begin", "actor", "branch",
-        "expectedBranchHead", "authorityHead", "leaseIdsBefore", "command", "commandHash", "source",
-        "semanticAuthority", "authorizesMutation", "dispatchHash",
+        "schemaVersion", "cycleInstanceId", "requestHash", "action", "begin",
+        "actor", "branch", "expectedBranchHead", "authorityHead",
+        "previousBindingHash", "previousLeaseId", "command", "commandHash",
+        "source", "semanticAuthority", "authorizesMutation", "dispatchHash",
     }
-    if not isinstance(value, dict) or set(value) != fields or value.get("schemaVersion") != DISPATCH_SCHEMA:
+    if (
+        not isinstance(value, dict)
+        or set(value) != fields
+        or value.get("schemaVersion") != DISPATCH_SCHEMA
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
-    if not isinstance(value.get("cycleInstanceId"), str) or not CYCLE_RE.fullmatch(value["cycleInstanceId"]):
+    if (
+        not isinstance(value.get("cycleInstanceId"), str)
+        or not CYCLE_RE.fullmatch(value["cycleInstanceId"])
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_CYCLE_INVALID")
     _hash(value.get("requestHash"), "AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
-    _begin(value.get("begin")); _actor(value.get("actor"))
-    if value.get("action") not in ACTIONS:
+    _begin(value.get("begin"))
+    _actor(value.get("actor"))
+    action = value.get("action")
+    if action not in ACTIONS:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ACTION_INVALID")
     git_observation.canonical_branch(value.get("branch"))
     _sha(value.get("expectedBranchHead"), "AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
     _sha(value.get("authorityHead"), "AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
-    lease_ids = value.get("leaseIdsBefore")
-    if not isinstance(lease_ids, list) or lease_ids != sorted(set(lease_ids)) or any(not isinstance(item, str) or not item for item in lease_ids):
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_LEASE_IDS_INVALID")
+
+    previous_binding_hash = value.get("previousBindingHash")
+    previous_lease_id = value.get("previousLeaseId")
+    if action == "acquire":
+        if previous_binding_hash is not None or previous_lease_id is not None:
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
+    else:
+        _hash(
+            previous_binding_hash,
+            "AGENT_WRITE_LIFECYCLE_DISPATCH_PRIOR_BINDING_INVALID",
+        )
+        _text(
+            previous_lease_id,
+            "AGENT_WRITE_LIFECYCLE_DISPATCH_PRIOR_LEASE_INVALID",
+        )
+
     command = remote.validate_command(value.get("command"))
     if value.get("commandHash") != remote.command_hash(command):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_COMMAND_HASH_MISMATCH")
+
     source = value.get("source")
     if not isinstance(source, dict) or set(source) != SOURCE_FIELDS:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_SOURCE_INVALID")
     _positive_int(source.get("issueNumber"), "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID")
-    _positive_int(source.get("requestCommentId"), "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID")
-    _positive_int(source.get("hostedRunId"), "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID")
+    _positive_int(
+        source.get("requestCommentId"),
+        "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID",
+    )
+    _positive_int(
+        source.get("hostedRunId"),
+        "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID",
+    )
     _sha(source.get("semanticHostSha"), "AGENT_WRITE_LIFECYCLE_SOURCE_INVALID")
+
     if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_DISPATCH_MUST_NOT_AUTHORIZE")
-    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "dispatchHash"}
+        raise AgentWriteLifecycleError(
+            "AGENT_WRITE_LIFECYCLE_DISPATCH_MUST_NOT_AUTHORIZE"
+        )
+
+    core = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "dispatchHash"
+    }
     if value.get("dispatchHash") != stable_hash(core):
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_DISPATCH_HASH_MISMATCH")
+        raise AgentWriteLifecycleError(
+            "AGENT_WRITE_LIFECYCLE_DISPATCH_HASH_MISMATCH"
+        )
     return value
 
 
-def build_attempt(dispatch: dict[str, Any], *, run_id: int, host_sha: str) -> dict[str, Any]:
+def build_attempt(
+    dispatch: dict[str, Any],
+    *,
+    run_id: int,
+    host_sha: str,
+) -> dict[str, Any]:
     validate_dispatch(dispatch)
     core = {
         "schemaVersion": ATTEMPT_SCHEMA,
         "dispatchHash": dispatch["dispatchHash"],
         "requestHash": dispatch["requestHash"],
-        "runId": _positive_int(run_id, "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID"),
-        "hostSha": _sha(host_sha, "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID"),
+        "runId": _positive_int(
+            run_id, "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID"
+        ),
+        "hostSha": _sha(
+            host_sha, "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID"
+        ),
         "status": "STARTED",
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -273,9 +530,54 @@ def build_attempt(dispatch: dict[str, Any], *, run_id: int, host_sha: str) -> di
     return {**core, "attemptHash": stable_hash(core)}
 
 
-def build_binding(dispatch: dict[str, Any], *, authority_head_after: str, active_lease: dict[str, Any] | None, receipt_hash: str) -> dict[str, Any]:
+def build_binding(
+    dispatch: dict[str, Any],
+    *,
+    authority_head_after: str,
+    active_lease: dict[str, Any] | None,
+    receipt_hash: str,
+) -> dict[str, Any]:
     validate_dispatch(dispatch)
-    state = "RELEASED" if dispatch["action"] == "release" else "ACTIVE"
+    action = dispatch["action"]
+    state = "RELEASED" if action == "release" else "ACTIVE"
+
+    if action == "acquire":
+        if not isinstance(active_lease, dict):
+            raise AgentWriteLifecycleError(
+                "AGENT_WRITE_LIFECYCLE_ACTIVE_READBACK_MISMATCH"
+            )
+        lease_id = _text(
+            active_lease.get("leaseId"),
+            "AGENT_WRITE_LIFECYCLE_ACTIVE_READBACK_MISMATCH",
+        )
+        expires_at = _text(
+            active_lease.get("expiresAt"),
+            "AGENT_WRITE_LIFECYCLE_ACTIVE_READBACK_MISMATCH",
+        )
+        previous_binding_hash = None
+    elif action == "renew":
+        if (
+            not isinstance(active_lease, dict)
+            or active_lease.get("leaseId") != dispatch["previousLeaseId"]
+        ):
+            raise AgentWriteLifecycleError(
+                "AGENT_WRITE_LIFECYCLE_ACTIVE_READBACK_MISMATCH"
+            )
+        lease_id = dispatch["previousLeaseId"]
+        expires_at = _text(
+            active_lease.get("expiresAt"),
+            "AGENT_WRITE_LIFECYCLE_ACTIVE_READBACK_MISMATCH",
+        )
+        previous_binding_hash = dispatch["previousBindingHash"]
+    else:
+        if active_lease is not None:
+            raise AgentWriteLifecycleError(
+                "AGENT_WRITE_LIFECYCLE_RELEASE_READBACK_MISMATCH"
+            )
+        lease_id = dispatch["previousLeaseId"]
+        expires_at = None
+        previous_binding_hash = dispatch["previousBindingHash"]
+
     core = {
         "schemaVersion": BINDING_SCHEMA,
         "cycleInstanceId": dispatch["cycleInstanceId"],
@@ -283,11 +585,18 @@ def build_binding(dispatch: dict[str, Any], *, authority_head_after: str, active
         "actor": copy.deepcopy(dispatch["actor"]),
         "branch": dispatch["branch"],
         "state": state,
-        "leaseId": None if active_lease is None else active_lease.get("leaseId"),
-        "expiresAt": None if active_lease is None else active_lease.get("expiresAt"),
-        "authorityHead": _sha(authority_head_after, "AGENT_WRITE_LIFECYCLE_AUTHORITY_HEAD_INVALID"),
+        "leaseId": lease_id,
+        "expiresAt": expires_at,
+        "previousBindingHash": previous_binding_hash,
+        "authorityHead": _sha(
+            authority_head_after,
+            "AGENT_WRITE_LIFECYCLE_AUTHORITY_HEAD_INVALID",
+        ),
         "dispatchHash": dispatch["dispatchHash"],
-        "receiptHash": _hash(receipt_hash, "AGENT_WRITE_LIFECYCLE_RECEIPT_HASH_INVALID"),
+        "receiptHash": _hash(
+            receipt_hash,
+            "AGENT_WRITE_LIFECYCLE_RECEIPT_HASH_INVALID",
+        ),
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
@@ -296,34 +605,84 @@ def build_binding(dispatch: dict[str, Any], *, authority_head_after: str, active
 
 def validate_binding(value: Any) -> dict[str, Any]:
     fields = {
-        "schemaVersion", "cycleInstanceId", "begin", "actor", "branch", "state", "leaseId", "expiresAt",
-        "authorityHead", "dispatchHash", "receiptHash", "semanticAuthority", "authorizesMutation", "bindingHash",
+        "schemaVersion", "cycleInstanceId", "begin", "actor", "branch",
+        "state", "leaseId", "expiresAt", "previousBindingHash",
+        "authorityHead", "dispatchHash", "receiptHash", "semanticAuthority",
+        "authorizesMutation", "bindingHash",
     }
-    if not isinstance(value, dict) or set(value) != fields or value.get("schemaVersion") != BINDING_SCHEMA:
+    if (
+        not isinstance(value, dict)
+        or set(value) != fields
+        or value.get("schemaVersion") != BINDING_SCHEMA
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
-    if not isinstance(value.get("cycleInstanceId"), str) or not CYCLE_RE.fullmatch(value["cycleInstanceId"]):
+    if (
+        not isinstance(value.get("cycleInstanceId"), str)
+        or not CYCLE_RE.fullmatch(value["cycleInstanceId"])
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
-    _begin(value.get("begin")); _actor(value.get("actor")); git_observation.canonical_branch(value.get("branch"))
-    if value.get("state") not in {"ACTIVE", "RELEASED"}:
+
+    _begin(value.get("begin"))
+    _actor(value.get("actor"))
+    git_observation.canonical_branch(value.get("branch"))
+
+    state = value.get("state")
+    if state not in {"ACTIVE", "RELEASED"}:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
-    if value["state"] == "ACTIVE":
-        _text(value.get("leaseId"), "AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
+
+    _text(value.get("leaseId"), "AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
+    if state == "ACTIVE":
         _text(value.get("expiresAt"), "AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
-    elif value.get("leaseId") is not None or value.get("expiresAt") is not None:
+    elif value.get("expiresAt") is not None:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
+
+    previous_binding_hash = value.get("previousBindingHash")
+    if previous_binding_hash is not None:
+        _hash(
+            previous_binding_hash,
+            "AGENT_WRITE_LIFECYCLE_BINDING_INVALID",
+        )
+
     _sha(value.get("authorityHead"), "AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
     _hash(value.get("dispatchHash"), "AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
     _hash(value.get("receiptHash"), "AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
     if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
-    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "bindingHash"}
+
+    core = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "bindingHash"
+    }
     if value.get("bindingHash") != stable_hash(core):
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_HASH_MISMATCH")
+        raise AgentWriteLifecycleError(
+            "AGENT_WRITE_LIFECYCLE_BINDING_HASH_MISMATCH"
+        )
     return value
 
 
-def build_success_result(request: dict[str, Any], dispatch: dict[str, Any], *, receipt: dict[str, Any], binding: dict[str, Any]) -> dict[str, Any]:
-    validate_request(request); validate_dispatch(dispatch); validate_binding(binding); remote.validate_receipt(receipt)
+def build_success_result(
+    request: dict[str, Any],
+    dispatch: dict[str, Any],
+    *,
+    receipt: dict[str, Any],
+    binding: dict[str, Any],
+) -> dict[str, Any]:
+    validate_request(request)
+    validate_dispatch(dispatch)
+    validate_binding(binding)
+    remote.validate_receipt(receipt)
+
+    if binding["cycleInstanceId"] != dispatch["cycleInstanceId"]:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_MISMATCH")
+    if binding["previousBindingHash"] != dispatch["previousBindingHash"]:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_MISMATCH")
+    if (
+        dispatch["action"] != "acquire"
+        and binding["leaseId"] != dispatch["previousLeaseId"]
+    ):
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_MISMATCH")
+
     core = {
         "schemaVersion": RESULT_SCHEMA,
         "requestId": request["requestId"],
@@ -347,31 +706,63 @@ def build_success_result(request: dict[str, Any], dispatch: dict[str, Any], *, r
 
 def validate_result(value: Any) -> dict[str, Any]:
     fields = {
-        "schemaVersion", "requestId", "requestHash", "action", "begin", "cycleInstanceId", "actor", "branch",
-        "dispatchHash", "binding", "remoteReceipt", "remoteReceiptHash", "status", "blockers",
+        "schemaVersion", "requestId", "requestHash", "action", "begin",
+        "cycleInstanceId", "actor", "branch", "dispatchHash", "binding",
+        "remoteReceipt", "remoteReceiptHash", "status", "blockers",
         "semanticAuthority", "authorizesMutation", "resultHash",
     }
-    if not isinstance(value, dict) or set(value) != fields or value.get("schemaVersion") != RESULT_SCHEMA:
+    if (
+        not isinstance(value, dict)
+        or set(value) != fields
+        or value.get("schemaVersion") != RESULT_SCHEMA
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
-    if value.get("status") != "PASS" or value.get("blockers") != [] or value.get("action") not in ACTIONS:
+    if (
+        value.get("status") != "PASS"
+        or value.get("blockers") != []
+        or value.get("action") not in ACTIONS
+    ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
+
     _text(value.get("requestId"), "AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
     _hash(value.get("requestHash"), "AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
-    _begin(value.get("begin")); _actor(value.get("actor")); validate_binding(value.get("binding"))
+    _begin(value.get("begin"))
+    _actor(value.get("actor"))
+    binding = validate_binding(value.get("binding"))
+    if binding["cycleInstanceId"] != value.get("cycleInstanceId"):
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
+    if binding["begin"] != value["begin"] or binding["actor"] != value["actor"]:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
+    if binding["branch"] != value["branch"]:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
+
     receipt = remote.validate_receipt(value.get("remoteReceipt"))
     if value.get("remoteReceiptHash") != receipt["receiptHash"]:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
     if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID")
-    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "resultHash"}
+
+    core = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "resultHash"
+    }
     if value.get("resultHash") != stable_hash(core):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_RESULT_HASH_MISMATCH")
     return value
 
 
-def build_failure(request: dict[str, Any] | None, *, status: str, blockers: list[str], authority_head: str | None = None) -> dict[str, Any]:
+def build_failure(
+    request: dict[str, Any] | None,
+    *,
+    status: str,
+    blockers: list[str],
+    authority_head: str | None = None,
+) -> dict[str, Any]:
     if status not in {"BLOCKED", "UNKNOWN"}:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_FAILURE_STATUS_INVALID")
+        raise AgentWriteLifecycleError(
+            "AGENT_WRITE_LIFECYCLE_FAILURE_STATUS_INVALID"
+        )
     core = {
         "schemaVersion": FAILURE_SCHEMA,
         "requestId": request.get("requestId") if isinstance(request, dict) else None,
