@@ -33,6 +33,15 @@ def connector_runtime():
 
 
 class AgentSemanticBriefTests(unittest.TestCase):
+    def test_role_contract_is_single_direct_hash_bound_ref(self):
+        refs = brief.resolve_role_contract_refs("manager-gitops")
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(
+            refs[0]["path"],
+            "docs/kickstarts/roles/manager-gitops.md",
+        )
+        self.assertEqual(len(refs[0]["contentHash"]), 64)
+
     def test_begin_profile_builds_deterministic_brief(self):
         profile = agent_cycle.entry_profile("manager-gitops", "inspect-and-plan")
         context = brief.normalize_context(
