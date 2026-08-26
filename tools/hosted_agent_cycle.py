@@ -2,12 +2,14 @@
 """Hosted carrier for the Agent Cycle begin/close protocol.
 
 This module never creates an authority and never implements Agent Cycle domain
-semantics.  It validates the issue transport envelope, invokes the canonical
+semantics. It validates the issue transport envelope, invokes the canonical
 `tools/agent.py` facade, preserves begin provenance, and normalizes already
 verified remote mutation receipts into Agent Cycle close evidence.
 
-HostedAgentCycleBeginManifest 0.2 also binds a concrete hosted cycle instance
-and declares close features explicitly.  Legacy 0.1 manifests remain readable.
+HostedAgentCycleBeginManifest 0.3 binds a concrete hosted cycle instance,
+declares exhaustive trace support, and opts new cycles into the explicit Agent
+Write Lease lifecycle close gate. Legacy 0.1 and trace-only 0.2 manifests remain
+readable and keep their original close behavior.
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -27,8 +30,10 @@ if str(ROOT) not in sys.path:
 
 from tools import agent_cycle
 from tools import agent_cycle_close
+from tools import agent_write_lifecycle_guard
 from tools import hosted_agent_cycle_trace
 from tools import remote_canonical_execution
+from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
 
 REPOSITORY = "EAKerber/MobiliPresenter"
@@ -37,11 +42,14 @@ REQUEST_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1"
 RESULT_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RESULT_V0_1"
 COMMAND_SCHEMA = "HostedAgentCycleCommand 0.1"
 LEGACY_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.1"
-BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.2"
-BEGIN_RESULT_SCHEMA = "HostedAgentCycleBeginResult 0.2"
+TRACE_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.2"
+BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.3"
+BEGIN_RESULT_SCHEMA = "HostedAgentCycleBeginResult 0.3"
 CLOSE_RESULT_SCHEMA = "HostedAgentCycleCloseResult 0.1"
 FAILURE_SCHEMA = "HostedAgentCycleFailure 0.1"
 TRACE_FEATURE = "execution-trace-0.1"
+WRITE_LEASE_FEATURE = "agent-write-lease-lifecycle-0.1"
+CURRENT_FEATURES = sorted([TRACE_FEATURE, WRITE_LEASE_FEATURE])
 ACTIONS = {"begin", "close"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -247,7 +255,7 @@ def _begin_manifest(command: dict[str, Any], context: dict[str, Any], meta: dict
         "cycleId": context["cycleId"],
         "cycleInstanceId": cycle_instance_id,
         "contextHash": context["contextHash"],
-        "carrierFeatures": [TRACE_FEATURE],
+        "carrierFeatures": copy.deepcopy(CURRENT_FEATURES),
         "status": "READY",
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -267,7 +275,7 @@ def validate_begin_manifest(value: Any, context: dict[str, Any] | None = None) -
     version = value.get("schemaVersion")
     expected_fields = (
         legacy_fields if version == LEGACY_BEGIN_MANIFEST_SCHEMA
-        else current_fields if version == BEGIN_MANIFEST_SCHEMA
+        else current_fields if version in {TRACE_BEGIN_MANIFEST_SCHEMA, BEGIN_MANIFEST_SCHEMA}
         else None
     )
     if expected_fields is None or set(value) != expected_fields:
@@ -291,8 +299,9 @@ def validate_begin_manifest(value: Any, context: dict[str, Any] | None = None) -
         raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_ARTIFACT_NAME_INVALID")
     if not isinstance(value.get("contextHash"), str) or not HASH_RE.fullmatch(value["contextHash"]):
         raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_CONTEXT_HASH_INVALID")
-    if version == BEGIN_MANIFEST_SCHEMA:
-        if value.get("carrierFeatures") != [TRACE_FEATURE]:
+    if version in {TRACE_BEGIN_MANIFEST_SCHEMA, BEGIN_MANIFEST_SCHEMA}:
+        expected_features = [TRACE_FEATURE] if version == TRACE_BEGIN_MANIFEST_SCHEMA else CURRENT_FEATURES
+        if value.get("carrierFeatures") != expected_features:
             raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_FEATURES_INVALID")
         cycle_instance_id = value.get("cycleInstanceId")
         if not isinstance(cycle_instance_id, str) or not CYCLE_INSTANCE_RE.fullmatch(cycle_instance_id):
@@ -316,8 +325,16 @@ def validate_begin_manifest(value: Any, context: dict[str, Any] | None = None) -
 def _manifest_requires_trace(manifest: dict[str, Any]) -> bool:
     validate_begin_manifest(manifest)
     return (
-        manifest["schemaVersion"] == BEGIN_MANIFEST_SCHEMA
+        manifest["schemaVersion"] in {TRACE_BEGIN_MANIFEST_SCHEMA, BEGIN_MANIFEST_SCHEMA}
         and TRACE_FEATURE in manifest["carrierFeatures"]
+    )
+
+
+def _manifest_requires_write_lifecycle(manifest: dict[str, Any]) -> bool:
+    validate_begin_manifest(manifest)
+    return (
+        manifest["schemaVersion"] == BEGIN_MANIFEST_SCHEMA
+        and WRITE_LEASE_FEATURE in manifest["carrierFeatures"]
     )
 
 
@@ -444,6 +461,43 @@ def _validate_close_binding(
         raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_SUBSTITUTION")
 
 
+def _require_clean_write_lifecycle(
+    manifest: dict[str, Any], meta: dict[str, int], *, output_path: str
+) -> None:
+    if not _manifest_requires_write_lifecycle(manifest):
+        return
+    issue_number = manifest["source"]["issueNumber"]
+    close_comment_id = meta.get("commentId")
+    if not isinstance(close_comment_id, int) or isinstance(close_comment_id, bool) or close_comment_id <= 0:
+        raise HostedAgentCycleError("HOSTED_AGENT_WRITE_LIFECYCLE_CLOSE_COMMENT_INVALID")
+
+    last_report: dict[str, Any] | None = None
+    for attempt in range(hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS):
+        comments = trace_collect.fetch_issue_comments(REPOSITORY, issue_number)
+        try:
+            report = agent_write_lifecycle_guard.inspect_cycle(
+                comments,
+                manifest,
+                close_comment_id=close_comment_id,
+            )
+        except agent_write_lifecycle_guard.AgentWriteLifecycleGuardError as exc:
+            raise HostedAgentCycleError(exc.code) from exc
+        last_report = report
+        if report["state"] in {"NONE", "RELEASED"}:
+            _write_json(Path(output_path).with_name("agent-write-lifecycle-close.json"), report)
+            return
+        if attempt + 1 < hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS:
+            time.sleep(hosted_agent_cycle_trace.TRACE_STABILIZATION_DELAY_SECONDS)
+
+    assert last_report is not None
+    _write_json(Path(output_path).with_name("agent-write-lifecycle-close.json"), last_report)
+    if last_report["state"] == "ACTIVE":
+        raise HostedAgentCycleError("AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE")
+    if last_report["state"] == "EXPIRED":
+        raise HostedAgentCycleError("AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE")
+    raise HostedAgentCycleError("AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE")
+
+
 def close_from_envelope(
     command: dict[str, Any],
     meta: dict[str, int],
@@ -479,6 +533,8 @@ def close_from_envelope(
         effective_command = validate_command(effective_command)
         trace_path = Path(output_path).with_name("execution-trace.json")
         _write_json(trace_path, trace_value)
+
+    _require_clean_write_lifecycle(manifest, meta, output_path=output_path)
 
     evidence_root = Path(evidence_dir)
     evidence_root.mkdir(parents=True, exist_ok=True)
