@@ -4,7 +4,7 @@
   "title": "AgentWriteLeaseDispatch 0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "cycleInstanceId", "requestHash", "action", "begin", "actor", "branch", "expectedBranchHead", "authorityHead", "leaseIdsBefore", "command", "commandHash", "source", "semanticAuthority", "authorizesMutation", "dispatchHash"],
+  "required": ["schemaVersion", "cycleInstanceId", "requestHash", "action", "begin", "actor", "branch", "expectedBranchHead", "authorityHead", "previousBindingHash", "previousLeaseId", "command", "commandHash", "source", "semanticAuthority", "authorizesMutation", "dispatchHash"],
   "properties": {
     "schemaVersion": {"const": "AgentWriteLeaseDispatch 0.1"},
     "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
@@ -15,7 +15,8 @@
     "branch": {"type": "string", "minLength": 1},
     "expectedBranchHead": {"$ref": "#/$defs/gitSha"},
     "authorityHead": {"$ref": "#/$defs/gitSha"},
-    "leaseIdsBefore": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "previousBindingHash": {"anyOf": [{"$ref": "#/$defs/hash"}, {"type": "null"}]},
+    "previousLeaseId": {"type": ["string", "null"], "minLength": 1},
     "command": {"type": "object"},
     "commandHash": {"$ref": "#/$defs/hash"},
     "source": {"type": "object"},
