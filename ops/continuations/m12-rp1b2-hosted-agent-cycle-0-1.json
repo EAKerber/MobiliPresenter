@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "m12-rp1b2-hosted-agent-cycle-0-1",
   "workerId": "interactive-manager-gitops",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/m12-rp1b2-hosted-agent-cycle-0.1",
   "prNumber": null,
   "dependsOn": [],
