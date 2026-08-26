@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-write-lease-binding-0.1.json",
+  "title": "AgentWriteLeaseBinding 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cycleInstanceId", "begin", "actor", "branch", "state", "leaseId", "expiresAt", "authorityHead", "dispatchHash", "receiptHash", "semanticAuthority", "authorizesMutation", "bindingHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentWriteLeaseBinding 0.1"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "begin": {"type": "object"},
+    "actor": {"type": "object"},
+    "branch": {"type": "string", "minLength": 1},
+    "state": {"enum": ["ACTIVE", "RELEASED"]},
+    "leaseId": {"type": ["string", "null"]},
+    "expiresAt": {"type": ["string", "null"]},
+    "authorityHead": {"$ref": "#/$defs/gitSha"},
+    "dispatchHash": {"$ref": "#/$defs/hash"},
+    "receiptHash": {"$ref": "#/$defs/hash"},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "bindingHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {"hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}
+}
