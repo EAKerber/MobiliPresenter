@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "cddfdd9eed94d54f94e67c22cce2aec5acd34045",
+  "leases": [
+    {
+      "leaseId": "m12-at3c-impl-acquire:0",
+      "resource": "branch:work/operations/m12-at3c-agent-write-lease-lifecycle-v0.1",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m12-at3c-implementation-20260825",
+        "branch": "work/operations/m12-at3c-agent-write-lease-lifecycle-v0.1",
+        "pr": null
+      },
+      "reason": "M12-AT3C implementation branch bootstrap",
+      "acquiredAt": "2026-08-26T01:42:03Z",
+      "renewedAt": "2026-08-26T01:42:03Z",
+      "expiresAt": "2026-08-26T02:42:03Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "0820c3cd63c47ce72ea6359c23401db097fd85f3",
   "schemaVersion": "CoordinationState 0.1"
 }
