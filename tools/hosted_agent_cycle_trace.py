@@ -18,6 +18,7 @@ TRACE_STABILIZATION_ATTEMPTS = 3
 TRACE_STABILIZATION_DELAY_SECONDS = 1.0
 TRACE_COMPLETENESS_SCOPE = "same-cycle-attributable-events"
 MUTATION_RECEIPT_MISSING = "AGENT_TRACE_MUTATION_RECEIPT_MISSING"
+LIFECYCLE_RECEIPT_MISSING = "AGENT_TRACE_LIFECYCLE_RECEIPT_MISSING"
 
 
 class HostedAgentCycleTraceError(RuntimeError):
@@ -49,6 +50,118 @@ def _bound_trace(
     return value
 
 
+def _agent_write_lifecycle_evidence_comment_ids(
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    *,
+    close_comment_id: int,
+) -> list[int]:
+    """Discover canonical Coordination receipts emitted by this cycle's lease lifecycle."""
+
+    # Local imports keep the Hosted Agent Cycle import graph acyclic:
+    # hosted_agent_cycle -> hosted_agent_cycle_trace -> (this function) -> lifecycle.
+    from tools import agent_write_lifecycle as lifecycle
+    from tools import remote_canonical_execution
+
+    source = manifest["source"]
+    begin = {
+        "runId": source["runId"],
+        "sourceSha": source["sourceSha"],
+        "contextHash": manifest["contextHash"],
+    }
+    actor = copy.deepcopy(manifest["actor"])
+    cycle_id = trace_collect.cycle_instance_id(manifest)
+    window = trace_collect._window(comments, source["commentId"], close_comment_id)
+
+    expected: dict[str, dict[str, Any]] = {}
+    for comment in window:
+        if not trace_collect._result_comment_allowed(comment):
+            continue
+        payload = trace_collect._json_after_marker(
+            comment.get("body"), lifecycle.RESULT_MARKER
+        )
+        if not isinstance(payload, dict) or payload.get("schemaVersion") != lifecycle.RESULT_SCHEMA:
+            continue
+        # A different cycle sharing the bus must never contaminate this close.
+        if (
+            trace_collect._canonical_begin(payload.get("begin")) != begin
+            or trace_collect._canonical_actor(payload.get("actor")) != actor
+            or payload.get("cycleInstanceId") != cycle_id
+        ):
+            continue
+        try:
+            lifecycle.validate_result(payload)
+        except RuntimeError as exc:
+            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RESULT_INVALID") from exc
+
+        action = payload["action"]
+        binding = payload["binding"]
+        if (
+            (action == "release" and binding.get("state") != "RELEASED")
+            or (action in {"acquire", "renew"} and binding.get("state") != "ACTIVE")
+        ):
+            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RESULT_INVALID")
+
+        receipt = payload["remoteReceipt"]
+        command = receipt.get("command")
+        declared = command.get("declaredIntent") if isinstance(command, dict) else None
+        target = command.get("target") if isinstance(command, dict) else None
+        if (
+            not isinstance(declared, dict)
+            or declared.get("intent") != "agent-write-lease-lifecycle"
+            or declared.get("cycleInstanceId") != cycle_id
+            or declared.get("action") != action
+            or command.get("actor") != actor
+            or not isinstance(target, dict)
+            or target.get("domain") != "coordination"
+            or target.get("action") != action
+        ):
+            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RECEIPT_INVALID")
+
+        receipt_hash = payload["remoteReceiptHash"]
+        if receipt_hash in expected:
+            raise HostedAgentCycleTraceError(
+                "AGENT_TRACE_LIFECYCLE_RECEIPT_DUPLICATE_EXPECTATION"
+            )
+        expected[receipt_hash] = receipt
+
+    if not expected:
+        return []
+
+    found: dict[str, int] = {}
+    for comment in window:
+        if not trace_collect._result_comment_allowed(comment):
+            continue
+        payload = trace_collect._json_after_marker(
+            comment.get("body"), trace_collect.REMOTE_RESULT_MARKER
+        )
+        if not isinstance(payload, dict):
+            continue
+        receipt_hash = payload.get("receiptHash")
+        if receipt_hash not in expected:
+            continue
+        try:
+            remote_canonical_execution.validate_receipt(payload)
+        except RuntimeError as exc:
+            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RECEIPT_INVALID") from exc
+        if payload != expected[receipt_hash]:
+            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RECEIPT_MISMATCH")
+        if receipt_hash in found:
+            raise HostedAgentCycleTraceError(
+                "AGENT_TRACE_LIFECYCLE_RECEIPT_COMMENT_DUPLICATE"
+            )
+        comment_id = trace_collect._comment_id(comment)
+        if comment_id is None:
+            raise HostedAgentCycleTraceError(
+                "AGENT_TRACE_LIFECYCLE_RECEIPT_COMMENT_INVALID"
+            )
+        found[receipt_hash] = comment_id
+
+    if set(found) != set(expected):
+        raise HostedAgentCycleTraceError(LIFECYCLE_RECEIPT_MISSING)
+    return sorted(found.values())
+
+
 def _amend_command(
     command: dict[str, Any],
     trace_value: dict[str, Any],
@@ -66,7 +179,16 @@ def _amend_command(
                 close_comment_id=close_comment_id,
             )
         )
+        discovered.update(
+            _agent_write_lifecycle_evidence_comment_ids(
+                comments,
+                manifest,
+                close_comment_id=close_comment_id,
+            )
+        )
     except RuntimeError as exc:
+        if isinstance(exc, HostedAgentCycleTraceError):
+            raise
         raise HostedAgentCycleTraceError(str(exc).split(":", 1)[0]) from exc
     amended = copy.deepcopy(command)
     amended["evidenceCommentIds"] = sorted(
@@ -122,6 +244,10 @@ def prepare_close_stabilized(
     issue_number = manifest["source"]["issueNumber"]
     last_trace: dict[str, Any] | None = None
     last_observation_error: HostedAgentCycleTraceError | None = None
+    retryable_observation_errors = {
+        MUTATION_RECEIPT_MISSING,
+        LIFECYCLE_RECEIPT_MISSING,
+    }
     for observation in range(attempts):
         comments = fetcher(repository, issue_number)
         value = _bound_trace(command, meta, manifest, comments)
@@ -138,11 +264,11 @@ def prepare_close_stabilized(
                 )
                 return amended, value
             except HostedAgentCycleTraceError as exc:
-                if exc.code != MUTATION_RECEIPT_MISSING:
+                if exc.code not in retryable_observation_errors:
                     raise
-                # A terminal mutation result may be visible before the separately
-                # materialized canonical receipt comment. Reobserve the carrier;
-                # never replay the mutation to fill an observation gap.
+                # A terminal mutation/lifecycle result may be visible before its
+                # separately materialized canonical receipt comment. Reobserve
+                # the carrier only; never replay work to fill an observation gap.
                 last_observation_error = exc
         if observation + 1 < attempts:
             sleeper(float(delay_seconds))
