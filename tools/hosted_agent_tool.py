@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hosted carrier for Agent Tool Interface 0.1/AT3B.
+"""Hosted carrier for Agent Tool Interface 0.1/AT3C.
 
 The carrier binds an AgentToolRequest to an exact Hosted Agent Cycle begin and
 keeps the hosted workflow itself Git-read-only. Read-only tools may execute
@@ -205,10 +205,16 @@ def prepare_request(
     if not isinstance(cycle_instance_id, str):
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_DISPATCH_CYCLE_REQUIRED")
 
+    lifecycle_context = {
+        "cycleInstanceId": cycle_instance_id,
+        "issueNumber": issue_number,
+        "beforeCommentId": request_comment_id,
+    }
     proof_set = admission.collect_guard_proofs(
         plan,
         transport=transport,
         authority_factory=authority_factory,
+        lifecycle_context=lifecycle_context,
     )
     admission.assert_execution_admitted(plan, proof_set)
     dispatch = mutation_dispatch.build_dispatch(
