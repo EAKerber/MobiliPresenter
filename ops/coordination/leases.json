@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-m12-at3c-live2-acquire:0",
-      "resource": "branch:work/operations/m12-at3c-live-qualification-2",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m12-at3c-live2-cycle",
-        "branch": "work/operations/m12-at3c-live-qualification-2",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-1ad88899702736c1708f5398",
-      "acquiredAt": "2026-08-26T04:34:46Z",
-      "renewedAt": "2026-08-26T04:34:46Z",
-      "expiresAt": "2026-08-26T05:04:46Z",
-      "ttlSeconds": 1800
-    }
-  ],
-  "revision": "62841038ab286342b4c66b418780ce11fa4cddc6",
+  "leases": [],
+  "revision": "6b9d5d540a6353cb990c26091ff09bed54fc2c8e",
   "schemaVersion": "CoordinationState 0.1"
 }
