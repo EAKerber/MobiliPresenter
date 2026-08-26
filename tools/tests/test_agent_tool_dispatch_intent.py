@@ -9,15 +9,15 @@ from tools.agent_tools import dispatch_host
 CATALOG = {
     "targetPolicies": {
         "manager-non-control-git": {
-            "kind": "git-file",
+            "kind": "git-files",
             "branchPrefixes": [],
             "forbiddenBranches": ["main"],
             "pathPrefixes": [],
         }
     },
     "tools": {
-        "git.file.create": {
-            "adapter": "remote-git-file",
+        "git.files.mutate": {
+            "adapter": "remote-git-files",
             "effectClass": "shared-durable-mutation",
             "mode": "plan-only",
             "roles": {
@@ -39,13 +39,17 @@ PLAN = {
         "workerId": "manager-gitops-a",
         "sessionId": "session-1",
     },
-    "toolId": "git.file.create",
+    "toolId": "git.files.mutate",
     "effectClass": "shared-durable-mutation",
-    "adapter": "remote-git-file",
+    "adapter": "remote-git-files",
     "guards": ["coordination-lease-owned", "git-cas"],
     "requiredCapabilities": ["remote.canonical.execute"],
     "targetPolicy": "manager-non-control-git",
-    "target": {"branch": "work/operations/test", "path": "docs/test.txt"},
+    "target": {"branch": "work/operations/test"},
+    "input": {
+        "changes": [{"path": "docs/test.txt", "content": "test\n"}],
+        "message": "test",
+    },
 }
 
 
@@ -63,7 +67,11 @@ class AgentToolDispatchIntentTests(unittest.TestCase):
         }
         dispatch_host._validate_current_policy(PLAN, context)
         load_policy.assert_called_once_with()
-        validate_target.assert_called_once()
+        validate_target.assert_called_once_with(
+            CATALOG["targetPolicies"]["manager-non-control-git"],
+            PLAN["target"],
+            PLAN["input"],
+        )
 
     @patch("tools.agent_tools.dispatch_host.validate_target")
     @patch("tools.agent_tools.dispatch_host.tool_policy.load_policy", return_value=CATALOG)

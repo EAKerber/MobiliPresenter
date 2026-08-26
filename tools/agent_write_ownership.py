@@ -25,9 +25,14 @@ def required_resources(command: dict[str, Any]) -> tuple[list[str], list[str]]:
     target = command["target"]
     owned = [coordination.normalize_resource(f"branch:{target['branch']}")]
     conflict_checked: list[str] = []
-    if target["operation"] != "create-branch":
+    if target["operation"] == "mutate-files":
+        conflict_checked.extend(
+            coordination.normalize_resource(f"file:{change['path']}")
+            for change in command["payload"]["changes"]
+        )
+    elif target["operation"] != "create-branch":
         conflict_checked.append(coordination.normalize_resource(f"file:{target['path']}"))
-    return owned, conflict_checked
+    return owned, sorted(set(conflict_checked))
 
 
 def coordination_owner(command: dict[str, Any]) -> dict[str, Any]:

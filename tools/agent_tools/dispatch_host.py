@@ -192,7 +192,11 @@ def _validate_current_policy(
         or plan["targetPolicy"] != role_policy["targetPolicy"]
     ):
         raise DispatchHostError("AGENT_TOOL_DISPATCH_CURRENT_POLICY_MISMATCH")
-    validate_target(catalog["targetPolicies"][role_policy["targetPolicy"]], plan["target"])
+    validate_target(
+        catalog["targetPolicies"][role_policy["targetPolicy"]],
+        plan["target"],
+        plan["input"],
+    )
 
 
 def _lifecycle_context(
@@ -386,9 +390,14 @@ def inspect_protocol(
 
 def _observe_branch_head(plan: dict[str, Any], transport: Any) -> str | None:
     try:
-        observed = git_observation.observe_file(
-            plan["target"]["branch"], plan["target"]["path"], transport=transport
-        )
+        if "path" in plan["target"]:
+            observed = git_observation.observe_file(
+                plan["target"]["branch"], plan["target"]["path"], transport=transport
+            )
+        else:
+            observed = git_observation.observe_branch(
+                plan["target"]["branch"], transport=transport
+            )
     except Exception:
         return None
     value = observed.get("branchHead") if isinstance(observed, dict) else None

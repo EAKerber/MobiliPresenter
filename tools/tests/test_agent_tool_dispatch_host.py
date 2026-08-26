@@ -29,10 +29,10 @@ def bundle():
         "requestId": "agent-tool-test",
         "begin": copy.deepcopy(BEGIN),
         "actor": copy.deepcopy(ACTOR),
-        "toolId": "git.file.update",
+        "toolId": "git.files.mutate",
     }
     plan = {
-        "target": {"branch": "work/operations/test", "path": "docs/test.txt"},
+        "target": {"branch": "work/operations/test"},
     }
     dispatch = {
         "cycleInstanceId": CYCLE_INSTANCE_ID,

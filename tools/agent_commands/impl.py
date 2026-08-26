@@ -521,6 +521,22 @@ def command_git_mutation_plan(as_json, args):
             blob_sha=_required(args.blob_sha, "GIT_MUTATION_BLOB_SHA_REQUIRED"),
             control_branch=control,
         )
+    elif operation == "mutate-files":
+        if bool(args.changes_json) == bool(args.changes_file):
+            raise RuntimeError("GIT_MUTATION_CHANGES_SOURCE_REQUIRED")
+        try:
+            if args.changes_file:
+                changes = json.loads(Path(args.changes_file).read_text(encoding="utf-8"))
+            else:
+                changes = json.loads(args.changes_json)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError("GIT_MUTATION_CHANGES_JSON_INVALID") from exc
+        plan = git_mutation_plan.mutate_files(
+            branch=_required(args.branch, "GIT_MUTATION_BRANCH_REQUIRED"),
+            branch_head=_required(args.branch_head, "GIT_MUTATION_BRANCH_HEAD_REQUIRED"),
+            changes=changes,
+            control_branch=control,
+        )
     elif operation == "create-pr":
         plan = git_mutation_plan.create_pr(
             head=_required(args.head, "GIT_MUTATION_PR_HEAD_REQUIRED"),
@@ -585,6 +601,8 @@ def main():
     parser.add_argument("--path")
     parser.add_argument("--blob-sha")
     parser.add_argument("--content-sha256")
+    parser.add_argument("--changes-json")
+    parser.add_argument("--changes-file")
     parser.add_argument("--head")
     parser.add_argument("--base")
     parser.add_argument("--head-sha")

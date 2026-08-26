@@ -43,11 +43,46 @@ class GitMutationPlanTests(unittest.TestCase):
         self.assertEqual(updated["readback"]["expectedParentHead"], SHA_A)
         self.assertEqual(deleted["readback"]["expectedParentHead"], SHA_A)
 
+    def test_multi_path_plan_binds_one_branch_head_and_canonical_change_set(self):
+        value = plan.mutate_files(
+            branch=BRANCH,
+            branch_head=SHA_A,
+            changes=[
+                {"path": "docs/a.json", "content": "{}\n"},
+                {"path": "docs/b.json", "delete": True},
+            ],
+            control_branch=CONTROL,
+        )
+        self.assertEqual(value["operation"], "mutate-files")
+        self.assertEqual(value["preconditions"], {"branchHead": SHA_A})
+        self.assertEqual(
+            value["readback"]["expectedChangedPaths"],
+            ["docs/a.json", "docs/b.json"],
+        )
+        self.assertEqual(plan.validate(value), value)
+        with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_CHANGES_NOT_CANONICAL"):
+            plan.mutate_files(
+                branch=BRANCH,
+                branch_head=SHA_A,
+                changes=[
+                    {"path": "docs/b.json", "delete": True},
+                    {"path": "docs/a.json", "content": "{}\n"},
+                ],
+                control_branch=CONTROL,
+            )
+
     def test_direct_control_branch_content_and_ref_writes_are_forbidden(self):
         with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_DIRECT_CONTROL_BRANCH_FORBIDDEN"):
             plan.create_file(branch=CONTROL, path="dummy", branch_head=SHA_A, content_sha256=DIGEST, control_branch=CONTROL)
         with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_DIRECT_CONTROL_BRANCH_FORBIDDEN"):
             plan.update_ref(branch=CONTROL, current_sha=SHA_A, new_sha=SHA_B, control_branch=CONTROL)
+        with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_DIRECT_CONTROL_BRANCH_FORBIDDEN"):
+            plan.mutate_files(
+                branch=CONTROL,
+                branch_head=SHA_A,
+                changes=[{"path": "dummy", "content": "x"}],
+                control_branch=CONTROL,
+            )
 
     def test_rehashed_plan_cannot_turn_valid_content_write_into_direct_main_write(self):
         value = plan.create_file(branch=BRANCH, path="tools/x.py", branch_head=SHA_A, content_sha256=DIGEST, control_branch=CONTROL)

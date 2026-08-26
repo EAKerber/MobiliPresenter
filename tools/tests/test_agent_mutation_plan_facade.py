@@ -18,6 +18,8 @@ class AgentMutationPlanFacadeTests(unittest.TestCase):
             "path": None,
             "blob_sha": None,
             "content_sha256": None,
+            "changes_json": None,
+            "changes_file": None,
             "head": None,
             "base": None,
             "head_sha": None,
@@ -67,6 +69,34 @@ class AgentMutationPlanFacadeTests(unittest.TestCase):
         with patch.object(agent.project_state, "load_state", return_value=state):
             with self.assertRaisesRegex(RuntimeError, "GIT_MUTATION_BRANCH_HEAD_REQUIRED"):
                 agent.command_git_mutation_plan(True, args)
+
+    def test_agent_exposes_multi_path_bundle_plan(self):
+        state = {
+            "schemaVersion": "ProjectState 2.1",
+            "project": {"id": "mobilipresenter", "repository": "EAKerber/MobiliPresenter"},
+            "git": {"controlBranch": "main", "protectedBranches": []},
+            "published": {"url": "https://example.invalid", "artifactManifest": "ops/published/viewer-next-current.json"},
+            "development": {"initiative": "x", "phase": "between-increments", "checkpoint": "c", "nextTransition": "n"},
+        }
+        changes = [
+            {"path": "docs/a.txt", "content": "a\n"},
+            {"path": "docs/b.txt", "delete": True},
+        ]
+        args = self.args(
+            operation="mutate-files",
+            branch_head="a" * 40,
+            changes_file="changes.json",
+        )
+        with patch.object(agent.project_state, "load_state", return_value=state), patch(
+            "tools.agent_commands.impl.Path.read_text", return_value=json.dumps(changes)
+        ):
+            out = io.StringIO()
+            with redirect_stdout(out):
+                result = agent.command_git_mutation_plan(True, args)
+        self.assertEqual(result, 0)
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload["operation"], "mutate-files")
+        self.assertEqual(payload["readback"]["expectedChangedPaths"], ["docs/a.txt", "docs/b.txt"])
 
 
 if __name__ == "__main__":

@@ -92,7 +92,7 @@ class HostedAgentToolTests(unittest.TestCase):
     @patch("tools.hosted_agent_tool.validate_begin_binding")
     @patch("tools.hosted_agent_tool.resolver.resolve_request")
     def test_plan_only_tool_cannot_report_executed_mutation(self, resolve, validate_binding):
-        value = request("git.file.create")
+        value = request("git.files.mutate")
         resolve.return_value = {
             "plan": {"mode": "plan-only", "planHash": "c" * 64},
             "result": {"status": "PASS", "blockers": [], "resultHash": "d" * 64},
@@ -109,9 +109,12 @@ class HostedAgentToolTests(unittest.TestCase):
         self, resolve, collect, admitted, build_dispatch, validate_binding
     ):
         value = request(
-            "git.file.create",
-            target={"branch": "work/operations/at3b", "path": "docs/at3b.txt"},
-            input_value={"content": "x", "message": "AT3B"},
+            "git.files.mutate",
+            target={"branch": "work/operations/at3b"},
+            input_value={
+                "changes": [{"path": "docs/at3b.txt", "content": "x"}],
+                "message": "AT3B",
+            },
         )
         plan = {
             "mode": "mutation-execute",

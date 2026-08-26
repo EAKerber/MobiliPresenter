@@ -224,7 +224,14 @@ def _evidence_covers(change: dict[str, Any], evidence: dict[str, Any]) -> bool:
         return False
     operation = evidence.get("operation")
     target = evidence.get("target") or {}
-    if operation in {"create-branch", "update-ref", "create-file", "update-file", "delete-file"}:
+    if operation in {
+        "create-branch",
+        "update-ref",
+        "create-file",
+        "update-file",
+        "delete-file",
+        "mutate-files",
+    }:
         return target.get("branch") == branch
     if operation == "merge-pr":
         # A successful merge is the direct readback for the PR base branch movement.

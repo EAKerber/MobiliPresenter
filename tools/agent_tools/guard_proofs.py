@@ -82,9 +82,21 @@ def validate_git_cas_proof(value: Any) -> dict[str, Any]:
     if any(not isinstance(actor[item], str) or not actor[item] for item in actor):
         raise RuntimeError("GIT_CAS_GUARD_PROOF_ACTOR_INVALID")
     target = value.get("target")
-    if not isinstance(target, dict) or set(target) != {"branch", "path"}:
+    if not isinstance(target, dict) or set(target) not in (
+        {"branch", "path"},
+        {"branch", "paths"},
+    ):
         raise RuntimeError("GIT_CAS_GUARD_PROOF_TARGET_INVALID")
-    if not isinstance(target["branch"], str) or not isinstance(target["path"], str):
+    if not isinstance(target["branch"], str) or not target["branch"]:
+        raise RuntimeError("GIT_CAS_GUARD_PROOF_TARGET_INVALID")
+    if "path" in target and (not isinstance(target["path"], str) or not target["path"]):
+        raise RuntimeError("GIT_CAS_GUARD_PROOF_TARGET_INVALID")
+    if "paths" in target and (
+        not isinstance(target["paths"], list)
+        or not target["paths"]
+        or target["paths"] != sorted(set(target["paths"]))
+        or any(not isinstance(path, str) or not path for path in target["paths"])
+    ):
         raise RuntimeError("GIT_CAS_GUARD_PROOF_TARGET_INVALID")
     expected = value.get("expected")
     observed = value.get("observed")
@@ -92,7 +104,7 @@ def validate_git_cas_proof(value: Any) -> dict[str, Any]:
         raise RuntimeError("GIT_CAS_GUARD_PROOF_OBSERVATION_INVALID")
     if set(expected) not in ({"branchHead"}, {"branchHead", "blobSha"}):
         raise RuntimeError("GIT_CAS_GUARD_PROOF_EXPECTED_INVALID")
-    if set(observed) != {"branchHead", "blobSha"}:
+    if set(observed) not in ({"branchHead"}, {"branchHead", "blobSha"}):
         raise RuntimeError("GIT_CAS_GUARD_PROOF_OBSERVATION_INVALID")
     _require_git_sha(
         expected.get("branchHead"), "GIT_CAS_GUARD_PROOF_EXPECTED_INVALID"
@@ -197,21 +209,30 @@ def prove_git_cas(
     ):
         raise RuntimeError("AGENT_TOOL_GIT_CAS_ROUTE_UNSUPPORTED")
     target = command["target"]
-    observed_full = git_observation.observe_file(
-        target["branch"], target["path"], transport=transport
-    )
     expected = copy.deepcopy(command["expected"])
-    observed = {
-        "branchHead": observed_full["branchHead"],
-        "blobSha": observed_full["blobSha"],
-    }
+    operation = target["operation"]
+    if operation == "mutate-files":
+        observed_full = git_observation.observe_branch(target["branch"], transport=transport)
+        observed = {"branchHead": observed_full["branchHead"]}
+        proof_target = {
+            "branch": target["branch"],
+            "paths": [change["path"] for change in command["payload"]["changes"]],
+        }
+    else:
+        observed_full = git_observation.observe_file(
+            target["branch"], target["path"], transport=transport
+        )
+        observed = {
+            "branchHead": observed_full["branchHead"],
+            "blobSha": observed_full["blobSha"],
+        }
+        proof_target = {"branch": target["branch"], "path": target["path"]}
     if observed["branchHead"] != expected["branchHead"]:
         raise RuntimeError("AGENT_TOOL_GIT_CAS_BRANCH_DRIFT")
-    operation = target["operation"]
     if operation == "create-file":
         if observed["blobSha"] is not None:
             raise RuntimeError("AGENT_TOOL_GIT_CAS_PATH_EXISTS")
-    elif observed["blobSha"] != expected.get("blobSha"):
+    elif operation != "mutate-files" and observed["blobSha"] != expected.get("blobSha"):
         raise RuntimeError("AGENT_TOOL_GIT_CAS_BLOB_DRIFT")
     core = {
         "schemaVersion": GIT_CAS_SCHEMA,
@@ -219,7 +240,7 @@ def prove_git_cas(
         "planHash": plan["planHash"],
         "commandHash": remote.command_hash(command),
         "actor": copy.deepcopy(plan["actor"]),
-        "target": {"branch": target["branch"], "path": target["path"]},
+        "target": proof_target,
         "expected": expected,
         "observed": observed,
         "status": "PASS",

@@ -52,6 +52,20 @@ def owner_for(value):
     }
 
 
+def multi_path_command():
+    value = command()
+    value["executionId"] = "agent-owned-multi-path-test"
+    value["target"] = {"operation": "mutate-files", "branch": BRANCH}
+    value["payload"] = {
+        "changes": [
+            {"path": "docs/a.json", "content": "{}\n"},
+            {"path": "docs/b.json", "delete": True},
+        ],
+        "message": "agent-owned multi-path test",
+    }
+    return bridge.validate_command(value)
+
+
 def state_with_leases(value, *entries):
     state = coordination.empty_state()
     for index, (resources, owner) in enumerate(entries):
@@ -136,6 +150,18 @@ class AgentOwnedGitTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "REMOTE_AGENT_WRITE_LEASE_CONFLICT"):
             agent_owned_git.require_agent_write_ownership(value, FakeAuthority(state))
+
+    def test_multi_path_proof_checks_every_changed_path_under_one_branch_lease(self):
+        value = multi_path_command()
+        state = state_with_leases(
+            value,
+            ([f"branch:{value['target']['branch']}"], owner_for(value)),
+        )
+        proof = agent_owned_git.require_agent_write_ownership(value, FakeAuthority(state))
+        self.assertEqual(
+            proof["conflictCheckedResources"],
+            ["file:docs/a.json", "file:docs/b.json"],
+        )
 
     def test_transport_checks_only_mutable_calls_and_rechecks_each_mutation(self):
         value = command()
