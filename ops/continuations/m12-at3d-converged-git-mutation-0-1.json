@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "m12-at3d-converged-git-mutation-0-1",
+  "workerId": "interactive-manager-gitops-at3d",
+  "status": "READY",
+  "branch": "work/operations/m12-at3d-converged-git-mutation-v0.1",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "implement-converged-git-files-tool",
+    "qualify-agent-ops",
+    "integrate-and-close"
+  ],
+  "nextAction": "implement-converged-git-files-tool",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
