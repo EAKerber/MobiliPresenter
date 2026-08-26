@@ -18,7 +18,6 @@ CONTEXT_SCHEMA = "AgentSemanticContext 0.1"
 PROJECTION_SCHEMA = "CapabilityRelevanceProjection 0.1"
 FRESHNESS_SCHEMA = "CapabilityDiscoveryFreshness 0.1"
 ROLE_DIR = ROOT / "docs" / "kickstarts" / "roles"
-CURRENT_TARGET_RE = re.compile(r"\]\(\./([A-Za-z0-9._-]+-v[A-Za-z0-9._-]+\.md)\)")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 BRIEF_FIELDS = {
     "schemaVersion", "context", "inputs", "capabilityProjection", "maxims",
@@ -269,24 +268,15 @@ def validate_projection(value: Any) -> dict[str, Any]:
 
 
 def resolve_role_contract_refs(role: str) -> list[dict[str, str]]:
-    current = ROLE_DIR / f"{role}-current.md"
-    try:
-        current_text = current.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise RuntimeError("AGENT_SEMANTIC_ROLE_CONTRACT_CURRENT_MISSING") from exc
-    targets = CURRENT_TARGET_RE.findall(current_text)
-    if len(targets) != 1:
-        raise RuntimeError("AGENT_SEMANTIC_ROLE_CONTRACT_POINTER_INVALID")
-    target = current.parent / targets[0]
+    target = ROLE_DIR / f"{role}.md"
     try:
         target_text = target.read_text(encoding="utf-8")
     except OSError as exc:
-        raise RuntimeError("AGENT_SEMANTIC_ROLE_CONTRACT_TARGET_MISSING") from exc
-    refs = [
-        {"path": str(current.relative_to(ROOT)).replace("\\", "/"), "contentHash": hashlib.sha256(current_text.encode("utf-8")).hexdigest()},
-        {"path": str(target.relative_to(ROOT)).replace("\\", "/"), "contentHash": hashlib.sha256(target_text.encode("utf-8")).hexdigest()},
-    ]
-    return sorted(refs, key=lambda item: item["path"])
+        raise RuntimeError("AGENT_SEMANTIC_ROLE_CONTRACT_MISSING") from exc
+    return [{
+        "path": str(target.relative_to(ROOT)).replace("\\", "/"),
+        "contentHash": hashlib.sha256(target_text.encode("utf-8")).hexdigest(),
+    }]
 
 
 def _selected_objects(
@@ -336,7 +326,7 @@ def _validate_hash(value: Any, code: str) -> str:
 
 
 def _validate_role_refs(value: Any) -> list[dict[str, str]]:
-    if not isinstance(value, list) or len(value) != 2:
+    if not isinstance(value, list) or len(value) != 1:
         raise RuntimeError("AGENT_SEMANTIC_ROLE_REFS_INVALID")
     normalized: list[dict[str, str]] = []
     for item in value:
