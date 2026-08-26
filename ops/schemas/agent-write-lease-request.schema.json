@@ -4,7 +4,7 @@
   "title": "AgentWriteLeaseRequest 0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "requestId", "action", "begin", "actor", "branch", "expectedAuthorityHead", "expectedBranchHead", "ttlSeconds", "semanticAuthority", "authorizesMutation"],
+  "required": ["schemaVersion", "requestId", "action", "begin", "actor", "branch", "expectedAuthorityHead", "expectedBranchHead", "expectedBindingHash", "ttlSeconds", "semanticAuthority", "authorizesMutation"],
   "properties": {
     "schemaVersion": {"const": "AgentWriteLeaseRequest 0.1"},
     "requestId": {"type": "string", "minLength": 1},
@@ -14,6 +14,7 @@
     "branch": {"type": "string", "minLength": 1, "not": {"const": "main"}},
     "expectedAuthorityHead": {"$ref": "#/$defs/gitSha"},
     "expectedBranchHead": {"$ref": "#/$defs/gitSha"},
+    "expectedBindingHash": {"anyOf": [{"$ref": "#/$defs/hash"}, {"type": "null"}]},
     "ttlSeconds": {"type": ["integer", "null"], "minimum": 1},
     "semanticAuthority": {"const": false},
     "authorizesMutation": {"const": false}
