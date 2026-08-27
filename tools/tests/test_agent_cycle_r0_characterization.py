@@ -6,10 +6,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from tools import agent_cycle, hosted_agent_cycle, hosted_agent_cycle_trace
+from tools import agent_cycle, git_mutation_bundle, hosted_agent_cycle, hosted_agent_cycle_trace
 from tools import project_machine, runtime_capabilities
 from tools.agent_tools import contracts, mutation_dispatch, trace_collect
 from tools.canonical import stable_hash
+from tools.semantics.registry import load_registry
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -328,6 +329,40 @@ class AgentCycleR0CharacterizationTests(unittest.TestCase):
         self.assertNotIn("sequence", mutation_dispatch.FIELDS)
         self.assertNotIn("dependsOn", mutation_dispatch.FIELDS)
         self.assertNotIn("resourceKey", mutation_dispatch.FIELDS)
+
+    def test_connector_vocabulary_cannot_express_the_atomic_bundle_profile(self):
+        registry = load_registry()
+        vocabulary = set(registry["providerProfiles"]["github-connector"]["featureVocabulary"])
+        required = set(git_mutation_bundle.ATOMIC_PROFILE_REQUIRED_FEATURES)
+
+        self.assertEqual(
+            required - vocabulary,
+            {"ref-create-at-commit", "tree-create-inline-content", "tree-readback"},
+        )
+
+    def test_direct_mutation_pass_does_not_imply_atomic_bundle_profile(self):
+        registry = load_registry()
+        direct_features = registry["logicalCapabilities"]["git.direct-mutation"][
+            "providerRequirements"
+        ]["github-connector"]
+        observation = {
+            "schemaVersion": runtime_capabilities.PROVIDER_OBSERVATIONS_SCHEMA,
+            "providers": {
+                "github-connector": {
+                    "status": "PASS",
+                    "features": direct_features,
+                    "reason": None,
+                }
+            },
+        }
+        inspection = runtime_capabilities.build_inspection(observation)
+
+        self.assertEqual(inspection["capabilities"]["git.direct-mutation"]["status"], "PASS")
+        self.assertFalse(
+            git_mutation_bundle.provider_satisfies_atomic_profile(
+                inspection["providers"]["github-connector"]
+            )
+        )
 
 
 if __name__ == "__main__":

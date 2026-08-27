@@ -1,6 +1,6 @@
 # Agent Cycle R0 — caracterização e mapa de consumidores v0.1
 
-Status: **evidência de refatoração não autoritativa; nenhuma mudança de runtime**
+Status: **R0 completo no limite observável do repositório; nenhuma mudança de runtime**
 
 Baseline: `main@158d40b0a6c30035ba6dfa4b24b2566328eee10e`
 
@@ -36,6 +36,8 @@ Arquivo: `tools/tests/test_agent_cycle_r0_characterization.py`.
 | estabilização | repetir leitura não atravessa o boundary do close | mitigação incapaz de resolver async real | R4 |
 | concorrência | cycle/tool/lease/remote usam grupos ausentes ou distintos | risco de ultrapassagem confirmado | R4 |
 | dispatch ordering | dispatch não possui `sequence`, `dependsOn` ou `resourceKey` | gap confirmado | R4 |
+| vocabulário do connector | três requisitos do perfil atômico não existem no vocabulário do provider | incompatibilidade de projeção confirmada | D3 |
+| capability versus perfil | `git.direct-mutation=PASS` não implica satisfação do perfil atômico | semânticas sobrepostas e não equivalentes | D3 |
 
 Esses testes não declaram que o comportamento é correto. Eles impedem que uma
 refatoração misture mudanças não declaradas em uma alteração aparentemente
@@ -170,6 +172,21 @@ observações não foram convertidas automaticamente em
 de observação + proveniência + resolução + readback. Scope de escrita de
 workflow não foi exercitado e permanece `UNKNOWN`.
 
+Há também uma incompatibilidade concreta entre dois contratos internos. O
+perfil `github-connector` consegue expressar todos os requisitos registrados de
+`git.direct-mutation`, mas seu `featureVocabulary` não contém
+`ref-create-at-commit`, `tree-create-inline-content` nem `tree-readback`, que são
+exigidos por `GitMutationBundle.ATOMIC_PROFILE_REQUIRED_FEATURES`. Assim, uma
+observação válida pode produzir `git.direct-mutation=PASS` e ainda falhar
+`provider_satisfies_atomic_profile()`.
+
+Isso não demonstra ausência dessas capacidades no connector: o dogfooding
+acima executou a operação atômica equivalente e fez readback. Demonstra que o
+runtime não consegue representar essa evidência de modo aceito pelo verificador
+mais estrito. D3 deve escolher uma única taxonomia canônica ou definir uma
+projeção explícita e testada entre as duas; inferir capacidade pelo nome do
+provider ou relaxar silenciosamente o perfil perderia proveniência.
+
 ## 6. Matriz preserve/substitua/investigue
 
 | Elemento | Decisão R0 | Justificativa |
@@ -202,18 +219,48 @@ workflow não foi exercitado e permanece `UNKNOWN`.
 A meta não é “uma validação por fato” em termos de chamadas. É uma definição
 canônica reutilizada em cada trust boundary que precise revalidar o fato.
 
-## 7. Evidência ainda ausente
+## 7. Fechamento do limite R0
 
-R0 ainda não está encerrado. Faltam:
+### 7.1 Consumidores externos
 
-1. dois recursos disjuntos versus um mesmo recurso disputado no carrier hosted;
-2. inventário de consumidores externos ao repositório até o limite observável;
-3. orçamento aceitável para o adapter D3/Work Mode além do custo mínimo acima;
-4. decisão explícita sobre quais status antigos permanecem compatíveis em R1.
+Os consumidores internos estão mapeados até schemas, módulos e workflows. O
+connector disponível e a superfície Work Mode foram observados como providers,
+mas o repositório não contém um registro autoritativo de todos os consumidores
+externos de context, manifest ou comentários do bus. Portanto, o inventário
+externo termina em `UNKNOWN` delimitado, não em alegação de completude.
 
-O item 1 possui boundary estática caracterizada, mas a disputa real hosted ainda
-precisa de prova isolada. O item 2 só pode ser fechado até o limite dos consumers
-observáveis; desconhecidos devem permanecer declarados.
+Essa incerteza bloqueia remoção ou reinterpretação de campos públicos em R1,
+mas não bloqueia adição compatível de projeções dimensionais. Telemetria ou um
+registro de consumers poderá reduzir o `UNKNOWN` em fatia posterior.
+
+### 7.2 Compatibilidade de status em R1
+
+R1 deve manter o campo agregado `status` como projeção compatível durante a
+migração e adicionar dimensões explícitas para contexto, tool, provider e
+autorização. Em particular:
+
+- `status=READY` antigo continua significando que o contexto agregado passou;
+- ele não autoriza mutação quando a dimensão de tool/provider/autorização não
+  estiver `PASS`;
+- manifests e contexts antigos continuam legíveis, com dimensões ausentes
+  projetadas como `UNKNOWN`, nunca promovidas por inferência;
+- consumers aggregate-only recebem a projeção antiga até existir evidência de
+  migração; remoção exige deprecation e inventário observável.
+
+Essa decisão preserva leitura enquanto elimina a ambiguidade de autorização no
+novo caminho.
+
+### 7.3 Evidência deliberadamente posterior
+
+A disputa hosted entre dois recursos disjuntos e um mesmo recurso é uma prova
+de qualificação da solução de ordering/seal, não uma caracterização necessária
+para alterar readiness em R1. R0 já congela que os carriers atuais não possuem
+uma chave comum e que dispatch não expressa dependências. A prova ao vivo fica
+em R4, em ambiente isolado e com critérios antes/depois.
+
+O orçamento mínimo de D3 está agora delimitado por observação, proveniência,
+projeção de vocabulário, resolução e readback. O orçamento aceitável final
+depende do desenho D3 e não deve ser inventado por R0.
 
 Ambiguidade pós-write já possui caracterização em
 `test_agent_tool_dispatch_host.py` e `test_agent_write_lifecycle_host.py`: após a
@@ -222,19 +269,23 @@ retry/`PASS`. R0 reutiliza essa prova em vez de duplicá-la.
 
 ## 8. Gate para R1
 
-R1 não deve começar apenas porque estes primeiros testes passam. O gate exige:
+R0 considera o gate de desenho satisfeito quando esta fatia tiver testes locais
+e CI remota verdes e for revisada. Já estão materializados:
 
-- caso 1 da seção anterior materializado;
-- consumers internos classificados;
-- decisão explícita sobre o que `READY` continuará significando;
-- compatibilidade de leitura definida para context/manifest antigos;
-- nenhum novo writer ou authority;
-- testes completos, semantics check/coverage, roadmap freshness e CI remota PASS;
-- revisão de como D3 consome o novo vocabulário sem bloquear o próximo passo de
-  ProjectState.
+- consumers internos e limite externo `UNKNOWN` classificados;
+- semântica compatível do aggregate `READY` e das novas dimensões definida;
+- leitura conservadora de context/manifest antigos definida;
+- ausência de novo writer, authority, schema, entrypoint ou workflow;
+- incompatibilidade D3 reproduzida sem bloquear a refatoração aditiva de R1.
 
-## 9. Próximo micro-recorte R0
+R1 ainda exige autorização e fatia próprias; este relatório não inicia nem
+aprova sua implementação. A CI remota desta revisão deve ser registrada no PR,
+sem substituir os checks locais.
 
-Adicionar fixtures determinísticas para failure, post-write ambiguity e
-interleaving de duas cycle instances. Esse micro-recorte continua sem mudar
-runtime. Só depois medir o bus hospedado e fechar o mapa de duplicações.
+## 9. Próxima fatia recomendada
+
+R1 deve introduzir somente o modelo dimensional de readiness e sua projeção de
+compatibilidade, com fixtures para contexts antigos e novos. Failure payload,
+identidade uniforme, obligations, ordering e seal permanecem fora desse diff.
+D3 pode evoluir em paralelo desde que a projeção entre vocabulários seja
+explícita e não transforme `UNKNOWN` em `PASS`.
