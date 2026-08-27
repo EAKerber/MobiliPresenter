@@ -1,0 +1,186 @@
+# Agent Cycle R0 — caracterização e mapa de consumidores v0.1
+
+Status: **evidência de refatoração não autoritativa; nenhuma mudança de runtime**
+
+Baseline: `main@158d40b0a6c30035ba6dfa4b24b2566328eee10e`
+
+Relação: primeira fatia executável do plano proposto na PR de planejamento
+[#165](https://github.com/EAKerber/MobiliPresenter/pull/165). Este relatório
+não muda ProjectState, não substitui D3 e não autoriza R1.
+
+## 1. Objetivo e limite
+
+R0 transforma as hipóteses da biópsia em alarmes reproduzíveis antes de qualquer
+refatoração comportamental. Os testes adicionados descrevem o comportamento
+atual, inclusive gaps conhecidos. Quando R1 ou fatias posteriores substituírem
+um comportamento, a expectativa antiga deve ser alterada junto de uma nova
+prova explícita; ela não deve simplesmente desaparecer.
+
+R0 não adiciona schema, entrypoint, workflow, capability, writer ou authority.
+
+## 2. Caracterizações materializadas
+
+Arquivo: `tools/tests/test_agent_cycle_r0_characterization.py`.
+
+| Caso | Comportamento congelado | Classificação | Fatia candidata |
+|---|---|---|---|
+| readiness de mutação | contexto pode ser `READY` enquanto `git.files.mutate` é condicional | gap confirmado | R1 |
+| identidade | mesma baseline produz mesmo `cycleId` e `contextHash` | intenção parcial; falta instância uniforme | R2 |
+| instância hosted | run/comment de begin distintos produzem `cycleInstanceId` distintos | proteção existente a preservar | R2 |
+| close | intents diferentes recebem a mesma lista estática de requisitos | gap confirmado | R3 |
+| durable baseline | somente inspection/control/coordination/continuation são rastreados | cobertura insuficiente para refs arbitrárias | R3 |
+| binding com Work | command hosted rejeita `workId` como campo desconhecido | gap confirmado | R3 |
+| falha de begin | blocker raiz vira apenas `HOSTED_AGENT_BEGIN_NOT_READY:BLOCKED` | perda de observabilidade confirmada | R1 |
+| resultado tardio | resultado após comentário de close fica fora da trace window | defeito estrutural confirmado | R4 |
+| interleaving | resultado Agent Tool de outro begin é ignorado | isolamento existente a preservar | R2/R4 |
+| estabilização | repetir leitura não atravessa o boundary do close | mitigação incapaz de resolver async real | R4 |
+| concorrência | cycle/tool/lease/remote usam grupos ausentes ou distintos | risco de ultrapassagem confirmado | R4 |
+| dispatch ordering | dispatch não possui `sequence`, `dependsOn` ou `resourceKey` | gap confirmado | R4 |
+
+Esses testes não declaram que o comportamento é correto. Eles impedem que uma
+refatoração misture mudanças não declaradas em uma alteração aparentemente
+mecânica.
+
+## 3. Mapa de consumidores
+
+### 3.1 Identidade e begin binding
+
+| Elemento | Produtor/validador principal | Consumidores observados |
+|---|---|---|
+| `cycleId` | `tools/agent_cycle.py` | close local, hosted manifest/result |
+| `cycleInstanceId` | `tools/hosted_agent_cycle.py`, `tools/agent_tools/trace_collect.py` | Agent Tool admission/dispatch, trace, write lifecycle, schemas de receipt/binding |
+| begin ref (`runId`, `sourceSha`, `contextHash`) | hosted manifest | hosted tool, write lease, lifecycle guard, close |
+| actor (`role`, `workerId`, `sessionId`) | command/request | trace filtering, admission, lease binding e lifecycle |
+
+`cycleInstanceId` aparece em oito schemas operacionais e em pelo menos oito
+módulos de runtime. Uma troca de identidade não é uma refatoração local.
+
+### 3.2 Readiness e provider
+
+| Elemento | Origem | Consumidores |
+|---|---|---|
+| provider observations | input opcional do CLI/hosted begin | runtime capability inspection |
+| logical capabilities | semantic registry + observations | semantic brief e Agent Tool projection |
+| context aggregate status | ProjectMachine, routine, maintenance, scheduler e required capabilities | begin result e close after-state |
+| ToolSurface readiness | Agent Tool policy/projection | resolver, admission e dispatch |
+
+O aggregate status não consome a indisponibilidade de capabilities apenas
+condicionais para a tool. Por isso `context.status=READY` e uma tool de mutação
+condicional coexistem sem contradição estrutural para o schema atual, embora a
+interface seja ambígua para o agente.
+
+### 3.3 Trace e close
+
+| Elemento | Implementação | Consumidores |
+|---|---|---|
+| comment window | `tools/agent_tools/trace_collect.py::_window` | execution trace e lifecycle guards |
+| stabilization | `tools/hosted_agent_cycle_trace.py` | hosted close |
+| evidence discovery | trace collector + lifecycle trace | close evidence normalization |
+| durable delta | `tools/agent_cycle_close/__init__.py::build_delta` | aggregate readback e receipt |
+| static requirements | `tools/agent_cycle.py::_close_requirements` | begin context e reminder da CLI |
+
+A correção da janela não pode ser feita apenas em `_window`: o lifecycle guard
+mantém boundary semelhante, e hosted close usa o comentário de close como
+identidade e limite. R4 precisa tratar os consumidores como um conjunto.
+
+### 3.4 Carriers
+
+| Workflow | Trigger relevante | Concurrency atual | Efeito |
+|---|---|---|---|
+| Hosted Agent Cycle | issue comment | ausente | begin/close podem coexistir com outros carriers |
+| Hosted Agent Tool | issue comment | `hosted-agent-tool-<issue>` | serializa apenas tools |
+| Hosted Agent Write Lease | issue comment | `hosted-agent-write-lease-<issue>` | serializa apenas lease actions |
+| Remote Canonical Execution | issue comment/workflow run | grupo próprio por evento | não compartilha ordem total com tool/lease/cycle |
+
+GitHub concurrency reduz sobreposição dentro de cada carrier, mas não representa
+dependências `acquire -> mutate -> release -> close`.
+
+## 4. Inventário de campos manuais
+
+O command hosted de ciclo possui dez campos top-level. A referência de begin
+adiciona três valores e actor adiciona outros três. Para fechar uma operação, o
+caller ou carrier precisa correlacionar pelo menos:
+
+- request/action/intent/scope;
+- role, worker e session;
+- begin run, source SHA e context hash;
+- evidence comment IDs;
+- issue/comment usados pelo transport;
+- artifact name/run e cycle instance, obtidos em passos posteriores;
+- request/plan/dispatch/result hashes das tools;
+- authority/branch heads e lease binding quando existe mutação.
+
+Nem todos são digitados pelo agente em todo caminho, mas atravessam envelopes
+distintos e precisam permanecer coerentes. R2 deve medir redução pela quantidade
+de dados que a interface pública exige do caller, não pela remoção dos bindings
+internos necessários.
+
+## 5. Baseline estrutural
+
+Recorte medido durante a biópsia:
+
+- 4.231 linhas em dez módulos Python centrais e três workflows hosted;
+- quatro source-head slots no durable baseline;
+- três tentativas de stabilization com atraso de um segundo por padrão;
+- um begin artifact com retenção de 14 dias;
+- quatro carriers relacionados sem chave de ordenação comum;
+- uma issue compartilhada como bus e janela histórica.
+
+Esses números são baseline de comparação, não metas isoladas. Uma redução de
+linhas ou chamadas só é melhoria se os guards continuarem provados.
+
+## 6. Matriz preserve/substitua/investigue
+
+| Elemento | Decisão R0 | Justificativa |
+|---|---|---|
+| baseline/context hash binding | preservar | integridade já provada |
+| separação entre cycle e domain writers | preservar | evita authority creep |
+| begin ref ligado a source/context | preservar | impede substituição semântica no close |
+| `cycleId` como fingerprint | preservar, renomeando significado se necessário | útil para deduplicar contexto |
+| `cycleInstanceId` apenas hosted | substituir por presença uniforme | correlação precisa atravessar carriers |
+| aggregate `READY` único | substituir por projeções dimensionais | hoje mascara tool/provider readiness |
+| close requirements estáticos | substituir por obligations derivadas | não refletem trabalho ocorrido |
+| janela encerrada no close comment | substituir por seal | incompatível com async real |
+| polling de três segundos | retirar após seal/evento esperado | só cobre atraso curto de visibilidade |
+| issue comments como carrier | investigar | pode continuar viável com cursor e correlação |
+| artifact de begin por 14 dias | investigar | falta expiry/abandon/retomada explícita |
+| concurrency por workflow | substituir por ordem ciclo+recurso | não evita ultrapassagem entre carriers |
+| validação repetida de identidade | investigar antes de consolidar | parte pode ser defesa em profundidade |
+
+## 7. Evidência ainda ausente
+
+R0 ainda não está encerrado. Faltam:
+
+1. dois recursos disjuntos versus um mesmo recurso disputado no carrier hosted;
+2. medição incremental do Agent Bus real por cursor/paginação;
+3. inventário completo de consumidores externos ao repositório;
+4. classificação individual das validações duplicadas de identidade;
+5. definição do custo aceitável para o adapter D3/Work Mode.
+
+O item 1 é implementável como teste local determinístico. O item 2 exige
+observação read-only hospedada. O item 3 só pode ser fechado até o limite
+dos consumers observáveis; desconhecidos devem permanecer declarados.
+
+Ambiguidade pós-write já possui caracterização em
+`test_agent_tool_dispatch_host.py` e `test_agent_write_lifecycle_host.py`: após a
+primeira chamada mutável, falha de transporte permanece `UNKNOWN` e não vira
+retry/`PASS`. R0 reutiliza essa prova em vez de duplicá-la.
+
+## 8. Gate para R1
+
+R1 não deve começar apenas porque estes primeiros testes passam. O gate exige:
+
+- caso 1 da seção anterior materializado;
+- consumers internos classificados;
+- decisão explícita sobre o que `READY` continuará significando;
+- compatibilidade de leitura definida para context/manifest antigos;
+- nenhum novo writer ou authority;
+- testes completos, semantics check/coverage, roadmap freshness e CI remota PASS;
+- revisão de como D3 consome o novo vocabulário sem bloquear o próximo passo de
+  ProjectState.
+
+## 9. Próximo micro-recorte R0
+
+Adicionar fixtures determinísticas para failure, post-write ambiguity e
+interleaving de duas cycle instances. Esse micro-recorte continua sem mudar
+runtime. Só depois medir o bus hospedado e fechar o mapa de duplicações.
