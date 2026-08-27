@@ -1,7 +1,9 @@
 # Agent Cycle e paved path — plano de refatoração v0.1
 
-Status: **planejamento não autoritativo; primeira iteração da biópsia**  
-Baseline observado: `main@158d40b0a6c30035ba6dfa4b24b2566328eee10e`  
+Status: **planejamento não autoritativo; primeira iteração da biópsia**
+
+Baseline observado: `main@158d40b0a6c30035ba6dfa4b24b2566328eee10e`
+
 Escopo: Agent Cycle, Agent Tools, carriers hospedados, fechamento, observabilidade,
 integração com Work/Work Mode e ordenação assíncrona.
 
