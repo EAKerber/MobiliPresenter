@@ -129,6 +129,47 @@ Recorte medido durante a biópsia:
 Esses números são baseline de comparação, não metas isoladas. Uma redução de
 linhas ou chamadas só é melhoria se os guards continuarem provados.
 
+### 5.1 Medição read-only do Agent Bus
+
+Observação em 2026-08-27 da issue
+[#145](https://github.com/EAKerber/MobiliPresenter/issues/145), usando leitura
+de todas as páginas disponível no connector:
+
+| Marker | Comentários |
+|---|---:|
+| Agent Cycle request / result | 40 / 38 |
+| Agent Tool request / dispatch / result | 18 / 14 / 18 |
+| Agent Tool mutation attempt | 13 |
+| Write Lease request / dispatch / attempt / result | 8 / 7 / 6 / 8 |
+| Remote Canonical request / result | 63 / 80 |
+| **Total** | **313** |
+
+Todos os 313 comentários começam com um marker conhecido. Isso é positivo para
+parsing fechado, mas o close atual ainda precisa reconstruir uma janela a partir
+da coleção paginada. O custo mínimo observado para uma leitura completa é 313
+itens; não existe cursor de ciclo no contrato atual. R3/R4 devem comparar esse
+baseline com leitura incremental, sem converter cache/cursor em authority.
+
+A diferença entre requests e results não prova perda por si só: results incluem
+falhas de parse/carrier, retries históricos e versões cujas relações não são
+inferíveis apenas da contagem. A medição é volumétrica, não um receipt de
+completude.
+
+### 5.2 Dogfooding do provider disponível
+
+Esta fatia foi publicada sem credencial Git de shell por um bundle atômico no
+connector: create branch, dois blobs, uma tree baseada na tree de `main`, um
+commit com parent exato e update-ref non-force. Readback por Git e por hash de
+conteúdo confirmou os dois paths.
+
+Isso demonstra, para este escopo, features equivalentes a ref create/read,
+blob/tree/commit create, non-force ref update e content readback. O begin local,
+porém, continuou classificando `git.files.mutate` como condicional porque essas
+observações não foram convertidas automaticamente em
+`RuntimeProviderObservations`. Esse é o custo mínimo confirmado de D3: adapter
+de observação + proveniência + resolução + readback. Scope de escrita de
+workflow não foi exercitado e permanece `UNKNOWN`.
+
 ## 6. Matriz preserve/substitua/investigue
 
 | Elemento | Decisão R0 | Justificativa |
@@ -147,19 +188,32 @@ linhas ou chamadas só é melhoria se os guards continuarem provados.
 | concurrency por workflow | substituir por ordem ciclo+recurso | não evita ultrapassagem entre carriers |
 | validação repetida de identidade | investigar antes de consolidar | parte pode ser defesa em profundidade |
 
+### 6.1 Classificação inicial das validações repetidas
+
+| Validação | Locais | Classificação R0 | Direção |
+|---|---|---|---|
+| begin manifest/context binding | cycle, Agent Tool e Write Lease | defesa em profundidade entre trust boundaries | preservar regra; compartilhar kernel puro |
+| begin/actor canonicalization | contracts, trace e lifecycle | regra comum repetida em múltiplos envelopes | preservar validação; reduzir implementação paralela |
+| comment window begin/close | trace collector e lifecycle guard | duplicação semântica que reproduz o mesmo limite assíncrono | substituir conjuntamente pelo seal |
+| command exact fields | cycle/tool/lease/remote | defesa schema-specific | preservar por schema |
+| failure payload | cycle/tool/remote/lifecycle | schemas distintos com vocabulário parcialmente divergente | manter envelopes; compartilhar blocker/retryability core |
+| hash/readback validation | planner, dispatch, close | defesa em profundidade deliberada | preservar |
+
+A meta não é “uma validação por fato” em termos de chamadas. É uma definição
+canônica reutilizada em cada trust boundary que precise revalidar o fato.
+
 ## 7. Evidência ainda ausente
 
 R0 ainda não está encerrado. Faltam:
 
 1. dois recursos disjuntos versus um mesmo recurso disputado no carrier hosted;
-2. medição incremental do Agent Bus real por cursor/paginação;
-3. inventário completo de consumidores externos ao repositório;
-4. classificação individual das validações duplicadas de identidade;
-5. definição do custo aceitável para o adapter D3/Work Mode.
+2. inventário de consumidores externos ao repositório até o limite observável;
+3. orçamento aceitável para o adapter D3/Work Mode além do custo mínimo acima;
+4. decisão explícita sobre quais status antigos permanecem compatíveis em R1.
 
-O item 1 é implementável como teste local determinístico. O item 2 exige
-observação read-only hospedada. O item 3 só pode ser fechado até o limite
-dos consumers observáveis; desconhecidos devem permanecer declarados.
+O item 1 possui boundary estática caracterizada, mas a disputa real hosted ainda
+precisa de prova isolada. O item 2 só pode ser fechado até o limite dos consumers
+observáveis; desconhecidos devem permanecer declarados.
 
 Ambiguidade pós-write já possui caracterização em
 `test_agent_tool_dispatch_host.py` e `test_agent_write_lifecycle_host.py`: após a
