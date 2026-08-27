@@ -36,7 +36,7 @@ The versioned maxims in `ops/semantics/maxims.json` are deterministic guidance. 
 
 ## Agent Cycle
 
-`python3 tools/agent.py begin` is the composition facade for bootstrap. It builds one `AgentCycleContext 0.1` from existing canonical projections instead of requiring a worker to remember their manual order. Agent Cycle is not Routine and creates no authority.
+`python3 tools/agent.py begin` is the composition facade for bootstrap. It builds one `AgentCycleContext 0.3` from existing canonical projections instead of requiring a worker to remember their manual order. The aggregate status remains compatible while dimensional readiness separates context, intent, tool, provider and mutation authorization. Agent Cycle is not Routine and creates no authority.
 
 After work, `python3 tools/agent.py close` reobserves the same ProjectMachine scope, derives `AgentCycleDelta 0.1`, verifies attributable transition/Git evidence and emits aggregate readback plus `AgentCycleReceipt 0.1`. Durable delta without attributable evidence is `UNKNOWN`, never a silent `PASS`.
 

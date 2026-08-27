@@ -3,13 +3,21 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Callable
 
-from tools import maintenance_inspect, project_machine, routines, runtime_capabilities, scheduler_plan
+from tools import (
+    agent_cycle_readiness,
+    maintenance_inspect,
+    project_machine,
+    routines,
+    runtime_capabilities,
+    scheduler_plan,
+)
 from tools.agent_tools import policy as agent_tool_policy
 from tools.agent_tools import projection as agent_tool_projection
 from tools.canonical import stable_hash
 from tools.semantics import brief as semantic_brief
 
-SCHEMA_VERSION = "AgentCycleContext 0.2"
+SCHEMA_VERSION = "AgentCycleContext 0.3"
+PREVIOUS_SCHEMA_VERSION = "AgentCycleContext 0.2"
 LEGACY_SCHEMA_VERSION = "AgentCycleContext 0.1"
 LEGACY_CLOSE_VERSION = "AgentCycleCloseFoundation 0.1"
 CLOSE_VERSION = "AgentCycleCloseContract 0.1"
@@ -32,11 +40,12 @@ def entry_profile(role: str, declared_intent: str) -> dict[str, Any]:
 FIELDS = {
     "schemaVersion", "cycleId", "status", "repository", "semanticContext",
     "projectMachine", "runtimeCapabilities", "routineInspection",
-    "maintenanceInspection", "schedulerPlan", "semanticBrief", "agentTools", "baseline",
+    "maintenanceInspection", "schedulerPlan", "semanticBrief", "agentTools", "readiness", "baseline",
     "blockingUnknowns", "closeRequirements", "readOnly", "semanticAuthority",
     "authorizesMutation", "contextHash",
 }
-LEGACY_FIELDS = FIELDS - {"agentTools"}
+PREVIOUS_FIELDS = FIELDS - {"readiness"}
+LEGACY_FIELDS = PREVIOUS_FIELDS - {"agentTools"}
 
 
 def _slot_pass(value: dict[str, Any]) -> dict[str, Any]:
@@ -151,6 +160,11 @@ def build_context(*, role, declared_intent, lifecycle_phase, objects, operations
     brief = semantic_brief.build_brief(semantic_context, runtime_inspection)
     tools = agent_tool_projection.build_projection(semantic_context, brief)
     status, blockers = _aggregate_status(machine, routine_slot, maintenance_slot, scheduler_slot, brief)
+    readiness = agent_cycle_readiness.build_projection(
+        legacy_status=status,
+        blocking_unknowns=blockers,
+        tools=tools,
+    )
     baseline = {
         "projectMachineInspectionHash": machine["inspectionHash"],
         "projectStateHash": machine["project"]["stateHash"],
@@ -160,6 +174,7 @@ def build_context(*, role, declared_intent, lifecycle_phase, objects, operations
         "schedulerPlanHash": scheduler_slot["value"]["planHash"] if scheduler_slot["status"] == "PASS" else None,
         "semanticBriefHash": brief["briefHash"],
         "agentToolProjectionHash": tools["projectionHash"],
+        "readinessHash": readiness["readinessHash"],
         "sourceHeads": deepcopy(machine["sourceHeads"]),
     }
     baseline_hash = stable_hash(baseline); baseline["baselineHash"] = baseline_hash
@@ -176,6 +191,7 @@ def build_context(*, role, declared_intent, lifecycle_phase, objects, operations
         "schedulerPlan": scheduler_slot,
         "semanticBrief": brief,
         "agentTools": tools,
+        "readiness": readiness,
         "baseline": baseline,
         "blockingUnknowns": blockers,
         "closeRequirements": _close_requirements(),
@@ -201,8 +217,10 @@ def _expected_baseline(value: dict[str, Any]) -> dict[str, Any]:
         "schedulerPlanHash": scheduler_slot["value"]["planHash"] if scheduler_slot["status"] == "PASS" else None,
         "semanticBriefHash": value["semanticBrief"]["briefHash"],
     }
-    if value.get("schemaVersion") == SCHEMA_VERSION:
+    if value.get("schemaVersion") in {SCHEMA_VERSION, PREVIOUS_SCHEMA_VERSION}:
         body["agentToolProjectionHash"] = value["agentTools"]["projectionHash"]
+    if value.get("schemaVersion") == SCHEMA_VERSION:
+        body["readinessHash"] = value["readiness"]["readinessHash"]
     body["sourceHeads"] = deepcopy(value["projectMachine"]["sourceHeads"])
     return {**body, "baselineHash": stable_hash(body)}
 
@@ -232,7 +250,15 @@ def validate_context(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RuntimeError("AGENT_CYCLE_CONTEXT_FIELDS_INVALID")
     version = value.get("schemaVersion")
-    expected_fields = FIELDS if version == SCHEMA_VERSION else LEGACY_FIELDS if version == LEGACY_SCHEMA_VERSION else None
+    expected_fields = (
+        FIELDS
+        if version == SCHEMA_VERSION
+        else PREVIOUS_FIELDS
+        if version == PREVIOUS_SCHEMA_VERSION
+        else LEGACY_FIELDS
+        if version == LEGACY_SCHEMA_VERSION
+        else None
+    )
     if expected_fields is None:
         raise RuntimeError("AGENT_CYCLE_CONTEXT_SCHEMA_UNSUPPORTED")
     if set(value) != expected_fields:
@@ -252,10 +278,17 @@ def validate_context(value: Any) -> dict[str, Any]:
     semantic_brief.validate_brief(value.get("semanticBrief")); semantic_brief.validate_context(value.get("semanticContext"))
     if value["semanticBrief"]["context"] != value["semanticContext"]:
         raise RuntimeError("AGENT_CYCLE_SEMANTIC_CONTEXT_MISMATCH")
-    if version == SCHEMA_VERSION:
+    if version in {SCHEMA_VERSION, PREVIOUS_SCHEMA_VERSION}:
         agent_tool_projection.validate_projection(value.get("agentTools"))
         if value["agentTools"]["role"] != value["semanticContext"]["role"] or value["agentTools"]["declaredIntent"] != value["semanticContext"]["declaredIntent"]:
             raise RuntimeError("AGENT_CYCLE_AGENT_TOOL_CONTEXT_MISMATCH")
+    if version == SCHEMA_VERSION:
+        agent_cycle_readiness.validate_projection(
+            value.get("readiness"),
+            legacy_status=value["status"],
+            blocking_unknowns=value["blockingUnknowns"],
+            tools=value["agentTools"],
+        )
     baseline = value.get("baseline")
     if not isinstance(baseline, dict) or "baselineHash" not in baseline:
         raise RuntimeError("AGENT_CYCLE_BASELINE_INVALID")

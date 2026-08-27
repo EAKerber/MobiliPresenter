@@ -44,6 +44,7 @@ class BootstrapBoundaryTests(unittest.TestCase):
         for copied_runtime_contract in (
             "AgentCycleContext 0.1",
             "AgentCycleContext 0.2",
+            "AgentCycleContext 0.3",
             "RuntimeObservationBundle 0.1",
             "GitMutationBundle 0.1",
         ):

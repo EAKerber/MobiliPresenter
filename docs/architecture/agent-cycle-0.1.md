@@ -98,6 +98,23 @@ AgentCycleCloseContract 0.1   -> implemented=true, nextSlice=null
 
 This permits a preserved pre-close context to be closed after the executable protocol exists without rewriting history.
 
+## Dimensional readiness
+
+`AgentCycleContext 0.3` preserves the aggregate `status` consumed by existing
+begin/hosted/close paths and adds the hash-bound `AgentCycleReadiness 0.1`
+projection. It separates context integrity, intent readiness, tool readiness,
+provider resolution and mutation authorization.
+
+The projection is read-only and never authorizes mutation. In particular,
+aggregate `READY` does not imply that a mutation tool, provider or exact
+authorization is available. Provider resolution remains `UNKNOWN` until an
+operation is unambiguous, and mutation authorization remains `UNKNOWN` until
+the operation-specific policy and guards are evaluated.
+
+Contexts 0.1 and 0.2 remain readable as supplied. Missing dimensional fields in
+historical contexts are not synthesized or promoted to `PASS`; consumers that
+require dimensional readiness must require context 0.3.
+
 ## Boundary
 
 Agent Cycle owns orchestration of entry/reobservation/delta/receipt only. It does not replace ProjectState, Work, Coordination, Scheduler, Capability Lifecycle, GitMutationPlan or GitMutationBundle writers/planners.
