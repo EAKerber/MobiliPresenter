@@ -36,6 +36,12 @@
       "owner": "operations-core",
       "definition": "Read-only hash-bound projection of all traceable execution attempts belonging to one hosted Agent Cycle instance; it records completeness without authorizing or judging mutation."
     },
+    "artifact.agent-failure-core": {
+      "term": "AgentFailureCore",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only hash-bound semantic core for structured Agent Cycle, Agent Tool, remote canonical, and write-lease failures; it separates observation retry from operation replay and never authorizes mutation."
+    },
     "artifact.agent-semantic-brief": {
       "term": "AgentSemanticBrief",
       "kind": "artifact",
@@ -385,6 +391,11 @@
       "owner": "operations-core",
       "semanticValidator": "tools.agent_tools.trace.validate_trace",
       "structuralSchema": "ops/schemas/agent-cycle-execution-trace.schema.json"
+    },
+    "agent-failure-core": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.agent_failure.validate_failure_core",
+      "structuralSchema": "ops/schemas/agent-failure-core.schema.json"
     },
     "agent-tool-execution-result": {
       "owner": "operations-core",
