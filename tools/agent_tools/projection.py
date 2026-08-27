@@ -14,6 +14,8 @@ PROJECTION_FIELDS_V01 = {
     "policyHash", "projectionHash",
 }
 PROJECTION_FIELDS_V02 = PROJECTION_FIELDS_V01 | {"discoverable"}
+# Public current-contract alias retained for semantic-contract consumers.
+PROJECTION_FIELDS = PROJECTION_FIELDS_V02
 ENTRY_FIELDS = {"toolId", "effectClass", "mode", "requiredCapabilities"}
 CONDITIONAL_ENTRY_FIELDS = ENTRY_FIELDS | {"reasonCode"}
 DISCOVERABLE_ENTRY_FIELDS = {

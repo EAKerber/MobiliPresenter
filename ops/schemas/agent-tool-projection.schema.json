@@ -1,88 +1,190 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mobilipresenter.local/schemas/agent-tool-projection.json",
-  "title": "AgentToolProjection 0.1 / 0.2",
-  "oneOf": [
-    {"$ref": "#/$defs/projection01"},
-    {"$ref": "#/$defs/projection02"}
+  "$id": "https://mobilipresenter.local/schemas/agent-tool-projection-0.2.json",
+  "title": "AgentToolProjection 0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "role",
+    "declaredIntent",
+    "available",
+    "plannable",
+    "conditional",
+    "discoverable",
+    "policyHash",
+    "projectionHash"
   ],
+  "properties": {
+    "schemaVersion": {
+      "const": "AgentToolProjection 0.2"
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "declaredIntent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "available": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "plannable": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "conditional": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conditionalEntry"
+      }
+    },
+    "discoverable": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/discoverableEntry"
+      }
+    },
+    "policyHash": {
+      "$ref": "#/$defs/hash"
+    },
+    "projectionHash": {
+      "$ref": "#/$defs/hash"
+    }
+  },
   "$defs": {
-    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "capabilityList": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "intentList": {
       "type": "array",
       "uniqueItems": true,
       "minItems": 1,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "entry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["toolId", "effectClass", "mode", "requiredCapabilities"],
+      "required": [
+        "toolId",
+        "effectClass",
+        "mode",
+        "requiredCapabilities"
+      ],
       "properties": {
-        "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
-        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
-        "mode": {"enum": ["plan-only", "read-only-execute", "mutation-execute"]},
-        "requiredCapabilities": {"$ref": "#/$defs/capabilityList"}
+        "toolId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+        },
+        "effectClass": {
+          "enum": [
+            "read-only",
+            "shared-durable-mutation",
+            "specialized-maintenance",
+            "transport-side-effect"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "plan-only",
+            "read-only-execute",
+            "mutation-execute"
+          ]
+        },
+        "requiredCapabilities": {
+          "$ref": "#/$defs/capabilityList"
+        }
       }
     },
     "conditionalEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["toolId", "effectClass", "mode", "requiredCapabilities", "reasonCode"],
+      "required": [
+        "toolId",
+        "effectClass",
+        "mode",
+        "requiredCapabilities",
+        "reasonCode"
+      ],
       "properties": {
-        "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
-        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
-        "mode": {"enum": ["plan-only", "read-only-execute", "mutation-execute"]},
-        "requiredCapabilities": {"$ref": "#/$defs/capabilityList"},
-        "reasonCode": {"type": "string", "minLength": 1}
+        "toolId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+        },
+        "effectClass": {
+          "enum": [
+            "read-only",
+            "shared-durable-mutation",
+            "specialized-maintenance",
+            "transport-side-effect"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "plan-only",
+            "read-only-execute",
+            "mutation-execute"
+          ]
+        },
+        "requiredCapabilities": {
+          "$ref": "#/$defs/capabilityList"
+        },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "discoverableEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["toolId", "effectClass", "currentIntentAllowed", "allowedIntents", "requiredCapabilities"],
+      "required": [
+        "toolId",
+        "effectClass",
+        "currentIntentAllowed",
+        "allowedIntents",
+        "requiredCapabilities"
+      ],
       "properties": {
-        "toolId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
-        "effectClass": {"enum": ["read-only", "shared-durable-mutation", "specialized-maintenance", "transport-side-effect"]},
-        "currentIntentAllowed": {"type": "boolean"},
-        "allowedIntents": {"$ref": "#/$defs/intentList"},
-        "requiredCapabilities": {"$ref": "#/$defs/capabilityList"}
-      }
-    },
-    "projection01": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["schemaVersion", "role", "declaredIntent", "available", "plannable", "conditional", "policyHash", "projectionHash"],
-      "properties": {
-        "schemaVersion": {"const": "AgentToolProjection 0.1"},
-        "role": {"type": "string", "minLength": 1},
-        "declaredIntent": {"type": "string", "minLength": 1},
-        "available": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
-        "plannable": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
-        "conditional": {"type": "array", "items": {"$ref": "#/$defs/conditionalEntry"}},
-        "policyHash": {"$ref": "#/$defs/hash"},
-        "projectionHash": {"$ref": "#/$defs/hash"}
-      }
-    },
-    "projection02": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["schemaVersion", "role", "declaredIntent", "available", "plannable", "conditional", "discoverable", "policyHash", "projectionHash"],
-      "properties": {
-        "schemaVersion": {"const": "AgentToolProjection 0.2"},
-        "role": {"type": "string", "minLength": 1},
-        "declaredIntent": {"type": "string", "minLength": 1},
-        "available": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
-        "plannable": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
-        "conditional": {"type": "array", "items": {"$ref": "#/$defs/conditionalEntry"}},
-        "discoverable": {"type": "array", "items": {"$ref": "#/$defs/discoverableEntry"}},
-        "policyHash": {"$ref": "#/$defs/hash"},
-        "projectionHash": {"$ref": "#/$defs/hash"}
+        "toolId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+        },
+        "effectClass": {
+          "enum": [
+            "read-only",
+            "shared-durable-mutation",
+            "specialized-maintenance",
+            "transport-side-effect"
+          ]
+        },
+        "currentIntentAllowed": {
+          "type": "boolean"
+        },
+        "allowedIntents": {
+          "$ref": "#/$defs/intentList"
+        },
+        "requiredCapabilities": {
+          "$ref": "#/$defs/capabilityList"
+        }
       }
     }
   }
