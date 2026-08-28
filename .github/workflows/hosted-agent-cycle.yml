@@ -83,9 +83,75 @@ jobs:
             --command /tmp/hosted-command.json \
             --result /tmp/hosted-result.json
 
+      - name: Qualify begin artifact resumability
+        id: begin_resumability
+        if: steps.begin.outcome == 'success' && steps.begin_artifact.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import os
+          from tools import hosted_cycle_artifact
+          ok = hosted_cycle_artifact.qualify_begin_files(
+              repository=os.environ['GITHUB_REPOSITORY'],
+              command_path='/tmp/hosted-command.json',
+              manifest_path='/tmp/agent-cycle-begin/manifest.json',
+              result_path='/tmp/hosted-result.json',
+              observation_path='/tmp/hosted-begin-resumability.json',
+          )
+          raise SystemExit(0 if ok else 2)
+          PY
+
+      - name: Fail begin if resumability was not materialized
+        if: >-
+          steps.begin.outcome == 'success' &&
+          steps.begin_artifact.outcome == 'success' &&
+          steps.begin_resumability.outcome != 'success'
+        run: |
+          if python - <<'PY'
+          import json
+          try:
+              value=json.load(open('/tmp/hosted-result.json', encoding='utf-8'))
+          except Exception:
+              raise SystemExit(2)
+          raise SystemExit(0 if value.get('schemaVersion') == 'HostedAgentCycleFailure 0.2' else 2)
+          PY
+          then
+            exit 0
+          fi
+          python tools/hosted_agent_cycle.py failure \
+            --error HOSTED_AGENT_BEGIN_ARTIFACT_OBSERVATION_UNKNOWN \
+            --phase TRANSPORT \
+            --command /tmp/hosted-command.json \
+            --result /tmp/hosted-result.json
+
+      - name: Observe exact begin artifact
+        id: observe_begin
+        if: steps.parse.outcome == 'success' && steps.parse.outputs.action == 'close'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEGIN_RUN_ID: ${{ steps.parse.outputs.begin_run_id }}
+          BEGIN_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
+        run: |
+          python - <<'PY'
+          import os
+          from tools import hosted_cycle_artifact
+          ok = hosted_cycle_artifact.qualify_close_files(
+              repository=os.environ['GITHUB_REPOSITORY'],
+              command_path='/tmp/hosted-command.json',
+              run_id=int(os.environ['BEGIN_RUN_ID']),
+              source_sha=os.environ['BEGIN_SOURCE_SHA'],
+              result_path='/tmp/hosted-result.json',
+              observation_path='/tmp/hosted-close-resumability.json',
+          )
+          raise SystemExit(0 if ok else 2)
+          PY
+
       - name: Download exact begin context
         id: download_begin
-        if: steps.parse.outcome == 'success' && steps.parse.outputs.action == 'close'
+        if: steps.observe_begin.outcome == 'success'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -93,6 +159,30 @@ jobs:
           path: /tmp/agent-cycle-begin
           github-token: ${{ github.token }}
           run-id: ${{ steps.parse.outputs.begin_run_id }}
+
+      - name: Reobserve begin artifact after download failure
+        id: reobserve_begin
+        if: steps.observe_begin.outcome == 'success' && steps.download_begin.outcome != 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEGIN_RUN_ID: ${{ steps.parse.outputs.begin_run_id }}
+          BEGIN_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
+        run: |
+          python - <<'PY'
+          import os
+          from tools import hosted_cycle_artifact
+          hosted_cycle_artifact.qualify_close_files(
+              repository=os.environ['GITHUB_REPOSITORY'],
+              command_path='/tmp/hosted-command.json',
+              run_id=int(os.environ['BEGIN_RUN_ID']),
+              source_sha=os.environ['BEGIN_SOURCE_SHA'],
+              result_path='/tmp/hosted-result.json',
+              observation_path='/tmp/hosted-close-resumability-reobserve.json',
+              download_failed=True,
+          )
+          raise SystemExit(2)
+          PY
 
       - name: Checkout exact begin semantic host
         id: checkout_begin
@@ -103,12 +193,17 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.parse.outputs.begin_source_sha }}
 
-      - name: Materialize close carrier failure
+      - name: Materialize close carrier fallback
         if: >-
           steps.parse.outcome == 'success' &&
           steps.parse.outputs.action == 'close' &&
-          (steps.download_begin.outcome != 'success' || steps.checkout_begin.outcome != 'success')
+          (steps.observe_begin.outcome != 'success' ||
+           steps.download_begin.outcome != 'success' ||
+           steps.checkout_begin.outcome != 'success')
         run: |
+          if [ -f /tmp/hosted-result.json ]; then
+            exit 0
+          fi
           python tools/hosted_agent_cycle.py failure \
             --error HOSTED_AGENT_BEGIN_ARTIFACT_UNAVAILABLE \
             --phase TRANSPORT \
@@ -178,4 +273,8 @@ jobs:
           value=json.load(open('/tmp/hosted-result.json', encoding='utf-8'))
           if value.get('status') not in {'READY','PASS'}:
               raise SystemExit(2)
+          if value.get('status') == 'READY' and value.get('schemaVersion') == 'HostedAgentCycleBeginResult 0.5':
+              resumability=value.get('resumability')
+              if not isinstance(resumability, dict) or resumability.get('state') != 'AVAILABLE':
+                  raise SystemExit(2)
           PY
