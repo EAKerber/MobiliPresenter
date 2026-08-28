@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from tools import agent_write_lifecycle as lifecycle
 from tools import agent_write_lifecycle_host as host
+from tools import hosted_agent_write_lease
 from tools.canonical import stable_hash
 
 
@@ -197,6 +198,62 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
         )
         self.assertEqual("PRIOR_ATTEMPT_UNKNOWN", result["state"])
         self.assertEqual("UNKNOWN", result["terminal"]["status"])
+
+    @patch("tools.agent_write_lifecycle_host._validate_bundle")
+    @patch("tools.agent_write_lifecycle_host._comments")
+    def test_existing_terminal_short_circuits_without_new_attempt(self, comments, validate_bundle):
+        value = bundle()
+        terminal = {
+            "schemaVersion": lifecycle.RESULT_SCHEMA,
+            "requestHash": value["dispatch"]["requestHash"],
+            "begin": copy.deepcopy(value["dispatch"]["begin"]),
+            "actor": copy.deepcopy(value["dispatch"]["actor"]),
+            "branch": value["dispatch"]["branch"],
+            "status": "PASS",
+        }
+        comments.return_value = [bot_comment(lifecycle.RESULT_MARKER, terminal)]
+        result = host.inspect_protocol(
+            value,
+            host_sha="a" * 40,
+            hosted_run_id=456,
+            run_id=901,
+            transport=FakeTransport(),
+        )
+        self.assertEqual("TERMINAL_EXISTS", result["state"])
+        self.assertEqual(terminal, result["terminal"])
+
+    @patch("tools.agent_write_lifecycle_host._comment")
+    @patch("tools.agent_write_lifecycle_host.hosted_agent_write_lease.derive_handle_request")
+    def test_v02_outer_request_readback_must_derive_exact_inner_request(self, derive, comment):
+        request = acquire_request()
+        dispatch = minimal_dispatch()
+        outer = {
+            "schemaVersion": hosted_agent_write_lease.HANDLE_REQUEST_SCHEMA,
+            "requestId": request["requestId"],
+            "handle": {"opaque": "test-only"},
+            "action": request["action"],
+            "branch": request["branch"],
+            "expectedAuthorityHead": request["expectedAuthorityHead"],
+            "expectedBranchHead": request["expectedBranchHead"],
+            "expectedBindingHash": request["expectedBindingHash"],
+            "ttlSeconds": request["ttlSeconds"],
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        comment.return_value = {
+            "author_association": "OWNER",
+            "body": hosted_agent_write_lease.REQUEST_MARKER_V02 + "\n" + json.dumps(outer),
+        }
+        derive.return_value = copy.deepcopy(request)
+        host._validate_request_readback(
+            request,
+            dispatch,
+            manifest={},
+            context={},
+            transport=FakeTransport(),
+            outer_request=outer,
+        )
+        derive.assert_called_once_with(outer, {}, {})
 
     @patch("tools.agent_write_lifecycle.validate_begin_binding")
     @patch("tools.agent_write_lifecycle._prepare_previous_binding", return_value=(None, None))
