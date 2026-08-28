@@ -147,13 +147,8 @@ def _handle_claims_manifest(handle: Any, manifest: dict[str, Any], cycle_id: str
 
 
 def _record(
-    *,
-    kind: str,
-    comment: dict[str, Any],
-    marker: str,
-    binding: str,
-    payload: dict[str, Any],
-    normalized: dict[str, Any] | None = None,
+    *, kind: str, comment: dict[str, Any], marker: str, binding: str,
+    payload: dict[str, Any], normalized: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     cid = comment_id(comment)
     if cid is None:
@@ -234,10 +229,7 @@ def _validate_strong_lease_v02(
 
 
 def collect(
-    comments: list[dict[str, Any]],
-    manifest: dict[str, Any],
-    *,
-    close_comment_id: int,
+    comments: list[dict[str, Any]], manifest: dict[str, Any], *, close_comment_id: int,
 ) -> dict[str, Any]:
     if not isinstance(comments, list) or not isinstance(manifest, dict):
         raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_INPUT_INVALID")
@@ -256,11 +248,11 @@ def collect(
     current_window = window(comments, begin_comment_id, close_comment_id)
 
     records: list[dict[str, Any]] = []
-    pending_remote_results: list[tuple[int, dict[str, Any], dict[str, Any]]] = []
+    pending_remote_results: list[tuple[dict[str, Any], dict[str, Any]]] = []
     ambient_remote_hashes: set[str] = set()
     strong_command_hashes: set[str] = set()
 
-    for position, comment in enumerate(current_window):
+    for comment in current_window:
         if not isinstance(comment, dict):
             continue
         body = comment.get("body")
@@ -268,41 +260,41 @@ def collect(
         if request_comment_allowed(comment):
             payload = json_after_marker(body, AGENT_TOOL_REQUEST_MARKER)
             if isinstance(payload, dict) and _claims_begin_actor(payload, begin, actor):
-                normalized = _validate_strong_tool_v01(payload, begin, actor)
                 records.append(_record(
                     kind="agent-tool-request", comment=comment,
                     marker=AGENT_TOOL_REQUEST_MARKER, binding=STRONG,
-                    payload=payload, normalized=normalized,
+                    payload=payload,
+                    normalized=_validate_strong_tool_v01(payload, begin, actor),
                 ))
                 continue
 
             outer = json_after_marker(body, AGENT_TOOL_REQUEST_MARKER_V02)
             if isinstance(outer, dict) and _handle_claims_manifest(outer.get("handle"), manifest, cycle_id):
-                normalized = _validate_strong_tool_v02(outer, manifest, begin, actor)
                 records.append(_record(
                     kind="agent-tool-request", comment=comment,
                     marker=AGENT_TOOL_REQUEST_MARKER_V02, binding=STRONG,
-                    payload=outer, normalized=normalized,
+                    payload=outer,
+                    normalized=_validate_strong_tool_v02(outer, manifest, begin, actor),
                 ))
                 continue
 
             lease_payload = json_after_marker(body, WRITE_LEASE_REQUEST_MARKER)
             if isinstance(lease_payload, dict) and _claims_begin_actor(lease_payload, begin, actor):
-                normalized = _validate_strong_lease_v01(lease_payload, begin, actor)
                 records.append(_record(
                     kind="write-lease-request", comment=comment,
                     marker=WRITE_LEASE_REQUEST_MARKER, binding=STRONG,
-                    payload=lease_payload, normalized=normalized,
+                    payload=lease_payload,
+                    normalized=_validate_strong_lease_v01(lease_payload, begin, actor),
                 ))
                 continue
 
             lease_outer = json_after_marker(body, WRITE_LEASE_REQUEST_MARKER_V02)
             if isinstance(lease_outer, dict) and _handle_claims_manifest(lease_outer.get("handle"), manifest, cycle_id):
-                normalized = _validate_strong_lease_v02(lease_outer, manifest, begin, actor)
                 records.append(_record(
                     kind="write-lease-request", comment=comment,
                     marker=WRITE_LEASE_REQUEST_MARKER_V02, binding=STRONG,
-                    payload=lease_outer, normalized=normalized,
+                    payload=lease_outer,
+                    normalized=_validate_strong_lease_v02(lease_outer, manifest, begin, actor),
                 ))
                 continue
 
@@ -310,16 +302,15 @@ def collect(
             if isinstance(remote_payload, dict) and _claims_actor(remote_payload.get("actor"), actor):
                 from tools import remote_canonical_execution
 
-                normalized: dict[str, Any] | None = None
                 try:
                     normalized = remote_canonical_execution.validate_command(remote_payload)
                 except RuntimeError:
-                    normalized = None
+                    normalized = remote_payload
                 ambient_remote_hashes.add(stable_hash(remote_payload))
                 records.append(_record(
                     kind="remote-request", comment=comment,
                     marker=REMOTE_REQUEST_MARKER, binding=AMBIENT,
-                    payload=remote_payload, normalized=normalized or remote_payload,
+                    payload=remote_payload, normalized=normalized,
                 ))
                 continue
 
@@ -346,7 +337,7 @@ def collect(
                     records.append(_record(
                         kind="agent-tool-dispatch", comment=comment,
                         marker=AGENT_TOOL_DISPATCH_MARKER, binding=STRONG,
-                        payload=dispatch_payload, normalized=dispatch_payload,
+                        payload=dispatch_payload,
                     ))
                 continue
 
@@ -355,7 +346,7 @@ def collect(
                 records.append(_record(
                     kind="agent-tool-result", comment=comment,
                     marker=AGENT_TOOL_RESULT_MARKER, binding=STRONG,
-                    payload=tool_result, normalized=tool_result,
+                    payload=tool_result,
                 ))
                 continue
 
@@ -386,29 +377,27 @@ def collect(
 
             remote_result = json_after_marker(body, REMOTE_RESULT_MARKER)
             if isinstance(remote_result, dict):
-                pending_remote_results.append((position, comment, remote_result))
+                pending_remote_results.append((comment, remote_result))
 
-    for _, comment, payload in pending_remote_results:
+    # Binding and semantic validity are distinct. A remote result can have
+    # strong lineage to a cycle-owned dispatch while still be incomplete or
+    # malformed for a particular consumer. The scanner classifies lineage only;
+    # receipt consumers perform the full RemoteCanonical receipt validation.
+    for comment, payload in pending_remote_results:
         digest = payload.get("commandHash")
         if not isinstance(digest, str) or len(digest) != 64:
             continue
         if digest in strong_command_hashes:
-            from tools import remote_canonical_execution
-
-            try:
-                normalized = remote_canonical_execution.validate_receipt(payload)
-            except RuntimeError as exc:
-                raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_REMOTE_RESULT_INVALID") from exc
             records.append(_record(
                 kind="remote-result", comment=comment,
                 marker=REMOTE_RESULT_MARKER, binding=STRONG,
-                payload=payload, normalized=normalized,
+                payload=payload,
             ))
         elif digest in ambient_remote_hashes:
             records.append(_record(
                 kind="remote-result", comment=comment,
                 marker=REMOTE_RESULT_MARKER, binding=AMBIENT,
-                payload=payload, normalized=payload,
+                payload=payload,
             ))
 
     records.sort(key=lambda item: item["commentId"])
@@ -423,7 +412,7 @@ def collect(
 
 
 def records_of(
-    view: dict[str, Any], kind: str, *, binding: str | None = None
+    view: dict[str, Any], kind: str, *, binding: str | None = None,
 ) -> list[dict[str, Any]]:
     records = view.get("records") if isinstance(view, dict) else None
     if not isinstance(records, list):
