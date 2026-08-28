@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import copy
 import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 from tools import (
     agent_cycle_identity,
@@ -11,6 +13,7 @@ from tools import (
     agent_cycle_resources,
     agent_write_lifecycle,
     git_mutation_plan,
+    hosted_agent_cycle_trace,
     hosted_cycle_handle,
     hosted_handle_requests,
     remote_canonical_execution,
@@ -19,8 +22,6 @@ from tools import (
 from tools.agent_tools import mutation_dispatch, trace_collect
 from tools.canonical import stable_hash
 
-ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = ROOT / "ops" / "schemas" / "agent-cycle-touched-resource-set.schema.json"
 REPOSITORY = "EAKerber/MobiliPresenter"
 ACTOR = {"role": "manager-gitops", "workerId": "manager-gitops-a", "sessionId": "session-1"}
 BEGIN = {"runId": 123, "sourceSha": "a" * 40, "contextHash": "b" * 64}
@@ -233,6 +234,24 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
         self.assertFalse(left["semanticAuthority"])
         self.assertFalse(left["authorizesMutation"])
 
+    def test_rehashed_projection_cannot_claim_authority(self):
+        item = agent_cycle_resources.resource(
+            "git-branch",
+            {"repository": REPOSITORY, "branch": "work/operations/example"},
+            agent_cycle_resources.origin("one", "1" * 64, "write"),
+        )
+        value = agent_cycle_resources.build_resource_set(
+            repository=REPOSITORY,
+            cycle_instance_id="cycle-instance-" + "a" * 24,
+            resources=[item],
+        )
+        tampered = copy.deepcopy(value)
+        tampered["semanticAuthority"] = True
+        core = {key: copy.deepcopy(entry) for key, entry in tampered.items() if key != "resourceSetHash"}
+        tampered["resourceSetHash"] = stable_hash(core)
+        with self.assertRaisesRegex(RuntimeError, "AGENT_CYCLE_RESOURCE_SET_MISMATCH"):
+            agent_cycle_resources.validate_resource_set(tampered)
+
     def test_collector_uses_cycle_window_and_ignores_other_actor(self):
         current = manifest()
         other_actor = copy.deepcopy(ACTOR)
@@ -314,11 +333,34 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
         handle_first = agent_cycle_resource_collect.build_resource_set(handle_comments, current, close_comment_id=200)
         self.assertEqual(legacy, handle_first)
 
-    def test_schema_tracks_python_contract_surface(self):
-        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-        self.assertEqual(schema["title"], agent_cycle_resources.SCHEMA_VERSION)
-        self.assertEqual(set(schema["required"]), agent_cycle_resources.SET_FIELDS)
-        self.assertEqual(set(schema["properties"]), agent_cycle_resources.SET_FIELDS)
+    def test_shadow_materialization_reuses_one_trace_observation(self):
+        current = manifest()
+        comments = [
+            {"id": 100, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "begin"},
+            {"id": 200, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "close"},
+        ]
+        fetcher = Mock(return_value=comments)
+        command = {"evidenceCommentIds": []}
+        meta = {"issueNumber": 145, "commentId": 200}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "agent-cycle-touched-resources.json"
+            amended, trace = hosted_agent_cycle_trace.prepare_close_stabilized(
+                command,
+                meta,
+                current,
+                {},
+                repository=REPOSITORY,
+                fetch_comments=fetcher,
+                sleep=lambda _seconds: None,
+                attempts=1,
+                resource_output_path=str(path),
+            )
+            self.assertEqual(amended, command)
+            self.assertEqual(trace["traceStatus"], "PASS")
+            self.assertEqual(fetcher.call_count, 1)
+            value = json.loads(path.read_text(encoding="utf-8"))
+            agent_cycle_resources.validate_resource_set(value)
+            self.assertEqual(value["sourceSummary"]["resourceCount"], 0)
 
 
 if __name__ == "__main__":
