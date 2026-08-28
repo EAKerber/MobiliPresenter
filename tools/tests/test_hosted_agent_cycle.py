@@ -100,6 +100,8 @@ class HostedAgentCycleTests(unittest.TestCase):
         self, run_agent, validate_context
     ):
         context = {
+            "schemaVersion": hosted.agent_cycle.SCHEMA_VERSION,
+            "repository": hosted.REPOSITORY,
             "cycleId": "cycle-" + "c" * 20,
             "contextHash": "d" * 64,
             "status": "READY",
@@ -129,6 +131,12 @@ class HostedAgentCycleTests(unittest.TestCase):
             self.assertTrue(manifest["cycleInstanceId"].startswith("cycle-instance-"))
             self.assertTrue(hosted._manifest_requires_trace(manifest))
             self.assertTrue(hosted._manifest_requires_write_lifecycle(manifest))
+            handle = json.loads(Path(f"{tmp}/handle.json").read_text())
+            self.assertEqual(handle["cycleId"], context["cycleId"])
+            self.assertEqual(handle["cycleInstanceId"], manifest["cycleInstanceId"])
+            self.assertEqual(handle["context"]["contextHash"], context["contextHash"])
+            self.assertFalse(handle["semanticAuthority"])
+            self.assertFalse(handle["authorizesMutation"])
             self.assertEqual(result["cycleInstanceId"], manifest["cycleInstanceId"])
             self.assertEqual(result["carrierFeatures"], hosted.CURRENT_FEATURES)
             self.assertEqual(result["status"], "READY")
@@ -254,12 +262,21 @@ class HostedAgentCycleTests(unittest.TestCase):
     @patch("tools.hosted_agent_cycle.validate_begin_manifest")
     def test_close_binding_pins_begin_source_context_identity_and_scope(self, validate_manifest):
         command = close_command()
+        source = {
+            "runId": 123,
+            "sourceSha": "a" * 40,
+            "issueNumber": 145,
+            "commentId": 9001,
+        }
         manifest = {
-            "source": {"runId": 123, "sourceSha": "a" * 40},
+            "source": source,
             "contextHash": "b" * 64,
             "actor": copy.deepcopy(command["actor"]),
             "declaredIntent": command["declaredIntent"],
             "machineScope": "live",
+            "cycleInstanceId": hosted._cycle_instance_id(
+                source, command["actor"], "b" * 64
+            ),
         }
         hosted._validate_close_binding(command, manifest, {})
         bad = copy.deepcopy(command)
