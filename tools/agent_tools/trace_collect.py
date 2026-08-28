@@ -5,8 +5,8 @@ import json
 import subprocess
 from typing import Any
 
-from tools import remote_canonical_execution
-from tools.agent_tools import contracts, mutation_dispatch, trace
+from tools import agent_cycle_identity, remote_canonical_execution
+from tools.agent_tools import mutation_dispatch, trace
 from tools.canonical import stable_hash
 
 AGENT_TOOL_REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
@@ -35,14 +35,14 @@ def _json_after_marker(body: Any, marker: str) -> Any | None:
 
 def _canonical_actor(value: Any) -> dict[str, str] | None:
     try:
-        return contracts._actor(value)
+        return agent_cycle_identity.canonical_actor(value)
     except RuntimeError:
         return None
 
 
 def _canonical_begin(value: Any) -> dict[str, Any] | None:
     try:
-        return contracts._begin(value)
+        return agent_cycle_identity.canonical_begin(value)
     except RuntimeError:
         return None
 
@@ -62,18 +62,12 @@ def _result_comment_allowed(comment: dict[str, Any]) -> bool:
 
 
 def cycle_instance_id(manifest: dict[str, Any]) -> str:
-    source = manifest["source"]
-    body = {
-        "begin": {
-            "runId": source["runId"],
-            "sourceSha": source["sourceSha"],
-            "contextHash": manifest["contextHash"],
-        },
-        "actor": manifest["actor"],
-        "issueNumber": source["issueNumber"],
-        "beginCommentId": source["commentId"],
-    }
-    computed = "cycle-instance-" + stable_hash(body)[:24]
+    try:
+        computed = agent_cycle_identity.hosted_cycle_instance_id(
+            manifest["source"], manifest["actor"], manifest["contextHash"]
+        )
+    except (KeyError, RuntimeError) as exc:
+        raise AgentTraceCollectionError("AGENT_TRACE_CYCLE_INSTANCE_INVALID") from exc
     declared = manifest.get("cycleInstanceId")
     if declared is not None:
         if declared != computed:
@@ -222,12 +216,8 @@ def build_trace(
     close_comment_id: int,
 ) -> dict[str, Any]:
     source = manifest["source"]
-    begin = {
-        "runId": source["runId"],
-        "sourceSha": source["sourceSha"],
-        "contextHash": manifest["contextHash"],
-    }
-    actor = copy.deepcopy(manifest["actor"])
+    begin = agent_cycle_identity.begin_from_manifest(manifest)
+    actor = copy.deepcopy(agent_cycle_identity.canonical_actor(manifest["actor"]))
     cycle_id = cycle_instance_id(manifest)
     window = _window(comments, source["commentId"], close_comment_id)
     requests = _agent_tool_requests(window, begin, actor) + _remote_requests(window, actor)
@@ -276,9 +266,6 @@ def build_trace(
         raise AgentTraceCollectionError("AGENT_TRACE_ORPHAN_AGENT_TOOL_RESULT")
     if unmatched_dispatches:
         raise AgentTraceCollectionError("AGENT_TRACE_ORPHAN_AGENT_TOOL_DISPATCH")
-    # Remote results cannot be safely assigned to this cycle without a matching
-    # same-session request because the legacy result envelope carries no actor.
-    # They are therefore ignored unless paired by commandHash.
 
     summary = {
         "attemptCount": len(attempts),
@@ -329,12 +316,8 @@ def agent_tool_mutation_evidence_comment_ids(
     """Discover canonical receipt comments for successful dispatched Agent Tool mutations."""
 
     source = manifest["source"]
-    begin = {
-        "runId": source["runId"],
-        "sourceSha": source["sourceSha"],
-        "contextHash": manifest["contextHash"],
-    }
-    actor = copy.deepcopy(manifest["actor"])
+    begin = agent_cycle_identity.begin_from_manifest(manifest)
+    actor = copy.deepcopy(agent_cycle_identity.canonical_actor(manifest["actor"]))
     window = _window(comments, source["commentId"], close_comment_id)
     expected: dict[str, dict[str, Any]] = {}
     for comment in window:
