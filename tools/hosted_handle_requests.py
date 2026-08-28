@@ -4,12 +4,12 @@ import copy
 import re
 from typing import Any
 
-from tools import agent_cycle_identity, hosted_cycle_handle
+from tools import agent_cycle_identity, hosted_cycle_handle, hosted_record_vocabulary as markers
 from tools.agent_tools import contracts
 
-CYCLE_MARKER_V02 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2"
-TOOL_MARKER_V02 = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_2"
-WRITE_LEASE_MARKER_V02 = "MOBILIPRESENTER_AGENT_WRITE_LEASE_REQUEST_V0_2"
+CYCLE_MARKER_V02 = markers.AGENT_CYCLE_REQUEST_V02
+TOOL_MARKER_V02 = markers.AGENT_TOOL_REQUEST_V02
+WRITE_LEASE_MARKER_V02 = markers.AGENT_WRITE_LEASE_REQUEST_V02
 
 CYCLE_SCHEMA = "HostedAgentCycleCommand 0.2"
 TOOL_SCHEMA = "HostedAgentToolRequest 0.2"
