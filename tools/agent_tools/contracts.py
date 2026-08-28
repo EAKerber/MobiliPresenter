@@ -4,6 +4,7 @@ import copy
 import re
 from typing import Any
 
+from tools import agent_cycle_identity
 from tools.canonical import stable_hash
 
 REQUEST_SCHEMA = "AgentToolRequest 0.1"
@@ -17,8 +18,8 @@ REQUEST_FIELDS = {
     "schemaVersion", "requestId", "begin", "actor", "toolId", "target", "input",
     "semanticAuthority", "authorizesMutation",
 }
-BEGIN_FIELDS = {"runId", "sourceSha", "contextHash"}
-ACTOR_FIELDS = {"role", "workerId", "sessionId"}
+BEGIN_FIELDS = agent_cycle_identity.BEGIN_FIELDS
+ACTOR_FIELDS = agent_cycle_identity.ACTOR_FIELDS
 PLAN_FIELDS = {
     "schemaVersion", "requestHash", "begin", "actor", "toolId", "effectClass", "mode",
     "adapter", "requiredCapabilities", "eligibleToolSurfaces", "targetPolicy", "guards",
@@ -42,22 +43,17 @@ def _text(value: Any, code: str) -> str:
 
 
 def _begin(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != BEGIN_FIELDS:
-        raise RuntimeError("AGENT_TOOL_BEGIN_INVALID")
-    run_id = value.get("runId")
-    if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id <= 0:
-        raise RuntimeError("AGENT_TOOL_BEGIN_INVALID")
-    if not isinstance(value.get("sourceSha"), str) or not SHA_RE.fullmatch(value["sourceSha"]):
-        raise RuntimeError("AGENT_TOOL_BEGIN_INVALID")
-    if not isinstance(value.get("contextHash"), str) or not HASH_RE.fullmatch(value["contextHash"]):
-        raise RuntimeError("AGENT_TOOL_BEGIN_INVALID")
-    return copy.deepcopy(value)
+    try:
+        return agent_cycle_identity.canonical_begin(value)
+    except RuntimeError as exc:
+        raise RuntimeError("AGENT_TOOL_BEGIN_INVALID") from exc
 
 
 def _actor(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict) or set(value) != ACTOR_FIELDS:
-        raise RuntimeError("AGENT_TOOL_ACTOR_INVALID")
-    return {key: _text(value[key], "AGENT_TOOL_ACTOR_INVALID") for key in sorted(ACTOR_FIELDS)}
+    try:
+        return agent_cycle_identity.canonical_actor(value)
+    except RuntimeError as exc:
+        raise RuntimeError("AGENT_TOOL_ACTOR_INVALID") from exc
 
 
 def validate_request(value: Any) -> dict[str, Any]:
