@@ -42,9 +42,7 @@ def build_resource_set(
 
     resources: list[dict[str, Any]] = []
 
-    # Only strongly cycle-bound declarations are semantic resource sources.
-    # Ambient direct RemoteCanonical traffic remains trace-visible for historical
-    # compatibility but cannot create touched-resource obligations.
+    # Strong pre-apply declarations remain the preferred semantic source.
     for item in hosted_cycle_records.records_of(
         view, "agent-tool-dispatch", binding=hosted_cycle_records.STRONG
     ):
@@ -52,12 +50,30 @@ def build_resource_set(
             agent_cycle_resources.resources_from_agent_tool_dispatch(item["normalized"])
         )
 
-    # A RemoteCanonical receipt is strong only when the common record view can
-    # prove exact lineage back to a strongly-bound Agent Tool dispatch.
+    # R3A's artifact remains shadow/diagnostic in R3B0a, so valid ambient direct
+    # RemoteCanonical records remain visible for compatibility. Their AMBIENT
+    # classification is retained only in the common record view and future
+    # obligation consumers must require STRONG binding.
     for item in hosted_cycle_records.records_of(
-        view, "remote-result", binding=hosted_cycle_records.STRONG
+        view, "remote-request", binding=hosted_cycle_records.AMBIENT
     ):
-        resources.extend(_resources_from_remote_receipt(item["normalized"]))
+        try:
+            command = remote_canonical_execution.validate_command(item["payload"])
+        except RuntimeError:
+            # Ambient malformed data cannot poison the current cycle.
+            continue
+        resources.extend(agent_cycle_resources.resources_from_remote_command(command))
+
+    for binding in (hosted_cycle_records.STRONG, hosted_cycle_records.AMBIENT):
+        for item in hosted_cycle_records.records_of(view, "remote-result", binding=binding):
+            try:
+                resources.extend(_resources_from_remote_receipt(item["payload"]))
+            except RuntimeError:
+                if binding == hosted_cycle_records.STRONG:
+                    raise AgentCycleResourceCollectionError(
+                        "AGENT_CYCLE_RESOURCE_REMOTE_RECEIPT_INVALID"
+                    )
+                continue
 
     for item in hosted_cycle_records.records_of(
         view, "write-lease-request", binding=hosted_cycle_records.STRONG
