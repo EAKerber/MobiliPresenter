@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-cycle-touched-resource-set-0.1.json",
+  "title": "AgentCycleTouchedResourceSet 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "cycleInstanceId", "resources", "sourceSummary", "readOnly", "semanticAuthority", "authorizesMutation", "resourceSetHash"],
+  "properties": {
+    "schemaVersion": {"const": "AgentCycleTouchedResourceSet 0.1"},
+    "repository": {"const": "EAKerber/MobiliPresenter"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "resources": {"type": "array", "items": {"$ref": "#/$defs/resource"}},
+    "sourceSummary": {"$ref": "#/$defs/sourceSummary"},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "resourceSetHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceKind", "sourceHash", "operation"],
+      "properties": {
+        "sourceKind": {"type": "string", "minLength": 1},
+        "sourceHash": {"$ref": "#/$defs/hash"},
+        "operation": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "origins", "resourceHash"],
+      "properties": {
+        "kind": {"enum": ["git-branch", "git-path", "pull-request-slot", "pull-request", "domain-subject", "lease-scope", "coordination-lease"]},
+        "locator": {"type": "object"},
+        "origins": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/origin"}},
+        "resourceHash": {"$ref": "#/$defs/hash"}
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "git-branch"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/gitBranch"}}}},
+        {"if": {"properties": {"kind": {"const": "git-path"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/gitPath"}}}},
+        {"if": {"properties": {"kind": {"const": "pull-request-slot"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/prSlot"}}}},
+        {"if": {"properties": {"kind": {"const": "pull-request"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/pr"}}}},
+        {"if": {"properties": {"kind": {"const": "domain-subject"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/domainSubject"}}}},
+        {"if": {"properties": {"kind": {"const": "lease-scope"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/leaseScope"}}}},
+        {"if": {"properties": {"kind": {"const": "coordination-lease"}}}, "then": {"properties": {"locator": {"$ref": "#/$defs/coordinationLease"}}}}
+      ]
+    },
+    "repo": {"const": "EAKerber/MobiliPresenter"},
+    "gitBranch": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "branch"],
+      "properties": {"repository": {"$ref": "#/$defs/repo"}, "branch": {"type": "string", "minLength": 1}}
+    },
+    "gitPath": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "branch", "path"],
+      "properties": {"repository": {"$ref": "#/$defs/repo"}, "branch": {"type": "string", "minLength": 1}, "path": {"type": "string", "minLength": 1}}
+    },
+    "prSlot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "head", "base"],
+      "properties": {"repository": {"$ref": "#/$defs/repo"}, "head": {"type": "string", "minLength": 1}, "base": {"type": "string", "minLength": 1}}
+    },
+    "pr": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "number"],
+      "properties": {"repository": {"$ref": "#/$defs/repo"}, "number": {"type": "integer", "minimum": 1}}
+    },
+    "domainSubject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["domain", "subjectKind", "subjectId"],
+      "properties": {"domain": {"type": "string", "minLength": 1}, "subjectKind": {"type": "string", "minLength": 1}, "subjectId": {"type": "string", "minLength": 1}}
+    },
+    "leaseScope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "branch", "role", "sessionId"],
+      "properties": {"repository": {"$ref": "#/$defs/repo"}, "branch": {"type": "string", "minLength": 1}, "role": {"type": "string", "minLength": 1}, "sessionId": {"type": "string", "minLength": 1}}
+    },
+    "coordinationLease": {
+      "type": "object", "additionalProperties": false,
+      "required": ["leaseId"],
+      "properties": {"leaseId": {"type": "string", "minLength": 1}}
+    },
+    "sourceSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resourceCount", "originCount", "sourceKinds"],
+      "properties": {
+        "resourceCount": {"type": "integer", "minimum": 0},
+        "originCount": {"type": "integer", "minimum": 0},
+        "sourceKinds": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}
