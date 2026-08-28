@@ -8,7 +8,10 @@ no semantic authority, and never retries an operation or mutation.
 from __future__ import annotations
 
 import copy
+import json
+import os
 import time
+from pathlib import Path
 from typing import Any, Callable
 
 from tools.agent_tools import trace as trace_contract
@@ -197,6 +200,48 @@ def _amend_command(
     return amended
 
 
+def _materialize_shadow_resources(
+    output_path: str,
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    *,
+    close_comment_id: int,
+    repository: str,
+) -> None:
+    """Best-effort shadow projection; failure must never change close judgment."""
+    from tools import agent_cycle_resource_collect
+
+    path = Path(output_path)
+    error_path = path.with_suffix(path.suffix + ".error.json")
+    try:
+        value = agent_cycle_resource_collect.build_resource_set(
+            comments,
+            manifest,
+            close_comment_id=close_comment_id,
+            repository=repository,
+        )
+        path.write_text(
+            json.dumps(value, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        if error_path.exists():
+            error_path.unlink()
+    except Exception as exc:
+        code = str(exc).split(":", 1)[0] or exc.__class__.__name__
+        diagnostic = {
+            "schemaVersion": "AgentCycleTouchedResourceShadowDiagnostic 0.1",
+            "status": "UNKNOWN",
+            "error": code,
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        error_path.write_text(
+            json.dumps(diagnostic, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+
 def prepare_close(
     command: dict[str, Any],
     meta: dict[str, Any],
@@ -232,9 +277,11 @@ def prepare_close_stabilized(
     sleep: Callable[[float], None] | None = None,
     attempts: int = TRACE_STABILIZATION_ATTEMPTS,
     delay_seconds: float = TRACE_STABILIZATION_DELAY_SECONDS,
+    resource_output_path: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Reobserve transport only; never replay or retry the underlying work."""
     del context
+    resource_output_path = resource_output_path or os.environ.get("HOSTED_AGENT_RESOURCE_OUTPUT_PATH")
     if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts <= 0:
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_STABILIZATION_INVALID")
     if not isinstance(delay_seconds, (int, float)) or isinstance(delay_seconds, bool) or delay_seconds < 0:
@@ -262,6 +309,14 @@ def prepare_close_stabilized(
                     manifest,
                     close_comment_id=meta["commentId"],
                 )
+                if resource_output_path is not None:
+                    _materialize_shadow_resources(
+                        resource_output_path,
+                        comments,
+                        manifest,
+                        close_comment_id=meta["commentId"],
+                        repository=repository,
+                    )
                 return amended, value
             except HostedAgentCycleTraceError as exc:
                 if exc.code not in retryable_observation_errors:
