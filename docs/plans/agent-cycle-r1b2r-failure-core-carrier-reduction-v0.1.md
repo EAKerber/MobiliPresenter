@@ -1,6 +1,6 @@
 # Agent Cycle R1B-2R — Failure Core Adoption / Carrier Reduction 0.1
 
-Status: **implemented candidate; qualification pending**
+Status: **implemented and qualified on PR #170**
 
 Base: `main@5d45d88c127642575d63ef9267f38c60905e15ae`
 
@@ -155,7 +155,7 @@ These remain unnecessary for the behavior implemented here.
 
 ## 8. Tests / acceptance
 
-The candidate adds or updates coverage for:
+The slice adds or updates coverage for:
 
 - literal historical Hosted Cycle 0.1 readability;
 - 0.2 reader behavior without external phase;
@@ -167,9 +167,26 @@ The candidate adds or updates coverage for:
 - close blockers preserved before process return-code collapse;
 - no duplicated top-level blockers/detail/authority fields.
 
-Full Agent Ops, Operational Semantics, roadmap freshness, capability lifecycle,
-Coordination Guard, and Supervisor Snapshot qualification remain required before
-promotion.
+The first PR qualification found one pre-existing R0 characterization that
+explicitly froze the old root-cause compaction behavior and called
+`failure_payload()` without the now-required phase. The full test inventory did
+not reveal another consumer of that call shape. Rather than add a compatibility
+fallback or infer phase, the characterization was replaced with the new
+explicit expectation: preserve the root blocker in `failureCore` and pass
+`phase=BEGIN` explicitly.
+
+Qualification on the corrected implementation head passed:
+
+- 665/665 Toolbox unit tests;
+- Semantic contracts;
+- Operational Semantics coverage;
+- roadmap freshness coverage;
+- capability lifecycle guard;
+- Doctor and local coherence;
+- Project Machine, routine, maintenance, Scheduler, integration-reconcile and
+  handoff evidence generation/upload;
+- Coordination Guard;
+- Supervisor Snapshot.
 
 ## 9. Rollback
 
