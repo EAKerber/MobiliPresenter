@@ -5,11 +5,13 @@ import json
 import subprocess
 from typing import Any
 
-from tools import agent_cycle_identity, remote_canonical_execution
-from tools.agent_tools import mutation_dispatch, trace
+from tools import agent_cycle_identity, hosted_handle_requests, remote_canonical_execution
+from tools.agent_tools import contracts, mutation_dispatch, trace
 from tools.canonical import stable_hash
 
+CURRENT_REPOSITORY = "EAKerber/MobiliPresenter"
 AGENT_TOOL_REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
+AGENT_TOOL_REQUEST_MARKER_V02 = hosted_handle_requests.TOOL_MARKER_V02
 AGENT_TOOL_RESULT_MARKER = "MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1"
 AGENT_TOOL_DISPATCH_MARKER = "MOBILIPRESENTER_AGENT_TOOL_DISPATCH_V0_1"
 REMOTE_REQUEST_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_REQUEST_V0_1"
@@ -96,23 +98,53 @@ def _result_status(payload: dict[str, Any]) -> tuple[str, list[str]]:
 
 
 def _agent_tool_requests(
-    window: list[dict[str, Any]], begin: dict[str, Any], actor: dict[str, str]
+    window: list[dict[str, Any]],
+    begin: dict[str, Any],
+    actor: dict[str, str],
+    manifest: dict[str, Any],
 ) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
     hashes: set[str] = set()
     for comment in window:
         if not _request_comment_allowed(comment):
             continue
-        payload = _json_after_marker(comment.get("body"), AGENT_TOOL_REQUEST_MARKER)
-        if not isinstance(payload, dict):
-            continue
-        if _canonical_begin(payload.get("begin")) != begin or _canonical_actor(payload.get("actor")) != actor:
-            continue
-        digest = stable_hash(payload)
+        body = comment.get("body")
+        payload = _json_after_marker(body, AGENT_TOOL_REQUEST_MARKER)
+        digest: str | None = None
+        operation: str | None = None
+        if isinstance(payload, dict):
+            if _canonical_begin(payload.get("begin")) != begin or _canonical_actor(payload.get("actor")) != actor:
+                continue
+            try:
+                request = contracts.validate_request(payload)
+            except RuntimeError:
+                continue
+            digest = contracts.request_hash(request)
+            operation = request.get("requestId")
+        else:
+            outer = _json_after_marker(body, AGENT_TOOL_REQUEST_MARKER_V02)
+            if not isinstance(outer, dict):
+                continue
+            try:
+                hosted_handle_requests.validate_tool(outer, repository=CURRENT_REPOSITORY)
+            except RuntimeError:
+                continue
+            if not hosted_handle_requests.matches_manifest(
+                outer.get("handle"), manifest, repository=CURRENT_REPOSITORY
+            ):
+                continue
+            try:
+                request = hosted_handle_requests.build_tool_inner(
+                    outer, begin=begin, actor=actor
+                )
+            except RuntimeError:
+                continue
+            digest = contracts.request_hash(request)
+            operation = outer.get("requestId")
+        assert digest is not None
         if digest in hashes:
             raise AgentTraceCollectionError("AGENT_TRACE_REQUEST_HASH_DUPLICATE")
         hashes.add(digest)
-        operation = payload.get("requestId")
         if not isinstance(operation, str) or not operation:
             operation = "invalid-agent-tool-" + digest[:16]
         found.append({
@@ -220,7 +252,7 @@ def build_trace(
     actor = copy.deepcopy(agent_cycle_identity.canonical_actor(manifest["actor"]))
     cycle_id = cycle_instance_id(manifest)
     window = _window(comments, source["commentId"], close_comment_id)
-    requests = _agent_tool_requests(window, begin, actor) + _remote_requests(window, actor)
+    requests = _agent_tool_requests(window, begin, actor, manifest) + _remote_requests(window, actor)
     requests.sort(key=lambda item: item["requestCommentId"])
     agent_results, remote_results, agent_orphans = _result_indexes(window, begin, actor)
     dispatches = _agent_tool_dispatches(window, begin, actor, cycle_id)
@@ -314,7 +346,6 @@ def agent_tool_mutation_evidence_comment_ids(
     close_comment_id: int,
 ) -> list[int]:
     """Discover canonical receipt comments for successful dispatched Agent Tool mutations."""
-
     source = manifest["source"]
     begin = agent_cycle_identity.begin_from_manifest(manifest)
     actor = copy.deepcopy(agent_cycle_identity.canonical_actor(manifest["actor"]))
