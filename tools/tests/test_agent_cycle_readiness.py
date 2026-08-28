@@ -7,6 +7,18 @@ from tools import agent_cycle, agent_cycle_close, project_machine, runtime_capab
 from tools.canonical import stable_hash
 
 
+HISTORICAL_CONTEXT_FIELDS = {
+    "AgentCycleContext 0.1": {"workRef", "readiness", "agentTools"},
+    "AgentCycleContext 0.2": {"workRef", "readiness"},
+    "AgentCycleContext 0.3": {"workRef"},
+}
+HISTORICAL_BASELINE_FIELDS = {
+    "AgentCycleContext 0.1": {"readinessHash", "agentToolProjectionHash"},
+    "AgentCycleContext 0.2": {"readinessHash"},
+    "AgentCycleContext 0.3": set(),
+}
+
+
 def _context(intent: str) -> dict:
     machine = project_machine.inspect_local()
     runtime = runtime_capabilities.build_inspection(
@@ -39,12 +51,32 @@ def _rehash(value: dict) -> dict:
     return value
 
 
+def _historical_context_fixture(version: str) -> dict:
+    """Freeze historical outer contracts instead of following moving version aliases.
+
+    Nested artifacts intentionally reuse current-valid deterministic inputs; the historical
+    outer field sets and baseline additions are literal per the producer versions that
+    introduced AgentCycleContext 0.1, 0.2 and 0.3. This keeps the compatibility test from
+    silently changing meaning when the current producer advances again.
+    """
+    if version not in HISTORICAL_CONTEXT_FIELDS:
+        raise RuntimeError("TEST_HISTORICAL_CONTEXT_VERSION_UNSUPPORTED")
+    value = copy.deepcopy(_context("inspect-and-plan"))
+    value["schemaVersion"] = version
+    for field in HISTORICAL_CONTEXT_FIELDS[version]:
+        value.pop(field)
+    for field in HISTORICAL_BASELINE_FIELDS[version]:
+        value["baseline"].pop(field)
+    return _rehash(value)
+
+
 class AgentCycleReadinessTests(unittest.TestCase):
     def test_governed_mutation_separates_context_from_execution_readiness(self):
         context = _context("governed-mutation")
         readiness = context["readiness"]
 
-        self.assertEqual(context["schemaVersion"], "AgentCycleContext 0.3")
+        self.assertEqual(context["schemaVersion"], agent_cycle.SCHEMA_VERSION)
+        self.assertEqual(context["schemaVersion"], "AgentCycleContext 0.4")
         self.assertEqual(context["status"], "READY")
         self.assertEqual(readiness["legacyStatus"], "READY")
         self.assertEqual(readiness["contextStatus"], {"status": "PASS", "reasonCodes": []})
@@ -92,15 +124,25 @@ class AgentCycleReadinessTests(unittest.TestCase):
             },
         )
 
-    def test_v02_context_remains_readable_without_dimensional_promotion(self):
-        legacy = copy.deepcopy(_context("inspect-and-plan"))
-        legacy["schemaVersion"] = agent_cycle.PREVIOUS_SCHEMA_VERSION
-        legacy.pop("readiness")
-        legacy["baseline"].pop("readinessHash")
-        _rehash(legacy)
+    def test_v03_context_remains_readable_without_work_binding(self):
+        legacy = _historical_context_fixture("AgentCycleContext 0.3")
 
         self.assertEqual(agent_cycle.validate_context(legacy), legacy)
+        self.assertNotIn("workRef", legacy)
+        self.assertIn("readiness", legacy)
+        self.assertIn("agentTools", legacy)
+
+        delta = agent_cycle_close.build_delta(legacy, _context("inspect-and-plan"))
+        self.assertEqual(delta["durableChanges"], [])
+        self.assertEqual(delta["derivedChanges"], [])
+
+    def test_v02_context_remains_readable_without_dimensional_promotion(self):
+        legacy = _historical_context_fixture("AgentCycleContext 0.2")
+
+        self.assertEqual(agent_cycle.validate_context(legacy), legacy)
+        self.assertNotIn("workRef", legacy)
         self.assertNotIn("readiness", legacy)
+        self.assertIn("agentTools", legacy)
 
         delta = agent_cycle_close.build_delta(legacy, _context("inspect-and-plan"))
         self.assertEqual(delta["durableChanges"], [])
@@ -110,15 +152,10 @@ class AgentCycleReadinessTests(unittest.TestCase):
         )
 
     def test_v01_context_remains_readable_without_tool_or_readiness_projection(self):
-        legacy = copy.deepcopy(_context("inspect-and-plan"))
-        legacy["schemaVersion"] = agent_cycle.LEGACY_SCHEMA_VERSION
-        legacy.pop("readiness")
-        legacy.pop("agentTools")
-        legacy["baseline"].pop("readinessHash")
-        legacy["baseline"].pop("agentToolProjectionHash")
-        _rehash(legacy)
+        legacy = _historical_context_fixture("AgentCycleContext 0.1")
 
         self.assertEqual(agent_cycle.validate_context(legacy), legacy)
+        self.assertNotIn("workRef", legacy)
         self.assertNotIn("readiness", legacy)
         self.assertNotIn("agentTools", legacy)
 
