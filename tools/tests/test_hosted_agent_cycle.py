@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tools import agent_failure
 from tools import hosted_agent_cycle as hosted
 from tools.canonical import stable_hash
 
@@ -134,6 +135,42 @@ class HostedAgentCycleTests(unittest.TestCase):
             self.assertFalse(result["authorizesMutation"])
             validate_context.assert_called()
 
+    @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
+    @patch("tools.hosted_agent_cycle._run_agent")
+    def test_begin_failure_preserves_structured_blockers_root_to_wrapper(
+        self, run_agent, validate_context
+    ):
+        run_agent.return_value = (
+            2,
+            {
+                "status": "BLOCKED",
+                "blockingUnknowns": [
+                    "ROOT_PROVIDER_SCOPE_MISSING",
+                    "ROUTINE_INSPECTION_FAIL",
+                ],
+            },
+        )
+        with self.assertRaises(hosted.HostedAgentCycleError) as raised:
+            hosted.begin_from_envelope(
+                begin_command(),
+                {"issueNumber": 145, "commentId": 9001},
+                context_path="/unused/context.json",
+                manifest_path="/unused/manifest.json",
+            )
+        core = raised.exception.failure_core
+        self.assertIsNotNone(core)
+        self.assertEqual(
+            [
+                "ROOT_PROVIDER_SCOPE_MISSING",
+                "ROUTINE_INSPECTION_FAIL",
+                "HOSTED_AGENT_BEGIN_NOT_READY",
+            ],
+            [item["code"] for item in core["causes"]],
+        )
+        self.assertFalse(core["lossyProjection"])
+        self.assertEqual("BEGIN", core["phase"])
+        validate_context.assert_called()
+
     def test_legacy_begin_manifest_remains_valid_without_trace_requirement(self):
         source = {
             "workflow": "hosted-agent-cycle",
@@ -234,14 +271,50 @@ class HostedAgentCycleTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "CYCLE_IDENTITY_MISMATCH"):
             hosted._validate_close_binding(bad, manifest, {})
 
-    def test_failure_is_hash_bound_and_never_authorizes(self):
-        payload = hosted.failure_payload(hosted.HostedAgentCycleError("TEST_BLOCK"), begin_command())
+    def test_failure_shell_is_hash_bound_and_semantics_live_only_in_core(self):
+        payload = hosted.failure_payload(
+            hosted.HostedAgentCycleError("TEST_BLOCK"),
+            begin_command(),
+            phase="BEGIN",
+        )
+        self.assertEqual(payload["schemaVersion"], "HostedAgentCycleFailure 0.2")
         self.assertEqual(payload["status"], "BLOCKED")
-        self.assertEqual(payload["blockers"], ["TEST_BLOCK"])
-        self.assertFalse(payload["semanticAuthority"])
-        self.assertFalse(payload["authorizesMutation"])
-        core = {key: value for key, value in payload.items() if key != "failureHash"}
-        self.assertEqual(payload["failureHash"], stable_hash(core))
+        self.assertEqual(payload["requestId"], begin_command()["requestId"])
+        self.assertEqual(payload["commandHash"], hosted.command_hash(begin_command()))
+        self.assertNotIn("blockers", payload)
+        self.assertNotIn("detail", payload)
+        self.assertNotIn("semanticAuthority", payload)
+        self.assertNotIn("authorizesMutation", payload)
+        core = payload["failureCore"]
+        self.assertEqual(["TEST_BLOCK"], [item["code"] for item in core["causes"]])
+        self.assertTrue(core["readOnly"])
+        self.assertFalse(core["semanticAuthority"])
+        self.assertFalse(core["authorizesMutation"])
+        self.assertEqual(core, agent_failure.normalize_failure(payload))
+        body = {key: value for key, value in payload.items() if key != "failureHash"}
+        self.assertEqual(payload["failureHash"], stable_hash(body))
+
+    def test_invalid_command_cannot_break_failure_materialization(self):
+        payload = hosted.failure_payload(
+            hosted.HostedAgentCycleError("TEST_BLOCK"),
+            {"requestId": "partial"},
+            phase="PARSE",
+        )
+        self.assertIsNone(payload["requestId"])
+        self.assertIsNone(payload["commandHash"])
+        self.assertEqual("TEST_BLOCK", payload["failureCore"]["causes"][0]["code"])
+
+    def test_unexpected_exception_text_is_not_promoted_to_semantics(self):
+        payload = hosted.failure_payload(
+            RuntimeError("FAKE_ROOT: human diagnostic"),
+            phase="TRANSPORT",
+        )
+        self.assertEqual(
+            ["HOSTED_AGENT_UNEXPECTED_FAILURE"],
+            [item["code"] for item in payload["failureCore"]["causes"]],
+        )
+        self.assertNotIn("detail", payload)
+        self.assertTrue(payload["failureCore"]["lossyProjection"])
 
 
 if __name__ == "__main__":

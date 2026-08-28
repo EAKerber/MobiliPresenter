@@ -10,6 +10,10 @@ HostedAgentCycleBeginManifest 0.3 binds a concrete hosted cycle instance,
 declares exhaustive trace support, and opts new cycles into the explicit Agent
 Write Lease lifecycle close gate. Legacy 0.1 and trace-only 0.2 manifests remain
 readable and keep their original close behavior.
+
+Hosted failure transport 0.2 carries AgentFailureCore 0.1 as the sole semantic
+failure contract. The outer failure shell only preserves hosted correlation and
+operational status.
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ if str(ROOT) not in sys.path:
 
 from tools import agent_cycle
 from tools import agent_cycle_close
+from tools import agent_failure
 from tools import agent_write_lifecycle_guard
 from tools import hosted_agent_cycle_trace
 from tools import remote_canonical_execution
@@ -46,7 +51,7 @@ TRACE_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.2"
 BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.3"
 BEGIN_RESULT_SCHEMA = "HostedAgentCycleBeginResult 0.3"
 CLOSE_RESULT_SCHEMA = "HostedAgentCycleCloseResult 0.1"
-FAILURE_SCHEMA = "HostedAgentCycleFailure 0.1"
+FAILURE_SCHEMA = agent_failure.HOSTED_CYCLE_FAILURE_SCHEMA
 TRACE_FEATURE = "execution-trace-0.1"
 WRITE_LEASE_FEATURE = "agent-write-lease-lifecycle-0.1"
 CURRENT_FEATURES = sorted([TRACE_FEATURE, WRITE_LEASE_FEATURE])
@@ -64,9 +69,20 @@ BEGIN_REF_FIELDS = {"runId", "sourceSha", "contextHash"}
 
 
 class HostedAgentCycleError(RuntimeError):
-    def __init__(self, code: str, detail: str = "") -> None:
+    def __init__(
+        self,
+        code: str,
+        detail: str = "",
+        *,
+        failure_core: dict[str, Any] | None = None,
+    ) -> None:
         self.code = code
         self.detail = detail
+        self.failure_core = (
+            agent_failure.validate_failure_core(failure_core)
+            if failure_core is not None
+            else None
+        )
         super().__init__(f"{code}:{detail}" if detail else code)
 
 
@@ -338,6 +354,58 @@ def _manifest_requires_write_lifecycle(manifest: dict[str, Any]) -> bool:
     )
 
 
+def _failure_core(
+    *,
+    phase: str,
+    causes: list[dict[str, str]],
+    status: str = "BLOCKED",
+    lossy_projection: bool = False,
+) -> dict[str, Any]:
+    unique: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for cause in causes:
+        identity = (cause["code"], cause["source"], cause["phase"])
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(cause)
+    return agent_failure.build_failure_core(
+        surface="AGENT_CYCLE",
+        phase=phase,
+        status=status,
+        causes=unique,
+        observation_retry="UNKNOWN",
+        operation_replay="NOT_APPLICABLE",
+        mutation_state="NOT_APPLICABLE",
+        lossy_projection=lossy_projection,
+    )
+
+
+def _hosted_cause(code: str, phase: str) -> dict[str, str]:
+    return {"code": code, "source": "hosted-agent-cycle", "phase": phase}
+
+
+def _context_failure_core(context: dict[str, Any]) -> dict[str, Any]:
+    agent_cycle.validate_context(context)
+    status = context["status"] if context["status"] in {"BLOCKED", "UNKNOWN"} else "BLOCKED"
+    blockers = context.get("blockingUnknowns")
+    causes = [
+        {"code": code, "source": "agent-cycle", "phase": "BEGIN"}
+        for code in blockers
+        if isinstance(code, str) and agent_failure.CODE_RE.fullmatch(code)
+    ] if isinstance(blockers, list) else []
+    lossy = not causes
+    if not causes:
+        causes.append(_hosted_cause("HOSTED_AGENT_CANONICAL_BEGIN_FAILED", "BEGIN"))
+    causes.append(_hosted_cause("HOSTED_AGENT_BEGIN_NOT_READY", "BEGIN"))
+    return _failure_core(
+        phase="BEGIN",
+        status=status,
+        causes=causes,
+        lossy_projection=lossy,
+    )
+
+
 def begin_from_envelope(
     command: dict[str, Any], meta: dict[str, int], *, context_path: str, manifest_path: str
 ) -> dict[str, Any]:
@@ -352,11 +420,27 @@ def begin_from_envelope(
         "--json",
     ])
     if rc != 0:
-        status = context.get("status") or context.get("error") or f"exit-{rc}"
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_NOT_READY", str(status))
+        try:
+            failure_core = _context_failure_core(context)
+        except Exception:
+            failure_core = _failure_core(
+                phase="BEGIN",
+                causes=[
+                    _hosted_cause("HOSTED_AGENT_CANONICAL_BEGIN_FAILED", "BEGIN"),
+                    _hosted_cause("HOSTED_AGENT_BEGIN_NOT_READY", "BEGIN"),
+                ],
+                lossy_projection=True,
+            )
+        raise HostedAgentCycleError(
+            "HOSTED_AGENT_BEGIN_NOT_READY",
+            failure_core=failure_core,
+        )
     agent_cycle.validate_context(context)
     if context["status"] != "READY":
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_NOT_READY", context["status"])
+        raise HostedAgentCycleError(
+            "HOSTED_AGENT_BEGIN_NOT_READY",
+            failure_core=_context_failure_core(context),
+        )
     manifest = _begin_manifest(command, context, meta)
     validate_begin_manifest(manifest, context)
     _write_json(context_path, context)
@@ -461,6 +545,29 @@ def _validate_close_binding(
         raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_SUBSTITUTION")
 
 
+def _write_lifecycle_failure_core(
+    report: dict[str, Any],
+    wrapper: str,
+) -> dict[str, Any]:
+    blockers = report.get("blockers")
+    causes = [
+        {"code": code, "source": "agent-write-lifecycle-guard", "phase": "CLOSE"}
+        for code in blockers
+        if isinstance(code, str) and agent_failure.CODE_RE.fullmatch(code)
+    ] if isinstance(blockers, list) else []
+    if not causes:
+        causes.append(_hosted_cause(wrapper, "CLOSE"))
+        lossy = True
+    else:
+        causes.append(_hosted_cause(wrapper, "CLOSE"))
+        lossy = False
+    return _failure_core(
+        phase="CLOSE",
+        causes=causes,
+        lossy_projection=lossy,
+    )
+
+
 def _require_clean_write_lifecycle(
     manifest: dict[str, Any], meta: dict[str, int], *, output_path: str
 ) -> None:
@@ -481,7 +588,16 @@ def _require_clean_write_lifecycle(
                 close_comment_id=close_comment_id,
             )
         except agent_write_lifecycle_guard.AgentWriteLifecycleGuardError as exc:
-            raise HostedAgentCycleError(exc.code) from exc
+            core = _failure_core(
+                phase="CLOSE",
+                causes=[{
+                    "code": exc.code,
+                    "source": "agent-write-lifecycle-guard",
+                    "phase": "CLOSE",
+                }],
+                lossy_projection=False,
+            )
+            raise HostedAgentCycleError(exc.code, failure_core=core) from exc
         last_report = report
         if report["state"] in {"NONE", "RELEASED"}:
             _write_json(Path(output_path).with_name("agent-write-lifecycle-close.json"), report)
@@ -492,10 +608,44 @@ def _require_clean_write_lifecycle(
     assert last_report is not None
     _write_json(Path(output_path).with_name("agent-write-lifecycle-close.json"), last_report)
     if last_report["state"] == "ACTIVE":
-        raise HostedAgentCycleError("AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE")
-    if last_report["state"] == "EXPIRED":
-        raise HostedAgentCycleError("AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE")
-    raise HostedAgentCycleError("AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE")
+        code = "AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE"
+    elif last_report["state"] == "EXPIRED":
+        code = "AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE"
+    else:
+        code = "AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE"
+    raise HostedAgentCycleError(
+        code,
+        failure_core=_write_lifecycle_failure_core(last_report, code),
+    )
+
+
+def _closure_failure_core(
+    closure: dict[str, Any],
+    context: dict[str, Any],
+    evidence: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    try:
+        agent_cycle_close.validate_closure(closure, context, evidence=evidence)
+    except Exception:
+        return None
+    if closure["status"] == "PASS":
+        return None
+    blockers = closure["receipt"].get("blockers")
+    causes = [
+        {"code": code, "source": "agent-cycle-close", "phase": "CLOSE"}
+        for code in blockers
+        if isinstance(code, str) and agent_failure.CODE_RE.fullmatch(code)
+    ] if isinstance(blockers, list) else []
+    lossy = not causes
+    if not causes:
+        causes.append(_hosted_cause("HOSTED_AGENT_CANONICAL_CLOSE_FAILED", "CLOSE"))
+    causes.append(_hosted_cause("HOSTED_AGENT_CLOSE_NOT_PASS", "CLOSE"))
+    return _failure_core(
+        phase="CLOSE",
+        status=closure["status"],
+        causes=causes,
+        lossy_projection=lossy,
+    )
 
 
 def close_from_envelope(
@@ -527,9 +677,23 @@ def close_from_envelope(
                 repository=REPOSITORY,
             )
         except hosted_agent_cycle_trace.HostedAgentCycleTraceError as exc:
+            causes = [{
+                "code": exc.code,
+                "source": "hosted-agent-cycle-trace",
+                "phase": "CLOSE",
+            }]
+            code = exc.code
             if exc.code == "EXECUTION_TRACE_INCOMPLETE":
-                raise HostedAgentCycleError("HOSTED_AGENT_EXECUTION_TRACE_INCOMPLETE") from exc
-            raise HostedAgentCycleError(exc.code) from exc
+                code = "HOSTED_AGENT_EXECUTION_TRACE_INCOMPLETE"
+                causes.append(_hosted_cause(code, "CLOSE"))
+            raise HostedAgentCycleError(
+                code,
+                failure_core=_failure_core(
+                    phase="CLOSE",
+                    causes=causes,
+                    lossy_projection=False,
+                ),
+            ) from exc
         effective_command = validate_command(effective_command)
         trace_path = Path(output_path).with_name("execution-trace.json")
         _write_json(trace_path, trace_value)
@@ -554,13 +718,28 @@ def close_from_envelope(
     for path in evidence_paths:
         args.extend(["--evidence", path])
     rc, closure = _run_agent(args)
-    if rc != 0:
-        status = closure.get("status") or closure.get("error") or f"exit-{rc}"
-        raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS", str(status))
     evidence = agent_cycle_close.load_evidence(evidence_paths)
+    structured_failure = _closure_failure_core(closure, context, evidence)
+    if structured_failure is not None:
+        raise HostedAgentCycleError(
+            "HOSTED_AGENT_CLOSE_NOT_PASS",
+            failure_core=structured_failure,
+        )
+    if rc != 0:
+        raise HostedAgentCycleError(
+            "HOSTED_AGENT_CLOSE_NOT_PASS",
+            failure_core=_failure_core(
+                phase="CLOSE",
+                causes=[
+                    _hosted_cause("HOSTED_AGENT_CANONICAL_CLOSE_FAILED", "CLOSE"),
+                    _hosted_cause("HOSTED_AGENT_CLOSE_NOT_PASS", "CLOSE"),
+                ],
+                lossy_projection=True,
+            ),
+        )
     agent_cycle_close.validate_closure(closure, context, evidence=evidence)
     if closure["status"] != "PASS":
-        raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS", closure["status"])
+        raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_NOT_PASS")
     _write_json(output_path, closure)
     source = _source(meta)
     receipt = closure["receipt"]
@@ -582,22 +761,48 @@ def close_from_envelope(
     return {**core, "resultHash": stable_hash(core)}
 
 
-def failure_payload(exc: BaseException, command: dict[str, Any] | None = None) -> dict[str, Any]:
-    code = getattr(exc, "code", None)
-    if not isinstance(code, str) or not code:
-        text = str(exc)
-        code = text.split(":", 1)[0] if text else exc.__class__.__name__
-    core = {
+def _correlation(command: dict[str, Any] | None) -> tuple[str | None, str | None]:
+    if not isinstance(command, dict):
+        return None, None
+    try:
+        value = validate_command(command)
+    except Exception:
+        return None, None
+    return value["requestId"], stable_hash(value)
+
+
+def failure_payload(
+    exc: BaseException,
+    command: dict[str, Any] | None = None,
+    *,
+    phase: str,
+) -> dict[str, Any]:
+    if phase not in agent_failure.PHASES:
+        raise HostedAgentCycleError("HOSTED_AGENT_FAILURE_PHASE_INVALID")
+    embedded = getattr(exc, "failure_core", None)
+    if isinstance(embedded, dict):
+        failure_core = agent_failure.validate_failure_core(embedded)
+        if failure_core["phase"] != phase:
+            raise HostedAgentCycleError("HOSTED_AGENT_FAILURE_PHASE_MISMATCH")
+    else:
+        code = getattr(exc, "code", None)
+        if not isinstance(code, str) or not agent_failure.CODE_RE.fullmatch(code):
+            code = "HOSTED_AGENT_UNEXPECTED_FAILURE"
+        failure_core = _failure_core(
+            phase=phase,
+            causes=[_hosted_cause(code, phase)],
+            lossy_projection=True,
+        )
+    request_id, digest = _correlation(command)
+    body = {
         "schemaVersion": FAILURE_SCHEMA,
-        "requestId": command.get("requestId") if isinstance(command, dict) else None,
-        "commandHash": command_hash(command) if isinstance(command, dict) else None,
+        "requestId": request_id,
+        "commandHash": digest,
         "status": "BLOCKED",
-        "blockers": [code],
-        "detail": str(exc),
-        "semanticAuthority": False,
-        "authorizesMutation": False,
+        "failureCore": failure_core,
     }
-    return {**core, "failureHash": stable_hash(core)}
+    value = {**body, "failureHash": stable_hash(body)}
+    return agent_failure.validate_hosted_cycle_failure(value)
 
 
 def _emit_output(path: str, key: str, value: str) -> None:
@@ -632,6 +837,7 @@ def main(argv: list[str] | None = None) -> int:
 
     failure = sub.add_parser("failure")
     failure.add_argument("--error", required=True)
+    failure.add_argument("--phase", required=True, choices=sorted(agent_failure.PHASES))
     failure.add_argument("--command")
     failure.add_argument("--result", required=True)
 
@@ -667,14 +873,21 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             exc = HostedAgentCycleError(args.error)
-            result = failure_payload(exc, command_value)
+            result = failure_payload(exc, command_value, phase=args.phase)
         _write_json(args.result, result)
         print(json.dumps(result, ensure_ascii=False))
         return 0
     except Exception as exc:
         result_path = getattr(args, "result", None)
         if result_path:
-            payload = failure_payload(exc, command_value)
+            phase = (
+                "BEGIN"
+                if args.command_name == "begin"
+                else "CLOSE"
+                if args.command_name == "close"
+                else getattr(args, "phase", "TRANSPORT")
+            )
+            payload = failure_payload(exc, command_value, phase=phase)
             _write_json(result_path, payload)
             print(json.dumps(payload, ensure_ascii=False))
         else:

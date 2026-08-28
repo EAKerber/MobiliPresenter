@@ -24,6 +24,16 @@ FAILURE_CORE_FIELDS = {
 CAUSE_FIELDS = {"code", "source", "phase"}
 RECOVERY_FIELDS = {"observationRetry", "operationReplay"}
 
+HOSTED_CYCLE_FAILURE_SCHEMA = "HostedAgentCycleFailure 0.2"
+HOSTED_CYCLE_FAILURE_FIELDS = {
+    "schemaVersion",
+    "requestId",
+    "commandHash",
+    "status",
+    "failureCore",
+    "failureHash",
+}
+
 SURFACES = {
     "AGENT_CYCLE",
     "AGENT_TOOL",
@@ -219,6 +229,39 @@ def _validate_legacy_hash(value: dict[str, Any]) -> None:
         raise AgentFailureError("AGENT_FAILURE_LEGACY_HASH_MISMATCH")
 
 
+def validate_hosted_cycle_failure(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != HOSTED_CYCLE_FAILURE_FIELDS:
+        raise AgentFailureError("HOSTED_AGENT_FAILURE_FIELDS_INVALID")
+    if value.get("schemaVersion") != HOSTED_CYCLE_FAILURE_SCHEMA:
+        raise AgentFailureError("HOSTED_AGENT_FAILURE_SCHEMA_UNSUPPORTED")
+    request_id = value.get("requestId")
+    command_hash = value.get("commandHash")
+    if request_id is None or command_hash is None:
+        if request_id is not None or command_hash is not None:
+            raise AgentFailureError("HOSTED_AGENT_FAILURE_CORRELATION_INVALID")
+    else:
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise AgentFailureError("HOSTED_AGENT_FAILURE_REQUEST_ID_INVALID")
+        if not isinstance(command_hash, str) or not HASH_RE.fullmatch(command_hash):
+            raise AgentFailureError("HOSTED_AGENT_FAILURE_COMMAND_HASH_INVALID")
+    if value.get("status") != "BLOCKED":
+        raise AgentFailureError("HOSTED_AGENT_FAILURE_STATUS_INVALID")
+    failure_core = validate_failure_core(value.get("failureCore"))
+    if failure_core["surface"] != "AGENT_CYCLE":
+        raise AgentFailureError("HOSTED_AGENT_FAILURE_SURFACE_INVALID")
+    digest = value.get("failureHash")
+    if not isinstance(digest, str) or not HASH_RE.fullmatch(digest):
+        raise AgentFailureError("HOSTED_AGENT_FAILURE_HASH_INVALID")
+    body = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "failureHash"
+    }
+    if digest != stable_hash(body):
+        raise AgentFailureError("HOSTED_AGENT_FAILURE_HASH_MISMATCH")
+    return value
+
+
 def normalize_legacy_failure(value: Any, *, phase: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise AgentFailureError("AGENT_FAILURE_LEGACY_INVALID")
@@ -278,6 +321,12 @@ def normalize_failure(value: Any, *, phase: str | None = None) -> dict[str, Any]
         if phase is not None and validated["phase"] != phase:
             raise AgentFailureError("AGENT_FAILURE_CORE_PHASE_MISMATCH")
         return validated
+    if isinstance(value, dict) and value.get("schemaVersion") == HOSTED_CYCLE_FAILURE_SCHEMA:
+        validated = validate_hosted_cycle_failure(value)
+        core = validated["failureCore"]
+        if phase is not None and core["phase"] != phase:
+            raise AgentFailureError("AGENT_FAILURE_CORE_PHASE_MISMATCH")
+        return core
     if phase is None:
         raise AgentFailureError("AGENT_FAILURE_LEGACY_PHASE_REQUIRED")
     return normalize_legacy_failure(value, phase=phase)

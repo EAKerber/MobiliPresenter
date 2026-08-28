@@ -109,11 +109,65 @@ class HostedAgentCycleCloseRegressionTests(unittest.TestCase):
 
         validate_binding.assert_called_once()
         load_evidence.assert_called_once_with([])
-        validate_closure.assert_called_once_with(closure, context, evidence=evidence)
+        self.assertGreaterEqual(validate_closure.call_count, 2)
+        validate_closure.assert_any_call(closure, context, evidence=evidence)
         self.assertEqual(result["status"], "PASS")
 
+    @patch("tools.hosted_agent_cycle.agent_cycle_close.validate_closure")
+    @patch("tools.hosted_agent_cycle.agent_cycle_close.load_evidence")
+    @patch("tools.hosted_agent_cycle._run_agent")
+    @patch("tools.hosted_agent_cycle._validate_close_binding")
+    def test_nonzero_close_preserves_valid_closure_blockers_before_wrapper(
+        self,
+        validate_binding,
+        run_agent,
+        load_evidence,
+        validate_closure,
+    ):
+        context = {"context": "before"}
+        closure = {
+            "status": "UNKNOWN",
+            "receipt": {
+                "blockers": [
+                    "UNATTRIBUTED_DURABLE_DELTA",
+                    "AFTER_CONTEXT_UNKNOWN",
+                ]
+            },
+        }
+        run_agent.return_value = (1, closure)
+        load_evidence.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            begin_dir = Path(tmp) / "begin"
+            begin_dir.mkdir()
+            (begin_dir / "context.json").write_text(json.dumps(context), encoding="utf-8")
+            (begin_dir / "manifest.json").write_text(
+                json.dumps(legacy_manifest()), encoding="utf-8"
+            )
+            with self.assertRaises(hosted.HostedAgentCycleError) as raised:
+                hosted.close_from_envelope(
+                    close_command(),
+                    {"issueNumber": 145, "commentId": 9001},
+                    begin_dir=str(begin_dir),
+                    output_path=str(Path(tmp) / "closure.json"),
+                    evidence_dir=str(Path(tmp) / "evidence"),
+                )
+
+        core = raised.exception.failure_core
+        self.assertEqual("UNKNOWN", core["status"])
+        self.assertEqual(
+            [
+                "UNATTRIBUTED_DURABLE_DELTA",
+                "AFTER_CONTEXT_UNKNOWN",
+                "HOSTED_AGENT_CLOSE_NOT_PASS",
+            ],
+            [item["code"] for item in core["causes"]],
+        )
+        self.assertFalse(core["lossyProjection"])
+        validate_closure.assert_called_once_with(closure, context, evidence=[])
+
     @patch("tools.hosted_agent_cycle.close_from_envelope", side_effect=TypeError("unexpected close bug"))
-    def test_cli_materializes_unexpected_close_exception_as_blocker(self, close):
+    def test_cli_materializes_unexpected_close_exception_without_text_semantics(self, close):
         command = close_command()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -136,8 +190,13 @@ class HostedAgentCycleCloseRegressionTests(unittest.TestCase):
         close.assert_called_once()
         self.assertEqual(rc, 2)
         self.assertEqual(payload["status"], "BLOCKED")
-        self.assertIn("unexpected close bug", payload["detail"])
-        self.assertFalse(payload["authorizesMutation"])
+        self.assertNotIn("detail", payload)
+        self.assertEqual(
+            ["HOSTED_AGENT_UNEXPECTED_FAILURE"],
+            [item["code"] for item in payload["failureCore"]["causes"]],
+        )
+        self.assertEqual("CLOSE", payload["failureCore"]["phase"])
+        self.assertTrue(payload["failureCore"]["lossyProjection"])
 
 
 if __name__ == "__main__":
