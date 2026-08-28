@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import hosted_agent_cycle
+from tools import agent_cycle_identity, hosted_agent_cycle
 from tools.agent_tools import admission, contracts, mutation_dispatch, resolver
 from tools.canonical import stable_hash
 
@@ -50,7 +50,7 @@ def _partial_begin(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     try:
-        return contracts._begin(value)
+        return agent_cycle_identity.canonical_begin(value)
     except RuntimeError:
         return None
 
@@ -59,7 +59,7 @@ def _partial_actor(value: Any) -> dict[str, str] | None:
     if not isinstance(value, dict):
         return None
     try:
-        return contracts._actor(value)
+        return agent_cycle_identity.canonical_actor(value)
     except RuntimeError:
         return None
 
@@ -113,16 +113,15 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
 def validate_begin_binding(request: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any]) -> None:
     contracts.validate_request(request)
     hosted_agent_cycle.validate_begin_manifest(manifest, context)
-    source = manifest["source"]
-    begin = request["begin"]
-    if (
-        begin["runId"] != source["runId"]
-        or begin["sourceSha"] != source["sourceSha"]
-        or begin["contextHash"] != manifest["contextHash"]
-    ):
-        raise HostedAgentToolError("HOSTED_AGENT_TOOL_BEGIN_REF_MISMATCH")
-    if request["actor"] != manifest["actor"]:
-        raise HostedAgentToolError("HOSTED_AGENT_TOOL_CYCLE_IDENTITY_MISMATCH")
+    try:
+        agent_cycle_identity.validate_hosted_binding(
+            request["begin"], request["actor"], manifest
+        )
+    except RuntimeError as exc:
+        code = str(exc).split(":", 1)[0]
+        if code == "AGENT_CYCLE_IDENTITY_BEGIN_MISMATCH":
+            raise HostedAgentToolError("HOSTED_AGENT_TOOL_BEGIN_REF_MISMATCH") from exc
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_CYCLE_IDENTITY_MISMATCH") from exc
 
 
 def _terminal_payload(
