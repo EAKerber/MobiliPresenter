@@ -2,11 +2,11 @@
 """Hosted carrier for the Agent Cycle begin/close protocol.
 
 The carrier remains non-authoritative. Current begin emits a public
-AgentCycleHandle 0.1 and close accepts both the historical field-oriented
-HostedAgentCycleCommand 0.1 and a handle-first HostedAgentCycleCommand 0.2.
-A handle-first close is reduced back to the existing 0.1 command only after the
-exact begin artifact has been materialized and the handle has been rebound to
-its context and manifest.
+AgentCycleHandle 0.1. Historical HostedAgentCycleCommand 0.1 remains accepted,
+handle-first close uses HostedAgentCycleCommand 0.2, and explicit Work-bound
+begin uses HostedAgentCycleCommand 0.3. A handle-first close is reduced back to
+the existing 0.1 command only after the exact begin artifact has been
+materialized and the handle has been rebound to its context and manifest.
 """
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ from tools import agent_cycle_close
 from tools import agent_cycle_identity
 from tools import agent_failure
 from tools import agent_write_lifecycle_guard
+from tools import continuation_remote
 from tools import hosted_agent_cycle_trace
 from tools import hosted_cycle_handle
 from tools import remote_canonical_execution
@@ -40,9 +41,11 @@ REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
 REQUEST_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1"
 REQUEST_MARKER_V02 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2"
+REQUEST_MARKER_V03 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_3"
 RESULT_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RESULT_V0_1"
 COMMAND_SCHEMA = "HostedAgentCycleCommand 0.1"
 COMMAND_SCHEMA_V02 = "HostedAgentCycleCommand 0.2"
+COMMAND_SCHEMA_V03 = "HostedAgentCycleCommand 0.3"
 LEGACY_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.1"
 TRACE_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.2"
 BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.3"
@@ -64,6 +67,11 @@ COMMAND_FIELDS = {
 COMMAND_V02_FIELDS = {
     "schemaVersion", "requestId", "action", "handle", "evidenceCommentIds",
     "semanticAuthority", "authorizesMutation",
+}
+COMMAND_V03_FIELDS = {
+    "schemaVersion", "requestId", "action", "actor", "declaredIntent",
+    "machineScope", "workRef", "evidenceCommentIds", "semanticAuthority",
+    "authorizesMutation",
 }
 ACTOR_FIELDS = agent_cycle_identity.ACTOR_FIELDS
 BEGIN_REF_FIELDS = agent_cycle_identity.BEGIN_FIELDS
@@ -162,9 +170,38 @@ def validate_handle_close_command(value: Any) -> dict[str, Any]:
     return value
 
 
+def validate_work_begin_command(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != COMMAND_V03_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_BEGIN_FIELDS_INVALID")
+    if value.get("schemaVersion") != COMMAND_SCHEMA_V03 or value.get("action") != "begin":
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_BEGIN_INVALID")
+    _text(value.get("requestId"), "HOSTED_AGENT_REQUEST_ID_INVALID")
+    actor = _actor(value.get("actor"))
+    if actor != value["actor"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_NOT_CANONICAL")
+    declared = _text(value.get("declaredIntent"), "HOSTED_AGENT_INTENT_INVALID")
+    if declared != value["declaredIntent"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_INTENT_NOT_CANONICAL")
+    if value.get("machineScope") != "live":
+        raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_MUST_BE_LIVE")
+    try:
+        work_ref = agent_cycle.validate_work_ref(value.get("workRef"))
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_REF_INVALID") from exc
+    if work_ref != value.get("workRef"):
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_REF_NOT_CANONICAL")
+    if _evidence_ids(value.get("evidenceCommentIds")):
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_BEGIN_EVIDENCE_INVALID")
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_MUST_NOT_AUTHORIZE")
+    return value
+
+
 def validate_transport_command(value: Any) -> dict[str, Any]:
     if isinstance(value, dict) and value.get("schemaVersion") == COMMAND_SCHEMA_V02:
         return validate_handle_close_command(value)
+    if isinstance(value, dict) and value.get("schemaVersion") == COMMAND_SCHEMA_V03:
+        return validate_work_begin_command(value)
     return validate_command(value)
 
 
@@ -197,10 +234,12 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
     body = comment.get("body")
     if not isinstance(body, str):
         raise HostedAgentCycleError("HOSTED_AGENT_MARKER_INVALID")
-    marker = next(
-        (item for item in (REQUEST_MARKER, REQUEST_MARKER_V02) if body.startswith(item + "\n")),
-        None,
-    )
+    markers = {
+        REQUEST_MARKER: COMMAND_SCHEMA,
+        REQUEST_MARKER_V02: COMMAND_SCHEMA_V02,
+        REQUEST_MARKER_V03: COMMAND_SCHEMA_V03,
+    }
+    marker = next((item for item in markers if body.startswith(item + "\n")), None)
     if marker is None:
         raise HostedAgentCycleError("HOSTED_AGENT_MARKER_INVALID")
     try:
@@ -208,7 +247,7 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
     except json.JSONDecodeError as exc:
         raise HostedAgentCycleError("HOSTED_AGENT_JSON_INVALID") from exc
     command = validate_transport_command(command)
-    if (marker == REQUEST_MARKER) != (command["schemaVersion"] == COMMAND_SCHEMA):
+    if command["schemaVersion"] != markers[marker]:
         raise HostedAgentCycleError("HOSTED_AGENT_MARKER_SCHEMA_MISMATCH")
     issue_number = issue.get("number")
     comment_id = comment.get("id")
@@ -301,7 +340,7 @@ def _begin_manifest(command: dict[str, Any], context: dict[str, Any], meta: dict
     core = {
         "schemaVersion": BEGIN_MANIFEST_SCHEMA,
         "requestId": command["requestId"],
-        "commandHash": command_hash(command),
+        "commandHash": transport_command_hash(command),
         "actor": copy.deepcopy(command["actor"]),
         "declaredIntent": command["declaredIntent"],
         "machineScope": "live",
@@ -445,12 +484,35 @@ def _context_failure_core(context: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _observe_work_ref(work_ref: Any) -> dict[str, str] | None:
+    try:
+        normalized = agent_cycle.validate_work_ref(work_ref)
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_REF_INVALID") from exc
+    if normalized is None:
+        return None
+    try:
+        observed = continuation_remote.GitHubContinuationAuthority(
+            repository=REPOSITORY
+        ).observe()
+    except continuation_remote.ContinuationRemoteError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_AUTHORITY_UNKNOWN", exc.code) from exc
+    if normalized["workId"] not in observed.items:
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_NOT_FOUND")
+    return normalized
+
+
 def begin_from_envelope(
     command: dict[str, Any], meta: dict[str, int], *, context_path: str, manifest_path: str
 ) -> dict[str, Any]:
-    command = validate_command(command)
+    command = validate_transport_command(command)
     if command["action"] != "begin":
         raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_ACTION_REQUIRED")
+    work_ref = (
+        _observe_work_ref(command["workRef"])
+        if command["schemaVersion"] == COMMAND_SCHEMA_V03
+        else None
+    )
     rc, context = _run_agent([
         "begin",
         "--role", command["actor"]["role"],
@@ -480,6 +542,8 @@ def begin_from_envelope(
             "HOSTED_AGENT_BEGIN_NOT_READY",
             failure_core=_context_failure_core(context),
         )
+    if command["schemaVersion"] == COMMAND_SCHEMA_V03:
+        context = agent_cycle.bind_work_ref(context, work_ref)
     manifest = _begin_manifest(command, context, meta)
     validate_begin_manifest(manifest, context)
     handle = _handle_for_manifest(context, manifest)
@@ -489,7 +553,7 @@ def begin_from_envelope(
     core = {
         "schemaVersion": BEGIN_RESULT_SCHEMA,
         "requestId": command["requestId"],
-        "commandHash": command_hash(command),
+        "commandHash": transport_command_hash(command),
         "runId": manifest["source"]["runId"],
         "sourceSha": manifest["source"]["sourceSha"],
         "artifactName": manifest["artifactName"],
