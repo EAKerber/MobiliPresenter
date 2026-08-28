@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentCycleHandle 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "cycleId",
+    "cycleInstanceId",
+    "context",
+    "actor",
+    "resumeToken",
+    "readOnly",
+    "semanticAuthority",
+    "authorizesMutation",
+    "handleHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "AgentCycleHandle 0.1"},
+    "repository": {"type": "string", "minLength": 1},
+    "cycleId": {"type": "string", "pattern": "^cycle-[0-9a-f]{20}$"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "contextHash"],
+      "properties": {
+        "schemaVersion": {"type": "string", "minLength": 1},
+        "contextHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "workerId", "sessionId"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "workerId": {"type": "string", "minLength": 1},
+        "sessionId": {"type": "string", "minLength": 1}
+      }
+    },
+    "resumeToken": {"type": "string", "minLength": 1},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "handleHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
