@@ -204,8 +204,9 @@ class AgentCycleR0CharacterizationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "HOSTED_AGENT_COMMAND_FIELDS_INVALID"):
             hosted_agent_cycle.validate_command(command)
 
+    @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
     @patch("tools.hosted_agent_cycle._run_agent")
-    def test_hosted_begin_failure_compacts_the_root_blocker(self, run_agent):
+    def test_hosted_begin_failure_preserves_the_root_blocker(self, run_agent, validate_context):
         command = {
             "schemaVersion": hosted_agent_cycle.COMMAND_SCHEMA,
             "requestId": "r0-begin-failure",
@@ -233,11 +234,24 @@ class AgentCycleR0CharacterizationTests(unittest.TestCase):
                 context_path="unused-context.json",
                 manifest_path="unused-manifest.json",
             )
-        failure = hosted_agent_cycle.failure_payload(raised.exception, command)
+        failure = hosted_agent_cycle.failure_payload(
+            raised.exception,
+            command,
+            phase="BEGIN",
+        )
 
-        self.assertEqual(failure["blockers"], ["HOSTED_AGENT_BEGIN_NOT_READY"])
-        self.assertNotIn("ROOT_PROVIDER_SCOPE_MISSING", failure["detail"])
-        self.assertEqual(failure["detail"], "HOSTED_AGENT_BEGIN_NOT_READY:BLOCKED")
+        self.assertEqual(failure["schemaVersion"], "HostedAgentCycleFailure 0.2")
+        self.assertEqual(
+            [
+                "ROOT_PROVIDER_SCOPE_MISSING",
+                "HOSTED_AGENT_BEGIN_NOT_READY",
+            ],
+            [item["code"] for item in failure["failureCore"]["causes"]],
+        )
+        self.assertFalse(failure["failureCore"]["lossyProjection"])
+        self.assertNotIn("blockers", failure)
+        self.assertNotIn("detail", failure)
+        validate_context.assert_called()
 
     def test_result_after_close_is_outside_the_current_trace_window(self):
         trace = trace_collect.build_trace(
