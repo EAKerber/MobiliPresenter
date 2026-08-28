@@ -1,6 +1,6 @@
 # Agent Cycle R2A — Cycle Identity Kernel + CycleHandle 0.1
 
-Status: **implementation in qualification**
+Status: **implemented and qualified on PR #171**
 
 Base: `main@cbb6cbae91f69b4825cd845aa92e93240b66e277`
 
@@ -162,7 +162,7 @@ Preserved without wire-version changes:
 - existing trace schema and result correlation;
 - old begin artifacts that contain only context + manifest.
 
-R2A must preserve the exact historical Hosted formula for `cycleInstanceId` so
+R2A preserves the exact historical Hosted formula for `cycleInstanceId`, so
 existing manifests continue to validate.
 
 ## 8. What R2A does not solve
@@ -214,6 +214,35 @@ R2A is qualified only if all of the following hold:
 10. full Agent Ops, semantic checks, OperationalSemantics coverage, roadmap
     freshness, capability lifecycle, Coordination Guard and Supervisor Snapshot
     remain green.
+
+### Qualification result
+
+The first PR qualification found three pre-existing synthetic fixtures that
+mocked higher-level validators and therefore supplied incomplete or invented
+identity facts: one partial context omitted `repository/schemaVersion`, one
+partial manifest omitted hosted source correlation fields, and one Agent Tool
+fixture hard-coded an arbitrary `cycleInstanceId`.
+
+No runtime compatibility fallback was added. The fixtures were made
+identity-complete and now derive the concrete instance through the canonical
+kernel. This is an intentional application of the Single Definition gate: tests
+may mock a trust boundary, but they do not get a second private definition of
+cycle identity.
+
+Qualified runtime head before this documentation-only record:
+`3716e00ce6286082f540cd122e4a360841943783`.
+
+PASS:
+
+- Agent Ops run #1207 (`33177526998`): Toolbox unit tests, Semantic Contracts,
+  Operational Semantics coverage, roadmap freshness, capability lifecycle,
+  Doctor/coherence, Project Machine, routine, maintenance, Scheduler,
+  integration-reconcile and handoff evidence all passed;
+- Coordination Guard run #412 (`33177527052`);
+- Supervisor Snapshot run #1001 (`33177526996`).
+
+This documentation-only qualification record must itself be requalified before
+promotion.
 
 ## 11. R2B admission / death condition
 
