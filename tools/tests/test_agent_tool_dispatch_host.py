@@ -123,6 +123,38 @@ class AgentToolDispatchHostTests(unittest.TestCase):
 
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
     @patch("tools.agent_tools.dispatch_host._comments")
+    @patch("tools.agent_tools.dispatch_host._observe_branch_head", return_value=EXPECTED_HEAD)
+    @patch("tools.agent_tools.dispatch_host.mutation_dispatch.build_execution_result")
+    @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs")
+    def test_same_request_hash_prior_attempt_fences_even_when_dispatch_changed(
+        self, collect, build_result, observe, comments, validate_bundle
+    ):
+        value = bundle()
+        prior_dispatch = copy.deepcopy(value["dispatch"])
+        prior_dispatch["dispatchHash"] = "9" * 64
+        prior_dispatch["source"]["requestCommentId"] = 99
+        prior_dispatch["source"]["hostedRunId"] = 455
+        comments.return_value = [
+            bot_comment(dispatch_host.ATTEMPT_MARKER, attempt(prior_dispatch, run_id=899))
+        ]
+        build_result.return_value = {
+            "status": "UNKNOWN",
+            "blockers": ["AGENT_TOOL_MUTATION_PRIOR_ATTEMPT_WITHOUT_TERMINAL"],
+        }
+        with patch("tools.agent_tools.dispatch_host._hosted_terminal", return_value={"status": "UNKNOWN"}):
+            result = dispatch_host.inspect_protocol(
+                value,
+                host_sha=HOST_SHA,
+                hosted_run_id=HOSTED_RUN_ID,
+                run_id=901,
+                transport=FakeTransport(),
+            )
+        self.assertEqual("PRIOR_ATTEMPT_UNKNOWN", result["state"])
+        collect.assert_not_called()
+        build_result.assert_called_once()
+
+    @patch("tools.agent_tools.dispatch_host.validate_bundle")
+    @patch("tools.agent_tools.dispatch_host._comments")
     @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs")
     def test_existing_terminal_short_circuits_without_reproof_or_new_attempt(
         self, collect, comments, validate_bundle
