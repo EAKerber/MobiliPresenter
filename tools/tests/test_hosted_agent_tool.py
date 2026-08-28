@@ -5,6 +5,7 @@ import json
 import unittest
 from unittest.mock import patch
 
+from tools import agent_cycle_identity
 from tools import hosted_agent_tool as hosted
 from tools.agent_tools import contracts
 from tools.canonical import stable_hash
@@ -39,11 +40,19 @@ def event(value):
 
 
 def manifest(value):
+    source = {
+        "runId": 123,
+        "sourceSha": "a" * 40,
+        "issueNumber": 145,
+        "commentId": 8001,
+    }
     return {
-        "source": {"runId": 123, "sourceSha": "a" * 40, "issueNumber": 145, "commentId": 8001},
+        "source": source,
         "contextHash": "b" * 64,
         "actor": copy.deepcopy(value["actor"]),
-        "cycleInstanceId": "cycle-instance-" + "c" * 24,
+        "cycleInstanceId": agent_cycle_identity.hosted_cycle_instance_id(
+            source, value["actor"], "b" * 64
+        ),
     }
 
 
@@ -129,10 +138,11 @@ class HostedAgentToolTests(unittest.TestCase):
         }
         collect.return_value = proof_set
         build_dispatch.return_value = dispatch
+        current_manifest = manifest(value)
 
         outcome = hosted.prepare_request(
             value,
-            manifest(value),
+            current_manifest,
             {},
             meta={"issueNumber": 145, "commentId": 9001},
             hosted_run_id=456,
@@ -144,7 +154,7 @@ class HostedAgentToolTests(unittest.TestCase):
         build_dispatch.assert_called_once_with(
             plan,
             proof_set,
-            cycle_instance_id="cycle-instance-" + "c" * 24,
+            cycle_instance_id=current_manifest["cycleInstanceId"],
             issue_number=145,
             request_comment_id=9001,
             hosted_run_id=456,
