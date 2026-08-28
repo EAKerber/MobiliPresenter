@@ -74,7 +74,7 @@ def _load(path: Path) -> dict[str, Any]:
 
 def load_bundle(root: str | Path) -> dict[str, dict[str, Any]]:
     base = Path(root)
-    return {
+    result = {
         "request": _load(base / "agent-tool-request.json"),
         "plan": _load(base / "agent-tool-plan.json"),
         "proofSet": _load(base / "agent-tool-proof-set.json"),
@@ -82,6 +82,10 @@ def load_bundle(root: str | Path) -> dict[str, dict[str, Any]]:
         "context": _load(base / "agent-tool-begin-context.json"),
         "manifest": _load(base / "agent-tool-begin-manifest.json"),
     }
+    outer_path = base / "agent-tool-outer-request.json"
+    if outer_path.is_file():
+        result["outerRequest"] = _load(outer_path)
+    return result
 
 
 class MutationTrackingTransport:
@@ -150,7 +154,13 @@ def _comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
 
 
 def _validate_original_request(
-    request: dict[str, Any], dispatch: dict[str, Any], *, transport: Any
+    request: dict[str, Any],
+    dispatch: dict[str, Any],
+    *,
+    transport: Any,
+    outer_request: dict[str, Any] | None = None,
+    manifest: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
 ) -> None:
     issue_number = dispatch["source"]["issueNumber"]
     comment_id = dispatch["source"]["requestCommentId"]
@@ -160,9 +170,24 @@ def _validate_original_request(
     comment = _comment(transport, comment_id)
     if comment.get("author_association") != "OWNER":
         raise DispatchHostError("AGENT_TOOL_DISPATCH_REQUEST_ACTOR_FORBIDDEN")
-    observed = _json_after_marker(comment.get("body"), hosted_agent_tool.REQUEST_MARKER)
-    if observed != request:
-        raise DispatchHostError("AGENT_TOOL_DISPATCH_REQUEST_READBACK_MISMATCH")
+    body = comment.get("body")
+    if outer_request is None:
+        observed = _json_after_marker(body, hosted_agent_tool.REQUEST_MARKER)
+        if observed != request:
+            raise DispatchHostError("AGENT_TOOL_DISPATCH_REQUEST_READBACK_MISMATCH")
+        return
+    if manifest is None or context is None:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_OUTER_CONTEXT_REQUIRED")
+    observed = _json_after_marker(body, hosted_agent_tool.REQUEST_MARKER_V02)
+    if observed != outer_request:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_OUTER_REQUEST_READBACK_MISMATCH")
+    try:
+        hosted_agent_tool.validate_handle_request(outer_request)
+        derived = hosted_agent_tool.derive_handle_request(outer_request, manifest, context)
+    except RuntimeError as exc:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_OUTER_REQUEST_INVALID") from exc
+    if derived != request:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_DERIVED_REQUEST_MISMATCH")
 
 
 def _validate_current_policy(
@@ -242,7 +267,14 @@ def validate_bundle(
         raise DispatchHostError("AGENT_TOOL_DISPATCH_SEMANTIC_HOST_DRIFT")
     if dispatch["source"]["hostedRunId"] != hosted_run_id:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_HOSTED_RUN_MISMATCH")
-    _validate_original_request(request, dispatch, transport=carrier)
+    _validate_original_request(
+        request,
+        dispatch,
+        transport=carrier,
+        outer_request=bundle.get("outerRequest"),
+        manifest=manifest,
+        context=context,
+    )
     _validate_current_policy(plan, context)
     return bundle
 
