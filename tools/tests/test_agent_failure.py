@@ -7,7 +7,6 @@ import unittest
 from tools import (
     agent_failure,
     agent_write_lifecycle,
-    hosted_agent_cycle,
     hosted_agent_tool,
     remote_canonical_issue,
 )
@@ -23,6 +22,33 @@ def _rehash(value: dict) -> dict:
     }
     value["failureCoreHash"] = stable_hash(core)
     return value
+
+
+def _legacy_hosted_cycle_failure(
+    code: str = "HOSTED_AGENT_BEGIN_NOT_READY",
+) -> dict:
+    body = {
+        "schemaVersion": "HostedAgentCycleFailure 0.1",
+        "requestId": None,
+        "commandHash": None,
+        "status": "BLOCKED",
+        "blockers": [code],
+        "detail": code,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**body, "failureHash": stable_hash(body)}
+
+
+def _hosted_cycle_v02(core: dict, *, correlated: bool = False) -> dict:
+    body = {
+        "schemaVersion": agent_failure.HOSTED_CYCLE_FAILURE_SCHEMA,
+        "requestId": "hosted-cycle-1" if correlated else None,
+        "commandHash": "a" * 64 if correlated else None,
+        "status": "BLOCKED",
+        "failureCore": copy.deepcopy(core),
+    }
+    return {**body, "failureHash": stable_hash(body)}
 
 
 class AgentFailureCoreTests(unittest.TestCase):
@@ -140,13 +166,60 @@ class AgentFailureCoreTests(unittest.TestCase):
             agent_failure.validate_failure_core(value)
 
 
-class AgentFailureLegacyNormalizationTests(unittest.TestCase):
-    def test_hosted_cycle_failure_is_readable_without_inferred_retry(self):
-        legacy = hosted_agent_cycle.failure_payload(
-            hosted_agent_cycle.HostedAgentCycleError(
-                "HOSTED_AGENT_BEGIN_NOT_READY", "BLOCKED"
-            )
+class AgentFailureHostedCycleV02Tests(unittest.TestCase):
+    def build_core(self, *, phase: str = "BEGIN") -> dict:
+        return agent_failure.build_failure_core(
+            surface="AGENT_CYCLE",
+            phase=phase,
+            status="BLOCKED",
+            causes=[{
+                "code": "HOSTED_AGENT_BEGIN_NOT_READY",
+                "source": "hosted-agent-cycle",
+                "phase": phase,
+            }],
+            observation_retry="UNKNOWN",
+            operation_replay="NOT_APPLICABLE",
+            mutation_state="NOT_APPLICABLE",
+            lossy_projection=True,
         )
+
+    def test_v02_returns_embedded_core_without_external_phase(self):
+        core = self.build_core()
+        value = _hosted_cycle_v02(core, correlated=True)
+        self.assertEqual(value, agent_failure.validate_hosted_cycle_failure(value))
+        self.assertEqual(core, agent_failure.normalize_failure(value))
+        self.assertEqual(core, agent_failure.normalize_failure(value, phase="BEGIN"))
+
+    def test_v02_phase_mismatch_is_rejected(self):
+        value = _hosted_cycle_v02(self.build_core())
+        with self.assertRaisesRegex(
+            agent_failure.AgentFailureError, "AGENT_FAILURE_CORE_PHASE_MISMATCH"
+        ):
+            agent_failure.normalize_failure(value, phase="CLOSE")
+
+    def test_v02_shell_tamper_is_rejected(self):
+        value = _hosted_cycle_v02(self.build_core())
+        value["failureCore"]["lossyProjection"] = False
+        with self.assertRaisesRegex(
+            agent_failure.AgentFailureError, "AGENT_FAILURE_CORE_HASH_MISMATCH"
+        ):
+            agent_failure.validate_hosted_cycle_failure(value)
+
+    def test_v02_correlation_is_all_or_nothing(self):
+        value = _hosted_cycle_v02(self.build_core())
+        value["requestId"] = "partial-correlation"
+        value["failureHash"] = stable_hash(
+            {key: item for key, item in value.items() if key != "failureHash"}
+        )
+        with self.assertRaisesRegex(
+            agent_failure.AgentFailureError, "HOSTED_AGENT_FAILURE_CORRELATION_INVALID"
+        ):
+            agent_failure.validate_hosted_cycle_failure(value)
+
+
+class AgentFailureLegacyNormalizationTests(unittest.TestCase):
+    def test_hosted_cycle_literal_v01_is_readable_without_inferred_retry(self):
+        legacy = _legacy_hosted_cycle_failure()
         core = agent_failure.normalize_failure(legacy, phase="BEGIN")
         self.assertEqual("AGENT_CYCLE", core["surface"])
         self.assertEqual("BLOCKED", core["status"])
@@ -204,14 +277,14 @@ class AgentFailureLegacyNormalizationTests(unittest.TestCase):
                 self.assertTrue(core["lossyProjection"])
 
     def test_legacy_hash_and_closed_fields_are_required(self):
-        legacy = hosted_agent_cycle.failure_payload(RuntimeError("EXPECTED_FAILURE"))
+        legacy = _legacy_hosted_cycle_failure("EXPECTED_FAILURE")
         legacy["failureHash"] = ""
         with self.assertRaisesRegex(
             agent_failure.AgentFailureError, "AGENT_FAILURE_LEGACY_HASH_INVALID"
         ):
             agent_failure.normalize_failure(legacy, phase="BEGIN")
 
-        legacy = hosted_agent_cycle.failure_payload(RuntimeError("EXPECTED_FAILURE"))
+        legacy = _legacy_hosted_cycle_failure("EXPECTED_FAILURE")
         legacy["unexpected"] = True
         legacy["failureHash"] = stable_hash(
             {key: item for key, item in legacy.items() if key != "failureHash"}
@@ -222,7 +295,7 @@ class AgentFailureLegacyNormalizationTests(unittest.TestCase):
             agent_failure.normalize_failure(legacy, phase="BEGIN")
 
     def test_legacy_phase_is_never_inferred(self):
-        legacy = hosted_agent_cycle.failure_payload(RuntimeError("EXPECTED_FAILURE"))
+        legacy = _legacy_hosted_cycle_failure("EXPECTED_FAILURE")
         with self.assertRaisesRegex(
             agent_failure.AgentFailureError, "AGENT_FAILURE_LEGACY_PHASE_REQUIRED"
         ):
