@@ -4,14 +4,17 @@ import copy
 import json
 from typing import Any
 
-from tools import agent_write_lifecycle as lifecycle, coordination
+from tools import agent_write_lifecycle as lifecycle, coordination, hosted_handle_requests
 from tools.agent_tools import contracts as agent_tool_contracts
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
 REPORT_SCHEMA = "AgentWriteLeaseCloseReport 0.1"
 PROOF_SCHEMA = "AgentWriteLifecycleGuardProof 0.1"
+CURRENT_REPOSITORY = "EAKerber/MobiliPresenter"
 AGENT_TOOL_REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
+AGENT_TOOL_REQUEST_MARKER_V02 = hosted_handle_requests.TOOL_MARKER_V02
+WRITE_LEASE_REQUEST_MARKER_V02 = hosted_handle_requests.WRITE_LEASE_MARKER_V02
 STATES = {"NONE", "ACTIVE", "RELEASED", "EXPIRED", "UNKNOWN"}
 
 
@@ -52,55 +55,33 @@ def _comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
             "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID",
         )
         if not isinstance(value, list):
-            raise AgentWriteLifecycleGuardError(
-                "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID"
-            )
+            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID")
         result.extend(item for item in value if isinstance(item, dict))
         if len(value) < 100:
             return result
-    raise AgentWriteLifecycleGuardError(
-        "AGENT_WRITE_LIFECYCLE_COMMENTS_UNBOUNDED"
-    )
+    raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_COMMENTS_UNBOUNDED")
 
 
-def _before(
-    comments: list[dict[str, Any]],
-    comment_id: int | None,
-) -> list[dict[str, Any]]:
+def _before(comments: list[dict[str, Any]], comment_id: int | None) -> list[dict[str, Any]]:
     if comment_id is None:
         return list(comments)
     for index, item in enumerate(comments):
         if isinstance(item, dict) and item.get("id") == comment_id:
             return comments[:index]
-    raise AgentWriteLifecycleGuardError(
-        "AGENT_WRITE_LIFECYCLE_CUTOFF_INVALID"
-    )
+    raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_CUTOFF_INVALID")
 
 
-def _window(
-    comments: list[dict[str, Any]],
-    begin_id: int,
-    close_id: int,
-) -> list[dict[str, Any]]:
+def _window(comments: list[dict[str, Any]], begin_id: int, close_id: int) -> list[dict[str, Any]]:
     positions = {
-        item.get("id"): index
-        for index, item in enumerate(comments)
-        if isinstance(item, dict)
+        item.get("id"): index for index, item in enumerate(comments) if isinstance(item, dict)
     }
-    if (
-        begin_id not in positions
-        or close_id not in positions
-        or positions[begin_id] >= positions[close_id]
-    ):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_WINDOW_INVALID"
-        )
+    if begin_id not in positions or close_id not in positions or positions[begin_id] >= positions[close_id]:
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_WINDOW_INVALID")
     return comments[positions[begin_id] + 1:positions[close_id]]
 
 
 def _bound_results(
-    window: list[dict[str, Any]],
-    manifest: dict[str, Any],
+    window: list[dict[str, Any]], manifest: dict[str, Any]
 ) -> list[tuple[int, dict[str, Any]]]:
     begin = {
         "runId": manifest["source"]["runId"],
@@ -114,17 +95,12 @@ def _bound_results(
         if not isinstance(user, dict) or user.get("login") != "github-actions[bot]":
             continue
         value = _payload(comment.get("body"), lifecycle.RESULT_MARKER)
-        if (
-            not isinstance(value, dict)
-            or value.get("schemaVersion") != lifecycle.RESULT_SCHEMA
-        ):
+        if not isinstance(value, dict) or value.get("schemaVersion") != lifecycle.RESULT_SCHEMA:
             continue
         try:
             lifecycle.validate_result(value)
         except Exception as exc:
-            raise AgentWriteLifecycleGuardError(
-                "AGENT_WRITE_LIFECYCLE_RESULT_INVALID"
-            ) from exc
+            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID") from exc
         if (
             value["begin"] != begin
             or value["actor"] != actor
@@ -132,22 +108,13 @@ def _bound_results(
         ):
             continue
         comment_id = comment.get("id")
-        if (
-            not isinstance(comment_id, int)
-            or isinstance(comment_id, bool)
-            or comment_id <= 0
-        ):
-            raise AgentWriteLifecycleGuardError(
-                "AGENT_WRITE_LIFECYCLE_RESULT_COMMENT_INVALID"
-            )
+        if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
+            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_COMMENT_INVALID")
         found.append((comment_id, value))
     return found
 
 
-def _request_count(
-    window: list[dict[str, Any]],
-    manifest: dict[str, Any],
-) -> int:
+def _request_count(window: list[dict[str, Any]], manifest: dict[str, Any]) -> int:
     begin = {
         "runId": manifest["source"]["runId"],
         "sourceSha": manifest["source"]["sourceSha"],
@@ -156,26 +123,34 @@ def _request_count(
     actor = manifest["actor"]
     count = 0
     for comment in window:
-        if (
-            not isinstance(comment, dict)
-            or comment.get("author_association") != "OWNER"
-        ):
+        if not isinstance(comment, dict) or comment.get("author_association") != "OWNER":
             continue
-        value = _payload(comment.get("body"), lifecycle.REQUEST_MARKER)
-        if not isinstance(value, dict):
+        body = comment.get("body")
+        value = _payload(body, lifecycle.REQUEST_MARKER)
+        if isinstance(value, dict):
+            try:
+                request = lifecycle.validate_request(value)
+            except Exception:
+                continue
+            if request["begin"] == begin and request["actor"] == actor:
+                count += 1
+            continue
+        outer = _payload(body, WRITE_LEASE_REQUEST_MARKER_V02)
+        if not isinstance(outer, dict):
             continue
         try:
-            lifecycle.validate_request(value)
-        except Exception:
+            hosted_handle_requests.validate_write_lease(outer, repository=CURRENT_REPOSITORY)
+        except RuntimeError:
             continue
-        if value["begin"] == begin and value["actor"] == actor:
+        if hosted_handle_requests.matches_manifest(
+            outer.get("handle"), manifest, repository=CURRENT_REPOSITORY
+        ):
             count += 1
     return count
 
 
 def _bound_agent_tool_branches(
-    window: list[dict[str, Any]],
-    manifest: dict[str, Any],
+    window: list[dict[str, Any]], manifest: dict[str, Any]
 ) -> set[str]:
     begin = {
         "runId": manifest["source"]["runId"],
@@ -185,45 +160,47 @@ def _bound_agent_tool_branches(
     actor = manifest["actor"]
     branches: set[str] = set()
     for comment in window:
-        if (
-            not isinstance(comment, dict)
-            or comment.get("author_association") != "OWNER"
-        ):
+        if not isinstance(comment, dict) or comment.get("author_association") != "OWNER":
             continue
-        value = _payload(comment.get("body"), AGENT_TOOL_REQUEST_MARKER)
-        if not isinstance(value, dict):
-            continue
-        try:
-            request = agent_tool_contracts.validate_request(value)
-        except Exception:
-            continue
-        if request["begin"] != begin or request["actor"] != actor:
-            continue
-        branch = request["target"].get("branch")
+        body = comment.get("body")
+        value = _payload(body, AGENT_TOOL_REQUEST_MARKER)
+        if isinstance(value, dict):
+            try:
+                request = agent_tool_contracts.validate_request(value)
+            except Exception:
+                continue
+            if request["begin"] != begin or request["actor"] != actor:
+                continue
+            branch = request["target"].get("branch")
+        else:
+            outer = _payload(body, AGENT_TOOL_REQUEST_MARKER_V02)
+            if not isinstance(outer, dict):
+                continue
+            try:
+                hosted_handle_requests.validate_tool(outer, repository=CURRENT_REPOSITORY)
+            except RuntimeError:
+                continue
+            if not hosted_handle_requests.matches_manifest(
+                outer.get("handle"), manifest, repository=CURRENT_REPOSITORY
+            ):
+                continue
+            branch = outer["target"].get("branch")
         if isinstance(branch, str) and branch:
             branches.add(branch)
     return branches
 
 
 def _expected_owner(actor: dict[str, Any], branch: str) -> dict[str, Any]:
-    return {
-        "role": actor["role"],
-        "session": actor["sessionId"],
-        "branch": branch,
-        "pr": None,
-    }
+    return {"role": actor["role"], "session": actor["sessionId"], "branch": branch, "pr": None}
 
 
 def _matching_exact_leases(
-    active: list[dict[str, Any]],
-    *,
-    binding: dict[str, Any],
+    active: list[dict[str, Any]], *, binding: dict[str, Any]
 ) -> list[dict[str, Any]]:
     expected_owner = _expected_owner(binding["actor"], binding["branch"])
     resource = f"branch:{binding['branch']}"
     return [
-        lease
-        for lease in active
+        lease for lease in active
         if lease.get("leaseId") == binding["leaseId"]
         and lease.get("resource") == resource
         and lease.get("owner") == expected_owner
@@ -268,10 +245,7 @@ def prove_active_binding(
         if not isinstance(user, dict) or user.get("login") != "github-actions[bot]":
             continue
         value = _payload(comment.get("body"), lifecycle.RESULT_MARKER)
-        if (
-            not isinstance(value, dict)
-            or value.get("schemaVersion") != lifecycle.RESULT_SCHEMA
-        ):
+        if not isinstance(value, dict) or value.get("schemaVersion") != lifecycle.RESULT_SCHEMA:
             continue
         lifecycle.validate_result(value)
         if (
@@ -282,44 +256,27 @@ def prove_active_binding(
         ):
             continue
         comment_id = comment.get("id")
-        if (
-            not isinstance(comment_id, int)
-            or isinstance(comment_id, bool)
-            or comment_id <= 0
-        ):
-            raise AgentWriteLifecycleGuardError(
-                "AGENT_WRITE_LIFECYCLE_RESULT_COMMENT_INVALID"
-            )
+        if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
+            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_COMMENT_INVALID")
         candidates.append((comment_id, value))
 
     if not candidates:
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_BINDING_REQUIRED"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_REQUIRED")
 
     comment_id, result = candidates[-1]
     binding = result["binding"]
     if binding["state"] != "ACTIVE":
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_NOT_ACTIVE"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_NOT_ACTIVE")
 
     authority = GitHubCoordinationAuthority(transport=carrier)
     observation = authority.observe()
     if lifecycle.binding_is_expired(binding, observation.authority_now):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_BINDING_EXPIRED"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_EXPIRED")
 
-    active = coordination.active_leases(
-        observation.state,
-        observation.authority_now,
-    )
+    active = coordination.active_leases(observation.state, observation.authority_now)
     matching = _matching_exact_leases(active, binding=binding)
     if len(matching) != 1:
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
 
     core = {
         "schemaVersion": PROOF_SCHEMA,
@@ -333,9 +290,7 @@ def prove_active_binding(
         "lifecycleResultCommentId": comment_id,
         "leaseId": binding["leaseId"],
         "authorityHead": observation.head_sha,
-        "authorityNow": observation.authority_now.isoformat().replace(
-            "+00:00", "Z"
-        ),
+        "authorityNow": observation.authority_now.isoformat().replace("+00:00", "Z"),
         "status": "PASS",
         "readOnly": True,
         "semanticAuthority": False,
@@ -349,62 +304,28 @@ def validate_active_binding_proof(value: Any) -> dict[str, Any]:
         "schemaVersion", "cycleInstanceId", "requestHash", "planHash", "actor",
         "branch", "bindingHash", "lifecycleResultHash",
         "lifecycleResultCommentId", "leaseId", "authorityHead", "authorityNow",
-        "status", "readOnly", "semanticAuthority", "authorizesMutation",
-        "proofHash",
+        "status", "readOnly", "semanticAuthority", "authorizesMutation", "proofHash",
     }
-    if (
-        not isinstance(value, dict)
-        or set(value) != fields
-        or value.get("schemaVersion") != PROOF_SCHEMA
-    ):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_PROOF_INVALID"
-        )
+    if not isinstance(value, dict) or set(value) != fields or value.get("schemaVersion") != PROOF_SCHEMA:
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
     if value.get("status") != "PASS" or value.get("readOnly") is not True:
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_PROOF_INVALID"
-        )
-    if (
-        value.get("semanticAuthority") is not False
-        or value.get("authorizesMutation") is not False
-    ):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_PROOF_INVALID"
-        )
-    for field in (
-        "requestHash",
-        "planHash",
-        "bindingHash",
-        "lifecycleResultHash",
-        "proofHash",
-    ):
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
+    for field in ("requestHash", "planHash", "bindingHash", "lifecycleResultHash", "proofHash"):
         raw = value.get(field)
-        if (
-            not isinstance(raw, str)
-            or len(raw) != 64
-            or any(ch not in "0123456789abcdef" for ch in raw)
-        ):
-            raise AgentWriteLifecycleGuardError(
-                "AGENT_WRITE_LIFECYCLE_PROOF_INVALID"
-            )
+        if not isinstance(raw, str) or len(raw) != 64 or any(ch not in "0123456789abcdef" for ch in raw):
+            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
     if (
         not isinstance(value.get("lifecycleResultCommentId"), int)
         or isinstance(value["lifecycleResultCommentId"], bool)
         or value["lifecycleResultCommentId"] <= 0
     ):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_PROOF_INVALID"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
 
-    core = {
-        key: copy.deepcopy(item)
-        for key, item in value.items()
-        if key != "proofHash"
-    }
+    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "proofHash"}
     if value.get("proofHash") != stable_hash(core):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_PROOF_HASH_MISMATCH"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_HASH_MISMATCH")
     return value
 
 
@@ -416,21 +337,14 @@ def inspect_cycle(
     transport: Any | None = None,
 ) -> dict[str, Any]:
     carrier = transport or GhApiTransport()
-    window = _window(
-        comments,
-        manifest["source"]["commentId"],
-        close_comment_id,
-    )
+    window = _window(comments, manifest["source"]["commentId"], close_comment_id)
     results = _bound_results(window, manifest)
     request_count = _request_count(window, manifest)
     target_branches = _bound_agent_tool_branches(window, manifest)
 
     authority = GitHubCoordinationAuthority(transport=carrier)
     observation = authority.observe()
-    active = coordination.active_leases(
-        observation.state,
-        observation.authority_now,
-    )
+    active = coordination.active_leases(observation.state, observation.authority_now)
 
     state = "NONE"
     blockers: list[str] = []
@@ -440,24 +354,16 @@ def inspect_cycle(
     if results:
         latest_binding = results[-1][1]["binding"]
         matching = _matching_exact_leases(active, binding=latest_binding)
-
         if latest_binding["state"] == "RELEASED":
             if matching:
                 state = "UNKNOWN"
-                blockers.append(
-                    "AGENT_WRITE_LIFECYCLE_RELEASE_READBACK_MISMATCH"
-                )
+                blockers.append("AGENT_WRITE_LIFECYCLE_RELEASE_READBACK_MISMATCH")
             else:
                 state = "RELEASED"
-        elif lifecycle.binding_is_expired(
-            latest_binding,
-            observation.authority_now,
-        ):
+        elif lifecycle.binding_is_expired(latest_binding, observation.authority_now):
             if matching:
                 state = "UNKNOWN"
-                blockers.append(
-                    "AGENT_WRITE_LIFECYCLE_EXPIRED_BUT_LEASE_ACTIVE"
-                )
+                blockers.append("AGENT_WRITE_LIFECYCLE_EXPIRED_BUT_LEASE_ACTIVE")
             else:
                 state = "EXPIRED"
         elif len(matching) == 1:
@@ -465,20 +371,12 @@ def inspect_cycle(
             blockers.append("AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE")
         else:
             state = "UNKNOWN"
-            blockers.append(
-                "AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH"
-            )
+            blockers.append("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
     elif request_count:
         state = "UNKNOWN"
-        blockers.append(
-            "AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL"
-        )
+        blockers.append("AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL")
 
-    bound_lease_id = (
-        latest_binding["leaseId"]
-        if latest_binding is not None
-        else None
-    )
+    bound_lease_id = latest_binding["leaseId"] if latest_binding is not None else None
     unbound = _unbound_target_leases(
         active,
         manifest=manifest,
@@ -494,18 +392,10 @@ def inspect_cycle(
         "cycleInstanceId": manifest["cycleInstanceId"],
         "actor": copy.deepcopy(manifest["actor"]),
         "state": state,
-        "latestBindingHash": (
-            latest_binding["bindingHash"]
-            if latest_binding is not None
-            else None
-        ),
+        "latestBindingHash": latest_binding["bindingHash"] if latest_binding is not None else None,
         "authorityHead": observation.head_sha,
-        "authorityNow": observation.authority_now.isoformat().replace(
-            "+00:00", "Z"
-        ),
-        "matchingLeaseIds": sorted(
-            lease["leaseId"] for lease in matching
-        ),
+        "authorityNow": observation.authority_now.isoformat().replace("+00:00", "Z"),
+        "matchingLeaseIds": sorted(lease["leaseId"] for lease in matching),
         "blockers": sorted(set(blockers)),
         "readOnly": True,
         "semanticAuthority": False,
@@ -527,17 +417,8 @@ def validate_report(value: Any) -> dict[str, Any]:
         or value.get("schemaVersion") != REPORT_SCHEMA
         or value.get("state") not in STATES
     ):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_REPORT_INVALID"
-        )
-
-    core = {
-        key: copy.deepcopy(item)
-        for key, item in value.items()
-        if key != "reportHash"
-    }
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_REPORT_INVALID")
+    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "reportHash"}
     if value.get("reportHash") != stable_hash(core):
-        raise AgentWriteLifecycleGuardError(
-            "AGENT_WRITE_LIFECYCLE_REPORT_HASH_MISMATCH"
-        )
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_REPORT_HASH_MISMATCH")
     return value
