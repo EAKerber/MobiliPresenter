@@ -17,6 +17,7 @@ ATTEMPT_MARKER = "MOBILIPRESENTER_AGENT_TOOL_MUTATION_ATTEMPT_V0_1"
 ATTEMPT_SCHEMA = "AgentToolMutationAttempt 0.1"
 MUTABLE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class DispatchHostError(RuntimeError):
@@ -305,7 +306,7 @@ def build_attempt(dispatch: dict[str, Any], *, host_sha: str, run_id: int) -> di
     return {**core, "attemptHash": stable_hash(core)}
 
 
-def validate_attempt(value: Any, dispatch: dict[str, Any]) -> dict[str, Any]:
+def validate_attempt_record(value: Any) -> dict[str, Any]:
     fields = {
         "schemaVersion", "dispatchHash", "requestHash", "hostSha", "runId", "status",
         "semanticAuthority", "authorizesMutation", "attemptHash",
@@ -314,12 +315,12 @@ def validate_attempt(value: Any, dispatch: dict[str, Any]) -> dict[str, Any]:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_INVALID")
     if value.get("schemaVersion") != ATTEMPT_SCHEMA or value.get("status") != "STARTED":
         raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_INVALID")
-    if (
-        value.get("dispatchHash") != dispatch["dispatchHash"]
-        or value.get("requestHash") != dispatch["requestHash"]
-        or value.get("hostSha") != dispatch["source"]["semanticHostSha"]
-    ):
-        raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_MISMATCH")
+    for field in ("dispatchHash", "requestHash", "attemptHash"):
+        item = value.get(field)
+        if not isinstance(item, str) or HASH_RE.fullmatch(item) is None:
+            raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_INVALID")
+    if not isinstance(value.get("hostSha"), str) or SHA_RE.fullmatch(value["hostSha"]) is None:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_INVALID")
     _positive_int(value.get("runId"), "AGENT_TOOL_DISPATCH_ATTEMPT_INVALID")
     if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_MUST_NOT_AUTHORIZE")
@@ -327,6 +328,17 @@ def validate_attempt(value: Any, dispatch: dict[str, Any]) -> dict[str, Any]:
     if value.get("attemptHash") != stable_hash(core):
         raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_HASH_MISMATCH")
     return value
+
+
+def validate_attempt(value: Any, dispatch: dict[str, Any]) -> dict[str, Any]:
+    record = validate_attempt_record(value)
+    if (
+        record["dispatchHash"] != dispatch["dispatchHash"]
+        or record["requestHash"] != dispatch["requestHash"]
+        or record["hostSha"] != dispatch["source"]["semanticHostSha"]
+    ):
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_MISMATCH")
+    return record
 
 
 def _hosted_terminal(
@@ -376,8 +388,11 @@ def inspect_protocol(
         if _terminal_matches(terminal, dispatch):
             terminals.append(terminal)
         attempt = _json_after_marker(comment.get("body"), ATTEMPT_MARKER)
-        if isinstance(attempt, dict) and attempt.get("dispatchHash") == dispatch["dispatchHash"]:
-            attempts.append(validate_attempt(attempt, dispatch))
+        if isinstance(attempt, dict) and attempt.get("requestHash") == dispatch["requestHash"]:
+            record = validate_attempt_record(attempt)
+            if record["hostSha"] != dispatch["source"]["semanticHostSha"]:
+                raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_MISMATCH")
+            attempts.append(record)
     if len(terminals) > 1:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_TERMINAL_DUPLICATE")
     if len(attempts) > 1:
