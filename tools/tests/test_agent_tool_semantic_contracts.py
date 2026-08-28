@@ -5,6 +5,7 @@ import json
 import unittest
 from pathlib import Path
 
+from tools import agent_cycle_identity
 from tools.agent_tools import contracts, policy, projection, trace
 from tools.canonical import stable_hash
 from tools.semantics.registry import ROOT, load_registry, validate_registry
@@ -12,6 +13,7 @@ from tools.semantics.registry import ROOT, load_registry, validate_registry
 
 class AgentToolSemanticContractTests(unittest.TestCase):
     EXPECTED = {
+        "agent-cycle-handle": ("tools.agent_cycle_identity.validate_handle", "ops/schemas/agent-cycle-handle.schema.json", agent_cycle_identity.HANDLE_SCHEMA, agent_cycle_identity.HANDLE_FIELDS),
         "agent-tool-policy-catalog": ("tools.agent_tools.policy.validate_policy", "ops/schemas/agent-tool-policy-catalog.schema.json", policy.POLICY_SCHEMA, policy.TOP_FIELDS),
         "agent-tool-request": ("tools.agent_tools.contracts.validate_request", "ops/schemas/agent-tool-request.schema.json", contracts.REQUEST_SCHEMA, contracts.REQUEST_FIELDS),
         "agent-tool-plan": ("tools.agent_tools.contracts.validate_plan", "ops/schemas/agent-tool-plan.schema.json", contracts.PLAN_SCHEMA, contracts.PLAN_FIELDS),

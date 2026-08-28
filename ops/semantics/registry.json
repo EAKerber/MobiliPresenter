@@ -36,6 +36,12 @@
       "owner": "operations-core",
       "definition": "Read-only hash-bound projection of all traceable execution attempts belonging to one hosted Agent Cycle instance; it records completeness without authorizing or judging mutation."
     },
+    "artifact.agent-cycle-handle": {
+      "term": "AgentCycleHandle",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only hash-bound cycle identity and opaque resume locator; it carries no authority and never authorizes mutation."
+    },
     "artifact.agent-failure-core": {
       "term": "AgentFailureCore",
       "kind": "artifact",
@@ -391,6 +397,11 @@
       "owner": "operations-core",
       "semanticValidator": "tools.agent_tools.trace.validate_trace",
       "structuralSchema": "ops/schemas/agent-cycle-execution-trace.schema.json"
+    },
+    "agent-cycle-handle": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.agent_cycle_identity.validate_handle",
+      "structuralSchema": "ops/schemas/agent-cycle-handle.schema.json"
     },
     "agent-failure-core": {
       "owner": "operations-core",
@@ -1016,6 +1027,7 @@
       "readsResources": [],
       "writesResources": [],
       "produces": [
+        "artifact.agent-cycle-handle",
         "artifact.agent-write-lease-close-report"
       ],
       "canonicalWriterFor": [],
@@ -2149,7 +2161,7 @@
       },
       "requiredAuthorities": [],
       "requiredScopes": [
-        "workflow:read"
+        "repository:read"
       ],
       "preconditions": [],
       "providerRequirements": {

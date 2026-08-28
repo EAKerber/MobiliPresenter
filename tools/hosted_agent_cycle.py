@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
 """Hosted carrier for the Agent Cycle begin/close protocol.
 
-This module never creates an authority and never implements Agent Cycle domain
-semantics. It validates the issue transport envelope, invokes the canonical
-`tools/agent.py` facade, preserves begin provenance, and normalizes already
-verified remote mutation receipts into Agent Cycle close evidence.
-
-HostedAgentCycleBeginManifest 0.3 binds a concrete hosted cycle instance,
-declares exhaustive trace support, and opts new cycles into the explicit Agent
-Write Lease lifecycle close gate. Legacy 0.1 and trace-only 0.2 manifests remain
-readable and keep their original close behavior.
-
-Current hosted begins additionally materialize AgentCycleHandle 0.1 beside the
-existing context/manifest artifact. The handle is read-only correlation and
-resume metadata; it is not authority and legacy begin artifacts without a
-handle remain readable.
-
-Hosted failure transport 0.2 carries AgentFailureCore 0.1 as the sole semantic
-failure contract. The outer failure shell only preserves hosted correlation and
-operational status.
+The carrier remains non-authoritative. Current begin emits a public
+AgentCycleHandle 0.1 and close accepts both the historical field-oriented
+HostedAgentCycleCommand 0.1 and a handle-first HostedAgentCycleCommand 0.2.
+A handle-first close is reduced back to the existing 0.1 command only after the
+exact begin artifact has been materialized and the handle has been rebound to
+its context and manifest.
 """
 from __future__ import annotations
 
@@ -43,6 +31,7 @@ from tools import agent_cycle_identity
 from tools import agent_failure
 from tools import agent_write_lifecycle_guard
 from tools import hosted_agent_cycle_trace
+from tools import hosted_cycle_handle
 from tools import remote_canonical_execution
 from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
@@ -50,12 +39,14 @@ from tools.canonical import stable_hash
 REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
 REQUEST_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1"
+REQUEST_MARKER_V02 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2"
 RESULT_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RESULT_V0_1"
 COMMAND_SCHEMA = "HostedAgentCycleCommand 0.1"
+COMMAND_SCHEMA_V02 = "HostedAgentCycleCommand 0.2"
 LEGACY_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.1"
 TRACE_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.2"
 BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.3"
-BEGIN_RESULT_SCHEMA = "HostedAgentCycleBeginResult 0.3"
+BEGIN_RESULT_SCHEMA = "HostedAgentCycleBeginResult 0.4"
 CLOSE_RESULT_SCHEMA = "HostedAgentCycleCloseResult 0.1"
 FAILURE_SCHEMA = agent_failure.HOSTED_CYCLE_FAILURE_SCHEMA
 TRACE_FEATURE = "execution-trace-0.1"
@@ -69,6 +60,10 @@ COMMAND_FIELDS = {
     "schemaVersion", "requestId", "action", "actor", "declaredIntent",
     "machineScope", "begin", "evidenceCommentIds", "semanticAuthority",
     "authorizesMutation",
+}
+COMMAND_V02_FIELDS = {
+    "schemaVersion", "requestId", "action", "handle", "evidenceCommentIds",
+    "semanticAuthority", "authorizesMutation",
 }
 ACTOR_FIELDS = agent_cycle_identity.ACTOR_FIELDS
 BEGIN_REF_FIELDS = agent_cycle_identity.BEGIN_FIELDS
@@ -112,6 +107,16 @@ def _begin_ref(value: Any) -> dict[str, Any]:
         raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID") from exc
 
 
+def _evidence_ids(value: Any) -> list[int]:
+    if (
+        not isinstance(value, list)
+        or any(not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in value)
+        or len(value) != len(set(value))
+    ):
+        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_IDS_INVALID")
+    return value
+
+
 def validate_command(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != COMMAND_FIELDS:
         raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_FIELDS_INVALID")
@@ -129,13 +134,7 @@ def validate_command(value: Any) -> dict[str, Any]:
         raise HostedAgentCycleError("HOSTED_AGENT_INTENT_NOT_CANONICAL")
     if value.get("machineScope") != "live":
         raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_MUST_BE_LIVE")
-    evidence = value.get("evidenceCommentIds")
-    if (
-        not isinstance(evidence, list)
-        or any(not isinstance(item, int) or isinstance(item, bool) or item <= 0 for item in evidence)
-        or len(evidence) != len(set(evidence))
-    ):
-        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_IDS_INVALID")
+    evidence = _evidence_ids(value.get("evidenceCommentIds"))
     if action == "begin":
         if value.get("begin") is not None or evidence:
             raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_COMMAND_INVALID")
@@ -147,8 +146,35 @@ def validate_command(value: Any) -> dict[str, Any]:
     return value
 
 
+def validate_handle_close_command(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != COMMAND_V02_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_HANDLE_COMMAND_FIELDS_INVALID")
+    if value.get("schemaVersion") != COMMAND_SCHEMA_V02 or value.get("action") != "close":
+        raise HostedAgentCycleError("HOSTED_AGENT_HANDLE_COMMAND_INVALID")
+    _text(value.get("requestId"), "HOSTED_AGENT_REQUEST_ID_INVALID")
+    try:
+        hosted_cycle_handle.decode_handle(value.get("handle"), repository=REPOSITORY)
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_INVALID") from exc
+    _evidence_ids(value.get("evidenceCommentIds"))
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_MUST_NOT_AUTHORIZE")
+    return value
+
+
+def validate_transport_command(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict) and value.get("schemaVersion") == COMMAND_SCHEMA_V02:
+        return validate_handle_close_command(value)
+    return validate_command(value)
+
+
 def command_hash(command: dict[str, Any]) -> str:
     validate_command(command)
+    return stable_hash(command)
+
+
+def transport_command_hash(command: dict[str, Any]) -> str:
+    validate_transport_command(command)
     return stable_hash(command)
 
 
@@ -169,14 +195,21 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
     if repository.get("full_name") != REPOSITORY:
         raise HostedAgentCycleError("HOSTED_AGENT_REPOSITORY_MISMATCH")
     body = comment.get("body")
-    prefix = REQUEST_MARKER + "\n"
-    if not isinstance(body, str) or not body.startswith(prefix):
+    if not isinstance(body, str):
+        raise HostedAgentCycleError("HOSTED_AGENT_MARKER_INVALID")
+    marker = next(
+        (item for item in (REQUEST_MARKER, REQUEST_MARKER_V02) if body.startswith(item + "\n")),
+        None,
+    )
+    if marker is None:
         raise HostedAgentCycleError("HOSTED_AGENT_MARKER_INVALID")
     try:
-        command = json.loads(body[len(prefix):].strip())
+        command = json.loads(body[len(marker) + 1:].strip())
     except json.JSONDecodeError as exc:
         raise HostedAgentCycleError("HOSTED_AGENT_JSON_INVALID") from exc
-    command = validate_command(command)
+    command = validate_transport_command(command)
+    if (marker == REQUEST_MARKER) != (command["schemaVersion"] == COMMAND_SCHEMA):
+        raise HostedAgentCycleError("HOSTED_AGENT_MARKER_SCHEMA_MISMATCH")
     issue_number = issue.get("number")
     comment_id = comment.get("id")
     if (
@@ -211,17 +244,7 @@ def _cycle_instance_id(source: dict[str, Any], actor: dict[str, str], context_ha
 
 
 def _hosted_resume_token(manifest: dict[str, Any]) -> str:
-    source = manifest["source"]
-    locator = {
-        "artifactName": manifest["artifactName"],
-        "runId": source["runId"],
-        "sourceSha": source["sourceSha"],
-        "issueNumber": source["issueNumber"],
-        "beginCommentId": source["commentId"],
-        "contextHash": manifest["contextHash"],
-        "cycleInstanceId": manifest["cycleInstanceId"],
-    }
-    return "hosted-v1:" + json.dumps(locator, sort_keys=True, separators=(",", ":"))
+    return hosted_cycle_handle.build_resume_token(manifest)
 
 
 def _handle_for_manifest(context: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
@@ -475,6 +498,7 @@ def begin_from_envelope(
         "contextHash": context["contextHash"],
         "carrierFeatures": copy.deepcopy(manifest["carrierFeatures"]),
         "manifestHash": manifest["manifestHash"],
+        "handle": copy.deepcopy(handle),
         "status": "READY",
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -574,15 +598,40 @@ def _validate_optional_handle(
         return
     handle = _load_json(path)
     try:
-        agent_cycle_identity.validate_handle_binding(
+        hosted_cycle_handle.bind(
             handle,
             context=context,
-            actor=manifest["actor"],
-            cycle_instance_id=manifest["cycleInstanceId"],
-            resume_token=_hosted_resume_token(manifest),
+            manifest=manifest,
+            repository=REPOSITORY,
         )
     except RuntimeError as exc:
         raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_MISMATCH") from exc
+
+
+def _legacy_close_from_handle(
+    outer: dict[str, Any], context: dict[str, Any], manifest: dict[str, Any]
+) -> dict[str, Any]:
+    validate_handle_close_command(outer)
+    validate_begin_manifest(manifest, context)
+    try:
+        binding = hosted_cycle_handle.bind(
+            outer["handle"], context=context, manifest=manifest, repository=REPOSITORY
+        )
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_MISMATCH") from exc
+    value = {
+        "schemaVersion": COMMAND_SCHEMA,
+        "requestId": outer["requestId"],
+        "action": "close",
+        "actor": copy.deepcopy(binding["actor"]),
+        "declaredIntent": manifest["declaredIntent"],
+        "machineScope": manifest["machineScope"],
+        "begin": copy.deepcopy(binding["begin"]),
+        "evidenceCommentIds": copy.deepcopy(outer["evidenceCommentIds"]),
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return validate_command(value)
 
 
 def _write_lifecycle_failure_core(
@@ -696,22 +745,26 @@ def close_from_envelope(
     output_path: str,
     evidence_dir: str,
 ) -> dict[str, Any]:
-    command = validate_command(command)
-    if command["action"] != "close":
+    outer = validate_transport_command(command)
+    if outer["action"] != "close":
         raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_ACTION_REQUIRED")
     begin_root = Path(begin_dir)
     context_path = begin_root / "context.json"
     manifest_path = begin_root / "manifest.json"
     context = _load_json(context_path)
     manifest = _load_json(manifest_path)
-    _validate_close_binding(command, manifest, context)
+    effective_command = (
+        _legacy_close_from_handle(outer, context, manifest)
+        if outer["schemaVersion"] == COMMAND_SCHEMA_V02
+        else validate_command(outer)
+    )
+    _validate_close_binding(effective_command, manifest, context)
     _validate_optional_handle(begin_root, context, manifest)
 
-    effective_command = command
     if _manifest_requires_trace(manifest):
         try:
             effective_command, trace_value = hosted_agent_cycle_trace.prepare_close_stabilized(
-                command,
+                effective_command,
                 meta,
                 manifest,
                 context,
@@ -786,8 +839,8 @@ def close_from_envelope(
     receipt = closure["receipt"]
     core = {
         "schemaVersion": CLOSE_RESULT_SCHEMA,
-        "requestId": effective_command["requestId"],
-        "commandHash": command_hash(effective_command),
+        "requestId": outer["requestId"],
+        "commandHash": transport_command_hash(outer),
         "runId": source["runId"],
         "sourceSha": source["sourceSha"],
         "beginRunId": manifest["source"]["runId"],
@@ -806,7 +859,7 @@ def _correlation(command: dict[str, Any] | None) -> tuple[str | None, str | None
     if not isinstance(command, dict):
         return None, None
     try:
-        value = validate_command(command)
+        value = validate_transport_command(command)
     except Exception:
         return None, None
     return value["requestId"], stable_hash(value)
@@ -892,9 +945,16 @@ def main(argv: list[str] | None = None) -> int:
             _write_json(args.meta_out, meta)
             _emit_output(args.github_output, "action", command_value["action"])
             if command_value["action"] == "close":
-                begin = _begin_ref(command_value["begin"])
-                _emit_output(args.github_output, "begin_run_id", str(begin["runId"]))
-                _emit_output(args.github_output, "begin_source_sha", begin["sourceSha"])
+                if command_value["schemaVersion"] == COMMAND_SCHEMA_V02:
+                    _, locator = hosted_cycle_handle.decode_handle(
+                        command_value["handle"], repository=REPOSITORY
+                    )
+                    _emit_output(args.github_output, "begin_run_id", str(locator["runId"]))
+                    _emit_output(args.github_output, "begin_source_sha", locator["sourceSha"])
+                else:
+                    begin_ref = _begin_ref(command_value["begin"])
+                    _emit_output(args.github_output, "begin_run_id", str(begin_ref["runId"]))
+                    _emit_output(args.github_output, "begin_source_sha", begin_ref["sourceSha"])
             return 0
 
         command_value = _load_json(args.command) if getattr(args, "command", None) else None
