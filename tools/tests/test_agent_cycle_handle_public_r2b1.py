@@ -81,15 +81,15 @@ class AgentCycleHandlePublicR2B1Tests(unittest.TestCase):
             return False
         return True
 
-    def assertParity(self, value: object, expected: bool) -> None:
+    def assertStructuralParity(self, value: object, expected: bool) -> None:
         self.assertEqual(expected, _structural_accepts(value))
         self.assertEqual(expected, self._semantic_accepts(value))
 
     def test_positive_contract_parity(self):
         value = _valid_handle()
-        self.assertParity(value, True)
+        self.assertStructuralParity(value, True)
 
-    def test_negative_contract_parity(self):
+    def test_negative_structural_contract_parity(self):
         base = _valid_handle()
         cases: list[object] = []
 
@@ -110,7 +110,7 @@ class AgentCycleHandlePublicR2B1Tests(unittest.TestCase):
         cases.append(bad_instance)
 
         bad_context = copy.deepcopy(base)
-        bad_context["context"]["contextHash"] = "x" * 64
+        bad_context["context"]["contextHash"] = "x" * 63
         cases.append(bad_context)
 
         bad_actor = copy.deepcopy(base)
@@ -125,13 +125,15 @@ class AgentCycleHandlePublicR2B1Tests(unittest.TestCase):
         authority["authorizesMutation"] = True
         cases.append(authority)
 
-        tampered = copy.deepcopy(base)
-        tampered["actor"]["sessionId"] = "session-2"
-        cases.append(tampered)
-
         for value in cases:
             with self.subTest(value=value):
-                self.assertParity(value, False)
+                self.assertStructuralParity(value, False)
+
+    def test_hash_binding_is_semantic_not_a_second_schema_definition(self):
+        tampered = copy.deepcopy(_valid_handle())
+        tampered["actor"]["sessionId"] = "session-2"
+        self.assertTrue(_structural_accepts(tampered))
+        self.assertFalse(self._semantic_accepts(tampered))
 
     def test_schema_matches_current_python_field_sets(self):
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
