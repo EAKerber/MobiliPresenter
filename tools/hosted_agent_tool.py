@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Hosted carrier for Agent Tool Interface 0.1/AT3C.
-
-The carrier binds an AgentToolRequest to an exact Hosted Agent Cycle begin and
-keeps the hosted workflow itself Git-read-only. Read-only tools may execute
-locally, plan-only tools remain PLANNED, and Manager/GitOps mutation-execute
-tools are converted into a hash-bound AgentToolMutationDispatch after positive
-guard proofs. The mutation is never materialized by this carrier.
-"""
+"""Hosted carrier for Agent Tool Interface 0.1 with handle-first transport 0.2."""
 from __future__ import annotations
 
 import copy
@@ -21,18 +14,24 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import agent_cycle_identity, hosted_agent_cycle
+from tools import agent_cycle_identity, hosted_agent_cycle, hosted_cycle_handle
 from tools.agent_tools import admission, contracts, mutation_dispatch, resolver
 from tools.canonical import stable_hash
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = hosted_agent_cycle.BUS_TITLE
 REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
+REQUEST_MARKER_V02 = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_2"
+HANDLE_REQUEST_SCHEMA = "HostedAgentToolRequest 0.2"
 RESULT_MARKER = "MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1"
 DISPATCH_MARKER = "MOBILIPRESENTER_AGENT_TOOL_DISPATCH_V0_1"
 RESULT_SCHEMA = "HostedAgentToolResult 0.1"
 FAILURE_SCHEMA = "HostedAgentToolFailure 0.1"
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+HANDLE_REQUEST_FIELDS = {
+    "schemaVersion", "requestId", "handle", "toolId", "target", "input",
+    "semanticAuthority", "authorizesMutation",
+}
 
 
 class HostedAgentToolError(RuntimeError):
@@ -72,6 +71,53 @@ def _positive_int(value: Any, code: str) -> int:
     return value
 
 
+def validate_handle_request(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != HANDLE_REQUEST_FIELDS:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_HANDLE_REQUEST_FIELDS_INVALID")
+    if value.get("schemaVersion") != HANDLE_REQUEST_SCHEMA:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_HANDLE_REQUEST_SCHEMA_UNSUPPORTED")
+    request_id = value.get("requestId")
+    tool_id = value.get("toolId")
+    if not isinstance(request_id, str) or contracts.REQUEST_ID_RE.fullmatch(request_id) is None:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_REQUEST_ID_INVALID")
+    if not isinstance(tool_id, str) or contracts.ID_RE.fullmatch(tool_id) is None:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_ID_INVALID")
+    if not isinstance(value.get("target"), dict) or not isinstance(value.get("input"), dict):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_REQUEST_PAYLOAD_INVALID")
+    try:
+        hosted_cycle_handle.decode_handle(value.get("handle"), repository=REPOSITORY)
+    except RuntimeError as exc:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_HANDLE_INVALID") from exc
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_REQUEST_MUST_NOT_AUTHORIZE")
+    return value
+
+
+def derive_handle_request(
+    outer: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any]
+) -> dict[str, Any]:
+    outer = validate_handle_request(outer)
+    hosted_agent_cycle.validate_begin_manifest(manifest, context)
+    try:
+        binding = hosted_cycle_handle.bind(
+            outer["handle"], context=context, manifest=manifest, repository=REPOSITORY
+        )
+    except RuntimeError as exc:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_HANDLE_BINDING_MISMATCH") from exc
+    request = {
+        "schemaVersion": contracts.REQUEST_SCHEMA,
+        "requestId": outer["requestId"],
+        "begin": copy.deepcopy(binding["begin"]),
+        "actor": copy.deepcopy(binding["actor"]),
+        "toolId": outer["toolId"],
+        "target": copy.deepcopy(outer["target"]),
+        "input": copy.deepcopy(outer["input"]),
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return contracts.validate_request(request)
+
+
 def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
     if not isinstance(value, dict):
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_EVENT_INVALID")
@@ -89,17 +135,27 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
     if repository.get("full_name") != REPOSITORY:
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_REPOSITORY_MISMATCH")
     body = comment.get("body")
-    prefix = REQUEST_MARKER + "\n"
-    if not isinstance(body, str) or not body.startswith(prefix):
+    if not isinstance(body, str):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_MARKER_INVALID")
+    marker = next(
+        (item for item in (REQUEST_MARKER, REQUEST_MARKER_V02) if body.startswith(item + "\n")),
+        None,
+    )
+    if marker is None:
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_MARKER_INVALID")
     try:
-        request = json.loads(body[len(prefix):].strip())
+        request = json.loads(body[len(marker) + 1:].strip())
     except json.JSONDecodeError as exc:
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_JSON_INVALID") from exc
     try:
-        contracts.validate_request(request)
+        if marker == REQUEST_MARKER_V02:
+            validate_handle_request(request)
+        else:
+            contracts.validate_request(request)
     except RuntimeError as exc:
-        raise HostedAgentToolError(str(exc).split(":", 1)[0]) from exc
+        raise HostedAgentToolError(getattr(exc, "code", str(exc).split(":", 1)[0])) from exc
+    if (marker == REQUEST_MARKER_V02) != (request.get("schemaVersion") == HANDLE_REQUEST_SCHEMA):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_MARKER_SCHEMA_MISMATCH")
     issue_number = issue.get("number")
     comment_id = comment.get("id")
     if (
@@ -155,7 +211,6 @@ def prepare_request(
     authority_factory: Any | None = None,
 ) -> dict[str, Any]:
     """Prepare exactly one terminal result or one non-terminal mutation dispatch."""
-
     validate_begin_binding(request, manifest, context)
     planned = resolver.resolve_request(
         request, context, transport=transport, execute=False
@@ -167,26 +222,16 @@ def prepare_request(
         result = planned["result"]
         if result["status"] != "PLANNED":
             raise HostedAgentToolError("HOSTED_AGENT_TOOL_MUTATION_MODE_VIOLATION")
-        return {
-            "kind": "terminal",
-            "plan": plan,
-            "result": _terminal_payload(request, plan, result),
-        }
+        return {"kind": "terminal", "plan": plan, "result": _terminal_payload(request, plan, result)}
 
     if mode == "read-only-execute":
-        executed = resolver.resolve_request(
-            request, context, transport=transport, execute=True
-        )
+        executed = resolver.resolve_request(request, context, transport=transport, execute=True)
         if executed["plan"]["planHash"] != plan["planHash"]:
             raise HostedAgentToolError("HOSTED_AGENT_TOOL_PLAN_DRIFT")
         result = executed["result"]
         if result["status"] != "PASS":
             raise HostedAgentToolError("HOSTED_AGENT_TOOL_READ_ONLY_EXECUTION_INVALID")
-        return {
-            "kind": "terminal",
-            "plan": plan,
-            "result": _terminal_payload(request, plan, result),
-        }
+        return {"kind": "terminal", "plan": plan, "result": _terminal_payload(request, plan, result)}
 
     if mode != "mutation-execute":
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_MODE_UNSUPPORTED")
@@ -224,12 +269,7 @@ def prepare_request(
         request_comment_id=request_comment_id,
         hosted_run_id=run_id,
     )
-    return {
-        "kind": "dispatch",
-        "plan": plan,
-        "proofSet": proof_set,
-        "dispatch": dispatch,
-    }
+    return {"kind": "dispatch", "plan": plan, "proofSet": proof_set, "dispatch": dispatch}
 
 
 def execute_request(
@@ -239,10 +279,7 @@ def execute_request(
     *,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    """Compatibility facade for existing terminal-only callers."""
-    outcome = prepare_request(
-        request, manifest, context, transport=transport
-    )
+    outcome = prepare_request(request, manifest, context, transport=transport)
     if outcome["kind"] != "terminal":
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_MUTATION_DISPATCH_REQUIRED")
     return outcome["result"]
@@ -320,17 +357,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command_name == "parse-event":
             event = json.loads(Path(args.event).read_text(encoding="utf-8"))
-            body = event.get("comment", {}).get("body") if isinstance(event, dict) else None
-            if isinstance(body, str) and body.startswith(REQUEST_MARKER + "\n"):
-                try:
-                    request = json.loads(body[len(REQUEST_MARKER) + 1:].strip())
-                except json.JSONDecodeError:
-                    request = None
             request, meta = parse_event(event)
             _write(args.request_out, request)
             _write(args.meta_out, meta)
-            _emit_output(args.github_output, "begin_run_id", str(request["begin"]["runId"]))
-            _emit_output(args.github_output, "begin_source_sha", request["begin"]["sourceSha"])
+            if request.get("schemaVersion") == HANDLE_REQUEST_SCHEMA:
+                _, locator = hosted_cycle_handle.decode_handle(request["handle"], repository=REPOSITORY)
+                _emit_output(args.github_output, "begin_run_id", str(locator["runId"]))
+                _emit_output(args.github_output, "begin_source_sha", locator["sourceSha"])
+            else:
+                _emit_output(args.github_output, "begin_run_id", str(request["begin"]["runId"]))
+                _emit_output(args.github_output, "begin_source_sha", request["begin"]["sourceSha"])
             return 0
 
         request = _load(args.request) if getattr(args, "request", None) else None
@@ -339,6 +375,11 @@ def main(argv: list[str] | None = None) -> int:
             context = _load(root / "context.json")
             manifest = _load(root / "manifest.json")
             meta = _load(args.meta)
+            if request.get("schemaVersion") == HANDLE_REQUEST_SCHEMA:
+                outer = copy.deepcopy(request)
+                _write(Path(args.request).with_name("agent-tool-outer-request.json"), outer)
+                request = derive_handle_request(outer, manifest, context)
+                _write(args.request, request)
             outcome = prepare_request(request, manifest, context, meta=meta)
             _write(args.plan, outcome["plan"])
             if outcome["kind"] == "dispatch":
