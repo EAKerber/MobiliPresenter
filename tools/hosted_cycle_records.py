@@ -4,26 +4,20 @@ import copy
 import json
 from typing import Any
 
-from tools import (
-    agent_cycle_identity,
-    agent_write_lifecycle as lifecycle,
-    hosted_handle_requests,
-    remote_canonical_execution,
-)
-from tools.agent_tools import contracts, mutation_dispatch
+from tools import agent_cycle_identity, hosted_record_vocabulary as markers
 from tools.canonical import stable_hash
 
 CURRENT_REPOSITORY = "EAKerber/MobiliPresenter"
 
-AGENT_TOOL_REQUEST_MARKER = "MOBILIPRESENTER_AGENT_TOOL_REQUEST_V0_1"
-AGENT_TOOL_REQUEST_MARKER_V02 = hosted_handle_requests.TOOL_MARKER_V02
-AGENT_TOOL_RESULT_MARKER = "MOBILIPRESENTER_AGENT_TOOL_RESULT_V0_1"
-AGENT_TOOL_DISPATCH_MARKER = "MOBILIPRESENTER_AGENT_TOOL_DISPATCH_V0_1"
-REMOTE_REQUEST_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_REQUEST_V0_1"
-REMOTE_RESULT_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1"
-WRITE_LEASE_REQUEST_MARKER = lifecycle.REQUEST_MARKER
-WRITE_LEASE_REQUEST_MARKER_V02 = hosted_handle_requests.WRITE_LEASE_MARKER_V02
-WRITE_LEASE_RESULT_MARKER = lifecycle.RESULT_MARKER
+AGENT_TOOL_REQUEST_MARKER = markers.AGENT_TOOL_REQUEST_V01
+AGENT_TOOL_REQUEST_MARKER_V02 = markers.AGENT_TOOL_REQUEST_V02
+AGENT_TOOL_RESULT_MARKER = markers.AGENT_TOOL_RESULT_V01
+AGENT_TOOL_DISPATCH_MARKER = markers.AGENT_TOOL_DISPATCH_V01
+REMOTE_REQUEST_MARKER = markers.REMOTE_CANONICAL_REQUEST_V01
+REMOTE_RESULT_MARKER = markers.REMOTE_CANONICAL_RESULT_V01
+WRITE_LEASE_REQUEST_MARKER = markers.AGENT_WRITE_LEASE_REQUEST_V01
+WRITE_LEASE_REQUEST_MARKER_V02 = markers.AGENT_WRITE_LEASE_REQUEST_V02
+WRITE_LEASE_RESULT_MARKER = markers.AGENT_WRITE_LEASE_RESULT_V01
 
 STRONG = "STRONG"
 AMBIENT = "AMBIENT"
@@ -115,11 +109,15 @@ def window(
 
 
 def _claims_begin(value: Any, expected: dict[str, Any]) -> bool:
-    return isinstance(value, dict) and all(value.get(key) == expected[key] for key in agent_cycle_identity.BEGIN_FIELDS)
+    return isinstance(value, dict) and all(
+        value.get(key) == expected[key] for key in agent_cycle_identity.BEGIN_FIELDS
+    )
 
 
 def _claims_actor(value: Any, expected: dict[str, Any]) -> bool:
-    return isinstance(value, dict) and all(value.get(key) == expected[key] for key in agent_cycle_identity.ACTOR_FIELDS)
+    return isinstance(value, dict) and all(
+        value.get(key) == expected[key] for key in agent_cycle_identity.ACTOR_FIELDS
+    )
 
 
 def _claims_begin_actor(payload: Any, begin: dict[str, Any], actor: dict[str, Any]) -> bool:
@@ -173,6 +171,8 @@ def _record(
 def _validate_strong_tool_v01(
     payload: dict[str, Any], begin: dict[str, Any], actor: dict[str, Any]
 ) -> dict[str, Any]:
+    from tools.agent_tools import contracts
+
     try:
         value = contracts.validate_request(payload)
     except RuntimeError as exc:
@@ -185,6 +185,8 @@ def _validate_strong_tool_v01(
 def _validate_strong_tool_v02(
     payload: dict[str, Any], manifest: dict[str, Any], begin: dict[str, Any], actor: dict[str, Any]
 ) -> dict[str, Any]:
+    from tools import hosted_handle_requests
+
     try:
         hosted_handle_requests.validate_tool(payload, repository=CURRENT_REPOSITORY)
         if not hosted_handle_requests.matches_manifest(
@@ -201,6 +203,8 @@ def _validate_strong_tool_v02(
 def _validate_strong_lease_v01(
     payload: dict[str, Any], begin: dict[str, Any], actor: dict[str, Any]
 ) -> dict[str, Any]:
+    from tools import agent_write_lifecycle as lifecycle
+
     try:
         value = lifecycle.validate_request(payload)
     except RuntimeError as exc:
@@ -213,6 +217,8 @@ def _validate_strong_lease_v01(
 def _validate_strong_lease_v02(
     payload: dict[str, Any], manifest: dict[str, Any], begin: dict[str, Any], actor: dict[str, Any]
 ) -> dict[str, Any]:
+    from tools import agent_write_lifecycle as lifecycle, hosted_handle_requests
+
     try:
         hosted_handle_requests.validate_write_lease(payload, repository=CURRENT_REPOSITORY)
         if not hosted_handle_requests.matches_manifest(
@@ -302,6 +308,8 @@ def collect(
 
             remote_payload = json_after_marker(body, REMOTE_REQUEST_MARKER)
             if isinstance(remote_payload, dict) and _claims_actor(remote_payload.get("actor"), actor):
+                from tools import remote_canonical_execution
+
                 normalized: dict[str, Any] | None = None
                 try:
                     normalized = remote_canonical_execution.validate_command(remote_payload)
@@ -322,6 +330,8 @@ def collect(
                 if declared_instance == cycle_id or (
                     declared_instance is None and _claims_begin_actor(dispatch_payload, begin, actor)
                 ):
+                    from tools.agent_tools import mutation_dispatch
+
                     try:
                         mutation_dispatch.validate_dispatch(dispatch_payload)
                     except RuntimeError as exc:
@@ -355,6 +365,8 @@ def collect(
                 if declared_instance == cycle_id or (
                     declared_instance is None and _claims_begin_actor(lease_result, begin, actor)
                 ):
+                    from tools import agent_write_lifecycle as lifecycle
+
                     try:
                         normalized = lifecycle.validate_result(lease_result)
                     except RuntimeError as exc:
@@ -381,6 +393,8 @@ def collect(
         if not isinstance(digest, str) or len(digest) != 64:
             continue
         if digest in strong_command_hashes:
+            from tools import remote_canonical_execution
+
             try:
                 normalized = remote_canonical_execution.validate_receipt(payload)
             except RuntimeError as exc:
