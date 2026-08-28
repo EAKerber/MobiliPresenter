@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from tools import coordination, git_observation, hosted_agent_cycle
+from tools import agent_cycle_identity, coordination, git_observation, hosted_agent_cycle
 from tools import remote_canonical_execution as remote
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
@@ -26,9 +26,9 @@ BINDING_SCHEMA = "AgentWriteLeaseBinding 0.1"
 ACTIONS = {"acquire", "renew", "release"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
-CYCLE_RE = re.compile(r"^cycle-instance-[0-9a-f]{24}$")
-ACTOR_FIELDS = {"role", "workerId", "sessionId"}
-BEGIN_FIELDS = {"runId", "sourceSha", "contextHash"}
+CYCLE_RE = agent_cycle_identity.CYCLE_INSTANCE_RE
+ACTOR_FIELDS = agent_cycle_identity.ACTOR_FIELDS
+BEGIN_FIELDS = agent_cycle_identity.BEGIN_FIELDS
 REQUEST_FIELDS = {
     "schemaVersion", "requestId", "action", "begin", "actor", "branch",
     "expectedAuthorityHead", "expectedBranchHead", "expectedBindingHash",
@@ -71,22 +71,17 @@ def _positive_int(value: Any, code: str) -> int:
 
 
 def _actor(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict) or set(value) != ACTOR_FIELDS:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ACTOR_INVALID")
-    return {
-        key: _text(value[key], "AGENT_WRITE_LIFECYCLE_ACTOR_INVALID")
-        for key in sorted(ACTOR_FIELDS)
-    }
+    try:
+        return agent_cycle_identity.canonical_actor(value)
+    except RuntimeError as exc:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ACTOR_INVALID") from exc
 
 
 def _begin(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != BEGIN_FIELDS:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BEGIN_INVALID")
-    return {
-        "runId": _positive_int(value["runId"], "AGENT_WRITE_LIFECYCLE_BEGIN_INVALID"),
-        "sourceSha": _sha(value["sourceSha"], "AGENT_WRITE_LIFECYCLE_BEGIN_INVALID"),
-        "contextHash": _hash(value["contextHash"], "AGENT_WRITE_LIFECYCLE_BEGIN_INVALID"),
-    }
+    try:
+        return agent_cycle_identity.canonical_begin(value)
+    except RuntimeError as exc:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BEGIN_INVALID") from exc
 
 
 def validate_request(value: Any) -> dict[str, Any]:
@@ -141,16 +136,15 @@ def validate_begin_binding(
 ) -> None:
     validate_request(request)
     hosted_agent_cycle.validate_begin_manifest(manifest, context)
-    begin = request["begin"]
-    source = manifest["source"]
-    if (
-        begin["runId"] != source["runId"]
-        or begin["sourceSha"] != source["sourceSha"]
-        or begin["contextHash"] != manifest["contextHash"]
-    ):
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BEGIN_MISMATCH")
-    if request["actor"] != manifest["actor"]:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_IDENTITY_MISMATCH")
+    try:
+        agent_cycle_identity.validate_hosted_binding(
+            request["begin"], request["actor"], manifest
+        )
+    except RuntimeError as exc:
+        code = str(exc).split(":", 1)[0]
+        if code == "AGENT_CYCLE_IDENTITY_BEGIN_MISMATCH":
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BEGIN_MISMATCH") from exc
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_IDENTITY_MISMATCH") from exc
     semantic = context.get("semanticContext")
     if not isinstance(semantic, dict) or semantic.get("declaredIntent") != "governed-mutation":
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_INTENT_FORBIDDEN")
