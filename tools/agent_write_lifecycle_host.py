@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import agent_write_lifecycle as lifecycle
-from tools import coordination, hosted_agent_cycle, remote_canonical_issue
+from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, remote_canonical_issue
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
 MUTABLE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
@@ -59,12 +59,16 @@ def _load(path: str | Path) -> dict[str, Any]:
 
 def load_bundle(root: str | Path) -> dict[str, dict[str, Any]]:
     base = Path(root)
-    return {
+    result = {
         "request": _load(base / "agent-write-lease-request.json"),
         "dispatch": _load(base / "agent-write-lease-dispatch.json"),
         "context": _load(base / "agent-write-lease-begin-context.json"),
         "manifest": _load(base / "agent-write-lease-begin-manifest.json"),
     }
+    outer_path = base / "agent-write-lease-outer-request.json"
+    if outer_path.is_file():
+        result["outerRequest"] = _load(outer_path)
+    return result
 
 
 def _json_response(response: Any, code: str) -> Any:
@@ -124,6 +128,46 @@ def _payload(body: Any, marker: str) -> Any | None:
         return None
 
 
+def _validate_request_readback(
+    request: dict[str, Any],
+    dispatch: dict[str, Any],
+    *,
+    manifest: dict[str, Any],
+    context: dict[str, Any],
+    transport: Any,
+    outer_request: dict[str, Any] | None,
+) -> None:
+    comment = _comment(transport, dispatch["source"]["requestCommentId"])
+    if comment.get("author_association") != "OWNER":
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_REQUEST_ACTOR_FORBIDDEN"
+        )
+    body = comment.get("body")
+    if outer_request is None:
+        if _payload(body, lifecycle.REQUEST_MARKER) != request:
+            raise AgentWriteLifecycleHostError(
+                "AGENT_WRITE_LIFECYCLE_REQUEST_READBACK_MISMATCH"
+            )
+        return
+    observed = _payload(body, hosted_agent_write_lease.REQUEST_MARKER_V02)
+    if observed != outer_request:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_OUTER_REQUEST_READBACK_MISMATCH"
+        )
+    try:
+        derived = hosted_agent_write_lease.derive_handle_request(
+            outer_request, manifest, context
+        )
+    except RuntimeError as exc:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_OUTER_REQUEST_INVALID"
+        ) from exc
+    if derived != request:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_DERIVED_REQUEST_MISMATCH"
+        )
+
+
 def _validate_bundle(
     bundle: dict[str, dict[str, Any]],
     *,
@@ -133,11 +177,9 @@ def _validate_bundle(
 ) -> dict[str, dict[str, Any]]:
     request = lifecycle.validate_request(bundle["request"])
     dispatch = lifecycle.validate_dispatch(bundle["dispatch"])
-    lifecycle.validate_begin_binding(
-        request,
-        bundle["manifest"],
-        bundle["context"],
-    )
+    manifest = bundle["manifest"]
+    context = bundle["context"]
+    lifecycle.validate_begin_binding(request, manifest, context)
     if dispatch["requestHash"] != lifecycle.request_hash(request):
         raise AgentWriteLifecycleHostError(
             "AGENT_WRITE_LIFECYCLE_REQUEST_HASH_MISMATCH"
@@ -150,23 +192,19 @@ def _validate_bundle(
             "AGENT_WRITE_LIFECYCLE_HOST_BINDING_MISMATCH"
         )
 
-    comment = _comment(
-        transport,
-        dispatch["source"]["requestCommentId"],
+    _validate_request_readback(
+        request,
+        dispatch,
+        manifest=manifest,
+        context=context,
+        transport=transport,
+        outer_request=bundle.get("outerRequest"),
     )
-    if comment.get("author_association") != "OWNER":
-        raise AgentWriteLifecycleHostError(
-            "AGENT_WRITE_LIFECYCLE_REQUEST_ACTOR_FORBIDDEN"
-        )
-    if _payload(comment.get("body"), lifecycle.REQUEST_MARKER) != request:
-        raise AgentWriteLifecycleHostError(
-            "AGENT_WRITE_LIFECYCLE_REQUEST_READBACK_MISMATCH"
-        )
 
     current = lifecycle.prepare_dispatch(
         request,
-        bundle["manifest"],
-        bundle["context"],
+        manifest,
+        context,
         issue_number=dispatch["source"]["issueNumber"],
         request_comment_id=dispatch["source"]["requestCommentId"],
         hosted_run_id=dispatch["source"]["hostedRunId"],
@@ -235,9 +273,14 @@ def inspect_protocol(
         )
         if (
             isinstance(attempt, dict)
-            and attempt.get("dispatchHash") == dispatch["dispatchHash"]
+            and attempt.get("requestHash") == dispatch["requestHash"]
         ):
-            attempts.append(attempt)
+            record = lifecycle.validate_attempt_record(attempt)
+            if record["hostSha"] != dispatch["source"]["semanticHostSha"]:
+                raise AgentWriteLifecycleHostError(
+                    "AGENT_WRITE_LIFECYCLE_ATTEMPT_MISMATCH"
+                )
+            attempts.append(record)
 
     if len(terminals) > 1:
         raise AgentWriteLifecycleHostError(
@@ -362,13 +405,13 @@ def execute_dispatch(
         raise AgentWriteLifecycleHostError(
             "AGENT_WRITE_LIFECYCLE_ATTEMPT_COMMENT_INVALID"
         )
-
-    expected_attempt = lifecycle.build_attempt(
-        dispatch,
-        run_id=run_id,
-        host_sha=host_sha,
-    )
-    if attempt != expected_attempt:
+    try:
+        lifecycle.validate_attempt(attempt, dispatch)
+    except RuntimeError as exc:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_ATTEMPT_MISMATCH"
+        ) from exc
+    if attempt["runId"] != run_id:
         raise AgentWriteLifecycleHostError(
             "AGENT_WRITE_LIFECYCLE_ATTEMPT_MISMATCH"
         )

@@ -35,6 +35,10 @@ REQUEST_FIELDS = {
     "ttlSeconds", "semanticAuthority", "authorizesMutation",
 }
 SOURCE_FIELDS = {"issueNumber", "requestCommentId", "hostedRunId", "semanticHostSha"}
+ATTEMPT_FIELDS = {
+    "schemaVersion", "dispatchHash", "requestHash", "runId", "hostSha", "status",
+    "semanticAuthority", "authorizesMutation", "attemptHash",
+}
 
 
 class AgentWriteLifecycleError(RuntimeError):
@@ -343,7 +347,8 @@ def prepare_dispatch(
     )
 
     action = request["action"]
-    transition_id = f"agent-write-{request['requestId']}"
+    exact_request_hash = request_hash(request)
+    transition_id = f"agent-write-{exact_request_hash[:24]}"
     payload: dict[str, Any] = {
         "owner": _owner(request),
         "transitionId": transition_id,
@@ -389,7 +394,7 @@ def prepare_dispatch(
     core = {
         "schemaVersion": DISPATCH_SCHEMA,
         "cycleInstanceId": manifest["cycleInstanceId"],
-        "requestHash": request_hash(request),
+        "requestHash": exact_request_hash,
         "action": action,
         "begin": copy.deepcopy(request["begin"]),
         "actor": copy.deepcopy(request["actor"]),
@@ -522,6 +527,34 @@ def build_attempt(
         "authorizesMutation": False,
     }
     return {**core, "attemptHash": stable_hash(core)}
+
+
+def validate_attempt_record(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != ATTEMPT_FIELDS:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    if value.get("schemaVersion") != ATTEMPT_SCHEMA or value.get("status") != "STARTED":
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    _hash(value.get("dispatchHash"), "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    _hash(value.get("requestHash"), "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    _positive_int(value.get("runId"), "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    _sha(value.get("hostSha"), "AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ATTEMPT_INVALID")
+    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "attemptHash"}
+    if value.get("attemptHash") != stable_hash(core):
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ATTEMPT_HASH_MISMATCH")
+    return value
+
+
+def validate_attempt(value: Any, dispatch: dict[str, Any]) -> dict[str, Any]:
+    record = validate_attempt_record(value)
+    if (
+        record["dispatchHash"] != dispatch["dispatchHash"]
+        or record["requestHash"] != dispatch["requestHash"]
+        or record["hostSha"] != dispatch["source"]["semanticHostSha"]
+    ):
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ATTEMPT_MISMATCH")
+    return record
 
 
 def build_binding(
