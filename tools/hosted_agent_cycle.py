@@ -11,6 +11,11 @@ declares exhaustive trace support, and opts new cycles into the explicit Agent
 Write Lease lifecycle close gate. Legacy 0.1 and trace-only 0.2 manifests remain
 readable and keep their original close behavior.
 
+Current hosted begins additionally materialize AgentCycleHandle 0.1 beside the
+existing context/manifest artifact. The handle is read-only correlation and
+resume metadata; it is not authority and legacy begin artifacts without a
+handle remain readable.
+
 Hosted failure transport 0.2 carries AgentFailureCore 0.1 as the sole semantic
 failure contract. The outer failure shell only preserves hosted correlation and
 operational status.
@@ -34,6 +39,7 @@ if str(ROOT) not in sys.path:
 
 from tools import agent_cycle
 from tools import agent_cycle_close
+from tools import agent_cycle_identity
 from tools import agent_failure
 from tools import agent_write_lifecycle_guard
 from tools import hosted_agent_cycle_trace
@@ -58,14 +64,14 @@ CURRENT_FEATURES = sorted([TRACE_FEATURE, WRITE_LEASE_FEATURE])
 ACTIONS = {"begin", "close"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
-CYCLE_INSTANCE_RE = re.compile(r"^cycle-instance-[0-9a-f]{24}$")
+CYCLE_INSTANCE_RE = agent_cycle_identity.CYCLE_INSTANCE_RE
 COMMAND_FIELDS = {
     "schemaVersion", "requestId", "action", "actor", "declaredIntent",
     "machineScope", "begin", "evidenceCommentIds", "semanticAuthority",
     "authorizesMutation",
 }
-ACTOR_FIELDS = {"role", "workerId", "sessionId"}
-BEGIN_REF_FIELDS = {"runId", "sourceSha", "contextHash"}
+ACTOR_FIELDS = agent_cycle_identity.ACTOR_FIELDS
+BEGIN_REF_FIELDS = agent_cycle_identity.BEGIN_FIELDS
 
 
 class HostedAgentCycleError(RuntimeError):
@@ -93,28 +99,17 @@ def _text(value: Any, code: str) -> str:
 
 
 def _actor(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict) or set(value) != ACTOR_FIELDS:
-        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_INVALID")
-    return {
-        "role": _text(value.get("role"), "HOSTED_AGENT_ACTOR_INVALID"),
-        "workerId": _text(value.get("workerId"), "HOSTED_AGENT_ACTOR_INVALID"),
-        "sessionId": _text(value.get("sessionId"), "HOSTED_AGENT_ACTOR_INVALID"),
-    }
+    try:
+        return agent_cycle_identity.canonical_actor(value)
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_INVALID") from exc
 
 
 def _begin_ref(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != BEGIN_REF_FIELDS:
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
-    run_id = value.get("runId")
-    source_sha = value.get("sourceSha")
-    context_hash = value.get("contextHash")
-    if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id <= 0:
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
-    if not isinstance(source_sha, str) or not SHA_RE.fullmatch(source_sha):
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
-    if not isinstance(context_hash, str) or not HASH_RE.fullmatch(context_hash):
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID")
-    return {"runId": run_id, "sourceSha": source_sha, "contextHash": context_hash}
+    try:
+        return agent_cycle_identity.canonical_begin(value)
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_INVALID") from exc
 
 
 def validate_command(value: Any) -> dict[str, Any]:
@@ -209,17 +204,38 @@ def _source(meta: dict[str, int]) -> dict[str, Any]:
 
 
 def _cycle_instance_id(source: dict[str, Any], actor: dict[str, str], context_hash: str) -> str:
-    core = {
-        "begin": {
-            "runId": source["runId"],
-            "sourceSha": source["sourceSha"],
-            "contextHash": context_hash,
-        },
-        "actor": copy.deepcopy(actor),
+    try:
+        return agent_cycle_identity.hosted_cycle_instance_id(source, actor, context_hash)
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_INSTANCE_INVALID") from exc
+
+
+def _hosted_resume_token(manifest: dict[str, Any]) -> str:
+    source = manifest["source"]
+    locator = {
+        "artifactName": manifest["artifactName"],
+        "runId": source["runId"],
+        "sourceSha": source["sourceSha"],
         "issueNumber": source["issueNumber"],
         "beginCommentId": source["commentId"],
+        "contextHash": manifest["contextHash"],
+        "cycleInstanceId": manifest["cycleInstanceId"],
     }
-    return "cycle-instance-" + stable_hash(core)[:24]
+    return "hosted-v1:" + json.dumps(locator, sort_keys=True, separators=(",", ":"))
+
+
+def _handle_for_manifest(context: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+    agent_cycle.validate_context(context)
+    validate_begin_manifest(manifest, context)
+    return agent_cycle_identity.build_handle(
+        repository=context["repository"],
+        cycle_id=context["cycleId"],
+        cycle_instance_id=manifest["cycleInstanceId"],
+        context_schema_version=context["schemaVersion"],
+        context_hash=context["contextHash"],
+        actor=manifest["actor"],
+        resume_token=_hosted_resume_token(manifest),
+    )
 
 
 def _write_json(path: str | Path, value: dict[str, Any]) -> None:
@@ -443,8 +459,10 @@ def begin_from_envelope(
         )
     manifest = _begin_manifest(command, context, meta)
     validate_begin_manifest(manifest, context)
+    handle = _handle_for_manifest(context, manifest)
     _write_json(context_path, context)
     _write_json(manifest_path, manifest)
+    _write_json(Path(context_path).with_name("handle.json"), handle)
     core = {
         "schemaVersion": BEGIN_RESULT_SCHEMA,
         "requestId": command["requestId"],
@@ -530,19 +548,41 @@ def normalize_remote_evidence(receipt: dict[str, Any]) -> dict[str, Any]:
 def _validate_close_binding(
     command: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any]
 ) -> None:
-    begin = _begin_ref(command["begin"])
     validate_begin_manifest(manifest, context)
-    source = manifest["source"]
-    if (
-        begin["runId"] != source["runId"]
-        or begin["sourceSha"] != source["sourceSha"]
-        or begin["contextHash"] != manifest["contextHash"]
-    ):
-        raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_MISMATCH")
-    if command["actor"] != manifest["actor"] or command["declaredIntent"] != manifest["declaredIntent"]:
+    try:
+        agent_cycle_identity.validate_hosted_binding(
+            command["begin"], command["actor"], manifest
+        )
+    except RuntimeError as exc:
+        code = str(exc).split(":", 1)[0]
+        if code == "AGENT_CYCLE_IDENTITY_BEGIN_MISMATCH":
+            raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_REF_MISMATCH") from exc
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_IDENTITY_MISMATCH") from exc
+    if command["declaredIntent"] != manifest["declaredIntent"]:
         raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_IDENTITY_MISMATCH")
     if command["machineScope"] != manifest["machineScope"]:
         raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_SUBSTITUTION")
+
+
+def _validate_optional_handle(
+    begin_root: Path,
+    context: dict[str, Any],
+    manifest: dict[str, Any],
+) -> None:
+    path = begin_root / "handle.json"
+    if not path.exists():
+        return
+    handle = _load_json(path)
+    try:
+        agent_cycle_identity.validate_handle_binding(
+            handle,
+            context=context,
+            actor=manifest["actor"],
+            cycle_instance_id=manifest["cycleInstanceId"],
+            resume_token=_hosted_resume_token(manifest),
+        )
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_MISMATCH") from exc
 
 
 def _write_lifecycle_failure_core(
@@ -665,6 +705,7 @@ def close_from_envelope(
     context = _load_json(context_path)
     manifest = _load_json(manifest_path)
     _validate_close_binding(command, manifest, context)
+    _validate_optional_handle(begin_root, context, manifest)
 
     effective_command = command
     if _manifest_requires_trace(manifest):
