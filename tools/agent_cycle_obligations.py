@@ -554,6 +554,14 @@ def validate_disposition_set(
     if value.get("dispositionSetHash") != stable_hash(body):
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_HASH_MISMATCH")
     if inventory is not None:
+        inventory = validate_inventory(inventory)
+        if (
+            value["repository"] != inventory["repository"]
+            or value["cycleInstanceId"] != inventory["cycleInstanceId"]
+            or value["resourceSetHash"] != inventory["resourceSetHash"]
+            or value["inventoryHash"] != inventory["inventoryHash"]
+        ):
+            raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_BINDING_MISMATCH")
         expected = build_disposition_set(inventory, dispositions)
         if value != expected:
             raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_BINDING_MISMATCH")
