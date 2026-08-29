@@ -187,8 +187,6 @@ def _canonical_obligations(
                 )
             )
         elif kind == "coordination-lease":
-            # Exact lease identity is evidence consumed by R3B2. The lifecycle
-            # obligation is represented once at lease-scope granularity.
             continue
     return [found[key] for key in sorted(found)]
 
@@ -252,10 +250,13 @@ def validate_inventory(
         or value.get("authorizesMutation") is not False
     ):
         raise RuntimeError("AGENT_CYCLE_OBLIGATION_INVENTORY_AUTHORITY_INVALID")
-    body = {key: copy.deepcopy(item) for key, item in value.items() if key != "inventoryHash"}
+    body = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "inventoryHash"
+    }
     if value.get("inventoryHash") != stable_hash(body):
         raise RuntimeError("AGENT_CYCLE_OBLIGATION_INVENTORY_HASH_MISMATCH")
-
     if resource_set is not None:
         expected = build_inventory(resource_set, work_ref=work_ref)
         if value != expected:
@@ -309,13 +310,15 @@ def _work_binding(value: Any, branch: str) -> dict[str, Any]:
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_WORK_BINDING_INVALID")
     pr_number = value.get("prNumber")
     if pr_number is not None and (
-        not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number <= 0
+        not isinstance(pr_number, int)
+        or isinstance(pr_number, bool)
+        or pr_number <= 0
     ):
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_WORK_BINDING_INVALID")
     return value
 
 
-def _git_state(value: Any, status: str, branch: str) -> dict[str, Any]:
+def _git_state(value: Any, status: str, branch: str | None) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != GIT_STATE_FIELDS:
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_GIT_STATE_INVALID")
     exists = value.get("exists")
@@ -339,9 +342,19 @@ def _git_state(value: Any, status: str, branch: str) -> dict[str, Any]:
         _sha(work_head, "AGENT_CYCLE_DISPOSITION_GIT_STATE_INVALID")
         if not isinstance(bindings, list):
             raise RuntimeError("AGENT_CYCLE_DISPOSITION_GIT_STATE_INVALID")
-        checked = [copy.deepcopy(_work_binding(item, branch)) for item in bindings]
-        if checked != sorted(checked, key=lambda item: item["workId"]) or len(checked) != len(
-            {item["workId"] for item in checked}
+        inferred_branch = branch
+        if inferred_branch is None and bindings:
+            first_branch = bindings[0].get("branch") if isinstance(bindings[0], dict) else None
+            if not isinstance(first_branch, str) or not first_branch:
+                raise RuntimeError("AGENT_CYCLE_DISPOSITION_GIT_STATE_INVALID")
+            inferred_branch = first_branch
+        checked = [
+            copy.deepcopy(_work_binding(item, inferred_branch or item.get("branch")))
+            for item in bindings
+        ]
+        if (
+            checked != sorted(checked, key=lambda item: item["workId"])
+            or len(checked) != len({item["workId"] for item in checked})
         ):
             raise RuntimeError("AGENT_CYCLE_DISPOSITION_GIT_STATE_INVALID")
     if status == "PASS" and (exists is None or work_head is None):
@@ -380,7 +393,9 @@ def disposition(
         checked_state = _work_state(domain_state, observation_status)
     elif kind == "git-branch-disposition":
         checked_state = _git_state(
-            domain_state, observation_status, obligation_value["locator"]["branch"]
+            domain_state,
+            observation_status,
+            obligation_value["locator"]["branch"],
         )
     elif kind == "write-lifecycle-disposition":
         checked_state = _lease_state(domain_state, observation_status)
@@ -405,14 +420,14 @@ def validate_disposition(
     status = value.get("observationStatus")
     if kind not in OBLIGATION_KINDS or status not in OBSERVATION_STATUSES:
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_INVALID")
-    _hash(value.get("obligationHash"), "AGENT_CYCLE_DISPOSITION_OBLIGATION_HASH_INVALID")
+    _hash(
+        value.get("obligationHash"),
+        "AGENT_CYCLE_DISPOSITION_OBLIGATION_HASH_INVALID",
+    )
     _hash(value.get("dispositionHash"), "AGENT_CYCLE_DISPOSITION_HASH_INVALID")
     _reason_codes(value.get("reasonCodes"), status)
-    if obligation_value is None:
-        locator = None
-        if kind == "git-branch-disposition":
-            raise RuntimeError("AGENT_CYCLE_DISPOSITION_OBLIGATION_REQUIRED")
-    else:
+    locator = None
+    if obligation_value is not None:
         checked_obligation = validate_obligation(obligation_value)
         if (
             checked_obligation["obligationHash"] != value["obligationHash"]
@@ -423,11 +438,18 @@ def validate_disposition(
     if kind == "work-disposition":
         _work_state(value.get("domainState"), status)
     elif kind == "git-branch-disposition":
-        assert locator is not None
-        _git_state(value.get("domainState"), status, locator["branch"])
+        _git_state(
+            value.get("domainState"),
+            status,
+            locator["branch"] if locator is not None else None,
+        )
     else:
         _lease_state(value.get("domainState"), status)
-    body = {key: copy.deepcopy(item) for key, item in value.items() if key != "dispositionHash"}
+    body = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "dispositionHash"
+    }
     if value["dispositionHash"] != stable_hash(body):
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_HASH_MISMATCH")
     return value
@@ -437,7 +459,9 @@ def build_disposition_set(
     inventory: dict[str, Any], dispositions: Iterable[dict[str, Any]]
 ) -> dict[str, Any]:
     inventory = validate_inventory(inventory)
-    obligations = {item["obligationHash"]: item for item in inventory["obligations"]}
+    obligations = {
+        item["obligationHash"]: item for item in inventory["obligations"]
+    }
     supplied: dict[str, dict[str, Any]] = {}
     for raw in dispositions:
         if not isinstance(raw, dict):
@@ -483,16 +507,38 @@ def validate_disposition_set(
     if value.get("repository") != REPOSITORY:
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_REPOSITORY_INVALID")
     cycle_instance_id = value.get("cycleInstanceId")
-    if not isinstance(cycle_instance_id, str) or CYCLE_RE.fullmatch(cycle_instance_id) is None:
+    if (
+        not isinstance(cycle_instance_id, str)
+        or CYCLE_RE.fullmatch(cycle_instance_id) is None
+    ):
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_CYCLE_INVALID")
-    _hash(value.get("resourceSetHash"), "AGENT_CYCLE_DISPOSITION_SET_RESOURCE_HASH_INVALID")
-    _hash(value.get("inventoryHash"), "AGENT_CYCLE_DISPOSITION_SET_INVENTORY_HASH_INVALID")
+    _hash(
+        value.get("resourceSetHash"),
+        "AGENT_CYCLE_DISPOSITION_SET_RESOURCE_HASH_INVALID",
+    )
+    _hash(
+        value.get("inventoryHash"),
+        "AGENT_CYCLE_DISPOSITION_SET_INVENTORY_HASH_INVALID",
+    )
     agent_cycle_resources.validate_coverage(value.get("coverage"))
     if value.get("observationStatus") not in OBSERVATION_STATUSES:
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_STATUS_INVALID")
     dispositions = value.get("dispositions")
     if not isinstance(dispositions, list):
         raise RuntimeError("AGENT_CYCLE_DISPOSITION_LIST_INVALID")
+    checked = [copy.deepcopy(validate_disposition(item)) for item in dispositions]
+    if (
+        checked != sorted(checked, key=lambda item: item["obligationHash"])
+        or len(checked) != len({item["obligationHash"] for item in checked})
+    ):
+        raise RuntimeError("AGENT_CYCLE_DISPOSITION_LIST_NOT_CANONICAL")
+    expected_status = (
+        "PASS"
+        if all(item["observationStatus"] == "PASS" for item in checked)
+        else "UNKNOWN"
+    )
+    if value.get("observationStatus") != expected_status:
+        raise RuntimeError("AGENT_CYCLE_DISPOSITION_SET_STATUS_MISMATCH")
     if (
         value.get("enforcementEligible") is not False
         or value.get("readOnly") is not True
