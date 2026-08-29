@@ -44,6 +44,12 @@ def build_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]
         raise RuntimeError("AGENT_CYCLE_CLOSE_CONTEXT_MISMATCH")
     if before["projectMachine"]["scope"] != after["projectMachine"]["scope"]:
         raise RuntimeError("AGENT_CYCLE_CLOSE_SCOPE_MISMATCH")
+    if (
+        before.get("schemaVersion") == agent_cycle.SCHEMA_VERSION
+        and after.get("schemaVersion") == agent_cycle.SCHEMA_VERSION
+        and before.get("workRef") != after.get("workRef")
+    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_WORK_REF_MISMATCH")
 
     durable: list[dict[str, Any]] = []
     if before["baseline"]["projectStateHash"] != after["baseline"]["projectStateHash"]:
@@ -385,6 +391,11 @@ def close_from_files(
         scopes=semantic["scope"],
         machine=machine,
         runtime_inspection=runtime,
+        work_ref=(
+            before.get("workRef")
+            if before.get("schemaVersion") == agent_cycle.SCHEMA_VERSION
+            else None
+        ),
     )
     evidence = load_evidence(evidence_paths)
     receipt = build_receipt(before, after, evidence=evidence)
