@@ -1045,9 +1045,7 @@
         "artifact.inspection"
       ],
       "canonicalWriterFor": [],
-      "delegatesTo": [
-        "semantic-foundations-validator"
-      ]
+      "delegatesTo": []
     },
     "git-mutation-bundle": {
       "module": "tools.git_mutation_bundle",
@@ -1335,6 +1333,21 @@
       "delegatesTo": [
         "remote-canonical-executor"
       ]
+    },
+    "remote-canonical-planner": {
+      "module": "tools.remote_canonical",
+      "owner": "operations-core",
+      "kind": "mutation-planner",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.transition-plan"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
     },
     "roadmap-freshness-inspection": {
       "module": "tools.roadmap_freshness",
