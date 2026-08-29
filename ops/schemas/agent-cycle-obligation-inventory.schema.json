@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-cycle-obligation-inventory-0.1.json",
+  "title": "AgentCycleObligationInventory 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "cycleInstanceId",
+    "workRef",
+    "resourceSetHash",
+    "coverage",
+    "obligations",
+    "enforcementEligible",
+    "readOnly",
+    "semanticAuthority",
+    "authorizesMutation",
+    "inventoryHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "AgentCycleObligationInventory 0.1"},
+    "repository": {"const": "EAKerber/MobiliPresenter"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "workRef": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workId"],
+          "properties": {
+            "workId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"}
+          }
+        }
+      ]
+    },
+    "resourceSetHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "scope", "reasonCode"],
+      "properties": {
+        "status": {"const": "UNKNOWN"},
+        "scope": {"const": "strong-hosted-records"},
+        "reasonCode": {"const": "AGENT_CYCLE_PROVIDER_COVERAGE_INCOMPLETE"}
+      }
+    },
+    "obligations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/obligation"}
+    },
+    "enforcementEligible": {"const": false},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "inventoryHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "obligation": {
+      "oneOf": [
+        {"$ref": "#/$defs/gitBranchDisposition"},
+        {"$ref": "#/$defs/workDisposition"},
+        {"$ref": "#/$defs/writeLifecycleDisposition"}
+      ]
+    },
+    "gitBranchDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "obligationHash"],
+      "properties": {
+        "kind": {"const": "git-branch-disposition"},
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "branch"],
+          "properties": {
+            "repository": {"const": "EAKerber/MobiliPresenter"},
+            "branch": {"type": "string", "minLength": 1}
+          }
+        },
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "workDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "obligationHash"],
+      "properties": {
+        "kind": {"const": "work-disposition"},
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workId"],
+          "properties": {
+            "workId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"}
+          }
+        },
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "writeLifecycleDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "obligationHash"],
+      "properties": {
+        "kind": {"const": "write-lifecycle-disposition"},
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "branch", "role", "sessionId"],
+          "properties": {
+            "repository": {"const": "EAKerber/MobiliPresenter"},
+            "branch": {"type": "string", "minLength": 1},
+            "role": {"type": "string", "minLength": 1},
+            "sessionId": {"type": "string", "minLength": 1}
+          }
+        },
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
