@@ -21,14 +21,18 @@ from tools.semantics import registry
 
 ROOT = Path(__file__).resolve().parents[2]
 REPOSITORY = "EAKerber/MobiliPresenter"
-CYCLE_INSTANCE_ID = "cycle-instance-" + "a" * 24
+CYCLE_INSTANCE_ID = "cycle-instance-106d282fa4a74ea8a0330c37"
 WORK_ID = "m12-at3d-r3b1-test"
 RESOURCE_SCHEMA_PATH = ROOT / "ops" / "schemas" / "agent-cycle-touched-resource-set.schema.json"
 OBLIGATION_SCHEMA_PATH = ROOT / "ops" / "schemas" / "agent-cycle-obligation-inventory.schema.json"
 
 
 def _origin(source: str = "test", operation: str = "observe") -> dict[str, object]:
-    return agent_cycle_resources.origin(source, stable_hash({"source": source, "operation": operation}), operation)
+    return agent_cycle_resources.origin(
+        source,
+        stable_hash({"source": source, "operation": operation}),
+        operation,
+    )
 
 
 def _resource_set(resources: list[dict[str, object]] | None = None) -> dict[str, object]:
@@ -118,13 +122,29 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
         obligation_schema = json.loads(OBLIGATION_SCHEMA_PATH.read_text(encoding="utf-8"))
 
         self.assertEqual(agent_cycle_resources.SCHEMA_VERSION, resource_schema["title"])
-        self.assertEqual(agent_cycle_resources.SET_FIELDS, set(resource_schema["required"]))
-        self.assertEqual(agent_cycle_resources.SET_FIELDS, set(resource_schema["properties"]))
+        self.assertEqual(
+            agent_cycle_resources.SET_FIELDS, set(resource_schema["required"])
+        )
+        self.assertEqual(
+            agent_cycle_resources.SET_FIELDS, set(resource_schema["properties"])
+        )
         self.assertFalse(resource_schema["additionalProperties"])
-        self.assertEqual(agent_cycle_resources.COVERAGE_FIELDS, set(resource_schema["properties"]["coverage"]["required"]))
-        self.assertEqual(agent_cycle_resources.coverage()["status"], resource_schema["properties"]["coverage"]["properties"]["status"]["const"])
-        self.assertEqual(agent_cycle_resources.coverage()["scope"], resource_schema["properties"]["coverage"]["properties"]["scope"]["const"])
-        self.assertEqual(agent_cycle_resources.coverage()["reasonCode"], resource_schema["properties"]["coverage"]["properties"]["reasonCode"]["const"])
+        self.assertEqual(
+            agent_cycle_resources.COVERAGE_FIELDS,
+            set(resource_schema["properties"]["coverage"]["required"]),
+        )
+        self.assertEqual(
+            agent_cycle_resources.coverage()["status"],
+            resource_schema["properties"]["coverage"]["properties"]["status"]["const"],
+        )
+        self.assertEqual(
+            agent_cycle_resources.coverage()["scope"],
+            resource_schema["properties"]["coverage"]["properties"]["scope"]["const"],
+        )
+        self.assertEqual(
+            agent_cycle_resources.coverage()["reasonCode"],
+            resource_schema["properties"]["coverage"]["properties"]["reasonCode"]["const"],
+        )
 
         resource_defs = resource_schema["$defs"]
         schema_resource_kinds = {
@@ -133,9 +153,17 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
         }
         self.assertEqual(agent_cycle_resources.RESOURCE_KINDS, schema_resource_kinds)
 
-        self.assertEqual(agent_cycle_obligations.SCHEMA_VERSION, obligation_schema["title"])
-        self.assertEqual(agent_cycle_obligations.INVENTORY_FIELDS, set(obligation_schema["required"]))
-        self.assertEqual(agent_cycle_obligations.INVENTORY_FIELDS, set(obligation_schema["properties"]))
+        self.assertEqual(
+            agent_cycle_obligations.SCHEMA_VERSION, obligation_schema["title"]
+        )
+        self.assertEqual(
+            agent_cycle_obligations.INVENTORY_FIELDS,
+            set(obligation_schema["required"]),
+        )
+        self.assertEqual(
+            agent_cycle_obligations.INVENTORY_FIELDS,
+            set(obligation_schema["properties"]),
+        )
         self.assertFalse(obligation_schema["additionalProperties"])
         work_specs = [
             item
@@ -143,14 +171,19 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
             if item.get("type") == "object"
         ]
         self.assertEqual(1, len(work_specs))
-        self.assertEqual(continuation.ID_RE.pattern, work_specs[0]["properties"]["workId"]["pattern"])
+        self.assertEqual(
+            continuation.ID_RE.pattern,
+            work_specs[0]["properties"]["workId"]["pattern"],
+        )
 
         obligation_defs = obligation_schema["$defs"]
         schema_obligation_kinds = {
             obligation_defs[ref["$ref"].split("/")[-1]]["properties"]["kind"]["const"]
             for ref in obligation_defs["obligation"]["oneOf"]
         }
-        self.assertEqual(agent_cycle_obligations.OBLIGATION_KINDS, schema_obligation_kinds)
+        self.assertEqual(
+            agent_cycle_obligations.OBLIGATION_KINDS, schema_obligation_kinds
+        )
 
         live = registry.load_registry()
         self.assertEqual(
@@ -231,7 +264,9 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
             {"repository": REPOSITORY, "branch": "work/operations/example"},
             by_kind["git-branch-disposition"]["locator"],
         )
-        self.assertEqual({"workId": WORK_ID}, by_kind["work-disposition"]["locator"])
+        self.assertEqual(
+            {"workId": WORK_ID}, by_kind["work-disposition"]["locator"]
+        )
         self.assertEqual(
             {
                 "repository": REPOSITORY,
@@ -258,7 +293,9 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
                     source,
                 ),
                 agent_cycle_resources.resource(
-                    "coordination-lease", {"leaseId": "lease-one"}, source
+                    "coordination-lease",
+                    {"leaseId": "lease-one"},
+                    source,
                 ),
             ]
         )
@@ -270,7 +307,11 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
         inventory = agent_cycle_obligations.build_inventory(
             _resource_set(), work_ref={"workId": WORK_ID}
         )
-        for field in ("enforcementEligible", "semanticAuthority", "authorizesMutation"):
+        for field in (
+            "enforcementEligible",
+            "semanticAuthority",
+            "authorizesMutation",
+        ):
             tampered = copy.deepcopy(inventory)
             tampered[field] = True
             body = {
@@ -281,7 +322,8 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
             tampered["inventoryHash"] = stable_hash(body)
             with self.subTest(field=field):
                 with self.assertRaisesRegex(
-                    RuntimeError, "AGENT_CYCLE_OBLIGATION_INVENTORY_AUTHORITY_INVALID"
+                    RuntimeError,
+                    "AGENT_CYCLE_OBLIGATION_INVENTORY_AUTHORITY_INVALID",
                 ):
                     agent_cycle_obligations.validate_inventory(tampered)
 
@@ -300,7 +342,8 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
         second = _resource_set([other])
         inventory = agent_cycle_obligations.build_inventory(first)
         with self.assertRaisesRegex(
-            RuntimeError, "AGENT_CYCLE_OBLIGATION_INVENTORY_BINDING_MISMATCH"
+            RuntimeError,
+            "AGENT_CYCLE_OBLIGATION_INVENTORY_BINDING_MISMATCH",
         ):
             agent_cycle_obligations.validate_inventory(inventory, second)
 
@@ -315,7 +358,10 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
             for item in schema["properties"]["workRef"]["oneOf"]
             if item.get("type") == "object"
         )
-        self.assertEqual(continuation.ID_RE.pattern, work_spec["properties"]["workId"]["pattern"])
+        self.assertEqual(
+            continuation.ID_RE.pattern,
+            work_spec["properties"]["workId"]["pattern"],
+        )
 
     def test_hosted_shadow_materializes_inventory_from_same_comment_observation(self):
         comments = _comments()
@@ -376,10 +422,14 @@ class AgentCycleObligationR3B1Tests(unittest.TestCase):
                     obligation_output_path=str(obligation_path),
                 )
             resource_error = json.loads(
-                resource_path.with_suffix(".json.error.json").read_text(encoding="utf-8")
+                resource_path.with_suffix(".json.error.json").read_text(
+                    encoding="utf-8"
+                )
             )
             obligation_error = json.loads(
-                obligation_path.with_suffix(".json.error.json").read_text(encoding="utf-8")
+                obligation_path.with_suffix(".json.error.json").read_text(
+                    encoding="utf-8"
+                )
             )
 
         self.assertEqual(1, fetcher.call_count)
