@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from tools import agent_cycle_resources, hosted_cycle_records, remote_canonical_execution
+from tools import (
+    agent_cycle,
+    agent_cycle_obligations,
+    agent_cycle_resources,
+    hosted_cycle_records,
+    remote_canonical_execution,
+)
 
 CURRENT_REPOSITORY = hosted_cycle_records.CURRENT_REPOSITORY
 
@@ -42,7 +48,9 @@ def build_resource_set(
 
     resources: list[dict[str, Any]] = []
 
-    # Strong pre-apply declarations remain the preferred semantic source.
+    # R3B1 promotes only records with strong cycle-instance binding. Ambient
+    # direct RemoteCanonical records remain observable in hosted_cycle_records
+    # but cannot become semantic resources or obligations.
     for item in hosted_cycle_records.records_of(
         view, "agent-tool-dispatch", binding=hosted_cycle_records.STRONG
     ):
@@ -50,30 +58,15 @@ def build_resource_set(
             agent_cycle_resources.resources_from_agent_tool_dispatch(item["normalized"])
         )
 
-    # R3A's artifact remains shadow/diagnostic in R3B0a, so valid ambient direct
-    # RemoteCanonical records remain visible for compatibility. Their AMBIENT
-    # classification is retained only in the common record view and future
-    # obligation consumers must require STRONG binding.
     for item in hosted_cycle_records.records_of(
-        view, "remote-request", binding=hosted_cycle_records.AMBIENT
+        view, "remote-result", binding=hosted_cycle_records.STRONG
     ):
         try:
-            command = remote_canonical_execution.validate_command(item["payload"])
-        except RuntimeError:
-            # Ambient malformed data cannot poison the current cycle.
-            continue
-        resources.extend(agent_cycle_resources.resources_from_remote_command(command))
-
-    for binding in (hosted_cycle_records.STRONG, hosted_cycle_records.AMBIENT):
-        for item in hosted_cycle_records.records_of(view, "remote-result", binding=binding):
-            try:
-                resources.extend(_resources_from_remote_receipt(item["payload"]))
-            except RuntimeError:
-                if binding == hosted_cycle_records.STRONG:
-                    raise AgentCycleResourceCollectionError(
-                        "AGENT_CYCLE_RESOURCE_REMOTE_RECEIPT_INVALID"
-                    )
-                continue
+            resources.extend(_resources_from_remote_receipt(item["payload"]))
+        except RuntimeError as exc:
+            raise AgentCycleResourceCollectionError(
+                "AGENT_CYCLE_RESOURCE_REMOTE_RECEIPT_INVALID"
+            ) from exc
 
     for item in hosted_cycle_records.records_of(
         view, "write-lease-request", binding=hosted_cycle_records.STRONG
@@ -97,3 +90,34 @@ def build_resource_set(
         )
     except RuntimeError as exc:
         raise AgentCycleResourceCollectionError(str(exc).split(":", 1)[0]) from exc
+
+
+def build_obligation_inventory(
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    context: dict[str, Any],
+    *,
+    close_comment_id: int,
+    repository: str = CURRENT_REPOSITORY,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        agent_cycle.validate_context(context)
+    except RuntimeError as exc:
+        raise AgentCycleResourceCollectionError(
+            "AGENT_CYCLE_OBLIGATION_CONTEXT_INVALID"
+        ) from exc
+    resource_set = build_resource_set(
+        comments,
+        manifest,
+        close_comment_id=close_comment_id,
+        repository=repository,
+    )
+    work_ref = context.get("workRef") if context.get("schemaVersion") == agent_cycle.SCHEMA_VERSION else None
+    try:
+        inventory = agent_cycle_obligations.build_inventory(
+            resource_set,
+            work_ref=work_ref,
+        )
+    except RuntimeError as exc:
+        raise AgentCycleResourceCollectionError(str(exc).split(":", 1)[0]) from exc
+    return resource_set, inventory

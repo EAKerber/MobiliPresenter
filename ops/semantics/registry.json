@@ -42,6 +42,18 @@
       "owner": "operations-core",
       "definition": "Read-only hash-bound cycle identity and opaque resume locator; it carries no authority and never authorizes mutation."
     },
+    "artifact.agent-cycle-obligation-inventory": {
+      "term": "AgentCycleObligationInventory",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only cycle-instance-bound shadow inventory of bounded domain disposition obligations derived from strongly bound touched resources and optional explicit Work reference; it never enforces close or authorizes mutation."
+    },
+    "artifact.agent-cycle-touched-resource-set": {
+      "term": "AgentCycleTouchedResourceSet",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only cycle-instance-bound projection of resources attributable to strongly bound Hosted Agent Cycle records, with provider coverage explicitly incomplete until the Work Mode bridge is qualified."
+    },
     "artifact.agent-failure-core": {
       "term": "AgentFailureCore",
       "kind": "artifact",
@@ -403,6 +415,16 @@
       "semanticValidator": "tools.agent_cycle_identity.validate_handle",
       "structuralSchema": "ops/schemas/agent-cycle-handle.schema.json"
     },
+    "agent-cycle-obligation-inventory": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.agent_cycle_obligations.validate_inventory",
+      "structuralSchema": "ops/schemas/agent-cycle-obligation-inventory.schema.json"
+    },
+    "agent-cycle-touched-resource-set": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.agent_cycle_resources.validate_resource_set",
+      "structuralSchema": "ops/schemas/agent-cycle-touched-resource-set.schema.json"
+    },
     "agent-failure-core": {
       "owner": "operations-core",
       "semanticValidator": "tools.agent_failure.validate_failure_core",
@@ -693,6 +715,22 @@
         "project-state-executor",
         "runtime-capability-inspection"
       ]
+    },
+    "agent-cycle-resource-collector": {
+      "module": "tools.agent_cycle_resource_collect",
+      "owner": "operations-core",
+      "kind": "inspection",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [
+        "artifact.agent-cycle-obligation-inventory",
+        "artifact.agent-cycle-touched-resource-set"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
     },
     "agent-cycle-trace-collector": {
       "module": "tools.agent_tools.trace_collect",
@@ -1050,6 +1088,7 @@
       ],
       "canonicalWriterFor": [],
       "delegatesTo": [
+        "agent-cycle-resource-collector",
         "agent-cycle-trace-collector",
         "hosted-agent-cycle-cli"
       ]
