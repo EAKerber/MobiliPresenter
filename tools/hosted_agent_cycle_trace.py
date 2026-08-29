@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -330,12 +329,6 @@ def prepare_close_stabilized(
     obligation_output_path: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Reobserve transport only; never replay or retry the underlying work."""
-    resource_output_path = resource_output_path or os.environ.get(
-        "HOSTED_AGENT_RESOURCE_OUTPUT_PATH"
-    )
-    obligation_output_path = obligation_output_path or os.environ.get(
-        "HOSTED_AGENT_OBLIGATION_OUTPUT_PATH"
-    )
     if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts <= 0:
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_STABILIZATION_INVALID")
     if (
