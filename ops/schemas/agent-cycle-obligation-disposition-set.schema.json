@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mobilipresenter.local/schemas/agent-cycle-obligation-disposition-set-0.1.json",
+  "title": "AgentCycleObligationDispositionSet 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repository",
+    "cycleInstanceId",
+    "resourceSetHash",
+    "inventoryHash",
+    "coverage",
+    "observationStatus",
+    "dispositions",
+    "enforcementEligible",
+    "readOnly",
+    "semanticAuthority",
+    "authorizesMutation",
+    "dispositionSetHash"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "AgentCycleObligationDispositionSet 0.1"},
+    "repository": {"const": "EAKerber/MobiliPresenter"},
+    "cycleInstanceId": {"type": "string", "pattern": "^cycle-instance-[0-9a-f]{24}$"},
+    "resourceSetHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "inventoryHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "scope", "reasonCode"],
+      "properties": {
+        "status": {"const": "UNKNOWN"},
+        "scope": {"const": "strong-hosted-records"},
+        "reasonCode": {"const": "AGENT_CYCLE_PROVIDER_COVERAGE_INCOMPLETE"}
+      }
+    },
+    "observationStatus": {"enum": ["PASS", "UNKNOWN"]},
+    "dispositions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/disposition"}
+    },
+    "enforcementEligible": {"const": false},
+    "readOnly": {"const": true},
+    "semanticAuthority": {"const": false},
+    "authorizesMutation": {"const": false},
+    "dispositionSetHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "common": {
+      "type": "object",
+      "properties": {
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "observationStatus": {"enum": ["PASS", "UNKNOWN"]},
+        "reasonCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "dispositionHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "workBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workId", "workerId", "status", "branch", "prNumber"],
+      "properties": {
+        "workId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "workerId": {"type": ["string", "null"], "minLength": 1},
+        "status": {"enum": ["READY", "IN_PROGRESS", "WAITING", "HANDOFF", "DONE"]},
+        "branch": {"type": "string", "minLength": 1},
+        "prNumber": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "workDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligationHash", "kind", "observationStatus", "reasonCodes", "domainState", "dispositionHash"],
+      "properties": {
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "kind": {"const": "work-disposition"},
+        "observationStatus": {"enum": ["PASS", "UNKNOWN"]},
+        "reasonCodes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "domainState": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authorityHead", "exists", "status"],
+          "properties": {
+            "authorityHead": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+            "exists": {"type": ["boolean", "null"]},
+            "status": {"type": ["string", "null"], "enum": ["READY", "IN_PROGRESS", "WAITING", "HANDOFF", "DONE", null]}
+          }
+        },
+        "dispositionHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "gitDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligationHash", "kind", "observationStatus", "reasonCodes", "domainState", "dispositionHash"],
+      "properties": {
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "kind": {"const": "git-branch-disposition"},
+        "observationStatus": {"enum": ["PASS", "UNKNOWN"]},
+        "reasonCodes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "domainState": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exists", "headSha", "workAuthorityHead", "activeWorkBindings"],
+          "properties": {
+            "exists": {"type": ["boolean", "null"]},
+            "headSha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+            "workAuthorityHead": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+            "activeWorkBindings": {
+              "oneOf": [
+                {"type": "null"},
+                {"type": "array", "items": {"$ref": "#/$defs/workBinding"}}
+              ]
+            }
+          }
+        },
+        "dispositionHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "lifecycleDisposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligationHash", "kind", "observationStatus", "reasonCodes", "domainState", "dispositionHash"],
+      "properties": {
+        "obligationHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "kind": {"const": "write-lifecycle-disposition"},
+        "observationStatus": {"enum": ["PASS", "UNKNOWN"]},
+        "reasonCodes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "domainState": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "reportHash"],
+          "properties": {
+            "state": {"type": ["string", "null"], "enum": ["NONE", "ACTIVE", "RELEASED", "EXPIRED", "UNKNOWN", null]},
+            "reportHash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "dispositionHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "disposition": {
+      "oneOf": [
+        {"$ref": "#/$defs/workDisposition"},
+        {"$ref": "#/$defs/gitDisposition"},
+        {"$ref": "#/$defs/lifecycleDisposition"}
+      ]
+    }
+  }
+}
