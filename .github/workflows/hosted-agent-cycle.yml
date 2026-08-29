@@ -219,6 +219,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HOSTED_AGENT_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
           HOSTED_AGENT_RESOURCE_OUTPUT_PATH: /tmp/agent-cycle-close/agent-cycle-touched-resources.json
+          HOSTED_AGENT_OBLIGATION_OUTPUT_PATH: /tmp/agent-cycle-close/agent-cycle-obligation-inventory.json
         run: |
           mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
           python tools/hosted_agent_cycle.py close \
