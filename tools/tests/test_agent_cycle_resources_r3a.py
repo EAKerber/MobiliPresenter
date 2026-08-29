@@ -23,7 +23,11 @@ from tools.agent_tools import mutation_dispatch, trace_collect
 from tools.canonical import stable_hash
 
 REPOSITORY = "EAKerber/MobiliPresenter"
-ACTOR = {"role": "manager-gitops", "workerId": "manager-gitops-a", "sessionId": "session-1"}
+ACTOR = {
+    "role": "manager-gitops",
+    "workerId": "manager-gitops-a",
+    "sessionId": "session-1",
+}
 BEGIN = {"runId": 123, "sourceSha": "a" * 40, "contextHash": "b" * 64}
 
 
@@ -35,7 +39,9 @@ def manifest() -> dict[str, object]:
         "issueNumber": 145,
         "commentId": 100,
     }
-    cycle_instance_id = agent_cycle_identity.hosted_cycle_instance_id(source, ACTOR, BEGIN["contextHash"])
+    cycle_instance_id = agent_cycle_identity.hosted_cycle_instance_id(
+        source, ACTOR, BEGIN["contextHash"]
+    )
     return {
         "schemaVersion": "HostedAgentCycleBeginManifest 0.3",
         "requestId": "begin-one",
@@ -48,7 +54,10 @@ def manifest() -> dict[str, object]:
         "cycleId": "cycle-" + "d" * 20,
         "cycleInstanceId": cycle_instance_id,
         "contextHash": BEGIN["contextHash"],
-        "carrierFeatures": ["agent-write-lease-lifecycle-0.1", "execution-trace-0.1"],
+        "carrierFeatures": [
+            "agent-write-lease-lifecycle-0.1",
+            "execution-trace-0.1",
+        ],
         "status": "READY",
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -68,7 +77,9 @@ def handle_for(current: dict[str, object]) -> dict[str, object]:
     )
 
 
-def owner_comment(comment_id: int, marker: str, payload: dict[str, object]) -> dict[str, object]:
+def owner_comment(
+    comment_id: int, marker: str, payload: dict[str, object]
+) -> dict[str, object]:
     return {
         "id": comment_id,
         "author_association": "OWNER",
@@ -77,7 +88,9 @@ def owner_comment(comment_id: int, marker: str, payload: dict[str, object]) -> d
     }
 
 
-def bot_comment(comment_id: int, marker: str, payload: dict[str, object]) -> dict[str, object]:
+def bot_comment(
+    comment_id: int, marker: str, payload: dict[str, object]
+) -> dict[str, object]:
     return {
         "id": comment_id,
         "author_association": "NONE",
@@ -146,68 +159,84 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
         right = agent_cycle_resources.resources_from_git_plan(second)
         left_by_kind = {item["kind"]: item for item in left}
         right_by_kind = {item["kind"]: item for item in right}
-        self.assertEqual(left_by_kind["git-path"]["resourceHash"], right_by_kind["git-path"]["resourceHash"])
-        self.assertNotEqual(left_by_kind["git-path"]["origins"], right_by_kind["git-path"]["origins"])
+        self.assertEqual(
+            left_by_kind["git-path"]["resourceHash"],
+            right_by_kind["git-path"]["resourceHash"],
+        )
+        self.assertNotEqual(
+            left_by_kind["git-path"]["origins"],
+            right_by_kind["git-path"]["origins"],
+        )
         self.assertNotIn("branchHead", left_by_kind["git-path"]["locator"])
         self.assertNotIn("blobSha", left_by_kind["git-path"]["locator"])
 
-    def test_pr_slot_is_prospective_and_does_not_invent_number(self):
-        plan = git_mutation_plan.create_pr(
+    def test_pr_operations_are_not_promoted_without_a_strong_runtime_producer(self):
+        create = git_mutation_plan.create_pr(
             head="work/operations/example",
             base="main",
             head_sha="1" * 40,
-            title="R3A",
+            title="R3B1",
             body_sha256="2" * 64,
             control_branch="main",
         )
-        resources = agent_cycle_resources.resources_from_git_plan(plan)
-        self.assertEqual([item["kind"] for item in resources], ["pull-request-slot"])
-        self.assertEqual(resources[0]["locator"]["head"], "work/operations/example")
-        self.assertNotIn("number", resources[0]["locator"])
-
-    def test_merge_pr_materializes_pr_and_base_branch_without_copying_head_state(self):
-        plan = git_mutation_plan.merge_pr(
+        merge = git_mutation_plan.merge_pr(
             pr_number=77,
             head_sha="1" * 40,
             base="main",
             control_branch="main",
         )
-        resources = agent_cycle_resources.resources_from_git_plan(plan)
-        by_kind = {item["kind"]: item for item in resources}
-        self.assertEqual(by_kind["pull-request"]["locator"], {"repository": REPOSITORY, "number": 77})
-        self.assertEqual(by_kind["git-branch"]["locator"], {"repository": REPOSITORY, "branch": "main"})
+        for plan in (create, merge):
+            with self.subTest(operation=plan["operation"]):
+                with self.assertRaisesRegex(
+                    RuntimeError, "AGENT_CYCLE_RESOURCE_GIT_OPERATION_UNSUPPORTED"
+                ):
+                    agent_cycle_resources.resources_from_git_plan(plan)
 
     def test_transition_plan_projects_subject_not_candidate_state(self):
         plan = transition_protocol.build_plan(
             domain="continuation",
             action="advance",
             subject={"kind": "continuation", "id": "work-one"},
-            authority={"kind": "git", "locator": {"branch": "authority/continuations", "path": "work-one.json"}},
+            authority={
+                "kind": "git",
+                "locator": {
+                    "branch": "authority/continuations",
+                    "path": "work-one.json",
+                },
+            },
             before={"schemaVersion": "X", "status": "READY"},
             candidate={"schemaVersion": "X", "status": "IN_PROGRESS"},
             intent={"reason": "test"},
         )
-        resource = agent_cycle_resources.resources_from_transition_plan(plan)[0]
-        self.assertEqual(resource["locator"], {
-            "domain": "continuation",
-            "subjectKind": "continuation",
-            "subjectId": "work-one",
-        })
-        self.assertNotIn("status", resource["locator"])
+        projected = agent_cycle_resources.resources_from_transition_plan(plan)[0]
+        self.assertEqual(
+            projected["locator"],
+            {
+                "domain": "continuation",
+                "subjectKind": "continuation",
+                "subjectId": "work-one",
+            },
+        )
+        self.assertNotIn("status", projected["locator"])
 
     def test_lease_request_projects_scope_before_lease_id_exists(self):
-        resource = agent_cycle_resources.resources_from_write_lease_request(lease_request())[0]
-        self.assertEqual(resource["kind"], "lease-scope")
-        self.assertEqual(resource["locator"], {
-            "repository": REPOSITORY,
-            "branch": "work/operations/example",
-            "role": "manager-gitops",
-            "sessionId": "session-1",
-        })
-        self.assertNotIn("leaseId", resource["locator"])
-        self.assertNotIn("workerId", resource["locator"])
+        projected = agent_cycle_resources.resources_from_write_lease_request(
+            lease_request()
+        )[0]
+        self.assertEqual(projected["kind"], "lease-scope")
+        self.assertEqual(
+            projected["locator"],
+            {
+                "repository": REPOSITORY,
+                "branch": "work/operations/example",
+                "role": "manager-gitops",
+                "sessionId": "session-1",
+            },
+        )
+        self.assertNotIn("leaseId", projected["locator"])
+        self.assertNotIn("workerId", projected["locator"])
 
-    def test_union_is_order_independent_and_merges_provenance(self):
+    def test_union_is_order_independent_and_merges_provenance_without_summary(self):
         a = agent_cycle_resources.resource(
             "git-branch",
             {"repository": REPOSITORY, "branch": "work/operations/example"},
@@ -229,8 +258,10 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
             resources=[b, a],
         )
         self.assertEqual(left, right)
-        self.assertEqual(left["sourceSummary"]["resourceCount"], 1)
-        self.assertEqual(left["sourceSummary"]["originCount"], 2)
+        self.assertNotIn("sourceSummary", left)
+        self.assertEqual(len(left["resources"]), 1)
+        self.assertEqual(len(left["resources"][0]["origins"]), 2)
+        self.assertEqual(left["coverage"], agent_cycle_resources.coverage())
         self.assertFalse(left["semanticAuthority"])
         self.assertFalse(left["authorizesMutation"])
 
@@ -247,29 +278,46 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
         )
         tampered = copy.deepcopy(value)
         tampered["semanticAuthority"] = True
-        core = {key: copy.deepcopy(entry) for key, entry in tampered.items() if key != "resourceSetHash"}
+        core = {
+            key: copy.deepcopy(entry)
+            for key, entry in tampered.items()
+            if key != "resourceSetHash"
+        }
         tampered["resourceSetHash"] = stable_hash(core)
-        with self.assertRaisesRegex(RuntimeError, "AGENT_CYCLE_RESOURCE_SET_MISMATCH"):
+        with self.assertRaisesRegex(
+            RuntimeError, "AGENT_CYCLE_RESOURCE_SET_MISMATCH"
+        ):
             agent_cycle_resources.validate_resource_set(tampered)
 
-    def test_collector_uses_cycle_window_and_ignores_other_actor(self):
+    def test_ambient_direct_remote_records_do_not_enter_semantic_resource_set(self):
         current = manifest()
         other_actor = copy.deepcopy(ACTOR)
         other_actor["sessionId"] = "other-session"
-        own = remote_create_file()
-        other = remote_create_file(other_actor)
         comments = [
-            {"id": 100, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "begin"},
-            owner_comment(110, trace_collect.REMOTE_REQUEST_MARKER, own),
-            owner_comment(120, trace_collect.REMOTE_REQUEST_MARKER, other),
-            {"id": 200, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "close"},
+            {
+                "id": 100,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "begin",
+            },
+            owner_comment(110, trace_collect.REMOTE_REQUEST_MARKER, remote_create_file()),
+            owner_comment(
+                120,
+                trace_collect.REMOTE_REQUEST_MARKER,
+                remote_create_file(other_actor),
+            ),
+            {
+                "id": 200,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "close",
+            },
         ]
         value = agent_cycle_resource_collect.build_resource_set(
             comments, current, close_comment_id=200
         )
-        self.assertEqual(value["sourceSummary"]["resourceCount"], 2)
-        kinds = [item["kind"] for item in value["resources"]]
-        self.assertEqual(kinds, ["git-branch", "git-path"])
+        self.assertEqual(value["resources"], [])
+        self.assertEqual(value["coverage"]["status"], "UNKNOWN")
 
     def test_agent_tool_dispatch_contributes_declared_targets_before_apply(self):
         current = manifest()
@@ -298,13 +346,32 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
         dispatch = {**core, "dispatchHash": stable_hash(core)}
         mutation_dispatch.validate_dispatch(dispatch)
         comments = [
-            {"id": 100, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "begin"},
+            {
+                "id": 100,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "begin",
+            },
             bot_comment(110, trace_collect.AGENT_TOOL_DISPATCH_MARKER, dispatch),
-            {"id": 200, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "close"},
+            {
+                "id": 200,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "close",
+            },
         ]
-        value = agent_cycle_resource_collect.build_resource_set(comments, current, close_comment_id=200)
-        self.assertEqual(value["sourceSummary"]["resourceCount"], 2)
-        self.assertEqual(value["sourceSummary"]["sourceKinds"], ["agent-tool-mutation-dispatch"])
+        value = agent_cycle_resource_collect.build_resource_set(
+            comments, current, close_comment_id=200
+        )
+        self.assertEqual(len(value["resources"]), 2)
+        self.assertEqual(
+            {
+                origin["sourceKind"]
+                for item in value["resources"]
+                for origin in item["origins"]
+            },
+            {"agent-tool-mutation-dispatch"},
+        )
 
     def test_v01_and_handle_first_lease_requests_converge_to_same_resource(self):
         current = manifest()
@@ -324,20 +391,54 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
         }
         hosted_handle_requests.validate_write_lease(outer, repository=REPOSITORY)
         base = [
-            {"id": 100, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "begin"},
-            {"id": 200, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "close"},
+            {
+                "id": 100,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "begin",
+            },
+            {
+                "id": 200,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "close",
+            },
         ]
-        legacy_comments = [base[0], owner_comment(110, agent_write_lifecycle.REQUEST_MARKER, inner), base[1]]
-        handle_comments = [base[0], owner_comment(110, hosted_handle_requests.WRITE_LEASE_MARKER_V02, outer), base[1]]
-        legacy = agent_cycle_resource_collect.build_resource_set(legacy_comments, current, close_comment_id=200)
-        handle_first = agent_cycle_resource_collect.build_resource_set(handle_comments, current, close_comment_id=200)
+        legacy_comments = [
+            base[0],
+            owner_comment(110, agent_write_lifecycle.REQUEST_MARKER, inner),
+            base[1],
+        ]
+        handle_comments = [
+            base[0],
+            owner_comment(
+                110, hosted_handle_requests.WRITE_LEASE_MARKER_V02, outer
+            ),
+            base[1],
+        ]
+        legacy = agent_cycle_resource_collect.build_resource_set(
+            legacy_comments, current, close_comment_id=200
+        )
+        handle_first = agent_cycle_resource_collect.build_resource_set(
+            handle_comments, current, close_comment_id=200
+        )
         self.assertEqual(legacy, handle_first)
 
     def test_shadow_materialization_reuses_one_trace_observation(self):
         current = manifest()
         comments = [
-            {"id": 100, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "begin"},
-            {"id": 200, "author_association": "OWNER", "user": {"login": "EAKerber"}, "body": "close"},
+            {
+                "id": 100,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "begin",
+            },
+            {
+                "id": 200,
+                "author_association": "OWNER",
+                "user": {"login": "EAKerber"},
+                "body": "close",
+            },
         ]
         fetcher = Mock(return_value=comments)
         command = {"evidenceCommentIds": []}
@@ -360,7 +461,8 @@ class AgentCycleTouchedResourceR3ATests(unittest.TestCase):
             self.assertEqual(fetcher.call_count, 1)
             value = json.loads(path.read_text(encoding="utf-8"))
             agent_cycle_resources.validate_resource_set(value)
-            self.assertEqual(value["sourceSummary"]["resourceCount"], 0)
+            self.assertEqual(value["resources"], [])
+            self.assertEqual(value["coverage"]["status"], "UNKNOWN")
 
 
 if __name__ == "__main__":
