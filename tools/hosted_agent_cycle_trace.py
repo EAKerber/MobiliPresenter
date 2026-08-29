@@ -1,9 +1,10 @@
 """Internal read-only trace gate for Hosted Agent Cycle close.
 
-The Hosted Agent Cycle owns begin/close identity validation.  This helper owns
+The Hosted Agent Cycle owns begin/close identity validation. This helper owns
 only carrier observation, exhaustive attribution of supported request/result
-pairs, bounded transport stabilization, and evidence discovery.  It has no CLI,
-no semantic authority, and never retries an operation or mutation.
+pairs, bounded transport stabilization, evidence discovery, and best-effort
+shadow projections. It has no CLI, no semantic authority, and never retries an
+operation or mutation.
 """
 from __future__ import annotations
 
@@ -39,7 +40,11 @@ def _bound_trace(
     if meta.get("issueNumber") != manifest["source"]["issueNumber"]:
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_ISSUE_MISMATCH")
     close_comment_id = meta.get("commentId")
-    if not isinstance(close_comment_id, int) or isinstance(close_comment_id, bool) or close_comment_id <= 0:
+    if (
+        not isinstance(close_comment_id, int)
+        or isinstance(close_comment_id, bool)
+        or close_comment_id <= 0
+    ):
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_CLOSE_COMMENT_INVALID")
     try:
         value = trace_collect.build_trace(
@@ -83,9 +88,11 @@ def _agent_write_lifecycle_evidence_comment_ids(
         payload = trace_collect._json_after_marker(
             comment.get("body"), lifecycle.RESULT_MARKER
         )
-        if not isinstance(payload, dict) or payload.get("schemaVersion") != lifecycle.RESULT_SCHEMA:
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schemaVersion") != lifecycle.RESULT_SCHEMA
+        ):
             continue
-        # A different cycle sharing the bus must never contaminate this close.
         if (
             trace_collect._canonical_begin(payload.get("begin")) != begin
             or trace_collect._canonical_actor(payload.get("actor")) != actor
@@ -95,7 +102,9 @@ def _agent_write_lifecycle_evidence_comment_ids(
         try:
             lifecycle.validate_result(payload)
         except RuntimeError as exc:
-            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RESULT_INVALID") from exc
+            raise HostedAgentCycleTraceError(
+                "AGENT_TRACE_LIFECYCLE_RESULT_INVALID"
+            ) from exc
 
         action = payload["action"]
         binding = payload["binding"]
@@ -146,7 +155,9 @@ def _agent_write_lifecycle_evidence_comment_ids(
         try:
             remote_canonical_execution.validate_receipt(payload)
         except RuntimeError as exc:
-            raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RECEIPT_INVALID") from exc
+            raise HostedAgentCycleTraceError(
+                "AGENT_TRACE_LIFECYCLE_RECEIPT_INVALID"
+            ) from exc
         if payload != expected[receipt_hash]:
             raise HostedAgentCycleTraceError("AGENT_TRACE_LIFECYCLE_RECEIPT_MISMATCH")
         if receipt_hash in found:
@@ -200,46 +211,84 @@ def _amend_command(
     return amended
 
 
-def _materialize_shadow_resources(
-    output_path: str,
+def _shadow_error(path: Path, schema: str, code: str) -> None:
+    error_path = path.with_suffix(path.suffix + ".error.json")
+    diagnostic = {
+        "schemaVersion": schema,
+        "status": "UNKNOWN",
+        "error": code,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    error_path.write_text(
+        json.dumps(diagnostic, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_shadow(path: Path, value: dict[str, Any]) -> None:
+    path.write_text(
+        json.dumps(value, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    error_path = path.with_suffix(path.suffix + ".error.json")
+    if error_path.exists():
+        error_path.unlink()
+
+
+def _materialize_shadow_cycle_projections(
+    resource_output_path: str | None,
+    obligation_output_path: str | None,
     comments: list[dict[str, Any]],
     manifest: dict[str, Any],
+    context: dict[str, Any],
     *,
     close_comment_id: int,
     repository: str,
 ) -> None:
-    """Best-effort shadow projection; failure must never change close judgment."""
+    """Best-effort projections; failure must never change close judgment."""
     from tools import agent_cycle_resource_collect
 
-    path = Path(output_path)
-    error_path = path.with_suffix(path.suffix + ".error.json")
+    if resource_output_path is None and obligation_output_path is None:
+        return
+    resource_path = Path(resource_output_path) if resource_output_path else None
+    obligation_path = Path(obligation_output_path) if obligation_output_path else None
     try:
-        value = agent_cycle_resource_collect.build_resource_set(
-            comments,
-            manifest,
-            close_comment_id=close_comment_id,
-            repository=repository,
-        )
-        path.write_text(
-            json.dumps(value, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-        if error_path.exists():
-            error_path.unlink()
+        if obligation_path is not None:
+            resource_set, inventory = agent_cycle_resource_collect.build_obligation_inventory(
+                comments,
+                manifest,
+                context,
+                close_comment_id=close_comment_id,
+                repository=repository,
+            )
+        else:
+            resource_set = agent_cycle_resource_collect.build_resource_set(
+                comments,
+                manifest,
+                close_comment_id=close_comment_id,
+                repository=repository,
+            )
+            inventory = None
+        if resource_path is not None:
+            _write_shadow(resource_path, resource_set)
+        if obligation_path is not None and inventory is not None:
+            _write_shadow(obligation_path, inventory)
     except Exception as exc:
         code = str(exc).split(":", 1)[0] or exc.__class__.__name__
-        diagnostic = {
-            "schemaVersion": "AgentCycleTouchedResourceShadowDiagnostic 0.1",
-            "status": "UNKNOWN",
-            "error": code,
-            "readOnly": True,
-            "semanticAuthority": False,
-            "authorizesMutation": False,
-        }
-        error_path.write_text(
-            json.dumps(diagnostic, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        if resource_path is not None:
+            _shadow_error(
+                resource_path,
+                "AgentCycleTouchedResourceShadowDiagnostic 0.2",
+                code,
+            )
+        if obligation_path is not None:
+            _shadow_error(
+                obligation_path,
+                "AgentCycleObligationShadowDiagnostic 0.1",
+                code,
+            )
 
 
 def prepare_close(
@@ -278,13 +327,22 @@ def prepare_close_stabilized(
     attempts: int = TRACE_STABILIZATION_ATTEMPTS,
     delay_seconds: float = TRACE_STABILIZATION_DELAY_SECONDS,
     resource_output_path: str | None = None,
+    obligation_output_path: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Reobserve transport only; never replay or retry the underlying work."""
-    del context
-    resource_output_path = resource_output_path or os.environ.get("HOSTED_AGENT_RESOURCE_OUTPUT_PATH")
+    resource_output_path = resource_output_path or os.environ.get(
+        "HOSTED_AGENT_RESOURCE_OUTPUT_PATH"
+    )
+    obligation_output_path = obligation_output_path or os.environ.get(
+        "HOSTED_AGENT_OBLIGATION_OUTPUT_PATH"
+    )
     if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts <= 0:
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_STABILIZATION_INVALID")
-    if not isinstance(delay_seconds, (int, float)) or isinstance(delay_seconds, bool) or delay_seconds < 0:
+    if (
+        not isinstance(delay_seconds, (int, float))
+        or isinstance(delay_seconds, bool)
+        or delay_seconds < 0
+    ):
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_STABILIZATION_INVALID")
     fetcher = trace_collect.fetch_issue_comments if fetch_comments is None else fetch_comments
     sleeper = time.sleep if sleep is None else sleep
@@ -309,21 +367,19 @@ def prepare_close_stabilized(
                     manifest,
                     close_comment_id=meta["commentId"],
                 )
-                if resource_output_path is not None:
-                    _materialize_shadow_resources(
-                        resource_output_path,
-                        comments,
-                        manifest,
-                        close_comment_id=meta["commentId"],
-                        repository=repository,
-                    )
+                _materialize_shadow_cycle_projections(
+                    resource_output_path,
+                    obligation_output_path,
+                    comments,
+                    manifest,
+                    context,
+                    close_comment_id=meta["commentId"],
+                    repository=repository,
+                )
                 return amended, value
             except HostedAgentCycleTraceError as exc:
                 if exc.code not in retryable_observation_errors:
                     raise
-                # A terminal mutation/lifecycle result may be visible before its
-                # separately materialized canonical receipt comment. Reobserve
-                # the carrier only; never replay work to fill an observation gap.
                 last_observation_error = exc
         if observation + 1 < attempts:
             sleeper(float(delay_seconds))
