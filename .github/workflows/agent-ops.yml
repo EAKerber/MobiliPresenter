@@ -24,6 +24,158 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: R3B2 hosted qualification smoke
+        if: github.ref_name == 'work/operations/m12-at3d-r3b2-hosted-qualification-20260829'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOSTED_AGENT_SOURCE_SHA: 9b131594faaeb9c52a0bf5f3665ddd519d3329bc
+          R3B2_BEGIN_COMMENT_ID: '5465220874'
+          R3B2_CLOSE_COMMENT_ID: '5465221252'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          from tools import agent_cycle_obligations, hosted_agent_cycle
+
+          target = os.environ["HOSTED_AGENT_SOURCE_SHA"]
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", f"{target}..HEAD"],
+              text=True,
+          ).splitlines()
+          if changed != [".github/workflows/agent-ops.yml"]:
+              raise SystemExit(f"QUALIFICATION_DELTA_INVALID:{changed}")
+
+          root = Path("/tmp/r3b2-hosted-qualification")
+          begin_root = root / "begin"
+          close_root = root / "close"
+          begin_root.mkdir(parents=True, exist_ok=True)
+          close_root.mkdir(parents=True, exist_ok=True)
+          work_ref = {"workId": "m12-at3d-converged-git-mutation-0-1"}
+          actor = {
+              "role": "manager-gitops",
+              "workerId": "manager-gitops-a",
+              "sessionId": "r3b2-hosted-qualification-20260829-01",
+          }
+          begin_command = {
+              "schemaVersion": "HostedAgentCycleCommand 0.3",
+              "requestId": "r3b2-hosted-qualification-begin-20260829-01",
+              "action": "begin",
+              "actor": actor,
+              "declaredIntent": "inspect-and-plan",
+              "machineScope": "live",
+              "workRef": work_ref,
+              "evidenceCommentIds": [],
+              "semanticAuthority": False,
+              "authorizesMutation": False,
+          }
+          begin_meta = {
+              "issueNumber": 145,
+              "commentId": int(os.environ["R3B2_BEGIN_COMMENT_ID"]),
+          }
+          begin_result = hosted_agent_cycle.begin_from_envelope(
+              begin_command,
+              begin_meta,
+              context_path=str(begin_root / "context.json"),
+              manifest_path=str(begin_root / "manifest.json"),
+          )
+          if begin_result["status"] != "READY":
+              raise SystemExit("QUALIFICATION_BEGIN_NOT_READY")
+          context = json.loads((begin_root / "context.json").read_text(encoding="utf-8"))
+          if context.get("workRef") != work_ref:
+              raise SystemExit("QUALIFICATION_WORK_REF_NOT_BOUND")
+
+          close_command = {
+              "schemaVersion": "HostedAgentCycleCommand 0.2",
+              "requestId": "r3b2-hosted-qualification-close-20260829-01",
+              "action": "close",
+              "handle": begin_result["handle"],
+              "evidenceCommentIds": [],
+              "semanticAuthority": False,
+              "authorizesMutation": False,
+          }
+          close_meta = {
+              "issueNumber": 145,
+              "commentId": int(os.environ["R3B2_CLOSE_COMMENT_ID"]),
+          }
+          close_result = hosted_agent_cycle.close_from_envelope(
+              close_command,
+              close_meta,
+              begin_dir=str(begin_root),
+              output_path=str(close_root / "closure.json"),
+              evidence_dir=str(close_root / "evidence"),
+          )
+          if close_result["status"] != "PASS":
+              raise SystemExit("QUALIFICATION_CLOSE_NOT_PASS")
+
+          closure = json.loads((close_root / "closure.json").read_text(encoding="utf-8"))
+          inventory = json.loads(
+              (close_root / "agent-cycle-obligation-inventory.json").read_text(encoding="utf-8")
+          )
+          dispositions = json.loads(
+              (close_root / "agent-cycle-obligation-dispositions.json").read_text(encoding="utf-8")
+          )
+          lifecycle = json.loads(
+              (close_root / "agent-write-lifecycle-close.json").read_text(encoding="utf-8")
+          )
+          agent_cycle_obligations.validate_inventory(inventory)
+          agent_cycle_obligations.validate_disposition_set(dispositions, inventory)
+          if inventory.get("workRef") != work_ref:
+              raise SystemExit("QUALIFICATION_INVENTORY_WORK_REF_MISMATCH")
+          if len(dispositions["dispositions"]) != len(inventory["obligations"]):
+              raise SystemExit("QUALIFICATION_DISPOSITION_COVERAGE_MISMATCH")
+          obligation_hashes = [item["obligationHash"] for item in dispositions["dispositions"]]
+          if obligation_hashes != sorted(obligation_hashes):
+              raise SystemExit("QUALIFICATION_DISPOSITION_ORDER_INVALID")
+          if (close_root / "agent-cycle-obligation-dispositions.json.error.json").exists():
+              raise SystemExit("QUALIFICATION_DISPOSITION_SHADOW_ERROR")
+          if closure.get("status") != "PASS":
+              raise SystemExit("QUALIFICATION_CANONICAL_CLOSE_CHANGED")
+          if lifecycle.get("state") not in {"NONE", "RELEASED"}:
+              raise SystemExit(f"QUALIFICATION_LIFECYCLE_NOT_CLEAN:{lifecycle.get('state')}")
+          if any(
+              dispositions.get(key) is not expected
+              for key, expected in {
+                  "enforcementEligible": False,
+                  "readOnly": True,
+                  "semanticAuthority": False,
+                  "authorizesMutation": False,
+              }.items()
+          ):
+              raise SystemExit("QUALIFICATION_DISPOSITION_AUTHORITY_INVALID")
+
+          summary = {
+              "schemaVersion": "R3B2HostedQualification 0.1",
+              "targetHead": target,
+              "harnessHead": os.environ["GITHUB_SHA"],
+              "harnessDelta": changed,
+              "beginStatus": begin_result["status"],
+              "closeStatus": close_result["status"],
+              "canonicalCloseStatus": closure["status"],
+              "workRef": work_ref,
+              "obligationCount": len(inventory["obligations"]),
+              "dispositionCount": len(dispositions["dispositions"]),
+              "dispositionObservationStatus": dispositions["observationStatus"],
+              "lifecycleState": lifecycle["state"],
+              "readOnly": True,
+              "semanticAuthority": False,
+              "authorizesMutation": False,
+          }
+          (root / "summary.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, sort_keys=True))
+          PY
+      - name: Upload R3B2 hosted qualification
+        if: github.ref_name == 'work/operations/m12-at3d-r3b2-hosted-qualification-20260829' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r3b2-hosted-qualification
+          path: /tmp/r3b2-hosted-qualification
+          if-no-files-found: error
       - name: Toolbox unit tests
         run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
       - name: Semantic contracts
