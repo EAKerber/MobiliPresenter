@@ -26,7 +26,7 @@ jobs:
           python-version: '3.12'
       - name: R4C hosted mutation predecessor fence qualification
         if: github.ref_name == 'work/operations/m12-at3d-r4c-hosted-qualification-20260830'
-        run: python .github/qualification/r4c_predecessor_fence.py
+        run: PYTHONPATH=. python .github/qualification/r4c_predecessor_fence.py
       - name: Upload R4C hosted mutation predecessor fence qualification
         if: github.ref_name == 'work/operations/m12-at3d-r4c-hosted-qualification-20260830' && always()
         uses: actions/upload-artifact@v4
