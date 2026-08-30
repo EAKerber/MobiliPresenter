@@ -18,25 +18,12 @@ jobs:
           ref: work/operations/m12-at3d-r5a1-hosted-runtime-observation-ingress-v0.1
           fetch-depth: 0
 
-      - name: Materialize non-executable staged workflow
-        run: |
-          python - <<'PY'
-          from pathlib import Path
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-          source = Path('.github/workflows/hosted-agent-cycle.yml').read_text(encoding='utf-8')
-          old = """      (startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1') ||
-       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2') ||
-       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_3'))"""
-          new = """      (startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1') ||
-       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2') ||
-       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_3') ||
-       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_4'))"""
-          if source.count(old) != 1:
-              raise SystemExit('hosted workflow marker anchor mismatch')
-          target = Path('ops/staging/r5a1-hosted-agent-cycle.yml')
-          target.parent.mkdir(parents=True, exist_ok=True)
-          target.write_text(source.replace(old, new, 1), encoding='utf-8')
-          PY
+      - name: Materialize staged workflow
+        run: python tools/r5a1_stage_hosted_workflow.py
 
       - name: Commit staged blob
         run: |
