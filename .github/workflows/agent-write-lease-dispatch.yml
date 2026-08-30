@@ -70,7 +70,7 @@ jobs:
           value=json.loads(Path('/tmp/agent-write-lease-inspection.json').read_text(encoding='utf-8'))
           state=value.get('state')
           print(f"state={state}")
-          if state in {'TERMINAL_EXISTS','PRIOR_ATTEMPT_UNKNOWN'}:
+          if state in {'TERMINAL_EXISTS','PRIOR_ATTEMPT_UNKNOWN','PREDECESSOR_UNKNOWN'}:
               Path('/tmp/agent-write-lease-terminal.json').write_text(
                   json.dumps(value['terminal'],indent=2,ensure_ascii=False)+'\n',encoding='utf-8'
               )
@@ -187,7 +187,8 @@ jobs:
         if: >-
           steps.protocol.outputs.has_dispatch == 'true' &&
           steps.protocol.outputs.state != 'NO_DISPATCH' &&
-          steps.protocol.outputs.state != 'TERMINAL_EXISTS'
+          steps.protocol.outputs.state != 'TERMINAL_EXISTS' &&
+          steps.protocol.outputs.state != 'PREDECESSOR_WAITING'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -259,6 +260,7 @@ jobs:
         run: |
           if [ "${{ steps.protocol.outputs.has_dispatch }}" != "true" ]; then exit 0; fi
           if [ "${{ steps.protocol.outputs.state }}" = "TERMINAL_EXISTS" ]; then exit 0; fi
+          if [ "${{ steps.protocol.outputs.state }}" = "PREDECESSOR_WAITING" ]; then exit 0; fi
           test -f /tmp/agent-write-lease-terminal.json
           python - <<'PY'
           import json
