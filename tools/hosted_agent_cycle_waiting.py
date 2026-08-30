@@ -259,19 +259,25 @@ def close_once(
     hosted_agent_cycle.validate_transport_command(command)
     hosted_agent_cycle.validate_begin_manifest(manifest)
 
-    # Delegate the complete canonical close path. R4B sets the production
-    # stabilization default to one observation, so this call never sleeps or
-    # loops by default and never replays underlying work.
-    with contextlib.redirect_stdout(io.StringIO()):
-        rc = hosted_agent_cycle.main([
-            "close",
-            "--command", command_path,
-            "--meta", meta_path,
-            "--begin-dir", begin_dir,
-            "--closure", closure_path,
-            "--evidence-dir", evidence_dir,
-            "--result", result_path,
-        ])
+    # Scope the existing stabilization primitive to one production observation.
+    # Explicit characterization tests may still request multiple observations,
+    # but the paved-path adapter never sleeps or polls before returning WAITING.
+    previous_attempts = hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS
+    hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = 1
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            rc = hosted_agent_cycle.main([
+                "close",
+                "--command", command_path,
+                "--meta", meta_path,
+                "--begin-dir", begin_dir,
+                "--closure", closure_path,
+                "--evidence-dir", evidence_dir,
+                "--result", result_path,
+            ])
+    finally:
+        hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = previous_attempts
+
     if rc == 0:
         result = _json(result_path)
         print(json.dumps(result, ensure_ascii=False))
