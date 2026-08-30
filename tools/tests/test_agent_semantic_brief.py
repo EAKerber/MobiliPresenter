@@ -63,6 +63,20 @@ class AgentSemanticBriefTests(unittest.TestCase):
         self.assertIn("project.inspect", left["capabilityProjection"]["required"])
         self.assertIn("routine.inspect", left["capabilityProjection"]["required"])
 
+    def test_ui_inspect_and_plan_has_closed_required_capability_projection(self):
+        profile = agent_cycle.entry_profile("ui-ux", "inspect-and-plan")
+        context = brief.normalize_context(
+            role="ui-ux",
+            declared_intent="inspect-and-plan",
+            lifecycle_phase=profile["lifecyclePhase"],
+            objects=profile["objects"],
+            operations=profile["operations"],
+            scopes=profile["scope"],
+        )
+        projection = brief.build_projection(context, unknown_runtime())
+        self.assertEqual(projection["missingCoverage"], [])
+        self.assertIn("routine.inspect", projection["required"])
+
     def test_required_capability_remains_visible_when_scope_is_missing(self):
         context = brief.normalize_context(
             role="manager-gitops",

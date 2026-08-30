@@ -2957,7 +2957,8 @@
       "availabilityClass": "repository-static",
       "facets": {
         "roles": [
-          "manager-gitops"
+          "manager-gitops",
+          "ui-ux"
         ],
         "intentClasses": [
           "inspect-and-plan"
