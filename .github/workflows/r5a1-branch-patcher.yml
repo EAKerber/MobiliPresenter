@@ -22,8 +22,16 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Apply exact R5A1 patch
-        run: python tools/r5a1_branch_patcher.py
+      - name: Apply exact R5A1 Python patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from tools import r5a1_branch_patcher as patcher
+
+          patcher.patch_hosted_cycle()
+          patcher.create_tests()
+          Path('tools/r5a1_branch_patcher.py').unlink()
+          PY
 
       - name: Verify focused tests before commit
         run: |
