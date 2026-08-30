@@ -238,7 +238,7 @@ def build_trace(
         "window": {
             "issueNumber": source["issueNumber"],
             "beginCommentId": source["commentId"],
-            "closeCommentId": close_comment_id,
+            "closeCommentId": view["closeCommentId"],
         },
         "attempts": attempts,
         "summary": summary,
