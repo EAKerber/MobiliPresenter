@@ -9,6 +9,8 @@ from tools.canonical import stable_hash
 
 CURRENT_REPOSITORY = "EAKerber/MobiliPresenter"
 
+AGENT_CYCLE_REQUEST_MARKER = markers.AGENT_CYCLE_REQUEST_V01
+AGENT_CYCLE_REQUEST_MARKER_V02 = markers.AGENT_CYCLE_REQUEST_V02
 AGENT_TOOL_REQUEST_MARKER = markers.AGENT_TOOL_REQUEST_V01
 AGENT_TOOL_REQUEST_MARKER_V02 = markers.AGENT_TOOL_REQUEST_V02
 AGENT_TOOL_RESULT_MARKER = markers.AGENT_TOOL_RESULT_V01
@@ -21,6 +23,16 @@ WRITE_LEASE_RESULT_MARKER = markers.AGENT_WRITE_LEASE_RESULT_V01
 
 STRONG = "STRONG"
 AMBIENT = "AMBIENT"
+
+_CYCLE_CLOSE_V01_FIELDS = {
+    "schemaVersion", "requestId", "action", "actor", "declaredIntent",
+    "machineScope", "begin", "evidenceCommentIds", "semanticAuthority",
+    "authorizesMutation",
+}
+_CYCLE_CLOSE_V02_FIELDS = {
+    "schemaVersion", "requestId", "action", "handle", "evidenceCommentIds",
+    "semanticAuthority", "authorizesMutation",
+}
 
 
 class HostedCycleRecordError(RuntimeError):
@@ -38,6 +50,17 @@ def json_after_marker(body: Any, marker: str) -> Any | None:
         raw = raw[len("```json"): -len("```")].strip()
     try:
         return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+def _cycle_request_after_marker(body: Any, marker: str) -> Any | None:
+    """Parse the exact raw cycle-command transport shape used by the carrier."""
+    prefix = marker + "\n"
+    if not isinstance(body, str) or not body.startswith(prefix):
+        return None
+    try:
+        return json.loads(body[len(prefix):].strip())
     except json.JSONDecodeError:
         return None
 
@@ -97,10 +120,22 @@ def cycle_instance_id(manifest: dict[str, Any]) -> str:
     return computed
 
 
+def _positions(comments: list[dict[str, Any]]) -> dict[int, int]:
+    found: dict[int, int] = {}
+    for index, item in enumerate(comments):
+        cid = comment_id(item)
+        if cid is None:
+            continue
+        if cid in found:
+            raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_COMMENT_DUPLICATE")
+        found[cid] = index
+    return found
+
+
 def window(
     comments: list[dict[str, Any]], begin_comment_id: int, close_comment_id: int
 ) -> list[dict[str, Any]]:
-    positions = {comment_id(item): index for index, item in enumerate(comments)}
+    positions = _positions(comments)
     if begin_comment_id not in positions or close_comment_id not in positions:
         raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_WINDOW_COMMENT_MISSING")
     if positions[begin_comment_id] >= positions[close_comment_id]:
@@ -144,6 +179,129 @@ def _handle_claims_manifest(handle: Any, manifest: dict[str, Any], cycle_id: str
         context.get("contextHash") == manifest.get("contextHash")
         and _claims_actor(actor, manifest.get("actor") or {})
     )
+
+
+def _evidence_ids_valid(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) == len(set(value))
+        and all(
+            isinstance(item, int) and not isinstance(item, bool) and item > 0
+            for item in value
+        )
+    )
+
+
+def _legacy_close_claims_manifest(
+    payload: Any,
+    manifest: dict[str, Any],
+    begin: dict[str, Any],
+    actor: dict[str, Any],
+) -> bool:
+    return (
+        isinstance(payload, dict)
+        and set(payload) == _CYCLE_CLOSE_V01_FIELDS
+        and payload.get("schemaVersion") == "HostedAgentCycleCommand 0.1"
+        and payload.get("action") == "close"
+        and isinstance(payload.get("requestId"), str)
+        and bool(payload["requestId"].strip())
+        and _claims_begin_actor(payload, begin, actor)
+        and payload.get("declaredIntent") == manifest.get("declaredIntent")
+        and payload.get("machineScope") == manifest.get("machineScope")
+        and _evidence_ids_valid(payload.get("evidenceCommentIds"))
+        and payload.get("semanticAuthority") is False
+        and payload.get("authorizesMutation") is False
+    )
+
+
+def _handle_close_claims_manifest(
+    payload: Any,
+    manifest: dict[str, Any],
+    cycle_id: str,
+) -> bool:
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != _CYCLE_CLOSE_V02_FIELDS
+        or payload.get("schemaVersion") != "HostedAgentCycleCommand 0.2"
+        or payload.get("action") != "close"
+        or not isinstance(payload.get("requestId"), str)
+        or not payload["requestId"].strip()
+        or not _evidence_ids_valid(payload.get("evidenceCommentIds"))
+        or payload.get("semanticAuthority") is not False
+        or payload.get("authorizesMutation") is not False
+    ):
+        return False
+    try:
+        from tools import hosted_cycle_handle
+
+        handle, locator = hosted_cycle_handle.decode_handle(
+            payload.get("handle"), repository=CURRENT_REPOSITORY
+        )
+    except RuntimeError:
+        return False
+    source = manifest.get("source")
+    if not isinstance(source, dict):
+        return False
+    expected_locator = {
+        "artifactName": manifest.get("artifactName"),
+        "runId": source.get("runId"),
+        "sourceSha": source.get("sourceSha"),
+        "issueNumber": source.get("issueNumber"),
+        "beginCommentId": source.get("commentId"),
+        "contextHash": manifest.get("contextHash"),
+        "cycleInstanceId": cycle_id,
+    }
+    return locator == expected_locator and _handle_claims_manifest(handle, manifest, cycle_id)
+
+
+def stable_seal_comment_id(
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    *,
+    observation_comment_id: int,
+) -> int:
+    """Derive the first valid close bound to this cycle, or the current cutoff.
+
+    Historical fixtures and pre-R4 carriers may not expose a parseable cycle-close
+    marker. In that compatibility case the current observation remains the seal,
+    preserving the previous single-window behavior. Current handle/legacy Hosted
+    close requests produce a stable first-close frontier on retries.
+    """
+    if not isinstance(comments, list) or not isinstance(manifest, dict):
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_INPUT_INVALID")
+    try:
+        begin = agent_cycle_identity.begin_from_manifest(manifest)
+        actor = copy.deepcopy(agent_cycle_identity.canonical_actor(manifest.get("actor")))
+    except RuntimeError as exc:
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_MANIFEST_INVALID") from exc
+    cycle_id = cycle_instance_id(manifest)
+    source = manifest.get("source")
+    begin_comment_id = source.get("commentId") if isinstance(source, dict) else None
+    if not isinstance(begin_comment_id, int) or isinstance(begin_comment_id, bool) or begin_comment_id <= 0:
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_MANIFEST_INVALID")
+    positions = _positions(comments)
+    if begin_comment_id not in positions or observation_comment_id not in positions:
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_WINDOW_COMMENT_MISSING")
+    if positions[begin_comment_id] >= positions[observation_comment_id]:
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_WINDOW_ORDER_INVALID")
+
+    for comment in comments[
+        positions[begin_comment_id] + 1:positions[observation_comment_id] + 1
+    ]:
+        if not request_comment_allowed(comment):
+            continue
+        body = comment.get("body")
+        legacy = _cycle_request_after_marker(body, AGENT_CYCLE_REQUEST_MARKER)
+        if _legacy_close_claims_manifest(legacy, manifest, begin, actor):
+            cid = comment_id(comment)
+            assert cid is not None
+            return cid
+        handle_first = _cycle_request_after_marker(body, AGENT_CYCLE_REQUEST_MARKER_V02)
+        if _handle_close_claims_manifest(handle_first, manifest, cycle_id):
+            cid = comment_id(comment)
+            assert cid is not None
+            return cid
+    return observation_comment_id
 
 
 def _record(
@@ -245,7 +403,16 @@ def collect(
     begin_comment_id = source.get("commentId")
     if not isinstance(begin_comment_id, int) or isinstance(begin_comment_id, bool) or begin_comment_id <= 0:
         raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_MANIFEST_INVALID")
-    current_window = window(comments, begin_comment_id, close_comment_id)
+
+    observation_comment_id = close_comment_id
+    seal_comment_id = stable_seal_comment_id(
+        comments,
+        manifest,
+        observation_comment_id=observation_comment_id,
+    )
+    positions = _positions(comments)
+    seal_position = positions[seal_comment_id]
+    current_window = window(comments, begin_comment_id, observation_comment_id)
 
     records: list[dict[str, Any]] = []
     pending_remote_results: list[tuple[dict[str, Any], dict[str, Any]]] = []
@@ -255,51 +422,69 @@ def collect(
     for comment in current_window:
         if not isinstance(comment, dict):
             continue
+        cid = comment_id(comment)
+        before_seal = cid is not None and positions[cid] < seal_position
         body = comment.get("body")
 
         if request_comment_allowed(comment):
             payload = json_after_marker(body, AGENT_TOOL_REQUEST_MARKER)
             if isinstance(payload, dict) and _claims_begin_actor(payload, begin, actor):
+                normalized = _validate_strong_tool_v01(payload, begin, actor)
+                if not before_seal:
+                    raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_POST_SEAL_REQUEST")
                 records.append(_record(
                     kind="agent-tool-request", comment=comment,
                     marker=AGENT_TOOL_REQUEST_MARKER, binding=STRONG,
                     payload=payload,
-                    normalized=_validate_strong_tool_v01(payload, begin, actor),
+                    normalized=normalized,
                 ))
                 continue
 
             outer = json_after_marker(body, AGENT_TOOL_REQUEST_MARKER_V02)
             if isinstance(outer, dict) and _handle_claims_manifest(outer.get("handle"), manifest, cycle_id):
+                normalized = _validate_strong_tool_v02(outer, manifest, begin, actor)
+                if not before_seal:
+                    raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_POST_SEAL_REQUEST")
                 records.append(_record(
                     kind="agent-tool-request", comment=comment,
                     marker=AGENT_TOOL_REQUEST_MARKER_V02, binding=STRONG,
                     payload=outer,
-                    normalized=_validate_strong_tool_v02(outer, manifest, begin, actor),
+                    normalized=normalized,
                 ))
                 continue
 
             lease_payload = json_after_marker(body, WRITE_LEASE_REQUEST_MARKER)
             if isinstance(lease_payload, dict) and _claims_begin_actor(lease_payload, begin, actor):
+                normalized = _validate_strong_lease_v01(lease_payload, begin, actor)
+                if not before_seal:
+                    raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_POST_SEAL_REQUEST")
                 records.append(_record(
                     kind="write-lease-request", comment=comment,
                     marker=WRITE_LEASE_REQUEST_MARKER, binding=STRONG,
                     payload=lease_payload,
-                    normalized=_validate_strong_lease_v01(lease_payload, begin, actor),
+                    normalized=normalized,
                 ))
                 continue
 
             lease_outer = json_after_marker(body, WRITE_LEASE_REQUEST_MARKER_V02)
             if isinstance(lease_outer, dict) and _handle_claims_manifest(lease_outer.get("handle"), manifest, cycle_id):
+                normalized = _validate_strong_lease_v02(lease_outer, manifest, begin, actor)
+                if not before_seal:
+                    raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_POST_SEAL_REQUEST")
                 records.append(_record(
                     kind="write-lease-request", comment=comment,
                     marker=WRITE_LEASE_REQUEST_MARKER_V02, binding=STRONG,
                     payload=lease_outer,
-                    normalized=_validate_strong_lease_v02(lease_outer, manifest, begin, actor),
+                    normalized=normalized,
                 ))
                 continue
 
             remote_payload = json_after_marker(body, REMOTE_REQUEST_MARKER)
-            if isinstance(remote_payload, dict) and _claims_actor(remote_payload.get("actor"), actor):
+            if (
+                before_seal
+                and isinstance(remote_payload, dict)
+                and _claims_actor(remote_payload.get("actor"), actor)
+            ):
                 from tools import remote_canonical_execution
 
                 try:
@@ -406,7 +591,7 @@ def collect(
         "begin": begin,
         "actor": actor,
         "beginCommentId": begin_comment_id,
-        "closeCommentId": close_comment_id,
+        "closeCommentId": seal_comment_id,
         "records": records,
     }
 
