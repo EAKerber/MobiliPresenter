@@ -51,11 +51,10 @@ def close_command() -> dict:
 
 
 def manifest() -> dict:
-    command = close_command()
     core = {
         "schemaVersion": hosted_agent_cycle.BEGIN_MANIFEST_SCHEMA,
         "requestId": "r4b-begin",
-        "commandHash": stable_hash(command),
+        "commandHash": stable_hash(close_command()),
         "actor": copy.deepcopy(ACTOR),
         "declaredIntent": "inspect-and-plan",
         "machineScope": "live",
@@ -71,8 +70,9 @@ def manifest() -> dict:
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
-    value = {**core, "manifestHash": stable_hash(core)}
-    return hosted_agent_cycle.validate_begin_manifest(value)
+    return hosted_agent_cycle.validate_begin_manifest(
+        {**core, "manifestHash": stable_hash(core)}
+    )
 
 
 def failure(*codes: str) -> dict:
@@ -162,8 +162,7 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
     def test_write_lease_request_without_terminal_waits_for_lease_result(self):
         with tempfile.TemporaryDirectory() as tmp:
             closure = Path(tmp) / "closure.json"
-            report_path = closure.with_name("agent-write-lifecycle-close.json")
-            report_path.write_text(
+            closure.with_name("agent-write-lifecycle-close.json").write_text(
                 json.dumps(
                     lifecycle_report(["AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL"])
                 ),
@@ -181,24 +180,20 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
         self.assertEqual(observed, ["AGENT_WRITE_LEASE_RESULT"])
 
     def test_structural_or_active_lifecycle_failure_is_not_promoted(self):
-        self.assertEqual(
-            hosted_agent_cycle_waiting.classify_waiting(
-                failure("AGENT_TRACE_MUTATION_RECEIPT_MISMATCH"),
-                meta={"commentId": 200},
-                manifest=manifest(),
-                output_path="/tmp/closure.json",
-            ),
-            [],
-        )
-        self.assertEqual(
-            hosted_agent_cycle_waiting.classify_waiting(
-                failure("AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE"),
-                meta={"commentId": 200},
-                manifest=manifest(),
-                output_path="/tmp/closure.json",
-            ),
-            [],
-        )
+        for code in (
+            "AGENT_TRACE_MUTATION_RECEIPT_MISMATCH",
+            "AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE",
+        ):
+            with self.subTest(code=code):
+                self.assertEqual(
+                    hosted_agent_cycle_waiting.classify_waiting(
+                        failure(code),
+                        meta={"commentId": 200},
+                        manifest=manifest(),
+                        output_path="/tmp/closure.json",
+                    ),
+                    [],
+                )
 
     def test_waiting_result_is_hash_bound_non_authoritative_and_non_replaying(self):
         value = hosted_agent_cycle_waiting.build_waiting(
@@ -218,7 +213,7 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
         self.assertFalse(value["authorizesMutation"])
         hosted_agent_cycle_waiting.validate_waiting(value)
 
-    def test_close_adapter_forces_one_production_observation_and_restores_policy(self):
+    def test_promote_close_result_rewrites_only_waitable_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             begin = root / "begin"
@@ -229,24 +224,55 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
             result_path = root / "result.json"
             command_path.write_text(json.dumps(close_command()), encoding="utf-8")
             meta_path.write_text(json.dumps({"commentId": 200}), encoding="utf-8")
-            original = hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS
-
-            def canonical(argv):
-                self.assertEqual(hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS, 1)
-                result_path.write_text(json.dumps({"status": "PASS"}), encoding="utf-8")
-                return 0
-
-            with patch.object(hosted_agent_cycle_waiting.hosted_agent_cycle, "main", side_effect=canonical):
-                rc = hosted_agent_cycle_waiting.close_once(
+            result_path.write_text(
+                json.dumps(
+                    failure(
+                        "EXECUTION_TRACE_INCOMPLETE",
+                        "HOSTED_AGENT_EXECUTION_TRACE_INCOMPLETE",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            trace = {
+                "traceStatus": "INCOMPLETE",
+                "attempts": [{"matched": False, "kind": "agent-tool"}],
+            }
+            with patch.object(
+                hosted_agent_cycle_waiting.trace_collect,
+                "fetch_issue_comments",
+                return_value=[],
+            ), patch.object(
+                hosted_agent_cycle_waiting.trace_collect,
+                "build_trace",
+                return_value=trace,
+            ):
+                promoted = hosted_agent_cycle_waiting.promote_close_result(
                     command_path=str(command_path),
                     meta_path=str(meta_path),
                     begin_dir=str(begin),
                     closure_path=str(root / "closure.json"),
-                    evidence_dir=str(root / "evidence"),
                     result_path=str(result_path),
                 )
-            self.assertEqual(rc, 0)
-            self.assertEqual(hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS, original)
+            self.assertTrue(promoted)
+            waiting = json.loads(result_path.read_text(encoding="utf-8"))
+            hosted_agent_cycle_waiting.validate_waiting(waiting)
+            self.assertEqual(waiting["waitingFor"], ["AGENT_TOOL_RESULT"])
+
+            blocked = failure("AGENT_TRACE_MUTATION_RECEIPT_MISMATCH")
+            result_path.write_text(json.dumps(blocked), encoding="utf-8")
+            self.assertFalse(
+                hosted_agent_cycle_waiting.promote_close_result(
+                    command_path=str(command_path),
+                    meta_path=str(meta_path),
+                    begin_dir=str(begin),
+                    closure_path=str(root / "closure.json"),
+                    result_path=str(result_path),
+                )
+            )
+            self.assertEqual(
+                json.loads(result_path.read_text(encoding="utf-8")),
+                blocked,
+            )
 
     def test_waiting_is_operational_but_blocked_failure_is_not(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -40,6 +40,20 @@ There is no automatic wake-up. A later `close(handle)` is a fresh observation of
 the same cycle. R4A keeps the request frontier sealed while allowing correlated
 late results to become visible at the later observation horizon.
 
+## Ownership and surface boundary
+
+`tools/hosted_agent_cycle.py` remains the **only productive Hosted Agent Cycle CLI**.
+R4B does not add a second cycle entrypoint or semantic component.
+
+`tools/hosted_agent_cycle_waiting.py` is an internal projection helper. It has no
+`argparse` surface and no `__main__` entrypoint. The workflow still invokes
+`python tools/hosted_agent_cycle.py close`; only after that canonical close has
+materialized a validated failure can the workflow ask the internal helper whether
+the result is an evidence-backed observational WAITING case.
+
+This keeps trace and write-lifecycle judgment inside the existing Hosted Agent Cycle
+component and avoids a parallel authority, registry component or execution surface.
+
 ## Classification boundary
 
 R4B promotes only evidence-backed observational gaps.
@@ -50,8 +64,8 @@ Recognized waiting targets are closed vocabulary:
 - `REMOTE_CANONICAL_RESULT`;
 - `AGENT_WRITE_LEASE_RESULT`.
 
-Trace incompleteness is re-derived from the exact cycle record view; the adapter
-does not infer a target from error text alone. Write-lifecycle WAITING requires the
+Trace incompleteness is re-derived from the exact cycle record view; the helper does
+not infer a target from error text alone. Write-lifecycle WAITING requires the
 validated close report to say a lifecycle request exists without its terminal
 result. Receipt mismatch, duplicate/orphan records, active or expired leases,
 authority mismatch, malformed identity and other structural failures remain on the
@@ -59,27 +73,30 @@ existing failure path.
 
 ## Single-observation enforcement
 
-Existing multi-observation helpers remain available for explicit tests and forensic
-use. R4B does not delete them. The productive Hosted close adapter temporarily
-scopes both current stabilization surfaces to one observation:
+The existing trace helper remains capable of explicit multi-observation
+characterization when a caller supplies `attempts > 1`, but its productive default
+is changed from three observations to **one**:
 
-1. the trace helper is invoked with `attempts=1`, `delay_seconds=0` even though its
-   historical Python default was captured as three at import time;
-2. the write-lifecycle close loop sees `TRACE_STABILIZATION_ATTEMPTS = 1`.
+- `TRACE_STABILIZATION_ATTEMPTS = 1`;
+- `prepare_close_stabilized(... attempts=1)` by default;
+- the write-lifecycle close loop reuses the same constant and therefore also runs
+  once by default.
 
-The previous module values/functions are restored after the delegated close,
-including on exceptions. No global runtime policy is persisted.
+No `sleep()` is reachable on that default path because there is no second attempt.
+Tests that intentionally characterize delayed transport may continue to request two
+or more observations explicitly. No runtime monkey-patch or persistent global policy
+is needed.
 
 ## Carrier result
 
 `HostedAgentCycleCloseWaiting 0.1` is a transport-local, hash-bound result envelope.
-It is not registered as an authority or domain state. Its `sourceFailureHash` binds
-it to the validated failure that was promoted after observational classification.
+It is not an authority or persistent domain state. Its `sourceFailureHash` binds it
+to the validated failure that was promoted after observational classification.
 
-The existing Hosted workflow treats a WAITING close step as non-terminal, so it does
-not upload a terminal close proof. The final operational-result gate validates the
-WAITING envelope and allows the workflow to complete successfully after posting the
-compact result.
+A WAITING close remains non-terminal, so no terminal close proof is uploaded. The
+workflow posts the compact WAITING result and its final operational-result gate
+accepts the validated envelope. Structural BLOCKED/UNKNOWN results still fail that
+gate.
 
 ## Non-goals
 
@@ -104,16 +121,17 @@ downstream of that broader async-safety work.
 Repository qualification must prove:
 
 1. unit tests cover exact WAITING promotion and structural non-promotion;
-2. the production adapter truly invokes trace with one observation despite the
-   historical bound Python default;
-3. lifecycle close also performs only one observation;
-4. existing Agent Ops, Semantic Contracts, OperationalSemantics, Doctor,
+2. the productive stabilization default is exactly one observation;
+3. explicit characterization can still request multiple observations;
+4. Hosted workflow still delegates close to the canonical cycle CLI and does not
+   acquire a parallel semantic component;
+5. existing Agent Ops, Semantic Contracts, OperationalSemantics, Doctor,
    Coordination Guard and Supervisor Snapshot remain green;
-5. Hosted qualification produces `WAITING` on a first close with a pre-seal request
+6. Hosted qualification produces `WAITING` on a first close with a pre-seal request
    whose terminal result is absent at that observation;
-6. after the correlated result arrives, a later close of the same handle produces
+7. after the correlated result arrives, a later close of the same handle produces
    `PASS` without a new begin or operation replay;
-7. no post-seal request is admitted into that retry.
+8. no post-seal request is admitted into that retry.
 
 ## Exit criterion
 

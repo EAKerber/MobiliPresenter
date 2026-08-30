@@ -1,28 +1,17 @@
-#!/usr/bin/env python3
-"""Explicit non-terminal WAITING adapter for Hosted Agent Cycle close.
+"""Internal WAITING projection for Hosted Agent Cycle close.
 
-The canonical Hosted Agent Cycle remains the owner of begin/close semantics.
-This adapter delegates one close attempt to that carrier and only promotes a
-validated close failure when the exact sealed observation proves that the
-remaining gap is observational. It never retries an operation, mutates Work or
-Coordination, or creates authority.
+Hosted Agent Cycle remains the only productive begin/close CLI. This helper only
+promotes an already materialized and validated close failure when the exact
+sealed observation proves the remaining gap is observational. It has no CLI,
+semantic authority, replay behavior, Work/Coordination mutation, or writer.
 """
 from __future__ import annotations
 
-import argparse
-import contextlib
 import copy
-import io
 import json
 import re
-import sys
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from tools import agent_failure
 from tools import agent_write_lifecycle_guard
@@ -239,58 +228,23 @@ def build_waiting(
     return validate_waiting({**core, "resultHash": stable_hash(core)})
 
 
-@contextlib.contextmanager
-def _single_observation_policy() -> Iterator[None]:
-    """Force the delegated production close to observe once, then restore policy."""
-    previous_attempts = hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS
-    previous_prepare = hosted_agent_cycle_trace.prepare_close_stabilized
-
-    def prepare_once(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
-        kwargs["attempts"] = 1
-        kwargs["delay_seconds"] = 0.0
-        return previous_prepare(*args, **kwargs)
-
-    hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = 1
-    hosted_agent_cycle_trace.prepare_close_stabilized = prepare_once
-    try:
-        yield
-    finally:
-        hosted_agent_cycle_trace.prepare_close_stabilized = previous_prepare
-        hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = previous_attempts
-
-
-def close_once(
+def promote_close_result(
     *,
     command_path: str,
     meta_path: str,
     begin_dir: str,
     closure_path: str,
-    evidence_dir: str,
     result_path: str,
-) -> int:
+) -> bool:
+    """Rewrite one waitable Hosted close failure as WAITING; otherwise no-op."""
+    failure = _json(result_path)
+    try:
+        agent_failure.validate_hosted_cycle_failure(failure)
+    except Exception:
+        return False
     command = _json(command_path)
     meta = _json(meta_path)
     manifest = _json(Path(begin_dir) / "manifest.json")
-    hosted_agent_cycle.validate_transport_command(command)
-    hosted_agent_cycle.validate_begin_manifest(manifest)
-
-    with _single_observation_policy(), contextlib.redirect_stdout(io.StringIO()):
-        rc = hosted_agent_cycle.main([
-            "close",
-            "--command", command_path,
-            "--meta", meta_path,
-            "--begin-dir", begin_dir,
-            "--closure", closure_path,
-            "--evidence-dir", evidence_dir,
-            "--result", result_path,
-        ])
-
-    if rc == 0:
-        result = _json(result_path)
-        print(json.dumps(result, ensure_ascii=False))
-        return 0
-
-    failure = _json(result_path)
     waiting_for = classify_waiting(
         failure,
         meta=meta,
@@ -298,15 +252,10 @@ def close_once(
         output_path=closure_path,
     )
     if not waiting_for:
-        print(json.dumps(failure, ensure_ascii=False))
-        return rc
-
+        return False
     waiting = build_waiting(command, manifest, failure, waiting_for)
     _write_json(result_path, waiting)
-    print(json.dumps(waiting, ensure_ascii=False))
-    # Keep the close step non-successful so the existing workflow does not
-    # upload a terminal close proof. The final carrier gate validates WAITING.
-    return 3
+    return True
 
 
 def require_operational_result(path: str) -> None:
@@ -321,40 +270,3 @@ def require_operational_result(path: str) -> None:
         resumability = value.get("resumability")
         if not isinstance(resumability, dict) or resumability.get("state") != "AVAILABLE":
             raise HostedAgentCycleWaitingError("HOSTED_AGENT_BEGIN_RESUMABILITY_INVALID")
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="hosted-agent-cycle-waiting")
-    sub = parser.add_subparsers(dest="command_name", required=True)
-
-    close = sub.add_parser("close")
-    close.add_argument("--command", required=True)
-    close.add_argument("--meta", required=True)
-    close.add_argument("--begin-dir", required=True)
-    close.add_argument("--closure", required=True)
-    close.add_argument("--evidence-dir", required=True)
-    close.add_argument("--result", required=True)
-
-    require = sub.add_parser("require-operational-result")
-    require.add_argument("--result", required=True)
-
-    args = parser.parse_args(argv)
-    try:
-        if args.command_name == "close":
-            return close_once(
-                command_path=args.command,
-                meta_path=args.meta,
-                begin_dir=args.begin_dir,
-                closure_path=args.closure,
-                evidence_dir=args.evidence_dir,
-                result_path=args.result,
-            )
-        require_operational_result(args.result)
-        return 0
-    except Exception as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
