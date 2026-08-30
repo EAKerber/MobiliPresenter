@@ -16,14 +16,18 @@ def patch_registry() -> None:
     block = text[start:end]
     old = '        "roles": [\n          "manager-gitops"\n        ],'
     new = '        "roles": [\n          "manager-gitops",\n          "ui-ux"\n        ],'
+    if new in block and old not in block:
+        return
     if block.count(old) != 1:
         raise RuntimeError("ROUTINE_INSPECT_ROLE_FACET_PRECONDITION_FAILED")
-    patched = text[:start] + block.replace(old, new, 1) + text[end:]
-    REGISTRY.write_text(patched, encoding="utf-8")
+    REGISTRY.write_text(text[:start] + block.replace(old, new, 1) + text[end:], encoding="utf-8")
 
 
 def patch_test() -> None:
     text = TEST.read_text(encoding="utf-8")
+    method_name = "    def test_ui_inspect_and_plan_has_closed_required_capability_projection(self):\n"
+    if method_name in text:
+        return
     anchor = "    def test_required_capability_remains_visible_when_scope_is_missing(self):\n"
     if text.count(anchor) != 1:
         raise RuntimeError("SEMANTIC_BRIEF_TEST_ANCHOR_PRECONDITION_FAILED")
