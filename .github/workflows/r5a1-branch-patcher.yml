@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  patch:
+  stage-workflow:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -18,33 +18,31 @@ jobs:
           ref: work/operations/m12-at3d-r5a1-hosted-runtime-observation-ingress-v0.1
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Apply exact R5A1 Python patch
+      - name: Materialize non-executable staged workflow
         run: |
           python - <<'PY'
           from pathlib import Path
-          from tools import r5a1_branch_patcher as patcher
 
-          patcher.patch_hosted_cycle()
-          patcher.create_tests()
-          Path('tools/r5a1_branch_patcher.py').unlink()
+          source = Path('.github/workflows/hosted-agent-cycle.yml').read_text(encoding='utf-8')
+          old = """      (startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1') ||
+       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2') ||
+       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_3'))"""
+          new = """      (startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1') ||
+       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2') ||
+       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_3') ||
+       startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_4'))"""
+          if source.count(old) != 1:
+              raise SystemExit('hosted workflow marker anchor mismatch')
+          target = Path('ops/staging/r5a1-hosted-agent-cycle.yml')
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_text(source.replace(old, new, 1), encoding='utf-8')
           PY
 
-      - name: Verify focused tests before commit
-        run: |
-          python -m unittest \
-            tools.tests.test_agent_runtime_tool_surfaces_d3c \
-            tools.tests.test_hosted_runtime_observation_ingress_r5a1 \
-            tools.tests.test_hosted_agent_cycle
-
-      - name: Commit implementation patch
+      - name: Commit staged blob
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add ops/staging/r5a1-hosted-agent-cycle.yml
           git diff --cached --check
-          git commit -m "M12-AT3D-R5A1: add hosted runtime observation ingress"
+          git commit -m "R5A1 scaffold: stage hosted workflow blob"
           git push origin HEAD:work/operations/m12-at3d-r5a1-hosted-runtime-observation-ingress-v0.1
