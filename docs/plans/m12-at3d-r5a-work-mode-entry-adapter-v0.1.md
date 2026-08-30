@@ -347,3 +347,128 @@ R5A plan (this document)
 `implement-m12-at3d-r5a1-hosted-runtime-observation-ingress-v0.1`
 
 This intentionally selects the repo-owned prerequisite first. It does not claim that the Work Mode host adapter already exists or is qualified.
+
+---
+
+## Post-R5A1 evidence amendment — 2026-08-30
+
+This amendment records observed state after implementation and **supersedes forward-looking status/sequence statements above where they conflict with the evidence below**. The original plan is retained in place so the design intent and re-evaluation conditions remain auditable.
+
+### Current disposition
+
+- **R5A1 — QUALIFIED + MERGED.**
+- **R5A2 — UNKNOWN / external host-observation boundary unresolved.**
+- **R5A as a whole is not complete.**
+- R6 compatibility retirement remains ineligible because the real Work Mode adapter has not been qualified.
+
+### R5A1 integrated evidence
+
+R5A1 was implemented in PR `#206` and squash-merged into `main` as:
+
+`18ae88fe3707c1d157512b25d2e429394842fd04`
+
+The integrated repo-owned boundary is `HostedAgentCycleCommand 0.4`, carrying only the closed non-authoritative runtime observation:
+
+```json
+{
+  "runtimeEnvironment": {
+    "toolSurfaces": ["github-connector-tools"],
+    "inventoryComplete": true
+  }
+}
+```
+
+The Hosted carrier validates registered ToolSurface ids and reduces the observation to the existing D3B/D3C path. It does not add provider features, provider selection, mutation authority, a second registry, or provider state to `AgentCycleContext`.
+
+Final Hosted qualification used the registered Agent Ops carrier rather than an unregistered ad-hoc workflow, because an earlier qualification workflow correctly exposed that adding an unregistered workflow perturbs OperationalSemantics coverage and can create a false-negative readiness result.
+
+Final qualification evidence:
+
+- qualification branch: `work/operations/m12-at3d-r5a1-hosted-qualification-20260830`;
+- qualification head: `036f0c51d2b420226dfd1a68338f2f27fd742c3a`;
+- Agent Ops run: `33333952520` — PASS;
+- artifact: `r5a1-hosted-runtime-ingress-qualification`;
+- artifact id: `9738453196`;
+- artifact SHA-256: `f9808ac42e5cc3a931cadd14d59ec764208378ccf209cb2d7cc2d71d48192429`;
+- Hosted begin status: `READY`;
+- raw Agent Cycle begin status: `READY`, `blockingUnknowns=[]`;
+- `github.git-data.write = PASS` via `github-connector`;
+- `github.expected-head-write = PASS` via `github-connector`;
+- `github.mutation-readback = PASS` via `github-connector`;
+- `runtimeEnvironment` did not leak into `AgentCycleContext`;
+- `semanticAuthority=false`;
+- `authorizesMutation=false`.
+
+The qualification intentionally labels its input as `host-input-fixture` and records:
+
+`provesWorkModeDiscovery=false`
+
+Therefore R5A1 proves the **repo-owned ingress and reduction path on a real hosted runner**. It does not prove that Work Mode itself can discover and supply the observation.
+
+### Activated re-evaluation trigger for R5A2
+
+The plan's explicit trigger is now active:
+
+> Work Mode cannot expose an actual tool inventory or completeness fact to the host adapter.
+
+More precisely, current investigation found **no publicly documented Work/product surface that repository-owned Python or GitHub Actions can use to truthfully observe the complete per-run Work tool/connector inventory and its completeness**. This is not evidence that such a surface can never exist; it means the repo currently has no observed host API on which R5A2 can be implemented and qualified without fabrication.
+
+The current ChatGPT host may itself know which tools/connectors are available. That host knowledge is not equivalent to a repository-visible observation source and must not be inferred from:
+
+- the presence of `gh` or `git` in a runner;
+- environment variables;
+- prompt convention;
+- manually typed `github-connector-tools`;
+- a synthetic provider bundle;
+- historical memory that a connector was available in another run.
+
+Accordingly, the absence of a repo-visible host inventory surface is **UNKNOWN**, not `PASS` and not evidence that the connector itself is `FAIL`.
+
+### R5A2 current boundary
+
+Until an actual host observation source is available, the repo-owned implementation stops at `HostedAgentCycleCommand 0.4`.
+
+Do **not** add a repository-side wrapper whose only behavior is to hard-code or ask the agent to supply the ToolSurface that R5A2 is supposed to discover. Do not create a second provider registry, WorkModeProvider authority, mutable session registry, or implicit shell fallback to make the status appear complete.
+
+R5A2 may re-enter implementation only when the host/product surface can provide enough observed information to satisfy this contract truthfully:
+
+1. actual available host tool/connector surfaces for the current run;
+2. a defensible completeness fact, or explicit incompleteness;
+3. mapping to registered MobiliPresenter ToolSurface ids without arbitrary provider feature claims;
+4. provenance sufficient to distinguish host observation from repository authority;
+5. construction of the existing Hosted 0.4 begin envelope without agent-authored provider mechanics.
+
+If the host can expose only a partial inventory, the correct result remains incomplete observation / `UNKNOWN`; R5A2 must not promote it to complete.
+
+### Revised sequence
+
+Observed sequence is now:
+
+```text
+R5A plan
+  -> R5A1 Hosted Runtime Observation Ingress        DONE
+  -> Hosted ingress qualification                  PASS
+  -> R5A1 integration                              DONE
+  -> reconcile ProjectState with R5A1 evidence     NEXT REPO-OWNED STEP
+  -> R5A2 actual Work Mode host adapter             UNKNOWN / HOST-SIDE RE-ENTRY CONDITION
+  -> real Work Mode cold-start qualification        NOT YET ELIGIBLE
+  -> evaluate remaining R5 provider/carrier needs   only without claiming Work Mode qualification
+  -> R6 retirement                                  NOT YET ELIGIBLE
+```
+
+### ProjectState implication
+
+The prior proposed transition:
+
+`implement-m12-at3d-r5a1-hosted-runtime-observation-ingress-v0.1`
+
+is now historical and must not remain the selected next transition after R5A1 integration.
+
+The next repo-owned action is a **separate ProjectState reconciliation** using the canonical ProjectState transition/apply tooling. That reconciliation must:
+
+- record R5A1 as qualified/integrated;
+- retain R5A2 as unresolved/UNKNOWN rather than marking R5A complete;
+- avoid inventing a host capability or false Work Mode qualification;
+- derive the exact checkpoint and `nextTransition` strings from canonical transition conventions before writing ProjectState.
+
+This amendment intentionally does not choose those strings itself; ProjectState remains a separate authority with its own writer/validation path.
