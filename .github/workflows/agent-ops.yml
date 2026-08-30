@@ -1,10 +1,10 @@
 name: Agent Ops
 on:
   pull_request:
-    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
+    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml','.github/qualification/**']
   push:
     branches: ['work/**','experiment/**']
-    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
+    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml','.github/qualification/**']
   workflow_dispatch:
 jobs:
   verify:
@@ -137,4 +137,145 @@ jobs:
         with:
           name: agent-ops-handoff
           path: /tmp/agent-handoff.json
+          if-no-files-found: error
+
+  maturity-manager-a:
+    if: github.ref_name == 'work/operations/m12-final-maturity-qualification-20260830'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout qualification head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Observe Manager A
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/qualification/m12_final_maturity_probe.py observe \
+            --worker-id manager-gitops-a \
+            --role manager-gitops \
+            --output /tmp/m12-final-maturity/manager-gitops-a.json
+      - name: Upload Manager A observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-final-maturity-observation-manager-a
+          path: /tmp/m12-final-maturity/manager-gitops-a.json
+          if-no-files-found: error
+
+  maturity-manager-b:
+    if: github.ref_name == 'work/operations/m12-final-maturity-qualification-20260830'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout qualification head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Observe Manager B
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/qualification/m12_final_maturity_probe.py observe \
+            --worker-id manager-gitops-b \
+            --role manager-gitops \
+            --output /tmp/m12-final-maturity/manager-gitops-b.json
+      - name: Upload Manager B observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-final-maturity-observation-manager-b
+          path: /tmp/m12-final-maturity/manager-gitops-b.json
+          if-no-files-found: error
+
+  maturity-ui:
+    if: github.ref_name == 'work/operations/m12-final-maturity-qualification-20260830'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout qualification head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Observe UI confinement
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/qualification/m12_final_maturity_probe.py observe \
+            --worker-id ui-ux-a \
+            --role ui-ux \
+            --output /tmp/m12-final-maturity/ui-ux-a.json
+      - name: Upload UI observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-final-maturity-observation-ui
+          path: /tmp/m12-final-maturity/ui-ux-a.json
+          if-no-files-found: error
+
+  maturity-aggregate:
+    if: always() && github.ref_name == 'work/operations/m12-final-maturity-qualification-20260830'
+    needs: [maturity-manager-a, maturity-manager-b, maturity-ui]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout qualification head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download worker observations
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/m12-final-maturity/inputs
+          pattern: m12-final-maturity-observation-*
+      - name: Aggregate final maturity evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/qualification/m12_final_maturity_probe.py aggregate \
+            --inputs /tmp/m12-final-maturity/inputs \
+            --output /tmp/m12-final-maturity/m12-final-maturity-qualification.json
+      - name: Upload final maturity qualification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-final-maturity-qualification
+          path: /tmp/m12-final-maturity/m12-final-maturity-qualification.json
           if-no-files-found: error
