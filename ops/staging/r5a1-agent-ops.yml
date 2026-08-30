@@ -1,0 +1,152 @@
+name: Agent Ops
+on:
+  pull_request:
+    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
+  push:
+    branches: ['work/**','experiment/**']
+    paths: ['AGENTS.md','ops/**','tools/**','docs/plans/**','docs/kickstarts/**','.github/workflows/agent-ops.yml']
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: R5A1 Hosted runtime ingress qualification
+        if: github.ref_name == 'work/operations/m12-at3d-r5a1-hosted-qualification-20260830'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: PYTHONPATH=. python .github/qualification/r5a1_hosted_runtime_ingress.py
+      - name: Upload R5A1 Hosted runtime ingress qualification
+        if: github.ref_name == 'work/operations/m12-at3d-r5a1-hosted-qualification-20260830' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r5a1-hosted-runtime-ingress-qualification
+          path: /tmp/r5a1-hosted-qualification
+          if-no-files-found: error
+      - name: Toolbox unit tests
+        run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
+      - name: Semantic contracts
+        run: python -m tools.semantics check --json
+      - name: Operational semantics coverage
+        run: |
+          python -m tools.semantics coverage --json > /tmp/operational-semantics-coverage.json
+          python -m json.tool /tmp/operational-semantics-coverage.json > /dev/null
+      - name: Upload operational semantics coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: operational-semantics-coverage
+          path: /tmp/operational-semantics-coverage.json
+          if-no-files-found: error
+      - name: Roadmap freshness coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/roadmap_freshness.py inspect \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --json > /tmp/roadmap-freshness-inspection.json
+          python -m json.tool /tmp/roadmap-freshness-inspection.json > /dev/null
+      - name: Upload roadmap freshness inspection
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roadmap-freshness-inspection
+          path: /tmp/roadmap-freshness-inspection.json
+          if-no-files-found: error
+      - name: Capability lifecycle guard
+        if: github.event_name == 'pull_request'
+        run: python tools/capability_gates_ci.py --base-sha "${{ github.event.pull_request.base.sha }}" --head-sha "${{ github.event.pull_request.head.sha }}" --json
+      - name: Doctor
+        run: python tools/agent.py doctor --json
+      - name: Verify local coherence
+        run: python tools/agent.py verify --json
+      - name: Generate Project Machine inspection
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/project_machine.py inspect --live --json > /tmp/project-machine-inspection.json
+          python -m json.tool /tmp/project-machine-inspection.json > /dev/null
+          python tools/project_machine.py validate /tmp/project-machine-inspection.json --json
+      - name: Upload Project Machine inspection
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-machine-inspection
+          path: /tmp/project-machine-inspection.json
+          if-no-files-found: error
+      - name: Derive routine inspection
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/routines.py inspect --input /tmp/project-machine-inspection.json --json > /tmp/routine-inspection.json
+          python -m json.tool /tmp/routine-inspection.json > /dev/null
+          python tools/routines.py validate /tmp/routine-inspection.json --project-machine /tmp/project-machine-inspection.json --json
+      - name: Upload routine inspection
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: routine-inspection
+          path: /tmp/routine-inspection.json
+          if-no-files-found: error
+      - name: Derive maintenance inspection
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/maintenance_inspect.py --input /tmp/project-machine-inspection.json --routines /tmp/routine-inspection.json --json > /tmp/maintenance-inspection.json
+          python -m json.tool /tmp/maintenance-inspection.json > /dev/null
+      - name: Upload maintenance inspection
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-inspection
+          path: /tmp/maintenance-inspection.json
+          if-no-files-found: error
+      - name: Derive Scheduler plan
+        if: github.event_name == 'pull_request'
+        run: |
+          python tools/scheduler_plan.py --input /tmp/maintenance-inspection.json --json > /tmp/scheduler-plan.json
+          python -m json.tool /tmp/scheduler-plan.json > /dev/null
+      - name: Upload Scheduler plan
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduler-plan
+          path: /tmp/scheduler-plan.json
+          if-no-files-found: error
+      - name: Generate integration reconcile evidence
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python tools/integration_reconcile.py reconcile-plan "$PR_NUMBER" --json > /tmp/integration-reconcile-plan.json
+          python -m json.tool /tmp/integration-reconcile-plan.json > /dev/null
+      - name: Upload integration reconcile evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-reconcile-plan
+          path: /tmp/integration-reconcile-plan.json
+          if-no-files-found: error
+      - name: Generate handoff evidence
+        run: |
+          python tools/agent.py handoff --json > /tmp/agent-handoff.json
+          python -m json.tool /tmp/agent-handoff.json > /dev/null
+      - name: Upload handoff evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-ops-handoff
+          path: /tmp/agent-handoff.json
+          if-no-files-found: error
