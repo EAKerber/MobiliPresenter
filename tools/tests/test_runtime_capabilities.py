@@ -97,23 +97,22 @@ class RuntimeCapabilityTests(unittest.TestCase):
         )
 
     def test_force_only_provider_is_not_equivalent_to_expected_head_write(self):
-        features = [
-            "blob-create",
-            "commit-create-with-parent",
-            "content-readback",
-            "force-ref-update",
-            "ref-read",
-            "tree-create",
-        ]
-        observed = payload(
-            **{
-                "gh-api": provider("FAIL", reason="PROVIDER_NOT_PRESENT"),
-                "github-connector": provider("PASS", features),
-            }
+        value = rc._evaluate_capability(
+            {
+                "providers": {
+                    "synthetic-provider": provider("PASS", ["force-ref-update"])
+                }
+            },
+            "github.expected-head-write",
+            {
+                "providerRequirements": {
+                    "synthetic-provider": ["non-force-ref-update"]
+                }
+            },
         )
-        inspection = rc.build_inspection(observed)
+        self.assertEqual(value["status"], "FAIL")
         self.assertEqual(
-            inspection["capabilities"]["github.expected-head-write"]["status"], "FAIL"
+            value["reasonCode"], "NO_SUPPORTED_PROVIDER_SATISFIES_REQUIREMENTS"
         )
 
     def test_connector_git_data_without_remote_time_keeps_coordination_mutation_blocked(self):
@@ -169,6 +168,21 @@ class RuntimeCapabilityTests(unittest.TestCase):
                     **{
                         "github-connector": provider(
                             "UNKNOWN", ["repository-read"], "NOT_PROBED"
+                        )
+                    }
+                )
+            )
+
+    def test_provider_cannot_claim_feature_outside_registry_vocabulary(self):
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "RUNTIME_PROVIDER_FEATURE_UNKNOWN:github-connector:force-ref-update",
+        ):
+            rc.validate_provider_observations(
+                payload(
+                    **{
+                        "github-connector": provider(
+                            "PASS", ["force-ref-update"]
                         )
                     }
                 )
