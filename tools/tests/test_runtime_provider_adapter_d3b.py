@@ -40,7 +40,7 @@ class RuntimeProviderAdapterD3BTests(unittest.TestCase):
         scope = runtime_provider_scope.resolve_provider_scope(inspection, GIT_SCOPE)
         self.assertEqual(scope["status"], "UNKNOWN")
         self.assertEqual(scope["completeProviders"], [])
-        self.assertEqual(scope["possibleProviders"], ["github-connector"])
+        self.assertEqual(scope["possibleProviders"], ["gh-api", "github-connector"])
 
     def test_unobserved_providers_are_not_invented(self):
         observed = runtime_provider_adapter.observations_from_tool_surfaces(
