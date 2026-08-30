@@ -133,7 +133,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
         request = tool_request()
         collect.return_value = view_for((90, request))
 
-        value = host._mutation_predecessor_fence(bundle(), [])
+        value = host._mutation_predecessor_fence([], bundle())
 
         self.assertEqual(host.PREDECESSOR_WAITING, value["state"])
         self.assertEqual([90], value["predecessorRequestCommentIds"])
@@ -148,7 +148,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
         collect.return_value = view_for((90, request))
         comments = [bot_result(request, status="PASS", comment_id=120)]
 
-        value = host._mutation_predecessor_fence(bundle(), comments)
+        value = host._mutation_predecessor_fence(comments, bundle())
 
         self.assertEqual("CLEAR", value["state"])
 
@@ -158,7 +158,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
         collect.return_value = view_for((90, request))
         comments = [bot_result(request, status="BLOCKED", comment_id=120)]
 
-        value = host._mutation_predecessor_fence(bundle(), comments)
+        value = host._mutation_predecessor_fence(comments, bundle())
 
         self.assertEqual("CLEAR", value["state"])
 
@@ -168,7 +168,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
         collect.return_value = view_for((90, request))
         comments = [bot_result(request, status="UNKNOWN", comment_id=120)]
 
-        value = host._mutation_predecessor_fence(bundle(), comments)
+        value = host._mutation_predecessor_fence(comments, bundle())
 
         self.assertEqual(host.PREDECESSOR_UNKNOWN, value["state"])
         self.assertEqual("UNKNOWN", value["terminal"]["status"])
@@ -183,7 +183,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
         request = tool_request(branch=OTHER_BRANCH)
         collect.return_value = view_for((90, request))
 
-        value = host._mutation_predecessor_fence(bundle(), [])
+        value = host._mutation_predecessor_fence([], bundle())
 
         self.assertEqual("CLEAR", value["state"])
 
@@ -195,15 +195,15 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
         )
         collect.return_value = view_for((90, request))
 
-        value = host._mutation_predecessor_fence(bundle(), [])
+        value = host._mutation_predecessor_fence([], bundle())
 
         self.assertEqual("CLEAR", value["state"])
 
     @patch("tools.agent_write_lifecycle_host.hosted_cycle_records.collect")
     def test_non_release_lifecycle_actions_do_not_enter_predecessor_scan(self, collect):
         value = host._mutation_predecessor_fence(
-            bundle(action="acquire"),
             [],
+            bundle(action="acquire"),
         )
 
         self.assertEqual("CLEAR", value["state"])
@@ -222,7 +222,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
             host.AgentWriteLifecycleHostError,
             "AGENT_WRITE_LIFECYCLE_PREDECESSOR_RESULT_DUPLICATE",
         ):
-            host._mutation_predecessor_fence(bundle(), comments)
+            host._mutation_predecessor_fence(comments, bundle())
 
     @patch("tools.agent_write_lifecycle_host.lifecycle.build_attempt")
     @patch("tools.agent_write_lifecycle_host._mutation_predecessor_fence")
