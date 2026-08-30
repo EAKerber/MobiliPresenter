@@ -26,12 +26,20 @@ INSPECTION_SCHEMA = "RuntimeCapabilityInspection 0.1"
 PROVIDER_OBSERVATIONS_SCHEMA = "RuntimeProviderObservations 0.1"
 STATUSES = {"PASS", "UNKNOWN", "FAIL"}
 
-def _runtime_catalog() -> tuple[tuple[str, ...], dict[str, dict[str, dict[str, list[str]]]]]:
+def _runtime_catalog() -> tuple[
+    tuple[str, ...],
+    dict[str, dict[str, dict[str, list[str]]]],
+    dict[str, frozenset[str]],
+]:
     registry = load_registry()
     errors = validate_registry(registry)
     if errors:
         raise RuntimeError(errors[0])
     providers = tuple(sorted(registry["providerProfiles"]))
+    provider_features = {
+        provider_id: frozenset(item["featureVocabulary"])
+        for provider_id, item in registry["providerProfiles"].items()
+    }
     capabilities = {
         capability_id: {
             "providerRequirements": {
@@ -42,10 +50,10 @@ def _runtime_catalog() -> tuple[tuple[str, ...], dict[str, dict[str, dict[str, l
         for capability_id, item in registry["logicalCapabilities"].items()
         if item["availabilityClass"] == "runtime-observed"
     }
-    return providers, capabilities
+    return providers, capabilities, provider_features
 
 
-PROVIDERS, CAPABILITIES = _runtime_catalog()
+PROVIDERS, CAPABILITIES, PROVIDER_FEATURES = _runtime_catalog()
 
 
 def _unique_strings(value: Any, code: str) -> list[str]:
@@ -69,6 +77,11 @@ def _provider_record(value: Any, *, provider_id: str) -> dict[str, Any]:
     if status not in STATUSES:
         raise RuntimeError("RUNTIME_PROVIDER_STATUS_INVALID")
     features = _unique_strings(value.get("features"), "RUNTIME_PROVIDER_FEATURES_INVALID")
+    unknown_features = sorted(set(features) - PROVIDER_FEATURES[provider_id])
+    if unknown_features:
+        raise RuntimeError(
+            f"RUNTIME_PROVIDER_FEATURE_UNKNOWN:{provider_id}:{unknown_features[0]}"
+        )
     reason = value.get("reason")
     if reason is not None and (not isinstance(reason, str) or not reason.strip()):
         raise RuntimeError("RUNTIME_PROVIDER_REASON_INVALID")
