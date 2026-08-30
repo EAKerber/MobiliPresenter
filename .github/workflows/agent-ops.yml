@@ -159,7 +159,7 @@ jobs:
       - name: Validate focused semantics
         run: |
           python -m unittest tools.tests.test_agent_semantic_brief -v
-          python -m tools.semantics check --json
+          python -c 'from tools.semantics.registry import validate_registry; errors = validate_registry(); print(errors); raise SystemExit(bool(errors))'
           git diff --check
       - name: Commit only intended files when changed
         env:
