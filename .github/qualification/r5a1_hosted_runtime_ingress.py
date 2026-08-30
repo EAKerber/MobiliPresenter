@@ -16,6 +16,26 @@ CAPABILITIES = [
 ]
 
 
+def _write(name: str, value: object) -> None:
+    (OUT / name).write_text(
+        json.dumps(value, indent=2, sort_keys=True) + '\n',
+        encoding='utf-8',
+    )
+
+
+def _capability_summary(context: dict) -> dict:
+    runtime = context['runtimeCapabilities']
+    observed = {}
+    for capability_id in CAPABILITIES:
+        item = runtime['capabilities'][capability_id]
+        observed[capability_id] = {
+            'status': item['status'],
+            'satisfiedProviders': item['satisfiedProviders'],
+            'reasonCode': item['reasonCode'],
+        }
+    return observed
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     command = {
@@ -38,13 +58,52 @@ def main() -> None:
         'semanticAuthority': False,
         'authorizesMutation': False,
     }
+    _write('command.json', command)
+
+    raw_args = [
+        'begin',
+        '--role', command['actor']['role'],
+        '--intent', command['declaredIntent'],
+        '--machine-scope', 'live',
+        '--runtime-tool-surface', SURFACE,
+        '--runtime-tool-surfaces-complete',
+        '--json',
+    ]
+    raw_rc, raw_context = hosted._run_agent(raw_args)
+    _write('raw-context.json', raw_context)
+    raw_summary = {
+        'returnCode': raw_rc,
+        'status': raw_context.get('status'),
+        'blockingUnknowns': raw_context.get('blockingUnknowns'),
+        'capabilities': _capability_summary(raw_context) if 'runtimeCapabilities' in raw_context else None,
+    }
+    _write('raw-summary.json', raw_summary)
+    print(json.dumps({'rawBegin': raw_summary}, sort_keys=True))
+
+    for capability_id, item in (raw_summary['capabilities'] or {}).items():
+        if item['status'] != 'PASS' or 'github-connector' not in item['satisfiedProviders']:
+            raise SystemExit(
+                f'R5A1_QUALIFICATION_INGRESS_NOT_MATERIALIZED:{capability_id}:{item["status"]}'
+            )
+
     meta = {'issueNumber': 1, 'commentId': 1}
-    result = hosted.begin_from_envelope(
-        command,
-        meta,
-        context_path=OUT / 'context.json',
-        manifest_path=OUT / 'manifest.json',
-    )
+    try:
+        result = hosted.begin_from_envelope(
+            command,
+            meta,
+            context_path=OUT / 'context.json',
+            manifest_path=OUT / 'manifest.json',
+        )
+    except hosted.HostedAgentCycleError as exc:
+        failure = {
+            'code': exc.code,
+            'detail': exc.detail,
+            'failureCore': exc.failure_core,
+            'rawBegin': raw_summary,
+        }
+        _write('hosted-failure.json', failure)
+        raise
+
     context = json.loads((OUT / 'context.json').read_text(encoding='utf-8'))
     manifest = json.loads((OUT / 'manifest.json').read_text(encoding='utf-8'))
 
@@ -54,20 +113,6 @@ def main() -> None:
         raise SystemExit('R5A1_QUALIFICATION_CONTEXT_AUTHORITY_LEAK')
     if manifest.get('semanticAuthority') is not False or manifest.get('authorizesMutation') is not False:
         raise SystemExit('R5A1_QUALIFICATION_MANIFEST_AUTHORITY_LEAK')
-
-    runtime = context['runtimeCapabilities']
-    observed = {}
-    for capability_id in CAPABILITIES:
-        item = runtime['capabilities'][capability_id]
-        if item['status'] != 'PASS':
-            raise SystemExit(f'R5A1_QUALIFICATION_CAPABILITY_NOT_PASS:{capability_id}:{item["status"]}')
-        if 'github-connector' not in item['satisfiedProviders']:
-            raise SystemExit(f'R5A1_QUALIFICATION_CONNECTOR_NOT_SATISFIED:{capability_id}')
-        observed[capability_id] = {
-            'status': item['status'],
-            'satisfiedProviders': item['satisfiedProviders'],
-        }
-
     if 'runtimeEnvironment' in context:
         raise SystemExit('R5A1_QUALIFICATION_TRANSPORT_FIELD_LEAKED_INTO_CONTEXT')
 
@@ -78,21 +123,18 @@ def main() -> None:
         'inputKind': 'host-input-fixture',
         'inputToolSurfaces': [SURFACE],
         'inventoryComplete': True,
-        'beginStatus': result['status'],
+        'rawBegin': raw_summary,
+        'hostedBeginStatus': result['status'],
         'cycleId': result['cycleId'],
         'cycleInstanceId': result['cycleInstanceId'],
-        'runtimeCapabilityInspectionHash': runtime['inspectionHash'],
-        'capabilities': observed,
+        'runtimeCapabilityInspectionHash': context['runtimeCapabilities']['inspectionHash'],
         'transportFieldLeakedIntoContext': False,
         'semanticAuthority': False,
         'authorizesMutation': False,
         'provesWorkModeDiscovery': False,
         'status': 'PASS',
     }
-    (OUT / 'summary.json').write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + '\n',
-        encoding='utf-8',
-    )
+    _write('summary.json', summary)
     print(json.dumps(summary, sort_keys=True))
 
 
