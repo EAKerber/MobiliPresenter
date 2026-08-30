@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M12-AT3D-R4A-STABLE-SEAL-HOSTED-QUALIFIED",
-    "nextTransition": "implement-m12-at3d-r4b-explicit-waiting-close-v0.1"
+    "checkpoint": "M12-AT3D-R4B-EXPLICIT-WAITING-HOSTED-QUALIFIED",
+    "nextTransition": "implement-m12-at3d-r4c-derived-mutation-predecessor-fence-v0.1"
   }
 }
