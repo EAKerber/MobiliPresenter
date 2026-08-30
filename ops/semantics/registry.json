@@ -42,6 +42,12 @@
       "owner": "operations-core",
       "definition": "Read-only hash-bound cycle identity and opaque resume locator; it carries no authority and never authorizes mutation."
     },
+    "artifact.agent-cycle-obligation-disposition-set": {
+      "term": "AgentCycleObligationDispositionSet",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only cycle-instance- and inventory-bound shadow projection of native Work, Git branch, and write-lifecycle disposition facts; it preserves UNKNOWN and never enforces close or authorizes mutation."
+    },
     "artifact.agent-cycle-obligation-inventory": {
       "term": "AgentCycleObligationInventory",
       "kind": "artifact",
@@ -414,6 +420,11 @@
       "owner": "operations-core",
       "semanticValidator": "tools.agent_cycle_identity.validate_handle",
       "structuralSchema": "ops/schemas/agent-cycle-handle.schema.json"
+    },
+    "agent-cycle-obligation-disposition-set": {
+      "owner": "operations-core",
+      "semanticValidator": "tools.agent_cycle_obligations.validate_disposition_set",
+      "structuralSchema": "ops/schemas/agent-cycle-obligation-disposition-set.schema.json"
     },
     "agent-cycle-obligation-inventory": {
       "owner": "operations-core",
@@ -1066,6 +1077,7 @@
       "writesResources": [],
       "produces": [
         "artifact.agent-cycle-handle",
+        "artifact.agent-cycle-obligation-disposition-set",
         "artifact.agent-write-lease-close-report"
       ],
       "canonicalWriterFor": [],

@@ -28,6 +28,8 @@ if str(ROOT) not in sys.path:
 from tools import agent_cycle
 from tools import agent_cycle_close
 from tools import agent_cycle_identity
+from tools import agent_cycle_obligation_inspect
+from tools import agent_cycle_obligations
 from tools import agent_failure
 from tools import agent_write_lifecycle_guard
 from tools import continuation_remote
@@ -721,11 +723,11 @@ def _write_lifecycle_failure_core(
     )
 
 
-def _require_clean_write_lifecycle(
+def _observe_write_lifecycle_close(
     manifest: dict[str, Any], meta: dict[str, int], *, output_path: str
-) -> None:
+) -> dict[str, Any] | None:
     if not _manifest_requires_write_lifecycle(manifest):
-        return
+        return None
     issue_number = manifest["source"]["issueNumber"]
     close_comment_id = meta.get("commentId")
     if not isinstance(close_comment_id, int) or isinstance(close_comment_id, bool) or close_comment_id <= 0:
@@ -751,25 +753,67 @@ def _require_clean_write_lifecycle(
                 lossy_projection=False,
             )
             raise HostedAgentCycleError(exc.code, failure_core=core) from exc
-        last_report = report
+        last_report = agent_write_lifecycle_guard.validate_report(report)
         if report["state"] in {"NONE", "RELEASED"}:
-            _write_json(Path(output_path).with_name("agent-write-lifecycle-close.json"), report)
-            return
+            break
         if attempt + 1 < hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS:
             time.sleep(hosted_agent_cycle_trace.TRACE_STABILIZATION_DELAY_SECONDS)
 
     assert last_report is not None
     _write_json(Path(output_path).with_name("agent-write-lifecycle-close.json"), last_report)
-    if last_report["state"] == "ACTIVE":
+    return last_report
+
+
+def _require_clean_write_lifecycle_report(report: dict[str, Any] | None) -> None:
+    if report is None or report["state"] in {"NONE", "RELEASED"}:
+        return
+    if report["state"] == "ACTIVE":
         code = "AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE"
-    elif last_report["state"] == "EXPIRED":
+    elif report["state"] == "EXPIRED":
         code = "AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE"
     else:
         code = "AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE"
     raise HostedAgentCycleError(
         code,
-        failure_core=_write_lifecycle_failure_core(last_report, code),
+        failure_core=_write_lifecycle_failure_core(report, code),
     )
+
+
+def _shadow_error(path: Path, code: str) -> None:
+    diagnostic = {
+        "schemaVersion": "AgentCycleObligationDispositionShadowDiagnostic 0.1",
+        "status": "UNKNOWN",
+        "error": code,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    _write_json(path.with_suffix(path.suffix + ".error.json"), diagnostic)
+
+
+def _materialize_disposition_shadow(
+    *, output_path: str, lifecycle_report: dict[str, Any] | None
+) -> None:
+    root = Path(output_path).parent
+    inventory_path = root / "agent-cycle-obligation-inventory.json"
+    disposition_path = root / "agent-cycle-obligation-dispositions.json"
+    if not inventory_path.exists():
+        return
+    try:
+        inventory = _load_json(inventory_path)
+        agent_cycle_obligations.validate_inventory(inventory)
+        value = agent_cycle_obligation_inspect.inspect_inventory(
+            inventory,
+            lifecycle_report=lifecycle_report,
+        )
+        agent_cycle_obligations.validate_disposition_set(value, inventory)
+        _write_json(disposition_path, value)
+        error_path = disposition_path.with_suffix(disposition_path.suffix + ".error.json")
+        if error_path.exists():
+            error_path.unlink()
+    except Exception as exc:
+        code = str(exc).split(":", 1)[0] or exc.__class__.__name__
+        _shadow_error(disposition_path, code)
 
 
 def _closure_failure_core(
@@ -826,6 +870,7 @@ def close_from_envelope(
     _validate_optional_handle(begin_root, context, manifest)
 
     if _manifest_requires_trace(manifest):
+        close_root = Path(output_path).parent
         try:
             effective_command, trace_value = hosted_agent_cycle_trace.prepare_close_stabilized(
                 effective_command,
@@ -833,6 +878,8 @@ def close_from_envelope(
                 manifest,
                 context,
                 repository=REPOSITORY,
+                resource_output_path=str(close_root / "agent-cycle-touched-resources.json"),
+                obligation_output_path=str(close_root / "agent-cycle-obligation-inventory.json"),
             )
         except hosted_agent_cycle_trace.HostedAgentCycleTraceError as exc:
             causes = [{
@@ -856,7 +903,14 @@ def close_from_envelope(
         trace_path = Path(output_path).with_name("execution-trace.json")
         _write_json(trace_path, trace_value)
 
-    _require_clean_write_lifecycle(manifest, meta, output_path=output_path)
+    lifecycle_report = _observe_write_lifecycle_close(
+        manifest, meta, output_path=output_path
+    )
+    _materialize_disposition_shadow(
+        output_path=output_path,
+        lifecycle_report=lifecycle_report,
+    )
+    _require_clean_write_lifecycle_report(lifecycle_report)
 
     evidence_root = Path(evidence_dir)
     evidence_root.mkdir(parents=True, exist_ok=True)
