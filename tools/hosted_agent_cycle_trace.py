@@ -17,7 +17,7 @@ from typing import Any, Callable
 from tools.agent_tools import trace as trace_contract
 from tools.agent_tools import trace_collect
 
-TRACE_STABILIZATION_ATTEMPTS = 3
+TRACE_STABILIZATION_ATTEMPTS = 1
 TRACE_STABILIZATION_DELAY_SECONDS = 1.0
 TRACE_COMPLETENESS_SCOPE = "same-cycle-attributable-events"
 MUTATION_RECEIPT_MISSING = "AGENT_TRACE_MUTATION_RECEIPT_MISSING"

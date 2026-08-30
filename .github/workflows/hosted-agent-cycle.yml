@@ -211,7 +211,7 @@ jobs:
             --command /tmp/hosted-command.json \
             --result /tmp/hosted-result.json
 
-      - name: Run canonical close
+      - name: Run canonical close once
         id: close
         if: steps.checkout_begin.outcome == 'success'
         continue-on-error: true
@@ -228,6 +228,22 @@ jobs:
             --evidence-dir /tmp/hosted-evidence \
             --result /tmp/hosted-result.json
           cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
+
+      - name: Promote observational close gap
+        if: steps.checkout_begin.outcome == 'success' && steps.close.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from tools import hosted_agent_cycle_waiting
+          hosted_agent_cycle_waiting.promote_close_result(
+              command_path='/tmp/hosted-command.json',
+              meta_path='/tmp/hosted-meta.json',
+              begin_dir='/tmp/agent-cycle-begin',
+              closure_path='/tmp/agent-cycle-close/closure.json',
+              result_path='/tmp/hosted-result.json',
+          )
+          PY
 
       - name: Upload close proof
         id: close_artifact
@@ -270,12 +286,6 @@ jobs:
         run: |
           test -f /tmp/hosted-result.json
           python - <<'PY'
-          import json
-          value=json.load(open('/tmp/hosted-result.json', encoding='utf-8'))
-          if value.get('status') not in {'READY','PASS'}:
-              raise SystemExit(2)
-          if value.get('status') == 'READY' and value.get('schemaVersion') == 'HostedAgentCycleBeginResult 0.5':
-              resumability=value.get('resumability')
-              if not isinstance(resumability, dict) or resumability.get('state') != 'AVAILABLE':
-                  raise SystemExit(2)
+          from tools import hosted_agent_cycle_waiting
+          hosted_agent_cycle_waiting.require_operational_result('/tmp/hosted-result.json')
           PY
