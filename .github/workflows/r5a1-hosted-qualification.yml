@@ -1,0 +1,46 @@
+name: R5A1 Hosted Runtime Ingress Qualification
+
+on:
+  push:
+    branches:
+      - work/operations/m12-at3d-r5a1-hosted-qualification-20260830
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qualification head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: R5A1 Hosted V0.4 runtime ingress qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: PYTHONPATH=. python .github/qualification/r5a1_hosted_runtime_ingress.py
+
+      - name: Focused regression tests
+        run: |
+          python -m unittest \
+            tools.tests.test_agent_runtime_tool_surfaces_d3c \
+            tools.tests.test_hosted_runtime_observation_ingress_r5a1 \
+            tools.tests.test_hosted_agent_cycle
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r5a1-hosted-runtime-ingress-qualification
+          path: /tmp/r5a1-hosted-qualification
+          if-no-files-found: error
+          retention-days: 14
