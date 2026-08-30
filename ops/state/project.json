@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "M12-AT3D-R4B-EXPLICIT-WAITING-HOSTED-QUALIFIED",
-    "nextTransition": "implement-m12-at3d-r4c-derived-mutation-predecessor-fence-v0.1"
+    "checkpoint": "M12-AT3D-R4C-DERIVED-PREDECESSOR-FENCE-HOSTED-QUALIFIED",
+    "nextTransition": "plan-m12-at3d-r5a-work-mode-entry-adapter-v0.1"
   }
 }
