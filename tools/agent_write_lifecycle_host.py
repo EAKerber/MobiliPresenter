@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any
 
 from tools import agent_write_lifecycle as lifecycle
-from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, remote_canonical_issue
+from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, hosted_cycle_records, remote_canonical_issue
+from tools.agent_tools import contracts, policy as tool_policy
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
 MUTABLE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
+PREDECESSOR_WAITING = "PREDECESSOR_WAITING"
+PREDECESSOR_UNKNOWN = "PREDECESSOR_UNKNOWN"
 
 
 class AgentWriteLifecycleHostError(RuntimeError):
@@ -232,6 +236,154 @@ def _terminal_matches(
     )
 
 
+def _mutation_tool_is_executable(
+    request: dict[str, Any],
+    context: dict[str, Any],
+) -> bool:
+    try:
+        catalog = tool_policy.load_policy()
+        tool = catalog["tools"].get(request["toolId"])
+        if not isinstance(tool, dict) or tool.get("effectClass") != "shared-durable-mutation":
+            return False
+        role_policy = tool["roles"].get(request["actor"]["role"])
+        if not isinstance(role_policy, dict):
+            return False
+        semantic = context.get("semanticContext")
+        if not isinstance(semantic, dict):
+            raise AgentWriteLifecycleHostError(
+                "AGENT_WRITE_LIFECYCLE_PREDECESSOR_CONTEXT_INVALID"
+            )
+        return (
+            tool_policy.effective_mode(
+                tool,
+                role_policy,
+                semantic.get("declaredIntent"),
+            )
+            == "mutation-execute"
+        )
+    except AgentWriteLifecycleHostError:
+        raise
+    except RuntimeError as exc:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_PREDECESSOR_POLICY_INVALID"
+        ) from exc
+
+
+def _mutation_predecessor_fence(
+    comments: list[dict[str, Any]],
+    bundle: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    dispatch = bundle["dispatch"]
+    request = bundle["request"]
+    manifest = bundle["manifest"]
+    context = bundle["context"]
+    if dispatch["action"] != "release":
+        return {"state": "CLEAR", "predecessorRequestCommentIds": []}
+
+    request_comment_id = dispatch["source"]["requestCommentId"]
+    try:
+        view = hosted_cycle_records.collect(
+            comments,
+            manifest,
+            close_comment_id=request_comment_id,
+        )
+    except hosted_cycle_records.HostedCycleRecordError as exc:
+        raise AgentWriteLifecycleHostError(exc.code) from exc
+
+    predecessors: list[dict[str, Any]] = []
+    for item in hosted_cycle_records.records_of(
+        view,
+        "agent-tool-request",
+        binding=hosted_cycle_records.STRONG,
+    ):
+        candidate = item["normalized"]
+        if candidate["target"].get("branch") != dispatch["branch"]:
+            continue
+        if not _mutation_tool_is_executable(candidate, context):
+            continue
+        predecessors.append(
+            {
+                "commentId": item["commentId"],
+                "requestHash": contracts.request_hash(candidate),
+            }
+        )
+
+    if not predecessors:
+        return {"state": "CLEAR", "predecessorRequestCommentIds": []}
+
+    results: dict[str, dict[str, Any]] = {}
+    for comment in comments:
+        if not hosted_cycle_records.result_comment_allowed(comment):
+            continue
+        payload = _payload(
+            comment.get("body"),
+            hosted_cycle_records.AGENT_TOOL_RESULT_MARKER,
+        )
+        if not isinstance(payload, dict):
+            continue
+        digest = payload.get("requestHash")
+        if not isinstance(digest, str):
+            continue
+        if digest not in {item["requestHash"] for item in predecessors}:
+            continue
+        if (
+            payload.get("begin") != dispatch["begin"]
+            or payload.get("actor") != dispatch["actor"]
+        ):
+            raise AgentWriteLifecycleHostError(
+                "AGENT_WRITE_LIFECYCLE_PREDECESSOR_RESULT_BINDING_MISMATCH"
+            )
+        if digest in results:
+            raise AgentWriteLifecycleHostError(
+                "AGENT_WRITE_LIFECYCLE_PREDECESSOR_RESULT_DUPLICATE"
+            )
+        results[digest] = payload
+
+    waiting: list[int] = []
+    unknown: list[int] = []
+    for predecessor in predecessors:
+        result = results.get(predecessor["requestHash"])
+        if result is None:
+            waiting.append(predecessor["commentId"])
+            continue
+        status = result.get("status")
+        if status in {"PASS", "BLOCKED"}:
+            continue
+        if status == "UNKNOWN":
+            unknown.append(predecessor["commentId"])
+            continue
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_PREDECESSOR_RESULT_INVALID"
+        )
+
+    predecessor_ids = sorted(item["commentId"] for item in predecessors)
+    if unknown:
+        failure = lifecycle.build_failure(
+            request,
+            status="UNKNOWN",
+            blockers=["AGENT_WRITE_LIFECYCLE_MUTATION_PREDECESSOR_UNKNOWN"],
+            authority_head=dispatch["authorityHead"],
+        )
+        return {
+            "state": PREDECESSOR_UNKNOWN,
+            "terminal": failure,
+            "predecessorRequestCommentIds": predecessor_ids,
+            "unknownPredecessorRequestCommentIds": sorted(unknown),
+        }
+    if waiting:
+        return {
+            "state": PREDECESSOR_WAITING,
+            "predecessorRequestCommentIds": predecessor_ids,
+            "waitingPredecessorRequestCommentIds": sorted(waiting),
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+    return {
+        "state": "CLEAR",
+        "predecessorRequestCommentIds": predecessor_ids,
+    }
+
+
 def inspect_protocol(
     bundle: dict[str, dict[str, Any]],
     *,
@@ -250,11 +402,12 @@ def inspect_protocol(
     dispatch = bundle["dispatch"]
     terminals: list[dict[str, Any]] = []
     attempts: list[dict[str, Any]] = []
-
-    for comment in _comments(
+    comments = _comments(
         carrier,
         dispatch["source"]["issueNumber"],
-    ):
+    )
+
+    for comment in comments:
         user = comment.get("user")
         if (
             not isinstance(user, dict)
@@ -308,6 +461,11 @@ def inspect_protocol(
             "state": "PRIOR_ATTEMPT_UNKNOWN",
             "terminal": failure,
         }
+
+    predecessor = _mutation_predecessor_fence(comments, bundle)
+    if predecessor["state"] != "CLEAR":
+        return predecessor
+
     return {
         "state": "CLEAR",
         "attempt": lifecycle.build_attempt(
@@ -315,6 +473,9 @@ def inspect_protocol(
             run_id=run_id,
             host_sha=host_sha,
         ),
+        "predecessorRequestCommentIds": predecessor[
+            "predecessorRequestCommentIds"
+        ],
     }
 
 
