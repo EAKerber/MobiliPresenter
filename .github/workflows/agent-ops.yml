@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: R4A hosted delayed-result qualification
+      - name: R4A hosted delayed-result qualification final
         if: github.ref_name == 'work/operations/m12-at3d-r4a-hosted-qualification-20260830'
         env:
           GH_TOKEN: ${{ github.token }}
