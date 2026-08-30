@@ -3,10 +3,11 @@
 
 The carrier remains non-authoritative. Current begin emits a public
 AgentCycleHandle 0.1. Historical HostedAgentCycleCommand 0.1 remains accepted,
-handle-first close uses HostedAgentCycleCommand 0.2, and explicit Work-bound
-begin uses HostedAgentCycleCommand 0.3. A handle-first close is reduced back to
-the existing 0.1 command only after the exact begin artifact has been
-materialized and the handle has been rebound to its context and manifest.
+handle-first close uses HostedAgentCycleCommand 0.2, explicit Work-bound begin
+uses HostedAgentCycleCommand 0.3, and current host-observed begin uses
+HostedAgentCycleCommand 0.4. A handle-first close is reduced back to the existing
+0.1 command only after the exact begin artifact has been materialized and the
+handle has been rebound to its context and manifest.
 """
 from __future__ import annotations
 
@@ -36,6 +37,7 @@ from tools import continuation_remote
 from tools import hosted_agent_cycle_trace
 from tools import hosted_cycle_handle
 from tools import remote_canonical_execution
+from tools import runtime_provider_adapter
 from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
 
@@ -44,10 +46,12 @@ BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
 REQUEST_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_1"
 REQUEST_MARKER_V02 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_2"
 REQUEST_MARKER_V03 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_3"
+REQUEST_MARKER_V04 = "MOBILIPRESENTER_AGENT_CYCLE_REQUEST_V0_4"
 RESULT_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RESULT_V0_1"
 COMMAND_SCHEMA = "HostedAgentCycleCommand 0.1"
 COMMAND_SCHEMA_V02 = "HostedAgentCycleCommand 0.2"
 COMMAND_SCHEMA_V03 = "HostedAgentCycleCommand 0.3"
+COMMAND_SCHEMA_V04 = "HostedAgentCycleCommand 0.4"
 LEGACY_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.1"
 TRACE_BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.2"
 BEGIN_MANIFEST_SCHEMA = "HostedAgentCycleBeginManifest 0.3"
@@ -75,6 +79,8 @@ COMMAND_V03_FIELDS = {
     "machineScope", "workRef", "evidenceCommentIds", "semanticAuthority",
     "authorizesMutation",
 }
+COMMAND_V04_FIELDS = COMMAND_V03_FIELDS | {"runtimeEnvironment"}
+RUNTIME_ENVIRONMENT_FIELDS = {"toolSurfaces", "inventoryComplete"}
 ACTOR_FIELDS = agent_cycle_identity.ACTOR_FIELDS
 BEGIN_REF_FIELDS = agent_cycle_identity.BEGIN_FIELDS
 
@@ -199,11 +205,66 @@ def validate_work_begin_command(value: Any) -> dict[str, Any]:
     return value
 
 
+def validate_runtime_environment(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != RUNTIME_ENVIRONMENT_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_ENVIRONMENT_FIELDS_INVALID")
+    inventory_complete = value.get("inventoryComplete")
+    if not isinstance(inventory_complete, bool):
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_ENVIRONMENT_COMPLETENESS_INVALID")
+    try:
+        runtime_provider_adapter.observations_from_tool_surfaces(
+            value.get("toolSurfaces"),
+            inventory_complete=inventory_complete,
+        )
+    except RuntimeError as exc:
+        code = str(exc).split(":", 1)[0] or "HOSTED_AGENT_RUNTIME_ENVIRONMENT_INVALID"
+        raise HostedAgentCycleError(code) from exc
+    surfaces = value["toolSurfaces"]
+    normalized = sorted(item.strip() for item in surfaces)
+    if surfaces != normalized:
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_ENVIRONMENT_NOT_CANONICAL")
+    return {
+        "toolSurfaces": list(surfaces),
+        "inventoryComplete": inventory_complete,
+    }
+
+
+def validate_runtime_begin_command(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != COMMAND_V04_FIELDS:
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_BEGIN_FIELDS_INVALID")
+    if value.get("schemaVersion") != COMMAND_SCHEMA_V04 or value.get("action") != "begin":
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_BEGIN_INVALID")
+    _text(value.get("requestId"), "HOSTED_AGENT_REQUEST_ID_INVALID")
+    actor = _actor(value.get("actor"))
+    if actor != value["actor"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_NOT_CANONICAL")
+    declared = _text(value.get("declaredIntent"), "HOSTED_AGENT_INTENT_INVALID")
+    if declared != value["declaredIntent"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_INTENT_NOT_CANONICAL")
+    if value.get("machineScope") != "live":
+        raise HostedAgentCycleError("HOSTED_AGENT_SCOPE_MUST_BE_LIVE")
+    try:
+        work_ref = agent_cycle.validate_work_ref(value.get("workRef"))
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_REF_INVALID") from exc
+    if work_ref != value.get("workRef"):
+        raise HostedAgentCycleError("HOSTED_AGENT_WORK_REF_NOT_CANONICAL")
+    if validate_runtime_environment(value.get("runtimeEnvironment")) != value["runtimeEnvironment"]:
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_ENVIRONMENT_NOT_CANONICAL")
+    if _evidence_ids(value.get("evidenceCommentIds")):
+        raise HostedAgentCycleError("HOSTED_AGENT_RUNTIME_BEGIN_EVIDENCE_INVALID")
+    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+        raise HostedAgentCycleError("HOSTED_AGENT_COMMAND_MUST_NOT_AUTHORIZE")
+    return value
+
+
 def validate_transport_command(value: Any) -> dict[str, Any]:
     if isinstance(value, dict) and value.get("schemaVersion") == COMMAND_SCHEMA_V02:
         return validate_handle_close_command(value)
     if isinstance(value, dict) and value.get("schemaVersion") == COMMAND_SCHEMA_V03:
         return validate_work_begin_command(value)
+    if isinstance(value, dict) and value.get("schemaVersion") == COMMAND_SCHEMA_V04:
+        return validate_runtime_begin_command(value)
     return validate_command(value)
 
 
@@ -240,6 +301,7 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
         REQUEST_MARKER: COMMAND_SCHEMA,
         REQUEST_MARKER_V02: COMMAND_SCHEMA_V02,
         REQUEST_MARKER_V03: COMMAND_SCHEMA_V03,
+        REQUEST_MARKER_V04: COMMAND_SCHEMA_V04,
     }
     marker = next((item for item in markers if body.startswith(item + "\n")), None)
     if marker is None:
@@ -512,16 +574,23 @@ def begin_from_envelope(
         raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_ACTION_REQUIRED")
     work_ref = (
         _observe_work_ref(command["workRef"])
-        if command["schemaVersion"] == COMMAND_SCHEMA_V03
+        if command["schemaVersion"] in {COMMAND_SCHEMA_V03, COMMAND_SCHEMA_V04}
         else None
     )
-    rc, context = _run_agent([
+    agent_args = [
         "begin",
         "--role", command["actor"]["role"],
         "--intent", command["declaredIntent"],
         "--machine-scope", "live",
-        "--json",
-    ])
+    ]
+    if command["schemaVersion"] == COMMAND_SCHEMA_V04:
+        runtime_environment = validate_runtime_environment(command["runtimeEnvironment"])
+        for surface_id in runtime_environment["toolSurfaces"]:
+            agent_args.extend(["--runtime-tool-surface", surface_id])
+        if runtime_environment["inventoryComplete"]:
+            agent_args.append("--runtime-tool-surfaces-complete")
+    agent_args.append("--json")
+    rc, context = _run_agent(agent_args)
     if rc != 0:
         try:
             failure_core = _context_failure_core(context)
@@ -544,7 +613,7 @@ def begin_from_envelope(
             "HOSTED_AGENT_BEGIN_NOT_READY",
             failure_core=_context_failure_core(context),
         )
-    if command["schemaVersion"] == COMMAND_SCHEMA_V03:
+    if command["schemaVersion"] in {COMMAND_SCHEMA_V03, COMMAND_SCHEMA_V04}:
         context = agent_cycle.bind_work_ref(context, work_ref)
     manifest = _begin_manifest(command, context, meta)
     validate_begin_manifest(manifest, context)
