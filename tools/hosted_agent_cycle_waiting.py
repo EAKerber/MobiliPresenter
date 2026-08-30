@@ -4,8 +4,8 @@
 The canonical Hosted Agent Cycle remains the owner of begin/close semantics.
 This adapter delegates one close attempt to that carrier and only promotes a
 validated close failure when the exact sealed observation proves that the
-remaining gap is observational. It never retries an operation, never mutates
-Work or Coordination, and never creates authority.
+remaining gap is observational. It never retries an operation, mutates Work or
+Coordination, or creates authority.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import io
 import json
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -120,11 +121,7 @@ def validate_waiting(value: Any) -> dict[str, Any]:
         or value.get("authorizesMutation") is not False
     ):
         raise HostedAgentCycleWaitingError("HOSTED_AGENT_WAITING_BOUNDARY_INVALID")
-    core = {
-        key: copy.deepcopy(item)
-        for key, item in value.items()
-        if key != "resultHash"
-    }
+    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "resultHash"}
     if value["resultHash"] != stable_hash(core):
         raise HostedAgentCycleWaitingError("HOSTED_AGENT_WAITING_RESULT_HASH_MISMATCH")
     return value
@@ -135,10 +132,7 @@ def _failure_codes(failure: dict[str, Any]) -> set[str]:
     return {item["code"] for item in failure["failureCore"]["causes"]}
 
 
-def _trace_waiting_for(
-    meta: dict[str, Any], manifest: dict[str, Any]
-) -> list[str]:
-    issue_number = manifest["source"]["issueNumber"]
+def _trace_waiting_for(meta: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
     close_comment_id = meta.get("commentId")
     if (
         not isinstance(close_comment_id, int)
@@ -148,7 +142,8 @@ def _trace_waiting_for(
         return []
     try:
         comments = trace_collect.fetch_issue_comments(
-            hosted_agent_cycle.REPOSITORY, issue_number
+            hosted_agent_cycle.REPOSITORY,
+            manifest["source"]["issueNumber"],
         )
         trace = trace_collect.build_trace(
             comments,
@@ -244,6 +239,26 @@ def build_waiting(
     return validate_waiting({**core, "resultHash": stable_hash(core)})
 
 
+@contextlib.contextmanager
+def _single_observation_policy() -> Iterator[None]:
+    """Force the delegated production close to observe once, then restore policy."""
+    previous_attempts = hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS
+    previous_prepare = hosted_agent_cycle_trace.prepare_close_stabilized
+
+    def prepare_once(*args: Any, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        kwargs["attempts"] = 1
+        kwargs["delay_seconds"] = 0.0
+        return previous_prepare(*args, **kwargs)
+
+    hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = 1
+    hosted_agent_cycle_trace.prepare_close_stabilized = prepare_once
+    try:
+        yield
+    finally:
+        hosted_agent_cycle_trace.prepare_close_stabilized = previous_prepare
+        hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = previous_attempts
+
+
 def close_once(
     *,
     command_path: str,
@@ -259,24 +274,16 @@ def close_once(
     hosted_agent_cycle.validate_transport_command(command)
     hosted_agent_cycle.validate_begin_manifest(manifest)
 
-    # Scope the existing stabilization primitive to one production observation.
-    # Explicit characterization tests may still request multiple observations,
-    # but the paved-path adapter never sleeps or polls before returning WAITING.
-    previous_attempts = hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS
-    hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = 1
-    try:
-        with contextlib.redirect_stdout(io.StringIO()):
-            rc = hosted_agent_cycle.main([
-                "close",
-                "--command", command_path,
-                "--meta", meta_path,
-                "--begin-dir", begin_dir,
-                "--closure", closure_path,
-                "--evidence-dir", evidence_dir,
-                "--result", result_path,
-            ])
-    finally:
-        hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS = previous_attempts
+    with _single_observation_policy(), contextlib.redirect_stdout(io.StringIO()):
+        rc = hosted_agent_cycle.main([
+            "close",
+            "--command", command_path,
+            "--meta", meta_path,
+            "--begin-dir", begin_dir,
+            "--closure", closure_path,
+            "--evidence-dir", evidence_dir,
+            "--result", result_path,
+        ])
 
     if rc == 0:
         result = _json(result_path)
@@ -297,8 +304,8 @@ def close_once(
     waiting = build_waiting(command, manifest, failure, waiting_for)
     _write_json(result_path, waiting)
     print(json.dumps(waiting, ensure_ascii=False))
-    # Non-zero keeps the existing workflow from uploading a terminal close
-    # proof. The final carrier gate explicitly validates WAITING as operational.
+    # Keep the close step non-successful so the existing workflow does not
+    # upload a terminal close proof. The final carrier gate validates WAITING.
     return 3
 
 

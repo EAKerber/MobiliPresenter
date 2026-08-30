@@ -211,7 +211,7 @@ jobs:
             --command /tmp/hosted-command.json \
             --result /tmp/hosted-result.json
 
-      - name: Run canonical close
+      - name: Run canonical close once
         id: close
         if: steps.checkout_begin.outcome == 'success'
         continue-on-error: true
@@ -220,7 +220,7 @@ jobs:
           HOSTED_AGENT_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
         run: |
           mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
-          python tools/hosted_agent_cycle.py close \
+          python tools/hosted_agent_cycle_waiting.py close \
             --command /tmp/hosted-command.json \
             --meta /tmp/hosted-meta.json \
             --begin-dir /tmp/agent-cycle-begin \
@@ -269,13 +269,5 @@ jobs:
         if: always()
         run: |
           test -f /tmp/hosted-result.json
-          python - <<'PY'
-          import json
-          value=json.load(open('/tmp/hosted-result.json', encoding='utf-8'))
-          if value.get('status') not in {'READY','PASS'}:
-              raise SystemExit(2)
-          if value.get('status') == 'READY' and value.get('schemaVersion') == 'HostedAgentCycleBeginResult 0.5':
-              resumability=value.get('resumability')
-              if not isinstance(resumability, dict) or resumability.get('state') != 'AVAILABLE':
-                  raise SystemExit(2)
-          PY
+          python tools/hosted_agent_cycle_waiting.py require-operational-result \
+            --result /tmp/hosted-result.json
