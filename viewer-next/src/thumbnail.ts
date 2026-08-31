@@ -7,7 +7,6 @@ import {
   module05,
   module06,
   module07,
-  setEntityMaterialOverride,
   type ScenePackage
 } from "@mobilipresenter/scene-core";
 import {
@@ -17,17 +16,13 @@ import {
   HemisphereLight,
   MathUtils,
   Mesh,
+  MeshStandardMaterial,
   PerspectiveCamera,
   Sphere,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer
 } from "three";
-import { styleAnchorAppearance } from "./fixtures/style-anchor.js";
-import {
-  bindModuleContinuousMaterialMappings,
-  ThreeMaterialRegistry
-} from "./renderer/three/materials.js";
 import { buildThreeScene } from "./renderer/three/scene-adapter.js";
 
 const MODULES = {
@@ -40,6 +35,7 @@ const MODULES = {
   "07": module07
 } as const;
 
+const THUMBNAIL_WOOD = "#A8744D";
 type ThumbnailAlias = keyof typeof MODULES;
 
 const appElement = document.querySelector<HTMLElement>("#app");
@@ -64,16 +60,6 @@ const scene: ScenePackage = {
   substitutionGroups: []
 };
 
-let appearance = styleAnchorAppearance;
-for (const primitive of moduleDefinition.geometry ?? []) {
-  appearance = setEntityMaterialOverride(
-    appearance,
-    moduleDefinition.id,
-    primitive.materialSlot ?? "__unassigned__",
-    "front-wood"
-  );
-}
-
 const renderer = new WebGLRenderer({
   antialias: true,
   alpha: true,
@@ -86,10 +72,14 @@ renderer.setPixelRatio(1);
 app.append(renderer.domElement);
 
 const camera = new PerspectiveCamera(30, 1, 1, 100_000);
-const materials = new ThreeMaterialRegistry(appearance);
-const adapter = buildThreeScene(scene, (entityId, slot) => materials.resolve(entityId, slot));
+const woodMaterial = new MeshStandardMaterial({
+  color: THUMBNAIL_WOOD,
+  roughness: 0.62,
+  metalness: 0
+});
+woodMaterial.name = "front-wood-thumbnail-preview";
+const adapter = buildThreeScene(scene, () => woodMaterial);
 adapter.scene.background = null;
-bindModuleContinuousMaterialMappings(adapter);
 
 const hemisphere = new HemisphereLight(0xffffff, 0x8a8177, 2.2);
 const ambient = new AmbientLight(0xffffff, 0.85);
@@ -123,12 +113,29 @@ function fitCamera(): void {
   camera.lookAt(center);
   camera.updateProjectionMatrix();
 
+  const projectedCenter = center.clone().project(camera);
+  if (Math.abs(projectedCenter.x) > 0.05 || Math.abs(projectedCenter.y) > 0.05 || projectedCenter.z < -1 || projectedCenter.z > 1) {
+    throw new Error(`THUMBNAIL_CAMERA_FRAME_INVALID:${alias}:${projectedCenter.toArray().join(",")}`);
+  }
+
   app.dataset.thumbnailBounds = [
     bounds.min.x, bounds.min.y, bounds.min.z,
     bounds.max.x, bounds.max.y, bounds.max.z
   ].map(value => value.toFixed(2)).join(",");
   app.dataset.thumbnailCamera = [camera.position.x, camera.position.y, camera.position.z]
     .map(value => value.toFixed(2)).join(",");
+}
+
+function assertRenderedPixels(widthPx: number, heightPx: number): void {
+  const gl = renderer.getContext();
+  const pixels = new Uint8Array(widthPx * heightPx * 4);
+  gl.readPixels(0, 0, widthPx, heightPx, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  let opaquePixels = 0;
+  for (let index = 3; index < pixels.length; index += 4) {
+    if (pixels[index]! > 0) opaquePixels += 1;
+  }
+  if (opaquePixels < 512) throw new Error(`THUMBNAIL_EMPTY_FRAME:${alias}:${opaquePixels}`);
+  app.dataset.thumbnailOpaquePixels = String(opaquePixels);
 }
 
 function render(): void {
@@ -139,11 +146,13 @@ function render(): void {
   camera.updateProjectionMatrix();
   fitCamera();
   renderer.render(adapter.scene, camera);
+  assertRenderedPixels(widthPx, heightPx);
   app.dataset.rendererReady = "true";
   app.dataset.frameRendered = "true";
   app.dataset.thumbnailModule = alias;
   app.dataset.thumbnailBackground = "transparent";
   app.dataset.thumbnailCameraPolicy = "isolated-product-three-quarter-v1";
+  app.dataset.thumbnailMaterial = "warm-wood-preview";
 }
 
 render();
@@ -152,6 +161,6 @@ window.addEventListener("pagehide", () => {
   adapter.scene.traverse(object => {
     if (object instanceof Mesh) object.geometry.dispose();
   });
-  materials.dispose();
+  woodMaterial.dispose();
   renderer.dispose();
 }, { once: true });
