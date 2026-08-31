@@ -1,0 +1,73 @@
+name: Product UI Evidence
+
+on:
+  pull_request:
+    paths:
+      - "viewer-next/src/ui/**"
+      - "viewer-next/src/bootstrap.ts"
+      - "viewer-next/src/renderer/three/selection.ts"
+      - "viewer-next/public/module-thumbnails/**"
+      - ".github/workflows/product-ui-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Scene Core toolchain
+        working-directory: scene-core
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Install Viewer Next toolchain
+        working-directory: viewer-next
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Build product UI
+        working-directory: viewer-next
+        env:
+          VITE_DEFAULT_UI_MODE: product
+        run: npm run build
+
+      - name: Start product preview
+        working-directory: viewer-next
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/product-ui-preview.log 2>&1 &
+          echo $! > /tmp/product-ui-preview.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/product-ui-preview.log
+          exit 1
+
+      - name: Capture responsive product UI
+        working-directory: viewer-next
+        run: python3 tests/runtime_ui_smoke.py
+
+      - name: Upload product UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-ui-evidence
+          path: viewer-next/artifacts/runtime-ui/
+          if-no-files-found: warn
+          retention-days: 14
