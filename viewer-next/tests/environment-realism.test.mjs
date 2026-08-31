@@ -4,7 +4,7 @@ import {
   currentSceneBase,
   sceneGeometryDigest
 } from "@mobilipresenter/scene-core";
-import { RectAreaLight } from "three";
+import { DirectionalLight, RectAreaLight } from "three";
 import { styleAnchorAppearance } from "../dist-ts/src/fixtures/style-anchor.js";
 import {
   applyEnvironmentRealism,
@@ -12,6 +12,8 @@ import {
   ENVIRONMENT_REALISM_ID,
   ENVIRONMENT_REALISM_LIGHTING_CALIBRATION,
   ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID,
+  ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN,
+  ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM,
   environmentRealismEnvironmentIntensity
 } from "../dist-ts/src/renderer/three/environment-realism.js";
 import { buildThreeLighting } from "../dist-ts/src/renderer/three/lighting.js";
@@ -64,7 +66,9 @@ test("Environment Realism 0.2 balances the canonical studio rig around the windo
   const key = lighting.baseLights.get("key-front-high");
   const fill = lighting.baseLights.get("fill-side");
   assert.ok(ambient && key && fill);
+  assert.ok(key instanceof DirectionalLight);
 
+  const originalKeyPosition = key.position.clone();
   const before = {
     ambient: ambient.intensity,
     key: key.intensity,
@@ -73,12 +77,19 @@ test("Environment Realism 0.2 balances the canonical studio rig around the windo
   const result = applyEnvironmentRealismLightingCalibration(lighting);
 
   assert.equal(result.calibrationId, ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID);
+  assert.equal(result.shadowKeyAlignedToWindow, true);
   close(ambient.intensity, before.ambient * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.ambientScale);
   close(key.intensity, before.key * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.keyScale);
   close(fill.intensity, before.fill * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.fillScale);
   assert.equal(ambient.userData.appearanceOnlyCalibration, ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID);
   assert.equal(key.userData.appearanceOnlyCalibration, ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID);
   assert.equal(fill.userData.appearanceOnlyCalibration, ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID);
+
+  assert.equal(key.castShadow, true);
+  assert.equal(key.userData.windowMotivatedShadowKey, true);
+  assert.deepEqual(key.userData.presentationSourceMm, ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM);
+  assert.equal(key.userData.presentationColorTemperatureK, ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN);
+  assert.equal(key.position.equals(originalKeyPosition), false);
 
   const baseEnvironment = styleAnchorAppearance.lighting.environment.relativeIntensity;
   close(
@@ -109,6 +120,7 @@ test("realism lighting calibration can be reapplied after canonical lighting syn
   close(ambient.intensity, canonical.ambient * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.ambientScale);
   close(key.intensity, canonical.key * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.keyScale);
   close(fill.intensity, canonical.fill * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.fillScale);
+  assert.equal(key.userData.windowMotivatedShadowKey, true);
 });
 
 test("Environment Realism is idempotent and does not accumulate presentation roots", () => {
