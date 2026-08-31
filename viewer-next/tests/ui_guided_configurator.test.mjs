@@ -83,11 +83,14 @@ test("module thumbnails are crops from the real current viewer renderer and sele
     "createViewerComposition",
     'alpha: true',
     'preserveDrawingBuffer: true',
-    "composition.adapter.scene.background = null",
-    "cropRenderedModule(renderer.domElement)",
+    "isolateCompositionVisuals(composition)",
+    "renderColorPass(renderer, composition)",
+    "renderMaskPass(renderer, composition, camera)",
+    "transparentComposite(colorPass, maskPass)",
     'thumbnailRenderer = "viewer-composition-three-webgl2"',
-    'thumbnailScenePolicy = "current-scene-isolated-entity-visibility-v1"',
+    'thumbnailScenePolicy = "current-scene-isolated-entity-visibility-v2"',
     'thumbnailCameraPolicy = "current-fixed-camera-then-crop-v1"',
+    'thumbnailMaskPolicy = "same-renderer-geometry-mask-v1"',
   ]);
   containsAll(selection, ["material.opacity = 0.62"]);
 });
