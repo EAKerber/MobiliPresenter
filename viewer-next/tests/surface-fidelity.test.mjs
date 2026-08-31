@@ -39,6 +39,7 @@ test("Surface Fidelity keeps the legacy wood shader when realism is off", () => 
   assert.match(shader.fragmentShader, /mpWoodTone/);
   assert.doesNotMatch(shader.fragmentShader, /mpWoodRoughnessDelta/);
   assert.doesNotMatch(shader.fragmentShader, /mpWoodMicroHeight/);
+  assert.doesNotMatch(shader.fragmentShader, /mpWoodFrequency/);
   registry.dispose();
 });
 
@@ -64,6 +65,10 @@ test("Surface Fidelity v0.2 makes wood materially expressive without raster maps
   assert.match(shader.fragmentShader, /mpWoodFiber/);
   assert.match(shader.fragmentShader, /mpWoodFine/);
   assert.match(shader.fragmentShader, /mpWoodPore/);
+  assert.match(shader.fragmentShader, /mpWoodFlow/);
+  assert.match(shader.fragmentShader, /mpWoodDrift/);
+  assert.match(shader.fragmentShader, /mpWoodFrequency/);
+  assert.match(shader.fragmentShader, /mpWoodFiberPresence/);
   assert.match(shader.fragmentShader, /mpWoodRoughnessDelta/);
   assert.match(shader.fragmentShader, /roughnessFactor = clamp/);
   assert.match(shader.fragmentShader, /mpWoodMicroHeight/);
