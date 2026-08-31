@@ -121,7 +121,7 @@ export function installProductUiEnhancements(
   controls: RuntimeControlsUi
 ): ProductUiEnhancements {
   let disposed = false;
-  let scheduled = false;
+  let scheduledFrame: number | null = null;
 
   const decorateModuleThumbnails = (): void => {
     for (const card of document.querySelectorAll<HTMLElement>(".viewer-module-card[data-module-alias]")) {
@@ -151,21 +151,23 @@ export function installProductUiEnhancements(
     const frontGroup = stage.querySelector<HTMLElement>(".viewer-option-group");
     if (!frontGroup) return;
     const heading = frontGroup.querySelector<HTMLElement>("h3");
-    if (heading) heading.textContent = "Cor dos móveis";
+    if (heading && heading.textContent !== "Cor dos móveis") heading.textContent = "Cor dos móveis";
 
     const context = stage.querySelector<HTMLElement>(".viewer-stage-context");
-    if (context) context.textContent = "Acabamento global · a escolha é aplicada a todos os módulos do ambiente.";
+    const contextCopy = "Acabamento global · a escolha é aplicada a todos os módulos do ambiente.";
+    if (context && context.textContent !== contextCopy) context.textContent = contextCopy;
 
     const activePreset = globalFrontPreset(api);
     for (const option of frontGroup.querySelectorAll<HTMLButtonElement>("[data-front-preset]")) {
       const presetId = option.dataset.frontPreset;
       if (!presetId) continue;
       if (presetId === "original") {
-        option.hidden = true;
+        if (!option.hidden) option.hidden = true;
         continue;
       }
-      option.disabled = false;
-      option.setAttribute("aria-pressed", activePreset === presetId ? "true" : "false");
+      if (option.disabled) option.disabled = false;
+      const pressed = activePreset === presetId ? "true" : "false";
+      if (option.getAttribute("aria-pressed") !== pressed) option.setAttribute("aria-pressed", pressed);
       if (option.dataset.productFinishEnhanced === "true") continue;
       option.dataset.productFinishEnhanced = "true";
       const label = option.textContent ?? presetId;
@@ -182,7 +184,7 @@ export function installProductUiEnhancements(
   };
 
   const decorate = (): void => {
-    scheduled = false;
+    scheduledFrame = null;
     if (disposed) return;
     decorateModuleThumbnails();
     decorateGlobalFinishes();
@@ -190,9 +192,8 @@ export function installProductUiEnhancements(
   };
 
   const scheduleDecorate = (): void => {
-    if (scheduled || disposed) return;
-    scheduled = true;
-    queueMicrotask(decorate);
+    if (scheduledFrame !== null || disposed) return;
+    scheduledFrame = requestAnimationFrame(decorate);
   };
 
   const handleGlobalFinishClick = (event: Event): void => {
@@ -227,6 +228,7 @@ export function installProductUiEnhancements(
     dispose(): void {
       disposed = true;
       observer.disconnect();
+      if (scheduledFrame !== null) cancelAnimationFrame(scheduledFrame);
       document.removeEventListener("click", handleGlobalFinishClick, true);
     }
   };
