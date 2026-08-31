@@ -692,7 +692,7 @@ function applyLucideIcons(): void {
       Wrench
     },
     attrs: {
-      class: ["viewer-semantic-icon", "viewer-semantic-icon--library"],
+      class: "viewer-semantic-icon viewer-semantic-icon--library",
       "stroke-width": 1.7,
       "aria-hidden": "true"
     },
