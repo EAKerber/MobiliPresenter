@@ -413,6 +413,8 @@ def _protection_reasons(
 ) -> list[str]:
     git_state = view["git"]
     reasons: list[str] = []
+    if branch == COLD_ARCHIVE_BRANCH:
+        reasons.append("cold-archive-root")
     if branch == git_state.get("controlBranch"):
         reasons.append("control-branch")
     if isinstance(published_source_branch, str) and branch == published_source_branch:

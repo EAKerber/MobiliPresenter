@@ -47,6 +47,22 @@ class PruneColdArchiveTests(unittest.TestCase):
             cold_archive_evidence=cold or {},
         )
 
+    def test_cold_archive_root_protection_wins_over_strong_ancestry(self):
+        refs = {"main": "a" * 40, "archive/cold": "c" * 40}
+        ancestry = {"main": "identical-to-control", "archive/cold": "ancestor-of-control"}
+        plan = prune.build_prune_plan(
+            self.state(), refs, [], ancestry,
+            work_items=[], work_authority_complete=True, work_authority_head="f" * 40,
+            branch_inventory_complete=True, ancestry_complete=True,
+            branch_inventory_source="remote-git-refs", published_source_branch="main",
+            cold_archive_evidence={},
+        )
+        entry = next(item for item in plan["entries"] if item["branch"] == "archive/cold")
+        self.assertEqual(entry["action"], "keep")
+        self.assertFalse(entry["autoDeleteEligible"])
+        self.assertIn("cold-archive-root", entry["protections"])
+        self.assertIn("ancestor-of-control", entry["evidence"])
+
     def test_verified_cold_archive_is_strong_delete_evidence(self):
         refs = {"main": "a" * 40, "archive/cold": "c" * 40, "tmp/fh06-user-artifacts": "b" * 40}
         plan = self.build(refs, cold={"tmp/fh06-user-artifacts": "cold-archive:" + "c" * 40})
