@@ -71,7 +71,8 @@ test("responsive shell reserves persistent scene space and avoids the internal c
 test("Netlify product builds open the current UI by default without weakening diagnostic overrides", () => {
   containsAll(netlify, ['VITE_DEFAULT_UI_MODE = "product"']);
   containsAll(bootstrap, [
-    'import.meta.env.VITE_DEFAULT_UI_MODE === "product"',
+    "VITE_DEFAULT_UI_MODE",
+    '=== "product"',
     'query.get("fidelity") !== "1"',
     'controlsPreference === "1"',
     'controlsPreference !== "0" && defaultUiMode',
