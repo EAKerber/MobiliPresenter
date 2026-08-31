@@ -115,6 +115,12 @@ body.viewer-product-ui {
     linear-gradient(180deg, rgba(255, 255, 255, .75), rgba(248, 246, 242, .82));
 }
 
+.viewer-product-detail__isometric-dimensions text {
+  fill: currentColor;
+  stroke: none;
+  font: 12px var(--ui-font);
+}
+
 .viewer-summary__card--value {
   border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border));
   background: color-mix(in srgb, var(--ui-accent-soft) 72%, var(--ui-surface-strong));
