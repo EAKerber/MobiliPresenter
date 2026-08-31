@@ -74,16 +74,14 @@ test("product mode publishes global furniture finishes with authoritative visual
   containsAll(productCss, [".viewer-choice-card__swatch", "border-radius: 10px"]);
 });
 
-test("module thumbnails are isolated renderer assets and selection contour is intentionally stronger", () => {
+test("module thumbnails are isolated Chromium geometry assets and selection contour is intentionally stronger", () => {
   containsAll(productEnhancements, ["/module-thumbnails/module-${alias}.png"]);
   containsAll(thumbnail, [
-    "environment: []",
-    "items: []",
-    "modules: [moduleDefinition]",
     'const THUMBNAIL_WOOD = "#A8744D"',
-    "new PerspectiveCamera",
-    "assertRenderedPixels",
-    "adapter.scene.background = null",
+    "moduleDefinition.geometry",
+    "function project(point",
+    "context.getImageData",
+    'thumbnailCameraPolicy = "isolated-product-isometric-canvas-v1"',
   ]);
   containsAll(selection, ["material.opacity = 0.62"]);
 });
