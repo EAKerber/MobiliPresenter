@@ -1,5 +1,9 @@
 import "./main.js";
 import { createViewerUiApi, type ViewerEngineControlPort } from "./api/ui-adapter.js";
+import {
+  installDesktopCompositionEnhancement,
+  type DesktopCompositionEnhancement
+} from "./ui/desktop-composition.js";
 import { installProductUiEnhancements, type ProductUiEnhancements } from "./ui/product-enhancements.js";
 import { mountRuntimeControls, type RuntimeControlsUi } from "./ui/runtime-controls.js";
 
@@ -20,6 +24,7 @@ app.dataset.viewerUiMode = controlsEnabled ? "product" : "renderer-only";
 
 let controls: RuntimeControlsUi | null = null;
 let productEnhancements: ProductUiEnhancements | null = null;
+let desktopComposition: DesktopCompositionEnhancement | null = null;
 
 if (controlsEnabled) {
   const runtime = (window as Window & { __MOBILIPRESENTER_VIEWER__?: ViewerEngineControlPort }).__MOBILIPRESENTER_VIEWER__;
@@ -28,6 +33,7 @@ if (controlsEnabled) {
 
   controls = mountRuntimeControls(document.body, uiApi);
   productEnhancements = installProductUiEnhancements(uiApi, controls);
+  desktopComposition = installDesktopCompositionEnhancement();
 
   const refreshAfterSceneClick = (event: MouseEvent): void => {
     if (!(event.target instanceof HTMLCanvasElement)) return;
@@ -37,6 +43,8 @@ if (controlsEnabled) {
 
   window.addEventListener("pagehide", () => {
     document.removeEventListener("click", refreshAfterSceneClick);
+    desktopComposition?.dispose();
+    desktopComposition = null;
     productEnhancements?.dispose();
     productEnhancements = null;
     controls?.dispose();
