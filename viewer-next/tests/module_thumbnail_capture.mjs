@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -28,11 +28,27 @@ for (const alias of MODULES) {
     throw new Error(`THUMBNAIL_CAPTURE_FAILED:${alias}:${result.stderr.slice(-3000)}`);
   }
 
+  const htmlPath = join(OUT, `${name}.html`);
+  const html = readFileSync(htmlPath, "utf8");
+  const errorMatch = html.match(/data-thumbnail-error="([^"]*)"/);
+  if (!errorMatch || errorMatch[1] !== "none") {
+    throw new Error(`THUMBNAIL_PAGE_ERROR:${alias}:${errorMatch?.[1] ?? "missing-error-marker"}`);
+  }
+  for (const marker of [
+    'data-thumbnail-renderer="viewer-composition-three-webgl2"',
+    'data-thumbnail-scene-policy="current-scene-isolated-entity-visibility-v2"',
+    'data-thumbnail-camera-policy="current-fixed-camera-then-crop-v1"',
+    'data-thumbnail-mask-policy="same-renderer-geometry-mask-v1"',
+    'data-thumbnail-background="transparent"'
+  ]) {
+    if (!html.includes(marker)) throw new Error(`THUMBNAIL_POLICY_MISSING:${alias}:${marker}`);
+  }
+
   const output = join(OUT, `${name}.png`);
   const size = statSync(output).size;
   if (size < 5_000) throw new Error(`THUMBNAIL_CAPTURE_SUSPICIOUSLY_SMALL:${alias}:${size}`);
 
-  rmSync(join(OUT, `${name}.html`), { force: true });
+  rmSync(htmlPath, { force: true });
   rmSync(join(OUT, `${name}.metrics.json`), { force: true });
   process.stdout.write(`${name}.png ${size} bytes\n`);
 }
