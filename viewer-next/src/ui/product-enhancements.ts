@@ -9,6 +9,7 @@ const FRONT_SWATCH_COLOR: Readonly<Record<FrontPresetId, string>> = {
   "warm-wood": "#A8744D",
   "neutral-greige": "#B2ADA5"
 };
+const PRODUCT_DEFAULT_FRONT_PRESET: FrontPresetId = "neutral-greige";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function reportProductUiError(error: unknown): void {
@@ -24,6 +25,14 @@ function globalFrontPreset(api: ViewerUiApi): FrontPresetId | null {
   const ids = api.getCatalog().modules.map(alias => snapshot.frontPresetByModule[alias] ?? null);
   const first = ids[0] ?? null;
   return ids.every(id => id === first) ? first : null;
+}
+
+function ensureProductDefaultFrontPreset(api: ViewerUiApi): void {
+  const snapshot = api.getSnapshot();
+  const aliases = api.getCatalog().modules;
+  const hasExplicitFrontPreset = aliases.some(alias => snapshot.frontPresetByModule[alias] !== undefined);
+  if (hasExplicitFrontPreset) return;
+  for (const alias of aliases) api.setFrontPreset(alias, PRODUCT_DEFAULT_FRONT_PRESET);
 }
 
 function fmt(value: number): string {
@@ -122,6 +131,13 @@ export function installProductUiEnhancements(
 ): ProductUiEnhancements {
   let disposed = false;
   let scheduledFrame: number | null = null;
+
+  try {
+    ensureProductDefaultFrontPreset(api);
+    controls.refresh();
+  } catch (error) {
+    reportProductUiError(error);
+  }
 
   const decorateModuleThumbnails = (): void => {
     for (const card of document.querySelectorAll<HTMLElement>(".viewer-module-card[data-module-alias]")) {
