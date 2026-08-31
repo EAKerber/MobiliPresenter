@@ -37,7 +37,7 @@ for (const alias of MODULES) {
   for (const marker of [
     'data-thumbnail-renderer="viewer-composition-three-webgl2"',
     'data-thumbnail-scene-policy="current-scene-isolated-entity-visibility-v2"',
-    'data-thumbnail-camera-policy="current-fixed-camera-then-crop-v1"',
+    'data-thumbnail-camera-policy="current-fixed-camera-aspect-then-crop-v1"',
     'data-thumbnail-mask-policy="same-renderer-geometry-mask-v1"',
     'data-thumbnail-background="transparent"'
   ]) {
