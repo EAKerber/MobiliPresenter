@@ -6,8 +6,14 @@ const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("APP_ROOT_NOT_FOUND");
 
 const query = new URLSearchParams(window.location.search);
-const controlsEnabled = query.get("controls") === "1" && query.get("fidelity") !== "1";
+const defaultUiMode = import.meta.env.VITE_DEFAULT_UI_MODE === "product";
+const controlsPreference = query.get("controls");
+const controlsEnabled = query.get("fidelity") !== "1" && (
+  controlsPreference === "1" ||
+  (controlsPreference !== "0" && defaultUiMode)
+);
 app.dataset.viewerControls = controlsEnabled ? "true" : "false";
+app.dataset.viewerUiMode = controlsEnabled ? "product" : "renderer-only";
 
 let controls: RuntimeControlsUi | null = null;
 
