@@ -8,6 +8,9 @@ import {
 } from "@mobilipresenter/scene-core";
 import {
   ACESFilmicToneMapping,
+  Color,
+  MeshBasicMaterial,
+  NoToneMapping,
   SRGBColorSpace,
   WebGLRenderer
 } from "three";
@@ -21,6 +24,7 @@ const MODULE_ALIASES = ["01", "02", "03", "04", "05", "06", "07"] as const satis
 const THUMBNAIL_SIZE = 512;
 const THUMBNAIL_PADDING = 42;
 const ALPHA_THRESHOLD = 8;
+const MATTE_COLOR = new Color(0xf0ede7);
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (!appElement) throw new Error("THUMBNAIL_APP_ROOT_NOT_FOUND");
@@ -64,6 +68,77 @@ function applyWarmWoodToTarget(scene: ScenePackage): AppearancePackage {
   return appearance;
 }
 
+function readCanvas(source: HTMLCanvasElement): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = THUMBNAIL_SIZE;
+  canvas.height = THUMBNAIL_SIZE;
+  const context = canvas.getContext("2d", { alpha: true, willReadFrequently: true });
+  if (!context) throw new Error("THUMBNAIL_READBACK_CONTEXT_UNAVAILABLE");
+  context.clearRect(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  context.drawImage(source, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  return context.getImageData(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+}
+
+function isolateCompositionVisuals(
+  composition: ReturnType<typeof createViewerComposition>
+): void {
+  const target = composition.adapter.entityGroups.get(moduleId);
+  if (!target) throw new Error(`THUMBNAIL_TARGET_GROUP_MISSING:${alias}`);
+  for (const child of composition.adapter.scene.children) {
+    child.visible = child === target || child.name === "__lighting/base";
+  }
+}
+
+function renderColorPass(
+  renderer: WebGLRenderer,
+  composition: ReturnType<typeof createViewerComposition>
+): ImageData {
+  composition.adapter.scene.overrideMaterial = null;
+  composition.adapter.scene.background = MATTE_COLOR;
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.setClearColor(MATTE_COLOR, 1);
+  composition.render();
+  return readCanvas(renderer.domElement);
+}
+
+function renderMaskPass(
+  renderer: WebGLRenderer,
+  composition: ReturnType<typeof createViewerComposition>,
+  camera: ReturnType<typeof createThreeCamera>
+): ImageData {
+  const maskMaterial = new MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+  composition.adapter.scene.overrideMaterial = maskMaterial;
+  composition.adapter.scene.background = new Color(0x000000);
+  renderer.toneMapping = NoToneMapping;
+  renderer.setClearColor(0x000000, 1);
+  renderer.clear(true, true, true);
+  renderer.render(composition.adapter.scene, camera);
+  const result = readCanvas(renderer.domElement);
+  composition.adapter.scene.overrideMaterial = null;
+  maskMaterial.dispose();
+  return result;
+}
+
+function transparentComposite(color: ImageData, mask: ImageData): ImageData {
+  const output = new ImageData(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  const background = [color.data[0]!, color.data[1]!, color.data[2]!] as const;
+  for (let index = 0; index < color.data.length; index += 4) {
+    const maskValue = Math.max(mask.data[index]!, mask.data[index + 1]!, mask.data[index + 2]!);
+    const alpha = Math.max(0, Math.min(1, maskValue / 255));
+    if (alpha <= ALPHA_THRESHOLD / 255) continue;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const observed = color.data[index + channel]!;
+      const matte = background[channel]!;
+      const foreground = alpha >= 0.999
+        ? observed
+        : (observed - matte * (1 - alpha)) / Math.max(alpha, 0.001);
+      output.data[index + channel] = Math.max(0, Math.min(255, Math.round(foreground)));
+    }
+    output.data[index + 3] = Math.round(alpha * 255);
+  }
+  return output;
+}
+
 function alphaBounds(data: Uint8ClampedArray, width: number, height: number): {
   readonly minX: number;
   readonly minY: number;
@@ -92,20 +167,19 @@ function alphaBounds(data: Uint8ClampedArray, width: number, height: number): {
     : null;
 }
 
-function cropRenderedModule(source: HTMLCanvasElement): {
+function cropRenderedModule(composite: ImageData): {
   readonly canvas: HTMLCanvasElement;
   readonly opaquePixels: number;
   readonly crop: readonly [number, number, number, number];
 } {
-  const scratch = document.createElement("canvas");
-  scratch.width = THUMBNAIL_SIZE;
-  scratch.height = THUMBNAIL_SIZE;
-  const scratchContext = scratch.getContext("2d", { alpha: true, willReadFrequently: true });
-  if (!scratchContext) throw new Error("THUMBNAIL_SCRATCH_CONTEXT_UNAVAILABLE");
-  scratchContext.clearRect(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-  scratchContext.drawImage(source, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-  const pixels = scratchContext.getImageData(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-  const bounds = alphaBounds(pixels.data, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  const source = document.createElement("canvas");
+  source.width = THUMBNAIL_SIZE;
+  source.height = THUMBNAIL_SIZE;
+  const sourceContext = source.getContext("2d", { alpha: true });
+  if (!sourceContext) throw new Error("THUMBNAIL_SOURCE_CONTEXT_UNAVAILABLE");
+  sourceContext.putImageData(composite, 0, 0);
+
+  const bounds = alphaBounds(composite.data, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
   if (!bounds || bounds.opaquePixels < 1_000) {
     throw new Error(`THUMBNAIL_EMPTY_RENDERED_FRAME:${alias}:${bounds?.opaquePixels ?? 0}`);
   }
@@ -131,7 +205,7 @@ function cropRenderedModule(source: HTMLCanvasElement): {
   const drawX = (THUMBNAIL_SIZE - drawWidth) / 2;
   const drawY = (THUMBNAIL_SIZE - drawHeight) / 2;
   outputContext.drawImage(
-    scratch,
+    source,
     cropX,
     cropY,
     cropWidth,
@@ -162,7 +236,6 @@ renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.setPixelRatio(1);
-renderer.setClearColor(0x000000, 0);
 renderer.setSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, false);
 renderer.domElement.style.width = "100%";
 renderer.domElement.style.height = "100%";
@@ -176,19 +249,22 @@ const composition = createViewerComposition(renderer, camera, scene, appearance,
   widthPx: THUMBNAIL_SIZE,
   heightPx: THUMBNAIL_SIZE
 });
-composition.adapter.scene.background = null;
 composition.syncInteraction(null, null);
 composition.setSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-composition.render();
+isolateCompositionVisuals(composition);
 
-const cropped = cropRenderedModule(renderer.domElement);
+const colorPass = renderColorPass(renderer, composition);
+const maskPass = renderMaskPass(renderer, composition, camera);
+const composite = transparentComposite(colorPass, maskPass);
+const cropped = cropRenderedModule(composite);
 app.replaceChildren(cropped.canvas);
 app.dataset.rendererReady = "true";
 app.dataset.frameRendered = "true";
 app.dataset.thumbnailModule = alias;
 app.dataset.thumbnailRenderer = "viewer-composition-three-webgl2";
-app.dataset.thumbnailScenePolicy = "current-scene-isolated-entity-visibility-v1";
+app.dataset.thumbnailScenePolicy = "current-scene-isolated-entity-visibility-v2";
 app.dataset.thumbnailCameraPolicy = "current-fixed-camera-then-crop-v1";
+app.dataset.thumbnailMaskPolicy = "same-renderer-geometry-mask-v1";
 app.dataset.thumbnailBackground = "transparent";
 app.dataset.thumbnailMaterial = FRONT_PRESETS["warm-wood"].materialId;
 app.dataset.thumbnailOpaquePixels = String(cropped.opaquePixels);
