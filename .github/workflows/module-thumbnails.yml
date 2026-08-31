@@ -10,15 +10,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout branch head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -56,6 +58,25 @@ jobs:
       - name: Capture transparent module thumbnails
         working-directory: viewer-next
         run: node tests/module_thumbnail_capture.mjs http://127.0.0.1:4174/
+
+      - name: Materialize approved deploy assets
+        if: success()
+        run: |
+          mkdir -p viewer-next/public/module-thumbnails
+          cp viewer-next/artifacts/module-thumbnails/module-*.png viewer-next/public/module-thumbnails/
+
+      - name: Commit generated thumbnails to PR branch
+        if: success() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add viewer-next/public/module-thumbnails/module-*.png
+          if git diff --cached --quiet; then
+            echo "Generated thumbnails already match the branch assets."
+            exit 0
+          fi
+          git commit -m "chore(ui): refresh real-renderer module thumbnails"
+          git push origin HEAD:${{ github.head_ref }}
 
       - name: Upload module thumbnails
         if: always()
