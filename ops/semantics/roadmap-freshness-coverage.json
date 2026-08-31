@@ -1,8 +1,8 @@
 {
   "schemaVersion": "RoadmapFreshnessCoverage 0.1",
   "projectState": {
-    "baseHash": "76a12e817f5ecba33b6bd65c6067ca882bca50ead63b2f13844e4b6191a1b886",
-    "currentHash": "6a251701aa10d35cb5f649ce001853ae82ff1a68c8685b1fdbb2cfa5081833b2",
+    "baseHash": "6a251701aa10d35cb5f649ce001853ae82ff1a68c8685b1fdbb2cfa5081833b2",
+    "currentHash": "3a891a6025731b316d422e22342337afa98dcd95cd071616c5607f849067689e",
     "changedFields": [
       "development.checkpoint",
       "development.nextTransition"
