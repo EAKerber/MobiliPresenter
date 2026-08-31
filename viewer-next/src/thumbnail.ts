@@ -25,6 +25,9 @@ const THUMBNAIL_SIZE = 512;
 const THUMBNAIL_PADDING = 42;
 const ALPHA_THRESHOLD = 8;
 const MATTE_COLOR = new Color(0xf0ede7);
+const CAPTURE_WIDTH = 1024;
+const CAPTURE_ASPECT = currentSceneBase.presentationFrame?.preferredAspectRatio ?? (1865 / 967);
+const CAPTURE_HEIGHT = Math.max(1, Math.round(CAPTURE_WIDTH / CAPTURE_ASPECT));
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (!appElement) throw new Error("THUMBNAIL_APP_ROOT_NOT_FOUND");
@@ -76,13 +79,13 @@ function applyWarmWoodToTarget(scene: ScenePackage): AppearancePackage {
 
 function readCanvas(source: HTMLCanvasElement): ImageData {
   const canvas = document.createElement("canvas");
-  canvas.width = THUMBNAIL_SIZE;
-  canvas.height = THUMBNAIL_SIZE;
+  canvas.width = CAPTURE_WIDTH;
+  canvas.height = CAPTURE_HEIGHT;
   const context = canvas.getContext("2d", { alpha: true, willReadFrequently: true });
   if (!context) throw new Error("THUMBNAIL_READBACK_CONTEXT_UNAVAILABLE");
-  context.clearRect(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-  context.drawImage(source, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
-  return context.getImageData(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  context.clearRect(0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+  context.drawImage(source, 0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
+  return context.getImageData(0, 0, CAPTURE_WIDTH, CAPTURE_HEIGHT);
 }
 
 function isolateCompositionVisuals(
@@ -126,7 +129,7 @@ function renderMaskPass(
 }
 
 function transparentComposite(color: ImageData, mask: ImageData): ImageData {
-  const output = new ImageData(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  const output = new ImageData(CAPTURE_WIDTH, CAPTURE_HEIGHT);
   const background = [color.data[0]!, color.data[1]!, color.data[2]!] as const;
   for (let index = 0; index < color.data.length; index += 4) {
     const maskValue = Math.max(mask.data[index]!, mask.data[index + 1]!, mask.data[index + 2]!);
@@ -179,13 +182,13 @@ function cropRenderedModule(composite: ImageData): {
   readonly crop: readonly [number, number, number, number];
 } {
   const source = document.createElement("canvas");
-  source.width = THUMBNAIL_SIZE;
-  source.height = THUMBNAIL_SIZE;
+  source.width = CAPTURE_WIDTH;
+  source.height = CAPTURE_HEIGHT;
   const sourceContext = source.getContext("2d", { alpha: true });
   if (!sourceContext) throw new Error("THUMBNAIL_SOURCE_CONTEXT_UNAVAILABLE");
   sourceContext.putImageData(composite, 0, 0);
 
-  const bounds = alphaBounds(composite.data, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  const bounds = alphaBounds(composite.data, CAPTURE_WIDTH, CAPTURE_HEIGHT);
   if (!bounds || bounds.opaquePixels < 1_000) {
     throw new Error(`THUMBNAIL_EMPTY_RENDERED_FRAME:${alias}:${bounds?.opaquePixels ?? 0}`);
   }
@@ -242,21 +245,21 @@ renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.setPixelRatio(1);
-renderer.setSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, false);
+renderer.setSize(CAPTURE_WIDTH, CAPTURE_HEIGHT, false);
 renderer.domElement.style.width = "100%";
 renderer.domElement.style.height = "100%";
 app.append(renderer.domElement);
 
 const camera = createThreeCamera(currentFixedCamera, {
-  widthPx: THUMBNAIL_SIZE,
-  heightPx: THUMBNAIL_SIZE
+  widthPx: CAPTURE_WIDTH,
+  heightPx: CAPTURE_HEIGHT
 });
 const composition = createViewerComposition(renderer, camera, scene, appearance, {
-  widthPx: THUMBNAIL_SIZE,
-  heightPx: THUMBNAIL_SIZE
+  widthPx: CAPTURE_WIDTH,
+  heightPx: CAPTURE_HEIGHT
 });
 composition.syncInteraction(null, null);
-composition.setSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+composition.setSize(CAPTURE_WIDTH, CAPTURE_HEIGHT);
 isolateCompositionVisuals(composition);
 
 const colorPass = renderColorPass(renderer, composition);
@@ -269,10 +272,11 @@ app.dataset.frameRendered = "true";
 app.dataset.thumbnailModule = alias;
 app.dataset.thumbnailRenderer = "viewer-composition-three-webgl2";
 app.dataset.thumbnailScenePolicy = "current-scene-isolated-entity-visibility-v2";
-app.dataset.thumbnailCameraPolicy = "current-fixed-camera-then-crop-v1";
+app.dataset.thumbnailCameraPolicy = "current-fixed-camera-aspect-then-crop-v1";
 app.dataset.thumbnailMaskPolicy = "same-renderer-geometry-mask-v1";
 app.dataset.thumbnailBackground = "transparent";
 app.dataset.thumbnailMaterial = FRONT_PRESETS["warm-wood"].materialId;
+app.dataset.thumbnailCaptureViewport = `${CAPTURE_WIDTH}x${CAPTURE_HEIGHT}`;
 app.dataset.thumbnailOpaquePixels = String(cropped.opaquePixels);
 app.dataset.thumbnailCrop = cropped.crop.join(",");
 
