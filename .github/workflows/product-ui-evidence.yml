@@ -7,6 +7,7 @@ on:
       - "viewer-next/src/bootstrap.ts"
       - "viewer-next/src/renderer/three/selection.ts"
       - "viewer-next/public/module-thumbnails/**"
+      - "viewer-next/tests/chrome_viewport_capture.mjs"
       - ".github/workflows/product-ui-evidence.yml"
   workflow_dispatch:
 
@@ -63,11 +64,30 @@ jobs:
         working-directory: viewer-next
         run: python3 tests/runtime_ui_smoke.py
 
+      - name: Exercise product stage navigation
+        working-directory: viewer-next
+        run: |
+          mkdir -p artifacts/product-ui-navigation
+          for step in finishes accessories summary; do
+            node tests/chrome_viewport_capture.mjs \
+              --url "http://127.0.0.1:4173/?controls=1" \
+              --name "navigation-${step}" \
+              --width 1366 \
+              --height 768 \
+              --out-dir artifacts/product-ui-navigation \
+              --no-screenshot \
+              --click-selector "[data-configurator-step=\"${step}\"]" \
+              --wait-selector "[data-stage-panel=\"${step}\"]" \
+              --expect-step "${step}"
+          done
+
       - name: Upload product UI evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: product-ui-evidence
-          path: viewer-next/artifacts/runtime-ui/
+          path: |
+            viewer-next/artifacts/runtime-ui/
+            viewer-next/artifacts/product-ui-navigation/
           if-no-files-found: warn
           retention-days: 14
