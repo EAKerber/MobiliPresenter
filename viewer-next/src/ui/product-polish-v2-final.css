@@ -1,0 +1,21 @@
+@media (min-width: 1180px) {
+  .viewer-configurator__actions .viewer-button--primary .viewer-semantic-icon--library {
+    width: 16px;
+    height: 16px;
+    color: currentColor;
+    stroke: currentColor;
+  }
+
+  .viewer-product-detail__view-selector {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .viewer-product-detail__view-button {
+    min-width: 0;
+    padding-inline: 2px;
+    font-size: 10.25px;
+    letter-spacing: -0.015em;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+}
