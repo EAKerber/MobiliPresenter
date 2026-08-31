@@ -1,0 +1,110 @@
+name: M13 RQ1 Semantic Composition Scaffold
+
+on:
+  push:
+    branches:
+      - work/operations/m13-rq1-semantic-composition-guard-20260830
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/operations/m13-rq1-semantic-composition-guard-20260830
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply semantic composition guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str, code: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(code)
+              target.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          foundations = '''\n\ndef required_capabilities_by_intent(\n    *,\n    registry: dict[str, Any] | None = None,\n    foundations: dict[str, Any] | None = None,\n) -> dict[str, list[str]]:\n    semantic = load_registry() if registry is None else registry\n    source = load_foundations() if foundations is None else foundations\n    artifacts = source.get("artifactContracts") if isinstance(source, dict) else None\n    contract = artifacts.get("capability-relevance-projection") if isinstance(artifacts, dict) else None\n    invariants = contract.get("invariants") if isinstance(contract, dict) else None\n    if not isinstance(invariants, dict):\n        raise RuntimeError("SEMANTIC_FOUNDATIONS_ARTIFACT_INVARIANTS_INVALID")\n    errors: list[str] = []\n    _validate_relevance_policy(invariants, semantic, errors)\n    if errors:\n        raise RuntimeError(errors[0])\n    policy = invariants["requiredCapabilitiesByIntent"]\n    return {intent: list(policy[intent]) for intent in sorted(policy)}\n\n\ndef required_capability_context_mismatches(\n    *,\n    role: str,\n    declared_intent: str,\n    lifecycle_phase: str,\n    registry: dict[str, Any] | None = None,\n    foundations: dict[str, Any] | None = None,\n) -> list[str]:\n    semantic = load_registry() if registry is None else registry\n    policy = required_capabilities_by_intent(registry=semantic, foundations=foundations)\n    if declared_intent not in policy:\n        raise RuntimeError("SEMANTIC_FOUNDATIONS_REQUIRED_POLICY_COVERAGE_INVALID")\n    capabilities = semantic.get("logicalCapabilities", {})\n    mismatches: list[str] = []\n    for capability_id in policy[declared_intent]:\n        item = capabilities[capability_id]\n        facets = item["facets"]\n        if role not in facets["roles"]:\n            mismatches.append(f"REQUIRED_CAPABILITY_ROLE_MISMATCH:{capability_id}")\n        if lifecycle_phase not in facets["lifecyclePhases"]:\n            mismatches.append(f"REQUIRED_CAPABILITY_LIFECYCLE_MISMATCH:{capability_id}")\n    return sorted(mismatches)\n'''
+          replace_once(
+              'tools/semantics/foundations.py',
+              '\n\ndef _validate_artifacts(value: Any, registry: dict[str, Any], errors: list[str]) -> None:\n',
+              foundations + '\n\ndef _validate_artifacts(value: Any, registry: dict[str, Any], errors: list[str]) -> None:\n',
+              'FOUNDATIONS_HELPER_ANCHOR_DRIFT',
+          )
+
+          replace_once(
+              'tools/semantics/brief.py',
+              'from tools.semantics.foundations import contract as foundation_contract\n',
+              'from tools.semantics import foundations as semantic_foundations\n',
+              'BRIEF_IMPORT_ANCHOR_DRIFT',
+          )
+          old_required = '''def _required_policy(registry: dict[str, Any]) -> dict[str, list[str]]:\n    contract = foundation_contract("capability-relevance-projection")\n    policy = contract["invariants"].get("requiredCapabilitiesByIntent")\n    if not isinstance(policy, dict):\n        raise RuntimeError("CAPABILITY_RELEVANCE_REQUIRED_POLICY_MISSING")\n    intents = registry["facetVocabulary"]["intentClasses"]\n    if set(policy) != set(intents):\n        raise RuntimeError("CAPABILITY_RELEVANCE_REQUIRED_POLICY_COVERAGE_INVALID")\n    return {key: list(policy[key]) for key in sorted(policy)}\n'''
+          new_required = '''def _required_policy(registry: dict[str, Any]) -> dict[str, list[str]]:\n    return semantic_foundations.required_capabilities_by_intent(registry=registry)\n'''
+          replace_once('tools/semantics/brief.py', old_required, new_required, 'BRIEF_REQUIRED_POLICY_ANCHOR_DRIFT')
+
+          replace_once(
+              'tools/agent_tools/policy.py',
+              'from tools.canonical import stable_hash\nfrom tools.semantics.registry import ROOT, load_registry, validate_registry\n',
+              'from tools.canonical import stable_hash\nfrom tools.semantics import foundations as semantic_foundations\nfrom tools.semantics.registry import ROOT, load_registry, validate_registry\n',
+              'POLICY_IMPORT_ANCHOR_DRIFT',
+          )
+          guard = '''    for role, entries in profiles.items():\n        for intent, profile in entries.items():\n            mismatches = semantic_foundations.required_capability_context_mismatches(\n                role=role,\n                declared_intent=intent,\n                lifecycle_phase=profile["lifecyclePhase"],\n                registry=semantic,\n            )\n            if mismatches:\n                dimension, capability_id = mismatches[0].split(":", 1)\n                raise RuntimeError(\n                    f"AGENT_TOOL_ENTRY_PROFILE_{dimension}:{role}:{intent}:{capability_id}"\n                )\n\n'''
+          replace_once(
+              'tools/agent_tools/policy.py',
+              '    targets = value.get("targetPolicies")\n',
+              guard + '    targets = value.get("targetPolicies")\n',
+              'POLICY_ENTRY_GUARD_ANCHOR_DRIFT',
+          )
+
+          replace_once(
+              'tools/tests/test_agent_tools.py',
+              'from tools.agent_tools import contracts, policy, projection, resolver\nfrom tools.semantics.registry import load_registry\n',
+              'from tools.agent_tools import contracts, policy, projection, resolver\nfrom tools.semantics import foundations\nfrom tools.semantics.registry import load_registry\n',
+              'AGENT_TOOLS_TEST_IMPORT_ANCHOR_DRIFT',
+          )
+          tests = '''    def test_entry_profiles_close_foundation_required_capability_context(self):\n        catalog = policy.load_policy()\n        registry = load_registry()\n        for role, entries in catalog["entryProfiles"].items():\n            for intent, profile in entries.items():\n                self.assertEqual(\n                    [],\n                    foundations.required_capability_context_mismatches(\n                        role=role,\n                        declared_intent=intent,\n                        lifecycle_phase=profile["lifecyclePhase"],\n                        registry=registry,\n                    ),\n                    (role, intent),\n                )\n\n    def test_entry_profile_required_capability_role_mismatch_fails_early(self):\n        catalog = policy.load_policy()\n        registry = copy.deepcopy(load_registry())\n        registry["logicalCapabilities"]["routine.inspect"]["facets"]["roles"].remove("ui-ux")\n        with self.assertRaisesRegex(\n            RuntimeError,\n            "AGENT_TOOL_ENTRY_PROFILE_REQUIRED_CAPABILITY_ROLE_MISMATCH:ui-ux:inspect-and-plan:routine.inspect",\n        ):\n            policy.validate_policy(catalog, registry=registry)\n\n    def test_entry_profile_required_capability_lifecycle_mismatch_fails_early(self):\n        catalog = policy.load_policy()\n        registry = copy.deepcopy(load_registry())\n        registry["logicalCapabilities"]["routine.inspect"]["facets"]["lifecyclePhases"].remove("bootstrap")\n        with self.assertRaisesRegex(\n            RuntimeError,\n            "AGENT_TOOL_ENTRY_PROFILE_REQUIRED_CAPABILITY_LIFECYCLE_MISMATCH:ui-ux:inspect-and-plan:routine.inspect",\n        ):\n            policy.validate_policy(catalog, registry=registry)\n\n'''
+          replace_once(
+              'tools/tests/test_agent_tools.py',
+              '    def test_projection_separates_planning_from_governed_mutation(self):\n',
+              tests + '    def test_projection_separates_planning_from_governed_mutation(self):\n',
+              'AGENT_TOOLS_TEST_INSERT_ANCHOR_DRIFT',
+          )
+          old_synthetic = '''        registry["logicalCapabilities"]["project.inspect"]["facets"]["roles"] = sorted(\n            registry["logicalCapabilities"]["project.inspect"]["facets"]["roles"] + ["synthetic-engine"]\n        )\n        catalog = copy.deepcopy(policy.load_policy())\n        catalog["entryProfiles"]["synthetic-engine"] = copy.deepcopy(catalog["entryProfiles"]["ui-ux"])\n        catalog["entryProfiles"] = dict(sorted(catalog["entryProfiles"].items()))\n'''
+          new_synthetic = '''        catalog = copy.deepcopy(policy.load_policy())\n        catalog["entryProfiles"]["synthetic-engine"] = copy.deepcopy(catalog["entryProfiles"]["ui-ux"])\n        catalog["entryProfiles"] = dict(sorted(catalog["entryProfiles"].items()))\n        required = foundations.required_capabilities_by_intent(registry=registry)\n        for intent in catalog["entryProfiles"]["synthetic-engine"]:\n            for capability_id in required[intent]:\n                roles = registry["logicalCapabilities"][capability_id]["facets"]["roles"]\n                if "synthetic-engine" not in roles:\n                    registry["logicalCapabilities"][capability_id]["facets"]["roles"] = sorted(\n                        roles + ["synthetic-engine"]\n                    )\n'''
+          replace_once('tools/tests/test_agent_tools.py', old_synthetic, new_synthetic, 'AGENT_TOOLS_SYNTHETIC_ANCHOR_DRIFT')
+
+          replace_once(
+              'tools/tests/test_semantic_foundations.py',
+              'from tools.semantics import foundations\n',
+              'from tools.semantics import foundations\nfrom tools.semantics.registry import load_registry\n',
+              'FOUNDATIONS_TEST_IMPORT_ANCHOR_DRIFT',
+          )
+          foundation_tests = '''    def test_required_capability_policy_has_public_validated_projection(self):\n        policy = foundations.required_capabilities_by_intent()\n        self.assertEqual(\n            policy["inspect-and-plan"],\n            ["project.inspect", "routine.inspect", "runtime.capabilities.inspect", "semantics.inspect"],\n        )\n\n    def test_required_capability_policy_rejects_intent_facet_mismatch(self):\n        registry = copy.deepcopy(load_registry())\n        registry["logicalCapabilities"]["routine.inspect"]["facets"]["intentClasses"] = [\n            "bootstrap-discovery"\n        ]\n        with self.assertRaisesRegex(\n            RuntimeError,\n            "SEMANTIC_FOUNDATIONS_REQUIRED_CAPABILITY_INTENT_MISMATCH:routine.inspect:inspect-and-plan",\n        ):\n            foundations.required_capabilities_by_intent(registry=registry)\n\n    def test_required_capability_policy_rejects_unknown_capability(self):\n        broken = copy.deepcopy(self.value)\n        required = broken["artifactContracts"]["capability-relevance-projection"]["invariants"][\n            "requiredCapabilitiesByIntent"\n        ]["inspect-and-plan"]\n        required.append("synthetic.missing")\n        required.sort()\n        with self.assertRaisesRegex(\n            RuntimeError,\n            "SEMANTIC_FOUNDATIONS_REQUIRED_CAPABILITY_UNKNOWN:synthetic.missing",\n        ):\n            foundations.required_capabilities_by_intent(foundations=broken)\n\n'''
+          replace_once(
+              'tools/tests/test_semantic_foundations.py',
+              '    def test_semantic_authority_claim_is_rejected(self):\n',
+              foundation_tests + '    def test_semantic_authority_claim_is_rejected(self):\n',
+              'FOUNDATIONS_TEST_INSERT_ANCHOR_DRIFT',
+          )
+          PY
+      - name: Validate focused semantic composition
+        run: |
+          python -m unittest tools.tests.test_semantic_foundations tools.tests.test_agent_tools tools.tests.test_agent_semantic_brief
+          python -m py_compile tools/semantics/foundations.py tools/semantics/brief.py tools/agent_tools/policy.py
+          git diff --check
+      - name: Commit permanent changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/semantics/foundations.py tools/semantics/brief.py tools/agent_tools/policy.py tools/tests/test_agent_tools.py tools/tests/test_semantic_foundations.py
+          git diff --cached --check
+          git commit -m "M13 RQ1: close semantic entry-profile composition"
+          git push origin HEAD:work/operations/m13-rq1-semantic-composition-guard-20260830
