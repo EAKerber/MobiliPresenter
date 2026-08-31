@@ -62,10 +62,13 @@ test("product mode widens the desktop rail and distributes detail to right and b
   ]);
 });
 
-test("product mode publishes global furniture finishes with authoritative visual swatches", () => {
+test("product mode publishes global furniture finishes with neutral greige as the initial product default", () => {
   containsAll(productEnhancements, [
     '"warm-wood": "#A8744D"',
     '"neutral-greige": "#B2ADA5"',
+    'const PRODUCT_DEFAULT_FRONT_PRESET: FrontPresetId = "neutral-greige"',
+    "ensureProductDefaultFrontPreset(api)",
+    "hasExplicitFrontPreset",
     "Cor dos móveis",
     "Acabamento global",
     "for (const alias of api.getCatalog().modules)",
