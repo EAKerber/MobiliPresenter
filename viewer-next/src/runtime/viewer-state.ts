@@ -11,6 +11,7 @@ import {
   type StonePresetId
 } from "../fixtures/stone-presets.js";
 import {
+  DEFAULT_FURNITURE_FINISH_PRESET_ID,
   FRONT_PRESET_IDS,
   FRONT_PRESETS,
   LIGHTING_PRESET_IDS,
@@ -19,7 +20,7 @@ import {
   type LightingPresetId
 } from "./presets.js";
 
-export const VIEWER_CONFIGURATION_SCHEMA_VERSION = "ViewerConfigurationState 0.1.0" as const;
+export const VIEWER_CONFIGURATION_SCHEMA_VERSION = "ViewerConfigurationState 0.1.1" as const;
 export const VIEWER_INTERACTION_SCHEMA_VERSION = "ViewerInteractionState 0.1.0" as const;
 
 export type ViewerVisibilityOverride = "inherit" | "on" | "off";
@@ -27,6 +28,7 @@ export type ViewerVisibilityOverride = "inherit" | "on" | "off";
 export interface ViewerConfigurationState {
   readonly schemaVersion: typeof VIEWER_CONFIGURATION_SCHEMA_VERSION;
   readonly visibilityByModule: Readonly<Record<string, ViewerVisibilityOverride>>;
+  readonly furnitureFinishPresetId: FrontPresetId;
   readonly frontPresetByModule: Readonly<Record<string, FrontPresetId>>;
   readonly stonePresetId: StonePresetId;
   readonly lightingPresetId: LightingPresetId;
@@ -40,6 +42,7 @@ export interface ViewerInteractionState {
 
 export type ViewerConfigurationAction =
   | { readonly type: "set-module-visibility"; readonly moduleId: string; readonly value: ViewerVisibilityOverride }
+  | { readonly type: "set-furniture-finish-preset"; readonly presetId: FrontPresetId }
   | { readonly type: "set-front-preset"; readonly moduleId: string; readonly presetId: FrontPresetId }
   | { readonly type: "clear-front-preset"; readonly moduleId: string }
   | { readonly type: "set-stone-preset"; readonly presetId: StonePresetId }
@@ -55,6 +58,7 @@ export function createDefaultViewerConfiguration(): ViewerConfigurationState {
   return {
     schemaVersion: VIEWER_CONFIGURATION_SCHEMA_VERSION,
     visibilityByModule: {},
+    furnitureFinishPresetId: DEFAULT_FURNITURE_FINISH_PRESET_ID,
     frontPresetByModule: {},
     stonePresetId: DEFAULT_STONE_PRESET_ID,
     lightingPresetId: "canonical"
@@ -88,6 +92,8 @@ export function reduceViewerConfiguration(
           ? withoutKey(state.visibilityByModule, action.moduleId)
           : { ...state.visibilityByModule, [action.moduleId]: action.value }
       };
+    case "set-furniture-finish-preset":
+      return { ...state, furnitureFinishPresetId: action.presetId };
     case "set-front-preset":
       return {
         ...state,
@@ -124,9 +130,13 @@ function moduleById(scene: ScenePackage, moduleId: string) {
   return module;
 }
 
+function assertFrontPreset(presetId: FrontPresetId): void {
+  if (!FRONT_PRESET_IDS.includes(presetId)) throw new Error(`VIEWER_FRONT_PRESET_NOT_FOUND:${presetId}`);
+}
+
 function assertFrontPresetTarget(scene: ScenePackage, moduleId: string, presetId: FrontPresetId): void {
   const module = moduleById(scene, moduleId);
-  if (!FRONT_PRESET_IDS.includes(presetId)) throw new Error(`VIEWER_FRONT_PRESET_NOT_FOUND:${presetId}`);
+  assertFrontPreset(presetId);
   if (!module.geometry.some(primitive => primitive.materialSlot === "front")) {
     throw new Error(`VIEWER_MODULE_FRONT_SLOT_MISSING:${moduleId}`);
   }
@@ -145,6 +155,21 @@ export function deriveViewerScene(
   return scene;
 }
 
+function applyGlobalFurnitureFinish(
+  appearance: AppearancePackage,
+  scene: ScenePackage,
+  presetId: FrontPresetId
+): AppearancePackage {
+  assertFrontPreset(presetId);
+  const materialId = FRONT_PRESETS[presetId].materialId;
+  let next = appearance;
+  for (const module of [...scene.modules].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!module.geometry.some(primitive => primitive.materialSlot === "front")) continue;
+    next = setEntityMaterialOverride(next, module.id, "front", materialId);
+  }
+  return next;
+}
+
 export function deriveViewerAppearance(
   base: AppearancePackage,
   scene: ScenePackage,
@@ -158,6 +183,7 @@ export function deriveViewerAppearance(
   }
 
   let appearance = withStonePreset(base, state.stonePresetId);
+  appearance = applyGlobalFurnitureFinish(appearance, scene, state.furnitureFinishPresetId);
   for (const [moduleId, presetId] of Object.entries(state.frontPresetByModule).sort(([a], [b]) => a.localeCompare(b))) {
     assertFrontPresetTarget(scene, moduleId, presetId);
     appearance = setEntityMaterialOverride(appearance, moduleId, "front", FRONT_PRESETS[presetId].materialId);
@@ -171,6 +197,7 @@ export function configurationFingerprint(state: ViewerConfigurationState): strin
   return JSON.stringify({
     schemaVersion: state.schemaVersion,
     visibility,
+    furnitureFinishPresetId: state.furnitureFinishPresetId,
     fronts,
     stonePresetId: state.stonePresetId,
     lightingPresetId: state.lightingPresetId
