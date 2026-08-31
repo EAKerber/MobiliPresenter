@@ -6,6 +6,10 @@ on:
       - "viewer-next/src/ui/**"
       - "viewer-next/src/bootstrap.ts"
       - "viewer-next/src/renderer/three/selection.ts"
+      - "viewer-next/src/renderer/three/environment-realism.ts"
+      - "viewer-next/src/renderer/three/wall-tiles.ts"
+      - "viewer-next/src/runtime/composition.ts"
+      - "viewer-next/tests/environment-realism.test.mjs"
       - "viewer-next/public/module-thumbnails/**"
       - "viewer-next/tests/chrome_viewport_capture.mjs"
       - ".github/workflows/product-ui-evidence.yml"
@@ -81,6 +85,18 @@ jobs:
               --expect-step "${step}"
           done
 
+      - name: Capture opt-in environment realism
+        working-directory: viewer-next
+        run: |
+          mkdir -p artifacts/environment-realism
+          node tests/chrome_viewport_capture.mjs \
+            --url "http://127.0.0.1:4173/?controls=1&realism=1" \
+            --name "environment-realism-1366x768" \
+            --width 1366 \
+            --height 768 \
+            --out-dir artifacts/environment-realism \
+            --canvas-png
+
       - name: Upload product UI evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,5 +105,6 @@ jobs:
           path: |
             viewer-next/artifacts/runtime-ui/
             viewer-next/artifacts/product-ui-navigation/
+            viewer-next/artifacts/environment-realism/
           if-no-files-found: warn
           retention-days: 14

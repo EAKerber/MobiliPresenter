@@ -16,6 +16,7 @@ import {
 import { attachParametricAppliances } from "../renderer/three/appliances.js";
 import { applyCabinetFrontEdgeResponse } from "../renderer/three/cabinet-front-edge.js";
 import { applyFh06CooktopContact } from "../renderer/three/cooktop-contact.js";
+import { applyEnvironmentRealism } from "../renderer/three/environment-realism.js";
 import { applyFh06FaucetRefinement } from "../renderer/three/faucet-refinement.js";
 import { applyFh06FrontReadability } from "../renderer/three/front-readability.js";
 import { attachCurrentHardware } from "../renderer/three/hardware.js";
@@ -63,6 +64,10 @@ export interface ViewerCompositionDiagnostics {
   readonly underCabKelvin: number;
   readonly underCabAreaLight: boolean;
   readonly wallTileSurfaceCount: number;
+  readonly wallTileMicroRelief: boolean;
+  readonly wallTileReliefMm: number;
+  readonly environmentRealismId: string;
+  readonly daylightWindowPresent: boolean;
 }
 
 export interface ViewerComposition {
@@ -85,6 +90,7 @@ export interface ViewerCompositionOptions {
   readonly widthPx: number;
   readonly heightPx: number;
   readonly background?: Color;
+  readonly environmentRealism?: boolean;
 }
 
 function disposeSceneResources(scene: Scene): void {
@@ -103,6 +109,13 @@ function disposeSceneResources(scene: Scene): void {
   for (const material of materials) material.dispose();
 }
 
+function resolveEnvironmentRealism(options: ViewerCompositionOptions): boolean {
+  if (typeof options.environmentRealism === "boolean") return options.environmentRealism;
+  if (typeof window === "undefined") return false;
+  const query = new URLSearchParams(window.location.search);
+  return query.get("realism") === "1" && query.get("fidelity") !== "1";
+}
+
 export function createViewerComposition(
   renderer: WebGLRenderer,
   camera: PerspectiveCamera,
@@ -110,6 +123,7 @@ export function createViewerComposition(
   initialAppearance: AppearancePackage,
   options: ViewerCompositionOptions
 ): ViewerComposition {
+  const realismEnabled = resolveEnvironmentRealism(options);
   const materials = new ThreeMaterialRegistry(initialAppearance);
   const adapter = buildThreeScene(initialScenePackage, (entityId, slot) => materials.resolve(entityId, slot));
   attachParametricAppliances(adapter, initialScenePackage, initialAppearance, materials);
@@ -120,7 +134,7 @@ export function createViewerComposition(
   applyCabinetFrontEdgeResponse(adapter, initialScenePackage);
   const hardwareRefinement = attachCurrentHardware(adapter, initialScenePackage, materials);
   const ovenReadability = applyFh06OvenReadability(adapter, materials, initialScenePackage, initialAppearance);
-  const tileRefinement = applyFh06FullWallTiles(adapter, initialScenePackage);
+  const tileRefinement = applyFh06FullWallTiles(adapter, initialScenePackage, { microRelief: realismEnabled });
   const sinkRefinement = applyFh06SinkRefinement(adapter, materials, initialScenePackage);
   const faucetRefinement = applyFh06FaucetRefinement(adapter, materials, currentFaucetAnchor);
   const underCabRefinement = applyFh06UnderCabProfile(
@@ -129,12 +143,20 @@ export function createViewerComposition(
     initialScenePackage,
     currentUnderCabLightContract
   );
+  const environmentRealism = realismEnabled
+    ? applyEnvironmentRealism(adapter, initialScenePackage)
+    : null;
   const initialMaterialMapping = bindModuleContinuousMaterialMappings(adapter);
 
   adapter.scene.background = options.background ?? new Color(0xf0ede7);
   const lighting = buildThreeLighting(initialScenePackage, initialAppearance);
   adapter.scene.add(lighting.root);
-  const ownership = auditRenderOwnership(adapter, [lighting.root.name, tileRefinement.groupName]);
+  const ownedPresentationRoots = [
+    lighting.root.name,
+    tileRefinement.groupName,
+    ...(environmentRealism ? [environmentRealism.groupName] : [])
+  ];
+  const ownership = auditRenderOwnership(adapter, ownedPresentationRoots);
   if (!ownership.pass) throw new Error(`VIEWER_RENDER_OWNERSHIP_FAILED:${ownership.unownedTopLevelNames.join(",")}`);
 
   const environment = installNeutralRoomEnvironment(
@@ -204,7 +226,11 @@ export function createViewerComposition(
       underCabHostModuleId: underCabRefinement.hostModuleId,
       underCabKelvin: underCabRefinement.colorTemperatureK,
       underCabAreaLight: underCabRefinement.hasActualAreaLight,
-      wallTileSurfaceCount: tileRefinement.surfaceCount
+      wallTileSurfaceCount: tileRefinement.surfaceCount,
+      wallTileMicroRelief: tileRefinement.microRelief,
+      wallTileReliefMm: tileRefinement.reliefMm,
+      environmentRealismId: environmentRealism?.realismId ?? "off",
+      daylightWindowPresent: environmentRealism?.daylightWindow ?? false
     },
     syncVisibility(scenePackage, appearance): void {
       assertActive();
