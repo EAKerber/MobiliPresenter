@@ -1,5 +1,4 @@
 import {
-  currentFixedCamera,
   currentSceneBase,
   module01,
   module02,
@@ -18,13 +17,13 @@ import {
   HemisphereLight,
   MathUtils,
   Mesh,
+  PerspectiveCamera,
   Sphere,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer
 } from "three";
 import { styleAnchorAppearance } from "./fixtures/style-anchor.js";
-import { createThreeCamera } from "./renderer/three/camera.js";
 import {
   bindModuleContinuousMaterialMappings,
   ThreeMaterialRegistry
@@ -86,8 +85,7 @@ renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(1);
 app.append(renderer.domElement);
 
-const viewport = { widthPx: Math.max(1, app.clientWidth), heightPx: Math.max(1, app.clientHeight) };
-const camera = createThreeCamera(currentFixedCamera, viewport);
+const camera = new PerspectiveCamera(30, 1, 1, 100_000);
 const materials = new ThreeMaterialRegistry(appearance);
 const adapter = buildThreeScene(scene, (entityId, slot) => materials.resolve(entityId, slot));
 adapter.scene.background = null;
@@ -104,25 +102,33 @@ adapter.scene.add(hemisphere, ambient, key, fill);
 function fitCamera(): void {
   const group = adapter.entityGroups.get(moduleDefinition.id);
   if (!group) throw new Error(`THUMBNAIL_MODULE_GROUP_NOT_FOUND:${alias}`);
+  if (!group.visible) throw new Error(`THUMBNAIL_MODULE_NOT_VISIBLE:${alias}`);
   group.updateWorldMatrix(true, true);
   const bounds = new Box3().setFromObject(group);
   if (bounds.isEmpty()) throw new Error(`THUMBNAIL_MODULE_BOUNDS_EMPTY:${alias}`);
 
   const sphere = bounds.getBoundingSphere(new Sphere());
   const center = sphere.center;
-  const direction = camera.getWorldDirection(new Vector3()).normalize();
   const verticalFov = MathUtils.degToRad(camera.fov);
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
   const fitDistance = Math.max(
     sphere.radius / Math.max(0.01, Math.sin(verticalFov / 2)),
     sphere.radius / Math.max(0.01, Math.sin(horizontalFov / 2))
-  ) * 1.22;
+  ) * 1.18;
 
-  camera.position.copy(center).addScaledVector(direction, -fitDistance);
-  camera.near = Math.max(1, fitDistance - sphere.radius * 2.4);
-  camera.far = fitDistance + sphere.radius * 4;
+  const viewingDirection = new Vector3(0.86, 0.48, 1.15).normalize();
+  camera.position.copy(center).addScaledVector(viewingDirection, fitDistance);
+  camera.near = Math.max(1, fitDistance - sphere.radius * 2.2);
+  camera.far = fitDistance + sphere.radius * 3.5;
   camera.lookAt(center);
   camera.updateProjectionMatrix();
+
+  app.dataset.thumbnailBounds = [
+    bounds.min.x, bounds.min.y, bounds.min.z,
+    bounds.max.x, bounds.max.y, bounds.max.z
+  ].map(value => value.toFixed(2)).join(",");
+  app.dataset.thumbnailCamera = [camera.position.x, camera.position.y, camera.position.z]
+    .map(value => value.toFixed(2)).join(",");
 }
 
 function render(): void {
@@ -137,6 +143,7 @@ function render(): void {
   app.dataset.frameRendered = "true";
   app.dataset.thumbnailModule = alias;
   app.dataset.thumbnailBackground = "transparent";
+  app.dataset.thumbnailCameraPolicy = "isolated-product-three-quarter-v1";
 }
 
 render();
