@@ -12,9 +12,12 @@ import {
   type ScenePackage
 } from "@mobilipresenter/scene-core";
 import {
-  ACESFilmicToneMapping,
+  AmbientLight,
   Box3,
+  DirectionalLight,
+  HemisphereLight,
   MathUtils,
+  Mesh,
   Sphere,
   SRGBColorSpace,
   Vector3,
@@ -22,7 +25,11 @@ import {
 } from "three";
 import { styleAnchorAppearance } from "./fixtures/style-anchor.js";
 import { createThreeCamera } from "./renderer/three/camera.js";
-import { createViewerComposition } from "./runtime/composition.js";
+import {
+  bindModuleContinuousMaterialMappings,
+  ThreeMaterialRegistry
+} from "./renderer/three/materials.js";
+import { buildThreeScene } from "./renderer/three/scene-adapter.js";
 
 const MODULES = {
   "01": module01,
@@ -58,8 +65,15 @@ const scene: ScenePackage = {
   substitutionGroups: []
 };
 
-let appearance = setEntityMaterialOverride(styleAnchorAppearance, moduleDefinition.id, "front", "front-wood");
-appearance = setEntityMaterialOverride(appearance, moduleDefinition.id, "carcass", "front-wood");
+let appearance = styleAnchorAppearance;
+for (const primitive of moduleDefinition.geometry ?? []) {
+  appearance = setEntityMaterialOverride(
+    appearance,
+    moduleDefinition.id,
+    primitive.materialSlot ?? "__unassigned__",
+    "front-wood"
+  );
+}
 
 const renderer = new WebGLRenderer({
   antialias: true,
@@ -67,20 +81,27 @@ const renderer = new WebGLRenderer({
   powerPreference: "high-performance"
 });
 renderer.outputColorSpace = SRGBColorSpace;
-renderer.toneMapping = ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = true;
 renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(1);
 app.append(renderer.domElement);
 
 const viewport = { widthPx: Math.max(1, app.clientWidth), heightPx: Math.max(1, app.clientHeight) };
 const camera = createThreeCamera(currentFixedCamera, viewport);
-const composition = createViewerComposition(renderer, camera, scene, appearance, viewport);
-composition.adapter.scene.background = null;
+const materials = new ThreeMaterialRegistry(appearance);
+const adapter = buildThreeScene(scene, (entityId, slot) => materials.resolve(entityId, slot));
+adapter.scene.background = null;
+bindModuleContinuousMaterialMappings(adapter);
+
+const hemisphere = new HemisphereLight(0xffffff, 0x8a8177, 2.2);
+const ambient = new AmbientLight(0xffffff, 0.85);
+const key = new DirectionalLight(0xffffff, 2.5);
+key.position.set(-1800, 2400, 2200);
+const fill = new DirectionalLight(0xfff5e8, 1.2);
+fill.position.set(2200, 1200, 900);
+adapter.scene.add(hemisphere, ambient, key, fill);
 
 function fitCamera(): void {
-  const group = composition.adapter.entityGroups.get(moduleDefinition.id);
+  const group = adapter.entityGroups.get(moduleDefinition.id);
   if (!group) throw new Error(`THUMBNAIL_MODULE_GROUP_NOT_FOUND:${alias}`);
   group.updateWorldMatrix(true, true);
   const bounds = new Box3().setFromObject(group);
@@ -94,7 +115,7 @@ function fitCamera(): void {
   const fitDistance = Math.max(
     sphere.radius / Math.max(0.01, Math.sin(verticalFov / 2)),
     sphere.radius / Math.max(0.01, Math.sin(horizontalFov / 2))
-  ) * 1.28;
+  ) * 1.22;
 
   camera.position.copy(center).addScaledVector(direction, -fitDistance);
   camera.near = Math.max(1, fitDistance - sphere.radius * 2.4);
@@ -110,8 +131,7 @@ function render(): void {
   camera.aspect = widthPx / heightPx;
   camera.updateProjectionMatrix();
   fitCamera();
-  composition.setSize(widthPx, heightPx);
-  composition.render();
+  renderer.render(adapter.scene, camera);
   app.dataset.rendererReady = "true";
   app.dataset.frameRendered = "true";
   app.dataset.thumbnailModule = alias;
@@ -121,6 +141,9 @@ function render(): void {
 render();
 
 window.addEventListener("pagehide", () => {
-  composition.dispose();
+  adapter.scene.traverse(object => {
+    if (object instanceof Mesh) object.geometry.dispose();
+  });
+  materials.dispose();
   renderer.dispose();
 }, { once: true });
