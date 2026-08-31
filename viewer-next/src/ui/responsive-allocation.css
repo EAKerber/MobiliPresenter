@@ -27,6 +27,14 @@
   body.viewer-product-ui .viewer-product-detail__cards .viewer-product-card--wide {
     overflow: visible;
   }
+
+  body.viewer-product-ui .viewer-product-detail__cards .viewer-product-card__list li,
+  body.viewer-product-ui .viewer-product-detail__cards .viewer-product-card__stack strong,
+  body.viewer-product-ui .viewer-product-detail__cards .viewer-product-card__stack span,
+  body.viewer-product-ui .viewer-product-detail__cards .viewer-product-notice__text {
+    font-size: 11px;
+    line-height: 1.42;
+  }
 }
 
 @media (min-width: 901px) and (max-width: 1240px) {
