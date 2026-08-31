@@ -4,7 +4,10 @@ import test from "node:test";
 
 const ui = readFileSync(new URL("../src/ui/runtime-controls.ts", import.meta.url), "utf8");
 const css = readFileSync(new URL("../src/ui/runtime-controls.css", import.meta.url), "utf8");
+const productCss = readFileSync(new URL("../src/ui/product-presentation.css", import.meta.url), "utf8");
+const bootstrap = readFileSync(new URL("../src/bootstrap.ts", import.meta.url), "utf8");
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const netlify = readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
 
 function containsAll(source, values) {
   for (const value of values) assert.ok(source.includes(value), `missing source contract: ${value}`);
@@ -54,7 +57,24 @@ test("responsive shell reserves persistent scene space and avoids the internal c
     ".viewer-product-detail",
     ".viewer-module-editor",
   ]);
+  containsAll(productCss, [
+    '.viewer-configurator__status[data-error="false"]',
+    "--ui-mobile-scene-height: min(43vh, 360px)",
+    ".viewer-product-detail",
+  ]);
   assert.equal(ui.includes("MobiliPresenter"), false);
   assert.equal(html.includes("MobiliPresenter"), false);
-  assert.ok(html.includes("Apresentação de Ambiente — Vista Fixa"));
+  assert.ok(html.includes("Configure seu ambiente — Vista fixa"));
+  assert.ok(html.includes("/src/ui/product-presentation.css"));
+});
+
+test("Netlify product builds open the current UI by default without weakening diagnostic overrides", () => {
+  containsAll(netlify, ['VITE_DEFAULT_UI_MODE = "product"']);
+  containsAll(bootstrap, [
+    'import.meta.env.VITE_DEFAULT_UI_MODE === "product"',
+    'query.get("fidelity") !== "1"',
+    'controlsPreference === "1"',
+    'controlsPreference !== "0" && defaultUiMode',
+    'app.dataset.viewerUiMode = controlsEnabled ? "product" : "renderer-only"',
+  ]);
 });
