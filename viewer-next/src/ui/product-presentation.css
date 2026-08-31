@@ -1,7 +1,7 @@
-/* Netlify Product UI 0.1
+/* Netlify Product UI 0.2
  * Product-facing finishing layer over Guided Configurator UI 0.3.
- * This file intentionally does not resize/reframe #app outside the existing
- * Responsive Fixed-Frame contract; it only refines UI presentation.
+ * Wide desktop distributes product detail between a right technical surface
+ * and a lower factual strip while Responsive Fixed-Frame keeps camera authority.
  */
 
 body.viewer-product-ui {
@@ -47,6 +47,52 @@ body.viewer-product-ui {
   font-size: 10px;
 }
 
+.viewer-module-card__thumbnail[data-product-thumbnail="true"] {
+  background: linear-gradient(180deg, #fff, #f5f1eb);
+}
+
+.viewer-module-card__thumbnail[data-product-thumbnail="true"]::after {
+  display: none;
+}
+
+.viewer-module-card__thumbnail-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  padding: 4px;
+}
+
+.viewer-module-card__thumbnail[data-thumbnail-unavailable="true"]::after {
+  display: block;
+}
+
+.viewer-choice-card[data-product-finish-enhanced="true"] {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 34px 10px 10px;
+}
+
+.viewer-choice-card[data-product-finish-enhanced="true"]::before {
+  display: none;
+}
+
+.viewer-choice-card__swatch {
+  width: 38px;
+  height: 38px;
+  border: 1px solid color-mix(in srgb, var(--ui-border-strong) 70%, transparent);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3);
+}
+
+.viewer-choice-card__label {
+  min-width: 0;
+  line-height: 1.25;
+}
+
 .viewer-configurator__status[data-error="false"] {
   display: none;
 }
@@ -75,12 +121,99 @@ body.viewer-product-ui {
 }
 
 @media (min-width: 1241px) {
+  :root {
+    --ui-stage-width: clamp(360px, 28vw, 420px);
+    --ui-detail-width: clamp(440px, 32vw, 520px);
+    --ui-detail-bottom-height: clamp(198px, 26vh, 232px);
+  }
+
+  body.viewer-product-ui[data-viewer-detail-open="true"] #app {
+    right: var(--ui-detail-width);
+    bottom: calc(var(--ui-actions-height) + var(--ui-detail-bottom-height));
+  }
+
+  .viewer-product-detail {
+    border-left: 1px solid var(--ui-border);
+    border-radius: 0;
+    box-shadow: -20px 0 52px rgba(35, 31, 28, .075);
+  }
+
   .viewer-product-detail__heading h2 {
-    font-size: 28px;
+    font-size: 29px;
   }
 
   .viewer-product-detail__body {
-    padding-inline: 22px;
+    padding: 18px 20px 26px;
+  }
+
+  .viewer-product-detail__figure-media {
+    min-height: 330px;
+  }
+
+  .viewer-product-detail__figure-media svg {
+    max-height: 390px;
+  }
+
+  .viewer-product-detail__cards {
+    position: fixed;
+    z-index: 30014;
+    left: var(--ui-stage-width);
+    right: var(--ui-detail-width);
+    bottom: var(--ui-actions-height);
+    height: var(--ui-detail-bottom-height);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: minmax(86px, 1fr);
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    overflow: auto;
+    border-top: 1px solid var(--ui-border);
+    border-right: 1px solid var(--ui-border);
+    background: color-mix(in srgb, var(--ui-surface) 97%, transparent);
+    box-shadow: 0 -14px 34px rgba(35, 31, 28, .055);
+    backdrop-filter: blur(16px);
+  }
+
+  .viewer-product-detail__cards .viewer-product-card,
+  .viewer-product-detail__cards .viewer-product-card--wide {
+    grid-column: auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 10px 11px;
+    border-radius: 10px;
+  }
+
+  .viewer-product-detail__cards .viewer-product-card h3 {
+    margin-bottom: 7px;
+  }
+
+  .viewer-product-detail__cards .viewer-product-card__list,
+  .viewer-product-detail__cards .viewer-product-card__stack {
+    margin-top: 6px;
+    gap: 5px;
+  }
+
+  .viewer-product-detail__cards .viewer-product-card__list li,
+  .viewer-product-detail__cards .viewer-product-card__stack strong,
+  .viewer-product-detail__cards .viewer-product-card__stack span {
+    font-size: 9px;
+  }
+
+  .viewer-configurator__stage {
+    box-shadow: 10px 0 34px rgba(35, 31, 28, .035);
+  }
+
+  .viewer-module-card {
+    min-height: 104px;
+    grid-template-columns: 36px 76px minmax(0, 1fr);
+    padding: 11px 12px;
+  }
+
+  .viewer-module-card__thumbnail {
+    width: 76px;
+    height: 80px;
+    border-radius: 10px;
   }
 }
 
@@ -99,6 +232,17 @@ body.viewer-product-ui {
 
   .viewer-product-detail {
     box-shadow: 0 -22px 64px rgba(35, 31, 28, .22);
+  }
+
+  .viewer-choice-card[data-product-finish-enhanced="true"] {
+    min-height: 68px;
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .viewer-choice-card__swatch {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
   }
 }
 
