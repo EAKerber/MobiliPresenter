@@ -5,7 +5,7 @@ export interface DesktopCompositionEnhancement {
 const STYLE_ID = "viewer-desktop-composition-v1";
 
 const DESKTOP_COMPOSITION_CSS = `
-@media (min-width: 1024px) {
+@media (min-width: 1180px) {
   html:root {
     --ui-stage-width: clamp(320px, 26vw, 400px);
     --ui-detail-width: clamp(350px, 30vw, 470px);
@@ -154,7 +154,7 @@ const DESKTOP_COMPOSITION_CSS = `
   }
 }
 
-@media (min-width: 1024px) and (max-height: 760px) {
+@media (min-width: 1180px) and (max-height: 760px) {
   html:root {
     --ui-detail-bottom-height: 164px;
     --ui-actions-height: 54px;
