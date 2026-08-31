@@ -5,11 +5,6 @@ export interface ProductUiEnhancements {
   dispose(): void;
 }
 
-const FRONT_SWATCH_COLOR: Readonly<Record<FrontPresetId, string>> = {
-  "warm-wood": "#A8744D",
-  "neutral-greige": "#B2ADA5"
-};
-const PRODUCT_DEFAULT_FRONT_PRESET: FrontPresetId = "neutral-greige";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 type ProductIconKind =
@@ -64,21 +59,6 @@ function createProductIcon(kind: ProductIconKind): SVGSVGElement {
     svg.append(path);
   }
   return svg;
-}
-
-function globalFrontPreset(api: ViewerUiApi): FrontPresetId | null {
-  const snapshot = api.getSnapshot();
-  const ids = api.getCatalog().modules.map(alias => snapshot.frontPresetByModule[alias] ?? null);
-  const first = ids[0] ?? null;
-  return ids.every(id => id === first) ? first : null;
-}
-
-function ensureProductDefaultFrontPreset(api: ViewerUiApi): void {
-  const snapshot = api.getSnapshot();
-  const aliases = api.getCatalog().modules;
-  const hasExplicitFrontPreset = aliases.some(alias => snapshot.frontPresetByModule[alias] !== undefined);
-  if (hasExplicitFrontPreset) return;
-  for (const alias of aliases) api.setFrontPreset(alias, PRODUCT_DEFAULT_FRONT_PRESET);
 }
 
 function fmt(value: number): string {
@@ -228,7 +208,7 @@ function decorateSemanticCards(api: ViewerUiApi): void {
       const fact = pkg.specifications[index];
       if (!fact || item.dataset.productSemanticDecorated === "true") return;
       item.dataset.productSemanticDecorated = "true";
-      item.dataset.semanticKind = fact.category;
+      item.dataset.semanticKind = fact.semanticKey ?? fact.category;
       const copy = document.createElement("span");
       copy.className = "viewer-product-card__semantic-copy";
       copy.textContent = item.textContent ?? "";
@@ -244,7 +224,7 @@ function decorateSemanticCards(api: ViewerUiApi): void {
       const component = pkg.components[index];
       if (!component || item.dataset.productSemanticDecorated === "true") return;
       item.dataset.productSemanticDecorated = "true";
-      item.dataset.semanticKind = component.kind;
+      item.dataset.semanticKind = component.semanticKey ?? component.kind;
       item.prepend(createProductIcon(componentIconKind(component.kind)));
     });
   }
@@ -310,13 +290,6 @@ export function installProductUiEnhancements(
   let disposed = false;
   let scheduledFrame: number | null = null;
 
-  try {
-    ensureProductDefaultFrontPreset(api);
-    controls.refresh();
-  } catch (error) {
-    reportProductUiError(error);
-  }
-
   const decorateModuleThumbnails = (): void => {
     for (const card of document.querySelectorAll<HTMLElement>(".viewer-module-card[data-module-alias]")) {
       const alias = card.dataset.moduleAlias;
@@ -351,7 +324,9 @@ export function installProductUiEnhancements(
     const contextCopy = "Acabamento global · a escolha é aplicada a todos os módulos do ambiente.";
     if (context && context.textContent !== contextCopy) context.textContent = contextCopy;
 
-    const activePreset = globalFrontPreset(api);
+    const snapshot = api.getSnapshot();
+    const catalog = api.getCatalog();
+    const activePreset = snapshot.furnitureFinishPresetId;
     for (const option of frontGroup.querySelectorAll<HTMLButtonElement>("[data-front-preset]")) {
       const presetId = option.dataset.frontPreset;
       if (!presetId) continue;
@@ -369,7 +344,11 @@ export function installProductUiEnhancements(
       const swatch = document.createElement("span");
       swatch.className = "viewer-choice-card__swatch";
       swatch.setAttribute("aria-hidden", "true");
-      swatch.style.backgroundColor = FRONT_SWATCH_COLOR[presetId as FrontPresetId] ?? "#d8d0c7";
+      const visual = catalog.furnitureFinishPresets.find(candidate => candidate.id === presetId)?.visual;
+      if (visual) {
+        swatch.style.backgroundColor = visual.previewColorSrgb;
+        swatch.dataset.materialId = visual.materialId;
+      }
       const copy = document.createElement("span");
       copy.className = "viewer-choice-card__label";
       copy.textContent = label;
@@ -406,9 +385,7 @@ export function installProductUiEnhancements(
     if (event instanceof MouseEvent) event.stopImmediatePropagation();
 
     try {
-      for (const alias of api.getCatalog().modules) {
-        api.setFrontPreset(alias, presetId as FrontPresetId);
-      }
+      api.setFurnitureFinishPreset(presetId as FrontPresetId);
       controls.refresh();
       scheduleDecorate();
     } catch (error) {
