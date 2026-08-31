@@ -4,11 +4,15 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 
 function parseArgs(argv) {
-  const options = { screenshot: true };
+  const options = { screenshot: true, canvasPng: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--no-screenshot") {
       options.screenshot = false;
+      continue;
+    }
+    if (token === "--canvas-png") {
+      options.canvasPng = true;
       continue;
     }
     if (!token.startsWith("--")) {
@@ -333,13 +337,31 @@ async function capture(options) {
     let screenshotPath = null;
     let screenshotBytes = null;
     if (options.screenshot) {
-      const screenshot = await client.send(
-        "Page.captureScreenshot",
-        { format: "png", fromSurface: true, captureBeyondViewport: false },
-        sessionId,
-      );
+      let screenshotBuffer;
+      if (options.canvasPng) {
+        const dataUrl = await evaluate(
+          client,
+          sessionId,
+          `(() => {
+            const canvas = document.querySelector('#app canvas');
+            if (!(canvas instanceof HTMLCanvasElement)) throw new Error('CAPTURE_CANVAS_NOT_FOUND');
+            return canvas.toDataURL('image/png');
+          })()`
+        );
+        if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) {
+          throw new Error("CAPTURE_CANVAS_DATA_URL_INVALID");
+        }
+        screenshotBuffer = Buffer.from(dataUrl.slice("data:image/png;base64,".length), "base64");
+      } else {
+        const screenshot = await client.send(
+          "Page.captureScreenshot",
+          { format: "png", fromSurface: true, captureBeyondViewport: false },
+          sessionId,
+        );
+        screenshotBuffer = Buffer.from(screenshot.data, "base64");
+      }
       screenshotPath = join(outputDirectory, `${options.name}.png`);
-      writeFileSync(screenshotPath, Buffer.from(screenshot.data, "base64"));
+      writeFileSync(screenshotPath, screenshotBuffer);
       screenshotBytes = readFileSync(screenshotPath).byteLength;
     }
 
