@@ -60,7 +60,10 @@ test("stone preset material installs deterministic world-space millimeter speckl
     macroScaleMm: 600,
     coarseCellMm: 20,
     fineCellMm: 5,
-    seed: 37.137
+    seed: 37.137,
+    surfaceFidelity: false,
+    roughnessAmplitude: 0,
+    rasterMaps: false
   });
   assert.equal(stone02.customProgramCacheKey(), "mobilipresenter:world-mm-v1:stone-speckled-light");
   registry.dispose();

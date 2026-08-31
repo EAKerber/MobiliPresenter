@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { currentAppearance } from "@mobilipresenter/scene-core";
+import { withStonePreset } from "../dist-ts/src/fixtures/stone-presets.js";
 import {
   SURFACE_FIDELITY_STONE_SHADER_VERSION,
   SURFACE_FIDELITY_WOOD_SHADER_VERSION,
@@ -73,7 +74,8 @@ test("Surface Fidelity v0.2 makes wood materially expressive without raster maps
 });
 
 test("Surface Fidelity adds bounded stone roughness response while preserving world-mm speckle", () => {
-  const registry = new ThreeMaterialRegistry(currentAppearance, { surfaceFidelity: true });
+  const appearance = withStonePreset(currentAppearance, "light-speckled");
+  const registry = new ThreeMaterialRegistry(appearance, { surfaceFidelity: true });
   const stone = registry.materialByDefinitionId("stone-speckled-light");
   const metadata = stone.userData.proceduralStoneSpeckle;
 
