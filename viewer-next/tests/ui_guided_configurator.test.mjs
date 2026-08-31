@@ -89,7 +89,7 @@ test("module thumbnails are crops from the real current viewer renderer and sele
     "transparentComposite(colorPass, maskPass)",
     'thumbnailRenderer = "viewer-composition-three-webgl2"',
     'thumbnailScenePolicy = "current-scene-isolated-entity-visibility-v2"',
-    'thumbnailCameraPolicy = "current-fixed-camera-then-crop-v1"',
+    'thumbnailCameraPolicy = "current-fixed-camera-aspect-then-crop-v1"',
     'thumbnailMaskPolicy = "same-renderer-geometry-mask-v1"',
   ]);
   containsAll(selection, ["material.opacity = 0.62"]);
