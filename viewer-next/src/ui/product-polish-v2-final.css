@@ -6,9 +6,10 @@
 }
 
 .viewer-finish-dot {
-  width: 14px;
-  height: 14px;
-  flex-basis: 14px;
+  width: 14px !important;
+  height: 14px !important;
+  flex-basis: 14px !important;
+  border-radius: 50% !important;
 }
 
 .viewer-product-detail__cards [data-product-card="finishes"] .viewer-product-card__stack {
