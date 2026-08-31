@@ -6,7 +6,9 @@ const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("APP_ROOT_NOT_FOUND");
 
 const query = new URLSearchParams(window.location.search);
-const defaultUiMode = import.meta.env.VITE_DEFAULT_UI_MODE === "product";
+const defaultUiMode = (import.meta as ImportMeta & {
+  readonly env: { readonly VITE_DEFAULT_UI_MODE?: string };
+}).env.VITE_DEFAULT_UI_MODE === "product";
 const controlsPreference = query.get("controls");
 const controlsEnabled = query.get("fidelity") !== "1" && (
   controlsPreference === "1" ||
