@@ -29,6 +29,12 @@ const MATTE_COLOR = new Color(0xf0ede7);
 const appElement = document.querySelector<HTMLElement>("#app");
 if (!appElement) throw new Error("THUMBNAIL_APP_ROOT_NOT_FOUND");
 const app: HTMLElement = appElement;
+app.dataset.thumbnailError = "none";
+window.addEventListener("error", event => {
+  app.dataset.thumbnailError = event.error instanceof Error ? event.error.message : event.message;
+  app.dataset.rendererReady = "true";
+  app.dataset.frameRendered = "true";
+});
 
 const query = new URLSearchParams(window.location.search);
 const aliasValue = query.get("module");
