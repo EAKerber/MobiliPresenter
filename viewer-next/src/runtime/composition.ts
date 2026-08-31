@@ -109,6 +109,13 @@ function disposeSceneResources(scene: Scene): void {
   for (const material of materials) material.dispose();
 }
 
+function resolveEnvironmentRealism(options: ViewerCompositionOptions): boolean {
+  if (typeof options.environmentRealism === "boolean") return options.environmentRealism;
+  if (typeof window === "undefined") return false;
+  const query = new URLSearchParams(window.location.search);
+  return query.get("realism") === "1" && query.get("fidelity") !== "1";
+}
+
 export function createViewerComposition(
   renderer: WebGLRenderer,
   camera: PerspectiveCamera,
@@ -116,7 +123,7 @@ export function createViewerComposition(
   initialAppearance: AppearancePackage,
   options: ViewerCompositionOptions
 ): ViewerComposition {
-  const realismEnabled = options.environmentRealism === true;
+  const realismEnabled = resolveEnvironmentRealism(options);
   const materials = new ThreeMaterialRegistry(initialAppearance);
   const adapter = buildThreeScene(initialScenePackage, (entityId, slot) => materials.resolve(entityId, slot));
   attachParametricAppliances(adapter, initialScenePackage, initialAppearance, materials);
