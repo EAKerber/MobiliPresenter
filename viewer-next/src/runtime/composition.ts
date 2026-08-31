@@ -26,7 +26,6 @@ import {
 } from "../renderer/three/interaction-highlight.js";
 import { buildThreeLighting, installNeutralRoomEnvironment } from "../renderer/three/lighting.js";
 import {
-  WOOD_GRAIN_SHADER_VERSION,
   ThreeMaterialRegistry,
   bindModuleContinuousMaterialMappings
 } from "../renderer/three/materials.js";
@@ -124,7 +123,9 @@ export function createViewerComposition(
   options: ViewerCompositionOptions
 ): ViewerComposition {
   const realismEnabled = resolveEnvironmentRealism(options);
-  const materials = new ThreeMaterialRegistry(initialAppearance);
+  const materials = new ThreeMaterialRegistry(initialAppearance, {
+    surfaceFidelity: realismEnabled
+  });
   const adapter = buildThreeScene(initialScenePackage, (entityId, slot) => materials.resolve(entityId, slot));
   attachParametricAppliances(adapter, initialScenePackage, initialAppearance, materials);
 
@@ -213,7 +214,7 @@ export function createViewerComposition(
       hardwareAnchorCount: hardwareRefinement.handleCount,
       interactionHighlightId: INTERACTION_HIGHLIGHT_ID,
       materialMappingId: initialMaterialMapping.bindingId,
-      woodGrainShaderVersion: WOOD_GRAIN_SHADER_VERSION,
+      woodGrainShaderVersion: materials.woodGrainShaderVersion,
       initialWoodMappedMeshCount: initialMaterialMapping.boundMeshCount,
       ovenReadabilityId: ovenReadability.refinementId,
       ovenPhysicalClearanceMm: ovenReadability.physicalClearanceMm,
