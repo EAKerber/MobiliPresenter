@@ -1,0 +1,111 @@
+/* Netlify Product UI 0.1
+ * Product-facing finishing layer over Guided Configurator UI 0.3.
+ * This file intentionally does not resize/reframe #app outside the existing
+ * Responsive Fixed-Frame contract; it only refines UI presentation.
+ */
+
+body.viewer-product-ui {
+  background:
+    radial-gradient(circle at 82% 12%, rgba(255, 255, 255, .72), transparent 30%),
+    var(--ui-bg);
+}
+
+.viewer-configurator__topbar {
+  box-shadow: 0 8px 28px rgba(45, 39, 34, .045);
+}
+
+.viewer-stage-heading__description,
+.viewer-module-editor__description {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.viewer-module-card {
+  box-shadow: 0 4px 14px rgba(43, 37, 32, .035);
+}
+
+.viewer-module-card[data-selected="true"] {
+  box-shadow: 0 6px 20px rgba(75, 64, 54, .08);
+}
+
+.viewer-module-card__copy strong,
+.viewer-summary__list strong,
+.viewer-product-card__stack strong {
+  font-size: 12px;
+}
+
+.viewer-module-card__copy span,
+.viewer-summary__list span,
+.viewer-product-card__stack span {
+  font-size: 10px;
+}
+
+.viewer-module-card__inspect,
+.viewer-text-button,
+.viewer-summary__muted,
+.viewer-summary__value-label {
+  font-size: 10px;
+}
+
+.viewer-configurator__status[data-error="false"] {
+  display: none;
+}
+
+.viewer-configurator__status[data-error="true"] {
+  min-height: 36px;
+  padding-block: 8px;
+}
+
+.viewer-product-detail {
+  box-shadow: -18px 0 48px rgba(35, 31, 28, .065);
+}
+
+.viewer-product-detail__header {
+  background: color-mix(in srgb, var(--ui-surface-strong) 72%, var(--ui-surface));
+}
+
+.viewer-product-detail__figure-media {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .75), rgba(248, 246, 242, .82));
+}
+
+.viewer-summary__card--value {
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-accent-soft) 72%, var(--ui-surface-strong));
+}
+
+@media (min-width: 1241px) {
+  .viewer-product-detail__heading h2 {
+    font-size: 28px;
+  }
+
+  .viewer-product-detail__body {
+    padding-inline: 22px;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --ui-mobile-scene-height: min(43vh, 360px);
+  }
+
+  .viewer-stage-heading__description {
+    font-size: 11px;
+  }
+
+  .viewer-module-list:not(.viewer-module-list--compact) .viewer-module-card {
+    flex-basis: 188px;
+  }
+
+  .viewer-product-detail {
+    box-shadow: 0 -22px 64px rgba(35, 31, 28, .22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer-module-card,
+  .viewer-product-detail,
+  .viewer-configurator__topbar {
+    transition: none;
+  }
+}
