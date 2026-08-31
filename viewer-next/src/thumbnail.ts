@@ -78,6 +78,7 @@ for (const primitive of moduleDefinition.geometry ?? []) {
 const renderer = new WebGLRenderer({
   antialias: true,
   alpha: true,
+  preserveDrawingBuffer: true,
   powerPreference: "high-performance"
 });
 renderer.outputColorSpace = SRGBColorSpace;
