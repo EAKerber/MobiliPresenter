@@ -20,7 +20,8 @@ for (const alias of MODULES) {
     "--name", name,
     "--width", "512",
     "--height", "512",
-    "--out-dir", OUT
+    "--out-dir", OUT,
+    "--canvas-png"
   ], { encoding: "utf8", timeout: 45_000 });
 
   if (result.status !== 0) {
