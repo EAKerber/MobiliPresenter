@@ -38,16 +38,16 @@ test("desktop footer is compact contextual navigation rather than a large isolat
   ]);
 });
 
-test("module card body is a keyboard-accessible primary entry to contextual detail", () => {
+test("module card body delegates pointer activation to the canonical details button", () => {
   containsAll(composition, [
     '.viewer-stage--modules .viewer-module-card',
-    'card.tabIndex = 0',
-    'card.setAttribute("role", "button")',
     'isInteractiveTarget(event.target)',
     'openCardDetail(card)',
     'inspect?.click()',
-    'event.key !== "Enter" && event.key !== " "',
+    'document.addEventListener("click", onClick)',
   ]);
+  assert.equal(composition.includes("MutationObserver"), false);
+  assert.equal(composition.includes('card.setAttribute("role", "button")'), false);
 });
 
 test("bootstrap installs and disposes the composition enhancement with product mode", () => {
