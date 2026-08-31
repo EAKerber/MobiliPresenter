@@ -74,6 +74,18 @@ test("product mode publishes global furniture finishes with neutral greige as th
     "for (const alias of api.getCatalog().modules)",
     "api.setFrontPreset(alias",
   ]);
+  containsAll(html, [
+    'const defaultUiMode = "%VITE_DEFAULT_UI_MODE%"',
+    'url.searchParams.get("controls") === "0"',
+    'url.searchParams.get("fidelity") === "1"',
+    'url.searchParams.has("front")',
+    '`${alias}:neutral-greige`',
+    'window.history.replaceState(null, "", url)',
+  ]);
+  assert.ok(
+    html.indexOf('window.history.replaceState(null, "", url)') < html.indexOf('/src/bootstrap.ts'),
+    "neutral product query must be materialized before viewer bootstrap"
+  );
   containsAll(productCss, [".viewer-choice-card__swatch", "border-radius: 10px"]);
 });
 
@@ -96,6 +108,24 @@ test("module thumbnails are crops from the real current viewer renderer and sele
     'thumbnailMaskPolicy = "same-renderer-geometry-mask-v1"',
   ]);
   containsAll(selection, ["material.opacity = 0.62"]);
+});
+
+test("technical views use semantic iconography and editorial drawing treatment without text inference", () => {
+  containsAll(productEnhancements, [
+    "PRODUCT_ICON_PATHS",
+    "decorateSemanticCards(api)",
+    "factIconKind(fact.category)",
+    "componentIconKind(component.kind)",
+    "decorateTechnicalFigures(api)",
+    'figure.dataset.technicalKind = request.kind',
+  ]);
+  containsAll(productCss, [
+    ".viewer-semantic-icon",
+    '[data-product-card="specifications"]',
+    ".viewer-technical-svg",
+    "font-variant-numeric: tabular-nums",
+    "scrollbar-gutter: stable",
+  ]);
 });
 
 test("isometric product views receive explicit width height and depth dimension lines", () => {
