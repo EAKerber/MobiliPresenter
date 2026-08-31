@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const polish = readFileSync(new URL("../src/ui/product-polish-v2.ts", import.meta.url), "utf8");
+const finalCss = readFileSync(new URL("../src/ui/product-polish-v2-final.css", import.meta.url), "utf8");
 const bootstrap = readFileSync(new URL("../src/bootstrap.ts", import.meta.url), "utf8");
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
@@ -35,6 +36,14 @@ test("wide desktop detail facts are a smooth snap carousel with adjacent-card co
   ]);
 });
 
+test("carousel chevron artwork cannot steal the button hit target", () => {
+  containsAll(finalCss, [
+    '.viewer-product-carousel__arrow svg',
+    '.viewer-product-carousel__arrow svg *',
+    'pointer-events: none'
+  ]);
+});
+
 test("wide desktop reuses the existing next-step action inside the module rail and frees the global footer strip", () => {
   containsAll(polish, [
     '--ui-actions-height: 0px',
@@ -56,6 +65,22 @@ test("current known finishes receive circular visual swatches without claiming u
     'STONE_SWATCH_COLOR',
     'candidates.find(item => item.label === text)',
     'if (!candidate) return'
+  ]);
+  containsAll(finalCss, [
+    '[data-product-card="finishes"]',
+    '.viewer-finish-value',
+    'width: 14px',
+    'border-radius: 50%'
+  ]);
+});
+
+test("finishes stage remains compact and leaves real clearance above the mobile next-step action", () => {
+  containsAll(finalCss, [
+    '.viewer-stage--finishes',
+    'padding-bottom: calc(var(--ui-actions-height) + 34px)',
+    'min-height: 58px !important',
+    '.viewer-choice-card__swatch',
+    'max-width: min(64vw, 250px)'
   ]);
 });
 
