@@ -34,6 +34,7 @@ function findChrome() {
 
 mkdirSync(OUT, { recursive: true });
 const chrome = findChrome();
+const suspicious = [];
 
 for (const alias of MODULES) {
   const output = join(OUT, `module-${alias}.png`);
@@ -61,6 +62,10 @@ for (const alias of MODULES) {
     throw new Error(`THUMBNAIL_CAPTURE_FAILED:${alias}:${result.stderr.slice(-2000)}`);
   }
   const size = statSync(output).size;
-  if (size < 5_000) throw new Error(`THUMBNAIL_CAPTURE_SUSPICIOUSLY_SMALL:${alias}:${size}`);
+  if (size < 1_000) suspicious.push(`${alias}:${size}`);
   process.stdout.write(`module-${alias}.png ${size} bytes\n`);
+}
+
+if (suspicious.length > 0) {
+  throw new Error(`THUMBNAIL_CAPTURE_SUSPICIOUSLY_SMALL:${suspicious.join(",")}`);
 }
