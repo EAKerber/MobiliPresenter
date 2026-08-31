@@ -4,6 +4,10 @@ import {
   installDesktopCompositionEnhancement,
   type DesktopCompositionEnhancement
 } from "./ui/desktop-composition.js";
+import {
+  installProductCtaAccessibility,
+  type ProductCtaAccessibility
+} from "./ui/product-cta-accessibility.js";
 import { installProductPolishV2, type ProductPolishV2 } from "./ui/product-polish-v2.js";
 import { installProductUiEnhancements, type ProductUiEnhancements } from "./ui/product-enhancements.js";
 import { mountRuntimeControls, type RuntimeControlsUi } from "./ui/runtime-controls.js";
@@ -27,6 +31,7 @@ let controls: RuntimeControlsUi | null = null;
 let productEnhancements: ProductUiEnhancements | null = null;
 let desktopComposition: DesktopCompositionEnhancement | null = null;
 let productPolishV2: ProductPolishV2 | null = null;
+let productCtaAccessibility: ProductCtaAccessibility | null = null;
 
 if (controlsEnabled) {
   const runtime = (window as Window & { __MOBILIPRESENTER_VIEWER__?: ViewerEngineControlPort }).__MOBILIPRESENTER_VIEWER__;
@@ -37,6 +42,7 @@ if (controlsEnabled) {
   productEnhancements = installProductUiEnhancements(uiApi, controls);
   desktopComposition = installDesktopCompositionEnhancement();
   productPolishV2 = installProductPolishV2(uiApi);
+  productCtaAccessibility = installProductCtaAccessibility();
 
   const refreshAfterSceneClick = (event: MouseEvent): void => {
     if (!(event.target instanceof HTMLCanvasElement)) return;
@@ -46,6 +52,8 @@ if (controlsEnabled) {
 
   window.addEventListener("pagehide", () => {
     document.removeEventListener("click", refreshAfterSceneClick);
+    productCtaAccessibility?.dispose();
+    productCtaAccessibility = null;
     productPolishV2?.dispose();
     productPolishV2 = null;
     desktopComposition?.dispose();
