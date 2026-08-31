@@ -1,0 +1,56 @@
+name: M13 Entry Cold Archive Root Scaffold
+
+on:
+  push:
+    branches:
+      - work/operations/m13-entry-cold-archive-root-20260830
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/operations/m13-entry-cold-archive-root-20260830
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply exact cold archive root guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          target = Path('tools/prune_plan.py')
+          text = target.read_text(encoding='utf-8')
+          old = '''    reasons: list[str] = []\n    if branch == git_state.get("controlBranch"):\n'''
+          new = '''    reasons: list[str] = []\n    if branch == COLD_ARCHIVE_BRANCH:\n        reasons.append("cold-archive-root")\n    if branch == git_state.get("controlBranch"):\n'''
+          if text.count(old) != 1:
+              raise SystemExit('PRUNE_PROTECTION_ANCHOR_DRIFT')
+          target.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('tools/tests/test_prune_cold_archive.py')
+          text = test.read_text(encoding='utf-8')
+          anchor = '''    def test_verified_cold_archive_is_strong_delete_evidence(self):\n'''
+          addition = '''    def test_cold_archive_root_protection_wins_over_strong_ancestry(self):\n        refs = {"main": "a" * 40, "archive/cold": "c" * 40}\n        ancestry = {"main": "identical-to-control", "archive/cold": "ancestor-of-control"}\n        plan = prune.build_prune_plan(\n            self.state(), refs, [], ancestry,\n            work_items=[], work_authority_complete=True, work_authority_head="f" * 40,\n            branch_inventory_complete=True, ancestry_complete=True,\n            branch_inventory_source="remote-git-refs", published_source_branch="main",\n            cold_archive_evidence={},\n        )\n        entry = next(item for item in plan["entries"] if item["branch"] == "archive/cold")\n        self.assertEqual(entry["action"], "keep")\n        self.assertFalse(entry["autoDeleteEligible"])\n        self.assertIn("cold-archive-root", entry["protections"])\n        self.assertIn("ancestor-of-control", entry["evidence"])\n\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('PRUNE_TEST_ANCHOR_DRIFT')
+          test.write_text(text.replace(anchor, addition + anchor, 1), encoding='utf-8')
+          PY
+      - name: Validate focused guard
+        run: |
+          python -m unittest tools.tests.test_prune_cold_archive
+          python -m py_compile tools/prune_plan.py
+          git diff --check
+      - name: Commit permanent changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/prune_plan.py tools/tests/test_prune_cold_archive.py
+          git diff --cached --check
+          git commit -m "M13 entry: protect persistent cold archive root"
+          git push origin HEAD:work/operations/m13-entry-cold-archive-root-20260830
