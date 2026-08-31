@@ -15,20 +15,14 @@ function parseArgs(argv) {
       options.canvasPng = true;
       continue;
     }
-    if (!token.startsWith("--")) {
-      throw new Error(`unexpected argument: ${token}`);
-    }
+    if (!token.startsWith("--")) throw new Error(`unexpected argument: ${token}`);
     const value = argv[index + 1];
-    if (value === undefined || value.startsWith("--")) {
-      throw new Error(`missing value for ${token}`);
-    }
+    if (value === undefined || value.startsWith("--")) throw new Error(`missing value for ${token}`);
     options[token.slice(2)] = value;
     index += 1;
   }
   for (const key of ["url", "name", "width", "height", "out-dir"]) {
-    if (!options[key]) {
-      throw new Error(`missing --${key}`);
-    }
+    if (!options[key]) throw new Error(`missing --${key}`);
   }
   options.width = Number.parseInt(options.width, 10);
   options.height = Number.parseInt(options.height, 10);
@@ -146,11 +140,8 @@ class CdpClient {
       if (!message.id || !this.pending.has(message.id)) return;
       const { resolveCommand, rejectCommand } = this.pending.get(message.id);
       this.pending.delete(message.id);
-      if (message.error) {
-        rejectCommand(new Error(`${message.error.code}: ${message.error.message}`));
-      } else {
-        resolveCommand(message.result ?? {});
-      }
+      if (message.error) rejectCommand(new Error(`${message.error.code}: ${message.error.message}`));
+      else resolveCommand(message.result ?? {});
     });
     this.socket.addEventListener("close", () => {
       for (const { rejectCommand } of this.pending.values()) {
@@ -216,14 +207,8 @@ const METRICS_EXPRESSION = `(() => {
     if (!element) return null;
     const value = element.getBoundingClientRect();
     return {
-      x: value.x,
-      y: value.y,
-      top: value.top,
-      right: value.right,
-      bottom: value.bottom,
-      left: value.left,
-      width: value.width,
-      height: value.height,
+      x: value.x, y: value.y, top: value.top, right: value.right, bottom: value.bottom,
+      left: value.left, width: value.width, height: value.height,
     };
   };
   const visibleRect = (selector) => {
@@ -245,12 +230,9 @@ const METRICS_EXPRESSION = `(() => {
       devicePixelRatio: window.devicePixelRatio,
     },
     document: {
-      clientWidth: root.clientWidth,
-      clientHeight: root.clientHeight,
-      scrollWidth: root.scrollWidth,
-      scrollHeight: root.scrollHeight,
-      bodyScrollWidth: body?.scrollWidth ?? 0,
-      bodyScrollHeight: body?.scrollHeight ?? 0,
+      clientWidth: root.clientWidth, clientHeight: root.clientHeight,
+      scrollWidth: root.scrollWidth, scrollHeight: root.scrollHeight,
+      bodyScrollWidth: body?.scrollWidth ?? 0, bodyScrollHeight: body?.scrollHeight ?? 0,
     },
     rects: {
       app: rect(app),
@@ -275,6 +257,7 @@ const METRICS_EXPRESSION = `(() => {
       rendererReady: app?.dataset.rendererReady ?? null,
       frameRendered: app?.dataset.frameRendered ?? null,
       runtimeUi: runtimeUi?.dataset.viewerRuntimeUi ?? null,
+      currentStep: runtimeUi?.dataset.currentStep ?? null,
       detailOpen: body?.dataset.viewerDetailOpen ?? null,
     },
     responsiveMode: matchMedia('(max-width: 900px)').matches
@@ -319,13 +302,46 @@ async function capture(options) {
     await client.send("Page.navigate", { url: options.url }, sessionId);
     const deadline = Date.now() + 20_000;
     while (!(await evaluate(client, sessionId, READY_EXPRESSION))) {
-      if (Date.now() >= deadline) {
-        throw new Error(`RUNTIME_UI_READY_TIMEOUT:${options.name}`);
-      }
+      if (Date.now() >= deadline) throw new Error(`RUNTIME_UI_READY_TIMEOUT:${options.name}`);
       await delay(100);
     }
     await client.send("Animation.setPlaybackRate", { playbackRate: 0 }, sessionId).catch(() => {});
     await delay(100);
+
+    if (options["click-selector"]) {
+      const selector = options["click-selector"];
+      const clicked = await evaluate(
+        client,
+        sessionId,
+        `(() => {
+          const element = document.querySelector(${JSON.stringify(selector)});
+          if (!(element instanceof HTMLElement)) return false;
+          element.click();
+          return true;
+        })()`
+      );
+      if (!clicked) throw new Error(`INTERACTION_TARGET_NOT_FOUND:${options.name}:${selector}`);
+
+      const interactionDeadline = Date.now() + 8_000;
+      while (true) {
+        const settled = await evaluate(
+          client,
+          sessionId,
+          `(() => {
+            const runtimeUi = document.querySelector('[data-viewer-runtime-ui="mounted"]');
+            const stepOk = ${options["expect-step"] ? `runtimeUi?.dataset.currentStep === ${JSON.stringify(options["expect-step"])}` : "true"};
+            const selectorOk = ${options["wait-selector"] ? `Boolean(document.querySelector(${JSON.stringify(options["wait-selector"])}))` : "true"};
+            return Boolean(stepOk && selectorOk);
+          })()`
+        );
+        if (settled) break;
+        if (Date.now() >= interactionDeadline) {
+          throw new Error(`INTERACTION_SETTLE_TIMEOUT:${options.name}:${options["expect-step"] ?? "none"}`);
+        }
+        await delay(50);
+      }
+      await delay(150);
+    }
 
     const metrics = await evaluate(client, sessionId, METRICS_EXPRESSION);
     const html = await evaluate(client, sessionId, "document.documentElement.outerHTML");
@@ -375,11 +391,7 @@ async function capture(options) {
       screenshotBytes,
     };
   } finally {
-    try {
-      client?.close();
-    } catch {
-      // Best-effort cleanup after evidence capture.
-    }
+    try { client?.close(); } catch { /* Best-effort cleanup. */ }
     await terminateChrome(launched?.child);
     try {
       rmSync(profileDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
