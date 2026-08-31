@@ -15,6 +15,20 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      (() => {
+        const defaultUiMode = "%VITE_DEFAULT_UI_MODE%";
+        if (defaultUiMode !== "product") return;
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("controls") === "0" || url.searchParams.get("fidelity") === "1") return;
+        if (url.searchParams.has("front")) return;
+        url.searchParams.set(
+          "front",
+          ["01", "02", "03", "04", "05", "06", "07"].map(alias => `${alias}:neutral-greige`).join(",")
+        );
+        window.history.replaceState(null, "", url);
+      })();
+    </script>
     <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>
