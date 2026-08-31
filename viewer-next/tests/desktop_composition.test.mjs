@@ -9,9 +9,9 @@ function containsAll(source, values) {
   for (const value of values) assert.ok(source.includes(value), `missing source contract: ${value}`);
 }
 
-test("desktop keeps module detail distributed between right rail and lower factual strip", () => {
+test("wide desktop keeps module detail distributed between right rail and lower factual strip", () => {
   containsAll(composition, [
-    "@media (min-width: 1024px)",
+    "@media (min-width: 1180px)",
     '--ui-detail-width: clamp(350px, 30vw, 470px)',
     '.viewer-product-detail__cards',
     'position: fixed !important',
@@ -22,6 +22,7 @@ test("desktop keeps module detail distributed between right rail and lower factu
     'overflow-x: auto !important',
     'overflow-y: hidden !important',
   ]);
+  assert.equal(composition.includes("@media (min-width: 1024px) {"), false);
 });
 
 test("desktop footer is compact contextual navigation rather than a large isolated CTA strip", () => {
