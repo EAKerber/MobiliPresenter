@@ -147,11 +147,6 @@ const DESKTOP_COMPOSITION_CSS = `
   body.viewer-product-ui .viewer-stage--modules .viewer-module-card {
     cursor: pointer;
   }
-
-  body.viewer-product-ui .viewer-stage--modules .viewer-module-card[data-product-row-interactive="true"]:focus-visible {
-    outline: 2px solid var(--ui-focus);
-    outline-offset: 2px;
-  }
 }
 
 @media (min-width: 1180px) and (max-height: 760px) {
@@ -182,35 +177,11 @@ function openCardDetail(card: HTMLElement): void {
   inspect?.click();
 }
 
-function decorateModuleCards(): void {
-  for (const card of document.querySelectorAll<HTMLElement>(".viewer-stage--modules .viewer-module-card")) {
-    if (!card.closest(".viewer-configurator__stage-content")) continue;
-    if (card.dataset.productRowInteractive === "true") continue;
-    card.dataset.productRowInteractive = "true";
-    card.tabIndex = 0;
-    card.setAttribute("role", "button");
-    card.setAttribute("aria-label", `Abrir detalhes do módulo ${card.dataset.moduleAlias ?? ""}`.trim());
-  }
-}
-
 export function installDesktopCompositionEnhancement(): DesktopCompositionEnhancement {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = DESKTOP_COMPOSITION_CSS;
   document.head.append(style);
-
-  let frame: number | null = null;
-  const scheduleDecoration = (): void => {
-    if (frame !== null) return;
-    frame = window.requestAnimationFrame(() => {
-      frame = null;
-      decorateModuleCards();
-    });
-  };
-
-  const observer = new MutationObserver(scheduleDecoration);
-  observer.observe(document.body, { childList: true, subtree: true });
-  scheduleDecoration();
 
   const onClick = (event: MouseEvent): void => {
     const card = moduleCardFromTarget(event.target);
@@ -218,23 +189,11 @@ export function installDesktopCompositionEnhancement(): DesktopCompositionEnhanc
     openCardDetail(card);
   };
 
-  const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const card = moduleCardFromTarget(event.target);
-    if (!card || event.target !== card) return;
-    event.preventDefault();
-    openCardDetail(card);
-  };
-
   document.addEventListener("click", onClick);
-  document.addEventListener("keydown", onKeyDown);
 
   return {
     dispose(): void {
-      observer.disconnect();
-      if (frame !== null) window.cancelAnimationFrame(frame);
       document.removeEventListener("click", onClick);
-      document.removeEventListener("keydown", onKeyDown);
       style.remove();
     }
   };
