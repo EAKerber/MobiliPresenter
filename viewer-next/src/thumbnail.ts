@@ -1,5 +1,4 @@
 import {
-  currentSceneBase,
   module01,
   module02,
   module03WithSink,
@@ -7,23 +6,9 @@ import {
   module05,
   module06,
   module07,
-  type ScenePackage
+  type GeometryPrimitive,
+  type RigidTransform
 } from "@mobilipresenter/scene-core";
-import {
-  AmbientLight,
-  Box3,
-  DirectionalLight,
-  HemisphereLight,
-  MathUtils,
-  Mesh,
-  MeshStandardMaterial,
-  PerspectiveCamera,
-  Sphere,
-  SRGBColorSpace,
-  Vector3,
-  WebGLRenderer
-} from "three";
-import { buildThreeScene } from "./renderer/three/scene-adapter.js";
 
 const MODULES = {
   "01": module01,
@@ -36,7 +21,15 @@ const MODULES = {
 } as const;
 
 const THUMBNAIL_WOOD = "#A8744D";
+const THUMBNAIL_SIZE = 512;
 type ThumbnailAlias = keyof typeof MODULES;
+type Point3 = { readonly x: number; readonly y: number; readonly z: number };
+type Point2 = { readonly x: number; readonly y: number };
+type DrawFace = {
+  readonly points: readonly Point3[];
+  readonly fill: string;
+  readonly depth: number;
+};
 
 const appElement = document.querySelector<HTMLElement>("#app");
 if (!appElement) throw new Error("THUMBNAIL_APP_ROOT_NOT_FOUND");
@@ -50,117 +43,153 @@ if (!aliasValue || !(aliasValue in MODULES)) {
 const alias = aliasValue as ThumbnailAlias;
 const moduleDefinition = MODULES[alias];
 
-const scene: ScenePackage = {
-  ...currentSceneBase,
-  sceneId: `thumbnail-${alias}`,
-  environment: [],
-  items: [],
-  modules: [moduleDefinition],
-  sourceBindings: [],
-  substitutionGroups: []
-};
+const canvas = document.createElement("canvas");
+canvas.width = THUMBNAIL_SIZE;
+canvas.height = THUMBNAIL_SIZE;
+canvas.style.width = "100%";
+canvas.style.height = "100%";
+canvas.setAttribute("aria-hidden", "true");
+app.append(canvas);
+const context = canvas.getContext("2d", { alpha: true });
+if (!context) throw new Error("THUMBNAIL_CANVAS_CONTEXT_UNAVAILABLE");
 
-const renderer = new WebGLRenderer({
-  antialias: true,
-  alpha: true,
-  preserveDrawingBuffer: true,
-  powerPreference: "high-performance"
-});
-renderer.outputColorSpace = SRGBColorSpace;
-renderer.setClearColor(0x000000, 0);
-renderer.setPixelRatio(1);
-app.append(renderer.domElement);
-
-const camera = new PerspectiveCamera(30, 1, 1, 100_000);
-const woodMaterial = new MeshStandardMaterial({
-  color: THUMBNAIL_WOOD,
-  roughness: 0.62,
-  metalness: 0
-});
-woodMaterial.name = "front-wood-thumbnail-preview";
-const adapter = buildThreeScene(scene, () => woodMaterial);
-adapter.scene.background = null;
-
-const hemisphere = new HemisphereLight(0xffffff, 0x8a8177, 2.2);
-const ambient = new AmbientLight(0xffffff, 0.85);
-const key = new DirectionalLight(0xffffff, 2.5);
-key.position.set(-1800, 2400, 2200);
-const fill = new DirectionalLight(0xfff5e8, 1.2);
-fill.position.set(2200, 1200, 900);
-adapter.scene.add(hemisphere, ambient, key, fill);
-
-function fitCamera(): void {
-  const group = adapter.entityGroups.get(moduleDefinition.id);
-  if (!group) throw new Error(`THUMBNAIL_MODULE_GROUP_NOT_FOUND:${alias}`);
-  if (!group.visible) throw new Error(`THUMBNAIL_MODULE_NOT_VISIBLE:${alias}`);
-  group.updateWorldMatrix(true, true);
-  const bounds = new Box3().setFromObject(group);
-  if (bounds.isEmpty()) throw new Error(`THUMBNAIL_MODULE_BOUNDS_EMPTY:${alias}`);
-
-  const sphere = bounds.getBoundingSphere(new Sphere());
-  const center = sphere.center;
-  const verticalFov = MathUtils.degToRad(camera.fov);
-  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
-  const fitDistance = Math.max(
-    sphere.radius / Math.max(0.01, Math.sin(verticalFov / 2)),
-    sphere.radius / Math.max(0.01, Math.sin(horizontalFov / 2))
-  ) * 1.18;
-
-  const viewingDirection = new Vector3(0.86, 0.48, 1.15).normalize();
-  camera.position.copy(center).addScaledVector(viewingDirection, fitDistance);
-  camera.near = Math.max(1, fitDistance - sphere.radius * 2.2);
-  camera.far = fitDistance + sphere.radius * 3.5;
-  camera.lookAt(center);
-  camera.updateProjectionMatrix();
-
-  const projectedCenter = center.clone().project(camera);
-  if (Math.abs(projectedCenter.x) > 0.05 || Math.abs(projectedCenter.y) > 0.05 || projectedCenter.z < -1 || projectedCenter.z > 1) {
-    throw new Error(`THUMBNAIL_CAMERA_FRAME_INVALID:${alias}:${projectedCenter.toArray().join(",")}`);
-  }
-
-  app.dataset.thumbnailBounds = [
-    bounds.min.x, bounds.min.y, bounds.min.z,
-    bounds.max.x, bounds.max.y, bounds.max.z
-  ].map(value => value.toFixed(2)).join(",");
-  app.dataset.thumbnailCamera = [camera.position.x, camera.position.y, camera.position.z]
-    .map(value => value.toFixed(2)).join(",");
+function rotate(point: Point3, transform: RigidTransform): Point3 {
+  const { x: qx, y: qy, z: qz, w: qw } = transform.rotation;
+  const ix = qw * point.x + qy * point.z - qz * point.y;
+  const iy = qw * point.y + qz * point.x - qx * point.z;
+  const iz = qw * point.z + qx * point.y - qy * point.x;
+  const iw = -qx * point.x - qy * point.y - qz * point.z;
+  return {
+    x: ix * qw + iw * -qx + iy * -qz - iz * -qy + transform.translationMm.x,
+    y: iy * qw + iw * -qy + iz * -qx - ix * -qz + transform.translationMm.y,
+    z: iz * qw + iw * -qz + ix * -qy - iy * -qx + transform.translationMm.z
+  };
 }
 
-function assertRenderedPixels(widthPx: number, heightPx: number): void {
-  const gl = renderer.getContext();
-  const pixels = new Uint8Array(widthPx * heightPx * 4);
-  gl.readPixels(0, 0, widthPx, heightPx, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-  let opaquePixels = 0;
-  for (let index = 3; index < pixels.length; index += 4) {
-    if (pixels[index]! > 0) opaquePixels += 1;
+function project(point: Point3): Point2 {
+  return {
+    x: point.x - point.y * 0.62,
+    y: -point.z + (point.x + point.y) * 0.28
+  };
+}
+
+function averageDepth(points: readonly Point3[]): number {
+  let value = 0;
+  for (const point of points) value += point.x * 0.46 - point.y * 0.78 + point.z * 0.43;
+  return value / Math.max(1, points.length);
+}
+
+function boxFaces(primitive: Extract<GeometryPrimitive, { readonly primitive: "box" }>): readonly DrawFace[] {
+  const { width, height, depth } = primitive.sizeMm;
+  const local: readonly Point3[] = [
+    { x: 0, y: 0, z: 0 },
+    { x: width, y: 0, z: 0 },
+    { x: width, y: depth, z: 0 },
+    { x: 0, y: depth, z: 0 },
+    { x: 0, y: 0, z: height },
+    { x: width, y: 0, z: height },
+    { x: width, y: depth, z: height },
+    { x: 0, y: depth, z: height }
+  ];
+  const p = local.map(point => rotate(point, primitive.localTransform));
+  const frontBase = primitive.role === "front" ? "#B57C52" : THUMBNAIL_WOOD;
+  const definitions: readonly { readonly indices: readonly number[]; readonly fill: string }[] = [
+    { indices: [0, 1, 5, 4], fill: frontBase },
+    { indices: [1, 2, 6, 5], fill: "#925F3E" },
+    { indices: [2, 3, 7, 6], fill: "#805438" },
+    { indices: [3, 0, 4, 7], fill: "#996543" },
+    { indices: [4, 5, 6, 7], fill: "#C58C62" },
+    { indices: [3, 2, 1, 0], fill: "#744B34" }
+  ];
+  return definitions.map(definition => {
+    const points = definition.indices.map(index => p[index]!);
+    return { points, fill: definition.fill, depth: averageDepth(points) };
+  });
+}
+
+function facePrimitive(
+  primitive: Extract<GeometryPrimitive, { readonly primitive: "face" }>
+): DrawFace {
+  const u: Point3 = {
+    x: primitive.uAxis.x * primitive.sizeMm[0],
+    y: primitive.uAxis.y * primitive.sizeMm[0],
+    z: primitive.uAxis.z * primitive.sizeMm[0]
+  };
+  const v: Point3 = {
+    x: primitive.vAxis.x * primitive.sizeMm[1],
+    y: primitive.vAxis.y * primitive.sizeMm[1],
+    z: primitive.vAxis.z * primitive.sizeMm[1]
+  };
+  const points = [
+    { x: 0, y: 0, z: 0 },
+    u,
+    { x: u.x + v.x, y: u.y + v.y, z: u.z + v.z },
+    v
+  ].map(point => rotate(point, primitive.localTransform));
+  return { points, fill: THUMBNAIL_WOOD, depth: averageDepth(points) };
+}
+
+function collectFaces(): readonly DrawFace[] {
+  const faces: DrawFace[] = [];
+  for (const primitive of moduleDefinition.geometry ?? []) {
+    if (primitive.primitive === "box") faces.push(...boxFaces(primitive));
+    else faces.push(facePrimitive(primitive));
   }
-  if (opaquePixels < 512) throw new Error(`THUMBNAIL_EMPTY_FRAME:${alias}:${opaquePixels}`);
-  app.dataset.thumbnailOpaquePixels = String(opaquePixels);
+  return faces.sort((a, b) => a.depth - b.depth);
 }
 
 function render(): void {
-  const widthPx = Math.max(1, Math.round(app.clientWidth));
-  const heightPx = Math.max(1, Math.round(app.clientHeight));
-  renderer.setSize(widthPx, heightPx, false);
-  camera.aspect = widthPx / heightPx;
-  camera.updateProjectionMatrix();
-  fitCamera();
-  renderer.render(adapter.scene, camera);
-  assertRenderedPixels(widthPx, heightPx);
+  const faces = collectFaces();
+  if (faces.length === 0) throw new Error(`THUMBNAIL_MODULE_GEOMETRY_EMPTY:${alias}`);
+  const projected = faces.flatMap(face => face.points.map(project));
+  const minX = Math.min(...projected.map(point => point.x));
+  const maxX = Math.max(...projected.map(point => point.x));
+  const minY = Math.min(...projected.map(point => point.y));
+  const maxY = Math.max(...projected.map(point => point.y));
+  const width = Math.max(1, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+  const padding = 54;
+  const scale = Math.min(
+    (THUMBNAIL_SIZE - padding * 2) / width,
+    (THUMBNAIL_SIZE - padding * 2) / height
+  );
+  const offsetX = (THUMBNAIL_SIZE - width * scale) / 2 - minX * scale;
+  const offsetY = (THUMBNAIL_SIZE - height * scale) / 2 - minY * scale;
+
+  context.clearRect(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+  context.lineJoin = "round";
+  context.lineCap = "round";
+  context.lineWidth = 1.25;
+  context.strokeStyle = "rgba(72, 46, 31, 0.38)";
+
+  for (const face of faces) {
+    const points = face.points.map(project);
+    context.beginPath();
+    context.moveTo(points[0]!.x * scale + offsetX, points[0]!.y * scale + offsetY);
+    for (const point of points.slice(1)) {
+      context.lineTo(point.x * scale + offsetX, point.y * scale + offsetY);
+    }
+    context.closePath();
+    context.fillStyle = face.fill;
+    context.fill();
+    context.stroke();
+  }
+
+  const pixels = context.getImageData(0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE).data;
+  let opaquePixels = 0;
+  for (let index = 3; index < pixels.length; index += 4) {
+    if (pixels[index]! > 8) opaquePixels += 1;
+  }
+  if (opaquePixels < 2_000) throw new Error(`THUMBNAIL_EMPTY_FRAME:${alias}:${opaquePixels}`);
+
   app.dataset.rendererReady = "true";
   app.dataset.frameRendered = "true";
   app.dataset.thumbnailModule = alias;
   app.dataset.thumbnailBackground = "transparent";
-  app.dataset.thumbnailCameraPolicy = "isolated-product-three-quarter-v1";
+  app.dataset.thumbnailCameraPolicy = "isolated-product-isometric-canvas-v1";
   app.dataset.thumbnailMaterial = "warm-wood-preview";
+  app.dataset.thumbnailOpaquePixels = String(opaquePixels);
+  app.dataset.thumbnailPrimitiveCount = String(moduleDefinition.geometry?.length ?? 0);
 }
 
 render();
-
-window.addEventListener("pagehide", () => {
-  adapter.scene.traverse(object => {
-    if (object instanceof Mesh) object.geometry.dispose();
-  });
-  woodMaterial.dispose();
-  renderer.dispose();
-}, { once: true });
