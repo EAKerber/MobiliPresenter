@@ -94,16 +94,16 @@ jobs:
             --wait-selector '[data-stage-panel="finishes"]' \
             --expect-step "finishes"
 
-      - name: Exercise carousel through chevron artwork
+      - name: Exercise carousel next control
         working-directory: viewer-next
         run: |
           node tests/chrome_viewport_capture.mjs \
             --url "http://127.0.0.1:4173/?controls=1&select=02" \
-            --name "carousel-chevron-hit" \
+            --name "carousel-next-control" \
             --width 1366 \
             --height 768 \
             --out-dir artifacts/product-ui-navigation \
-            --click-selector '.viewer-product-carousel__arrow--next svg' \
+            --click-selector '.viewer-product-carousel__arrow--next' \
             --wait-selector '.viewer-product-carousel__dot:nth-child(2)[aria-current="true"]'
 
       - name: Upload product UI evidence
