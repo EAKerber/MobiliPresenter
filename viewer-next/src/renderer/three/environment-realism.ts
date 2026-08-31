@@ -1,6 +1,7 @@
 import type { ScenePackage } from "@mobilipresenter/scene-core";
 import {
   BoxGeometry,
+  DirectionalLight,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -33,7 +34,7 @@ const SURFACE_TOWARD_ROOM_MM = 1.4;
 
 export const ENVIRONMENT_REALISM_LIGHTING_CALIBRATION = {
   ambientScale: 0.78,
-  keyScale: 0.72,
+  keyScale: 0.82,
   fillScale: 0.62,
   environmentScale: 1.12
 } as const;
@@ -42,6 +43,13 @@ const WINDOW_WIDTH_MM = WINDOW_X_MAX_MM - WINDOW_X_MIN_MM;
 const WINDOW_HEIGHT_MM = WINDOW_HEAD_MM - WINDOW_SILL_MM;
 const WINDOW_CENTER_X_MM = (WINDOW_X_MIN_MM + WINDOW_X_MAX_MM) / 2;
 const WINDOW_CENTER_Z_MM = (WINDOW_SILL_MM + WINDOW_HEAD_MM) / 2;
+
+export const ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM = {
+  x: WINDOW_CENTER_X_MM - 250,
+  y: LAUNDRY_WALL_Y_MM + 900,
+  z: WINDOW_HEAD_MM + 1100
+} as const;
+export const ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN = 5600;
 
 function planePatch(
   name: string,
@@ -246,6 +254,7 @@ export interface EnvironmentRealismLightingCalibrationResult {
   readonly keyScale: number;
   readonly fillScale: number;
   readonly environmentScale: number;
+  readonly shadowKeyAlignedToWindow: true;
 }
 
 export function applyEnvironmentRealismLightingCalibration(
@@ -265,9 +274,20 @@ export function applyEnvironmentRealismLightingCalibration(
     light.userData.presentationIntensityScale = scale;
   }
 
+  const key = lighting.baseLights.get("key-front-high");
+  if (!(key instanceof DirectionalLight)) {
+    throw new Error("ENVIRONMENT_REALISM_SHADOW_KEY_INVALID:key-front-high");
+  }
+  key.position.copy(sceneVectorToThree(ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM));
+  key.color.copy(kelvinToColor(ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN));
+  key.userData.windowMotivatedShadowKey = true;
+  key.userData.presentationSourceMm = { ...ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM };
+  key.userData.presentationColorTemperatureK = ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN;
+
   return {
     calibrationId: ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID,
-    ...ENVIRONMENT_REALISM_LIGHTING_CALIBRATION
+    ...ENVIRONMENT_REALISM_LIGHTING_CALIBRATION,
+    shadowKeyAlignedToWindow: true
   };
 }
 
