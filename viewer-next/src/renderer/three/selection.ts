@@ -83,7 +83,7 @@ export function createModuleSelectionOverlay(
       helper.name = `selection:${moduleId}`;
       for (const material of helperMaterials(helper)) {
         material.transparent = true;
-        material.opacity = 0.34;
+        material.opacity = 0.62;
         material.depthTest = true;
         material.depthWrite = false;
       }
