@@ -81,7 +81,7 @@ test("module thumbnails are isolated renderer assets and selection contour is in
     "items: []",
     "modules: [moduleDefinition]",
     '"front-wood"',
-    "composition.adapter.scene.background = null",
+    "adapter.scene.background = null",
   ]);
   containsAll(selection, ["material.opacity = 0.62"]);
 });
