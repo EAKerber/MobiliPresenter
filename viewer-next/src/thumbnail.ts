@@ -36,12 +36,16 @@ const MODULES = {
 
 type ThumbnailAlias = keyof typeof MODULES;
 
-const app = document.querySelector<HTMLElement>("#app");
-if (!app) throw new Error("THUMBNAIL_APP_ROOT_NOT_FOUND");
+const appElement = document.querySelector<HTMLElement>("#app");
+if (!appElement) throw new Error("THUMBNAIL_APP_ROOT_NOT_FOUND");
+const app: HTMLElement = appElement;
 
 const query = new URLSearchParams(window.location.search);
-const alias = query.get("module") as ThumbnailAlias | null;
-if (!alias || !(alias in MODULES)) throw new Error(`THUMBNAIL_MODULE_UNKNOWN:${alias ?? "none"}`);
+const aliasValue = query.get("module");
+if (!aliasValue || !(aliasValue in MODULES)) {
+  throw new Error(`THUMBNAIL_MODULE_UNKNOWN:${aliasValue ?? "none"}`);
+}
+const alias = aliasValue as ThumbnailAlias;
 const moduleDefinition = MODULES[alias];
 
 const scene: ScenePackage = {
