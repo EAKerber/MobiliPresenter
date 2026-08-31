@@ -252,13 +252,20 @@ float mpWoodMacro = mpWoodNoise(
 float mpWoodWarp = mpWoodNoise(
   vec2(mpWoodAcrossMm / ${(macroCellMm[0] * 1.7).toFixed(6)}, mpWoodAlongMm / ${(macroCellMm[1] * 0.55).toFixed(6)}) + vec2(19.2, 4.7)
 ) - 0.5;
-float mpWoodFiber = 0.5 + 0.5 * sin(
-  (
-    mpWoodAcrossMm / ${fiberBandMm.toFixed(6)} +
-    (mpWoodMacro - 0.5) * 1.85 +
-    mpWoodWarp * 1.15
-  ) * ${WOOD_GRAIN_TWO_PI.toFixed(6)}
-);
+float mpWoodFlow = mpWoodNoise(
+  vec2(mpWoodAcrossMm / ${(macroCellMm[0] * 3.6).toFixed(6)}, mpWoodAlongMm / ${(macroCellMm[1] * 0.31).toFixed(6)}) + vec2(57.4, 13.8)
+) - 0.5;
+float mpWoodDrift = mpWoodNoise(
+  vec2(mpWoodAcrossMm / ${(macroCellMm[0] * 5.4).toFixed(6)}, mpWoodAlongMm / ${(macroCellMm[1] * 0.17).toFixed(6)}) + vec2(8.9, 67.1)
+) - 0.5;
+float mpWoodFrequency = 1.0 + mpWoodFlow * 0.16 + mpWoodDrift * 0.07;
+float mpWoodPhase =
+  (mpWoodAcrossMm / ${fiberBandMm.toFixed(6)}) * mpWoodFrequency +
+  (mpWoodMacro - 0.5) * 1.45 +
+  mpWoodWarp * 1.55 +
+  mpWoodFlow * 2.10 +
+  mpWoodDrift * 1.25;
+float mpWoodFiber = 0.5 + 0.5 * sin(mpWoodPhase * ${WOOD_GRAIN_TWO_PI.toFixed(6)});
 float mpWoodFine = mpWoodNoise(
   vec2(mpWoodAcrossMm / ${fineCellMm[0].toFixed(6)}, mpWoodAlongMm / ${fineCellMm[1].toFixed(6)}) + vec2(41.7, 7.3)
 );
@@ -268,22 +275,27 @@ float mpWoodPore = mpWoodNoise(
     mpWoodAlongMm / ${(fineCellMm[1] * 0.65).toFixed(6)}
   ) + vec2(73.1, 29.4)
 );
+float mpWoodFiberPresence = smoothstep(0.16, 0.84, mpWoodNoise(
+  vec2(mpWoodAcrossMm / ${(macroCellMm[0] * 0.72).toFixed(6)}, mpWoodAlongMm / ${(macroCellMm[1] * 0.42).toFixed(6)}) + vec2(31.6, 91.2)
+));
 float mpWoodTone =
-  (mpWoodMacro - 0.5) * 0.180 +
-  (mpWoodFiber - 0.5) * 0.095 +
-  (mpWoodFine - 0.5) * 0.040;
+  (mpWoodMacro - 0.5) * 0.185 +
+  (mpWoodFiber - 0.5) * mix(0.035, 0.070, mpWoodFiberPresence) +
+  (mpWoodFine - 0.5) * 0.042 +
+  mpWoodFlow * 0.025;
 vec3 mpWoodCool = vec3(0.970, 0.985, 1.012);
 vec3 mpWoodWarm = vec3(1.035, 1.002, 0.962);
 diffuseColor.rgb *= mix(mpWoodCool, mpWoodWarm, clamp(mpWoodMacro, 0.0, 1.0));
 diffuseColor.rgb = clamp(diffuseColor.rgb * (1.0 + mpWoodTone), 0.0, 1.0);
 float mpWoodRoughnessDelta =
-  (0.5 - mpWoodFiber) * 0.105 +
-  (mpWoodFine - 0.5) * 0.042 +
-  (mpWoodPore - 0.5) * 0.024;
+  (0.5 - mpWoodFiber) * mix(0.055, 0.090, mpWoodFiberPresence) +
+  (mpWoodFine - 0.5) * 0.045 +
+  (mpWoodPore - 0.5) * 0.026 +
+  mpWoodFlow * 0.018;
 float mpWoodMicroHeight =
-  (mpWoodFiber - 0.5) * 0.52 +
-  (mpWoodFine - 0.5) * 0.24 +
-  (mpWoodPore - 0.5) * 0.10;
+  (mpWoodFiber - 0.5) * mix(0.26, 0.40, mpWoodFiberPresence) +
+  (mpWoodFine - 0.5) * 0.28 +
+  (mpWoodPore - 0.5) * 0.12;
 `
       : `
 float mpWoodAlongMm = vMpWoodWorldPosition.y;
