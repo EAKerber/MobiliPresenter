@@ -80,7 +80,9 @@ test("module thumbnails are isolated renderer assets and selection contour is in
     "environment: []",
     "items: []",
     "modules: [moduleDefinition]",
-    '"front-wood"',
+    'const THUMBNAIL_WOOD = "#A8744D"',
+    "new PerspectiveCamera",
+    "assertRenderedPixels",
     "adapter.scene.background = null",
   ]);
   containsAll(selection, ["material.opacity = 0.62"]);
