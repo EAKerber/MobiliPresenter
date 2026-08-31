@@ -50,8 +50,9 @@ canvas.style.width = "100%";
 canvas.style.height = "100%";
 canvas.setAttribute("aria-hidden", "true");
 app.append(canvas);
-const context = canvas.getContext("2d", { alpha: true });
-if (!context) throw new Error("THUMBNAIL_CANVAS_CONTEXT_UNAVAILABLE");
+const contextValue = canvas.getContext("2d", { alpha: true });
+if (!contextValue) throw new Error("THUMBNAIL_CANVAS_CONTEXT_UNAVAILABLE");
+const context: CanvasRenderingContext2D = contextValue;
 
 function rotate(point: Point3, transform: RigidTransform): Point3 {
   const { x: qx, y: qy, z: qz, w: qw } = transform.rotation;
