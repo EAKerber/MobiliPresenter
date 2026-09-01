@@ -2,7 +2,7 @@
 
 ## Status
 
-`HYPOTHESIS_UNDER_TEST`
+`CONFIRMED:LEGACY_FRONT_QUERY_LOCAL_OVERRIDES_SHADOW_GLOBAL_FINISH`
 
 This slice is diagnostic only. It does not change finish behavior, precedence, URL parsing, renderer synchronization, Scene Core, or production publication.
 
@@ -18,7 +18,7 @@ A clean `?controls=1` CI session does not reproduce the symptom.
 
 ## Historical traceback
 
-The strongest causal candidate is the transition from per-module compatibility state to the first-class global furniture-finish contract.
+The causal transition is the move from per-module compatibility state to the first-class global furniture-finish contract.
 
 ### 1. Historical neutral bootstrap bridge
 
@@ -55,13 +55,13 @@ global furniture finish
 frontPresetByModule overrides
 ```
 
-Therefore an old all-neutral `front=` query can shadow a later `warm-wood` global selection.
+Therefore an old all-neutral `front=` query shadows a later `warm-wood` global selection.
 
 ### 5. Reset clears state but does not migrate the URL
 
 `reset-configuration` returns `createDefaultViewerConfiguration()`, which clears `frontPresetByModule`.
 
-This predicts the reported behavior:
+The browser trace confirms:
 
 ```text
 legacy URL load
@@ -70,61 +70,94 @@ legacy URL load
   -> local neutral overrides still win
   -> Restaurar clears local overrides in memory
   -> global warm selection now works
+  -> URL still contains front=
+  -> reload materializes the legacy overrides again
 ```
 
-Because reset does not rewrite the query string, reload should materialize the legacy overrides again.
+## Confirmed evidence
 
-## Falsifiable signature
+PR #229 executed the traceback against the current viewer without changing runtime behavior.
 
-The hypothesis is considered confirmed only if both layers reproduce the same chain.
+All three workflows completed successfully:
 
-### State-level trace
+- `Coordination Guard`
+- `Viewer Next`
+- `Product UI Evidence`
 
-Given the exact historical all-module `front=` query:
+The clean global-finish smoke passed first, proving the first-class global path itself remains healthy on a clean URL.
 
-- parsed `furnitureFinishPresetId` is `neutral-greige`;
-- `frontPresetByModule` contains seven neutral overrides;
-- setting global `warm-wood` leaves module 03 resolved as `front-primary`;
-- reset empties `frontPresetByModule`;
-- setting global `warm-wood` after reset resolves module 03 as `front-wood`.
-
-### Browser trace
-
-Using a real Chrome against the current viewer:
-
-1. load the exact legacy URL;
-2. first warm selection:
-   - global finish becomes `warm-wood`;
-   - module 03 remains `front-primary`;
-3. click `Restaurar`;
-4. the URL must still contain `front=`;
-5. warm selection now resolves module 03 to `front-wood`;
-6. reload the same URL;
-7. warm selection is shadowed again and module 03 remains `front-primary`.
-
-The browser trace writes:
+The dedicated browser traceback then returned:
 
 ```text
+status = PASS
+classification = KNOWN_BUG_REPRODUCED
+hypothesis = legacy-front-query-local-overrides-shadow-global-finish
+```
+
+Observed states:
+
+```text
+legacy-load
+  finish = neutral-greige
+  module03 = front-primary
+
+legacy-first-warm
+  finish = warm-wood
+  module03 = front-primary
+
+after-reset
+  finish = neutral-greige
+  module03 = front-primary
+
+warm-after-reset
+  finish = warm-wood
+  module03 = front-wood
+
+reload-from-legacy-url
+  finish = neutral-greige
+  module03 = front-primary
+
+warm-after-reload
+  finish = warm-wood
+  module03 = front-primary
+```
+
+The emitted signature was fully true:
+
+```text
+firstClickChangesGlobalStateButNotModule03 = true
+resetClearsInMemoryShadowing = true
+legacyUrlSurvivesReset = true
+reloadRestoresShadowing = true
+```
+
+Artifact:
+
+```text
+product-ui-evidence
+artifact id = 9814965406
+digest = sha256:f089d58ecb9cee6491609f9d2313cf86a8eccf0ad7211cebfa7bdd15a16ece1b
 viewer-next/artifacts/global-finish-traceback/trace.json
 ```
+
+This closes the causal chain. The defect is not renderer synchronization or click ownership. It is stale compatibility state with stronger precedence than the global contract.
 
 ## Why the previous gate could pass
 
 `global_finish_browser_smoke.mjs` starts from a clean `?controls=1` URL. It therefore proves the first-class global path on clean state, but does not exercise compatibility state left by the historical `front=` bridge.
 
-The earlier diagnosis focused on DOM readiness and click ownership. Those were real integration debts, but a clean URL cannot falsify this legacy-state hypothesis.
+The earlier diagnosis focused on DOM readiness and click ownership. Those were real integration debts, but a clean URL could not falsify this legacy-state mechanism.
 
-## Next decision
+## Correction contract
 
-Do not implement migration in this slice.
+The correction must be a separate slice.
 
-If the state and browser traces both reproduce the signature, classify the root cause as:
+Required migration semantics:
 
-`CONFIRMED:LEGACY_FRONT_QUERY_LOCAL_OVERRIDES_SHADOW_GLOBAL_FINISH`
+- an all-modules-equal legacy `front=` query is compatibility state representing the old global bridge and must collapse into `furnitureFinishPresetId`;
+- intentional partial `front=` assignments retain local-override meaning;
+- mixed per-module assignments retain local-override meaning;
+- migrated uniform compatibility state must be removed from the live URL so reload cannot resurrect it;
+- clean URL, uniform legacy URL, partial override URL, mixed override URL, reset, and reload each require explicit gates.
 
-A separate correction slice should then define migration semantics carefully:
-
-- an all-modules-equal legacy `front=` query can be collapsed into `furnitureFinishPresetId`;
-- intentional partial/per-module `front=` assignments must retain their local-override meaning;
-- migrated compatibility state should not survive invisibly in the URL;
-- clean URL, legacy uniform URL, partial override URL, reset, and reload each need explicit gates.
+No renderer, Scene Core geometry, material definitions, or module-specific finish precedence should be changed to solve this defect.
