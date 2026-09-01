@@ -297,6 +297,50 @@ function decorateSummary(api: ViewerUiApi): void {
   furnitureItem.dataset.productFinishSource = "configuration-state";
 }
 
+function setCopy(selector: string, copy: string): void {
+  const target = document.querySelector<HTMLElement>(selector);
+  if (target && target.textContent !== copy) target.textContent = copy;
+}
+
+function decorateProductFacingCopy(): void {
+  setCopy(
+    '[data-stage-panel="finishes"] .viewer-stage-heading__description',
+    "Escolha cores e materiais e acompanhe o resultado diretamente no ambiente."
+  );
+  setCopy(
+    '[data-stage-panel="accessories"] .viewer-stage-heading__description',
+    "Escolha os opcionais disponíveis para esta configuração."
+  );
+  setCopy(
+    '[data-stage-panel="accessories"] .viewer-empty-state > strong',
+    "Acessórios ainda não disponíveis para seleção"
+  );
+  setCopy(
+    '[data-stage-panel="accessories"] .viewer-empty-state__text',
+    "Puxadores e outros opcionais aparecerão aqui quando houver escolhas disponíveis para esta configuração. Especificações técnicas continuam nos detalhes dos módulos."
+  );
+  setCopy(
+    '[data-stage-panel="summary"] .viewer-summary__card:nth-of-type(3) .viewer-summary__muted',
+    "Não há acessórios disponíveis para seleção nesta configuração no momento."
+  );
+  setCopy(
+    '[data-stage-panel="summary"] .viewer-summary__card--value > strong',
+    "Valor ainda não disponível"
+  );
+  setCopy(
+    '[data-stage-panel="summary"] .viewer-summary__card--value .viewer-summary__muted',
+    "O valor será exibido aqui quando estiver disponível para esta configuração."
+  );
+  setCopy(
+    '.viewer-product-detail__unavailable > strong',
+    "Detalhes técnicos ainda não disponíveis"
+  );
+  setCopy(
+    '.viewer-product-detail__unavailable-text',
+    "Este módulo continua disponível na configuração. As informações técnicas serão exibidas aqui quando estiverem disponíveis."
+  );
+}
+
 export function installProductContractEnhancements(api: ViewerUiApi): ProductContractEnhancements {
   let disposed = false;
   let scheduledFrame: number | null = null;
@@ -310,6 +354,7 @@ export function installProductContractEnhancements(api: ViewerUiApi): ProductCon
     decoratePublishedFinishDots(api);
     decoratePublishedSemanticIcons();
     decorateSummary(api);
+    decorateProductFacingCopy();
   };
 
   const scheduleDecorate = (): void => {
