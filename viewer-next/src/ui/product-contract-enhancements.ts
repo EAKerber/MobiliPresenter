@@ -8,6 +8,39 @@ export interface ProductContractEnhancements {
   dispose(): void;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const SEMANTIC_ICON_PATHS: Readonly<Record<string, readonly string[]>> = {
+  "electrical.outlet": [
+    "M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z",
+    "M9 9v3",
+    "M15 9v3",
+    "M12 15v.01"
+  ],
+  "electrical.cable": [
+    "M7 4v5a5 5 0 0 0 5 5h1a4 4 0 0 1 4 4v2",
+    "M5 4h4",
+    "M15 20h4"
+  ],
+  "electrical.switch": [
+    "M5 12h5",
+    "M14 8l5 4-5 4",
+    "M10 12h9"
+  ],
+  "hardware.hinge": [
+    "M5 5h5v14H5z",
+    "M14 5h5v14h-5z",
+    "M10 9h4",
+    "M10 15h4",
+    "M12 12v.01"
+  ],
+  "hardware.drawer-runner": [
+    "M4 8h16",
+    "M4 16h16",
+    "M7 11h10v2H7z"
+  ]
+};
+
 function formatMm(value: number): string {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value);
 }
@@ -28,6 +61,38 @@ function optionVisualByLabel(
   label: string
 ): ViewerUiOption["visual"] | undefined {
   return options.find(option => option.label === label)?.visual;
+}
+
+function createPublishedFinishDot(visual: NonNullable<ViewerUiOption["visual"]>): HTMLElement {
+  const dot = document.createElement("span");
+  dot.className = "viewer-finish-dot";
+  dot.style.backgroundColor = visual.previewColorSrgb;
+  dot.dataset.materialId = visual.materialId;
+  dot.setAttribute("aria-hidden", "true");
+  return dot;
+}
+
+function createPublishedSemanticIcon(semanticKey: string): SVGSVGElement | null {
+  const paths = SEMANTIC_ICON_PATHS[semanticKey];
+  if (!paths) return null;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.classList.add("viewer-semantic-icon", "viewer-semantic-icon--published");
+  svg.dataset.semanticIconKey = semanticKey;
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.7");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  for (const d of paths) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
 }
 
 function decorateModuleCards(api: ViewerUiApi): void {
@@ -95,11 +160,18 @@ function decoratePublishedFinishDots(api: ViewerUiApi): void {
 
   for (const meta of document.querySelectorAll<HTMLElement>(".viewer-product-detail__meta > span")) {
     const visual = optionVisualByLabel(selected, meta.textContent?.trim() ?? "");
-    const dot = meta.querySelector<HTMLElement>(".viewer-finish-dot");
-    if (visual && dot) {
+    if (!visual) continue;
+
+    meta.classList.add("viewer-current-finish-pill");
+    let dot = meta.querySelector<HTMLElement>(".viewer-finish-dot");
+    if (!dot) {
+      dot = createPublishedFinishDot(visual);
+      meta.prepend(dot);
+    } else {
       dot.style.backgroundColor = visual.previewColorSrgb;
       dot.dataset.materialId = visual.materialId;
     }
+    meta.dataset.productFinishSource = "published-visual";
   }
 
   const allFinishOptions: ViewerUiOption[] = [
@@ -108,11 +180,33 @@ function decoratePublishedFinishDots(api: ViewerUiApi): void {
   ];
   for (const value of document.querySelectorAll<HTMLElement>(".viewer-product-card .viewer-finish-value")) {
     const visual = optionVisualByLabel(allFinishOptions, value.textContent?.trim() ?? "");
-    const dot = value.querySelector<HTMLElement>(".viewer-finish-dot");
-    if (visual && dot) {
+    if (!visual) continue;
+
+    let dot = value.querySelector<HTMLElement>(".viewer-finish-dot");
+    if (!dot) {
+      dot = createPublishedFinishDot(visual);
+      value.prepend(dot);
+    } else {
       dot.style.backgroundColor = visual.previewColorSrgb;
       dot.dataset.materialId = visual.materialId;
     }
+    value.dataset.productFinishSource = "published-visual";
+  }
+}
+
+function decoratePublishedSemanticIcons(): void {
+  for (const item of document.querySelectorAll<HTMLElement>("[data-semantic-kind]")) {
+    const semanticKey = item.dataset.semanticKind;
+    if (!semanticKey || !SEMANTIC_ICON_PATHS[semanticKey]) continue;
+
+    const current = item.querySelector<HTMLElement>(":scope > .viewer-semantic-icon, :scope > i[data-lucide]");
+    if (current?.dataset.semanticIconKey === semanticKey) continue;
+
+    const icon = createPublishedSemanticIcon(semanticKey);
+    if (!icon) continue;
+    if (current) current.replaceWith(icon);
+    else item.prepend(icon);
+    item.dataset.productSemanticIconSource = "published-key";
   }
 }
 
@@ -126,6 +220,7 @@ export function installProductContractEnhancements(api: ViewerUiApi): ProductCon
     decorateModuleCards(api);
     decorateStoneChoices(api);
     decoratePublishedFinishDots(api);
+    decoratePublishedSemanticIcons();
   };
 
   const scheduleDecorate = (): void => {
