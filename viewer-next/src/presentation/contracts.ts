@@ -1,15 +1,21 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
 export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.1" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.2" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.3" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
 export type TechnicalViewPlane = "width-height" | "depth-height" | "width-depth";
+export type TechnicalViewProjection = TechnicalViewPlane | "isometric";
 export type TechnicalViewKind = "orthographic" | "internal" | "isometric" | "detail";
 export type TechnicalViewFidelity = "schematic" | "geometry-derived" | "authored";
-export type TechnicalViewCoverage = "envelope" | "authored-layout" | "module-front-primitives" | "appliance-front-openings";
-export type TechnicalViewOmission = "hardware" | "hidden-geometry";
+export type TechnicalViewCoverage =
+  | "envelope"
+  | "authored-layout"
+  | "module-front-primitives"
+  | "module-geometry-primitives"
+  | "appliance-front-openings";
+export type TechnicalViewOmission = "hardware" | "hidden-geometry" | "hidden-line-removal";
 export type TechnicalNoticeSeverity = "info" | "important" | "warning";
 export type TechnicalDependencyRelation = "requires-present" | "control-point-host" | "technical-support";
 export type TechnicalControlKind = "visibility" | "activation";
@@ -140,9 +146,15 @@ export interface TechnicalProjectedOpening {
   readonly evidenceRefs: readonly string[];
 }
 
+export interface TechnicalProjectedDimensionGuide {
+  readonly axis: TechnicalAxis;
+  readonly startMm: TechnicalPoint2Mm;
+  readonly endMm: TechnicalPoint2Mm;
+}
+
 export interface CompiledTechnicalViewGeometry {
   readonly viewId: string;
-  readonly plane: "width-height";
+  readonly projection: TechnicalViewProjection;
   readonly coordinateUnit: "mm";
   readonly boundsMm: {
     readonly horizontal: number;
@@ -150,6 +162,7 @@ export interface CompiledTechnicalViewGeometry {
   };
   readonly primitives: readonly TechnicalProjectedPrimitive[];
   readonly openings: readonly TechnicalProjectedOpening[];
+  readonly dimensionGuides: readonly TechnicalProjectedDimensionGuide[];
   readonly coverage: readonly TechnicalViewCoverage[];
   readonly omitted: readonly TechnicalViewOmission[];
 }

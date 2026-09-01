@@ -1,7 +1,9 @@
 import type {
   CompiledTechnicalViewGeometry,
   TechnicalAxis,
+  TechnicalPoint2Mm,
   TechnicalPresentationPackage,
+  TechnicalProjectedDimensionGuide,
   TechnicalViewCoverage,
   TechnicalViewFidelity,
   TechnicalViewOmission,
@@ -25,6 +27,9 @@ const HEIGHT = 300;
 const MARGIN = 48;
 const DEFAULT_OMISSIONS: readonly TechnicalViewOmission[] = ["hardware", "hidden-geometry"];
 
+type ScreenPoint = { readonly x: number; readonly y: number };
+type LabelBox = { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number };
+
 function escapeXml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -41,22 +46,58 @@ function planeAxes(plane: TechnicalViewPlane): readonly [TechnicalAxis, Technica
   }
 }
 
-function svgShell(label: string, body: string, fidelity: TechnicalViewFidelity, source: TechnicalViewRequest["source"]): string {
+function svgShell(
+  label: string,
+  body: string,
+  fidelity: TechnicalViewFidelity,
+  source: TechnicalViewRequest["source"]
+): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="${escapeXml(label)}" data-technical-fidelity="${fidelity}" data-technical-source="${source}">` +
     `<g fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke">${body}</g></svg>`;
 }
 
-function text(x: number, y: number, value: string, anchor: "start" | "middle" | "end" = "middle"): string {
-  return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" fill="currentColor" stroke="none" font-size="12" text-anchor="${anchor}" font-family="sans-serif">${escapeXml(value)}</text>`;
+function text(
+  x: number,
+  y: number,
+  value: string,
+  anchor: "start" | "middle" | "end" = "middle",
+  role?: string,
+  extraAttributes = ""
+): string {
+  const semantic = role ? ` data-role="${role}"` : "";
+  return `<text${semantic}${extraAttributes} x="${x.toFixed(2)}" y="${y.toFixed(2)}" fill="currentColor" stroke="none" font-size="12" text-anchor="${anchor}" font-family="sans-serif">${escapeXml(value)}</text>`;
 }
 
-function dimensionLine(x1: number, y1: number, x2: number, y2: number, label: string): string {
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"/>` +
-    `<line x1="${(x1 - 4).toFixed(2)}" y1="${(y1 - 4).toFixed(2)}" x2="${(x1 + 4).toFixed(2)}" y2="${(y1 + 4).toFixed(2)}"/>` +
-    `<line x1="${(x2 - 4).toFixed(2)}" y1="${(y2 - 4).toFixed(2)}" x2="${(x2 + 4).toFixed(2)}" y2="${(y2 + 4).toFixed(2)}"/>` +
-    text(mx, my - 6, label);
+function horizontalDimension(
+  x1: number,
+  x2: number,
+  geometryY: number,
+  dimensionY: number,
+  label: string
+): string {
+  const mid = (x1 + x2) / 2;
+  return `<line data-role="extension-line" x1="${x1.toFixed(2)}" y1="${geometryY.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${dimensionY.toFixed(2)}"/>` +
+    `<line data-role="extension-line" x1="${x2.toFixed(2)}" y1="${geometryY.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${dimensionY.toFixed(2)}"/>` +
+    `<line data-role="dimension-line" x1="${x1.toFixed(2)}" y1="${dimensionY.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${dimensionY.toFixed(2)}"/>` +
+    `<line data-role="tick" x1="${(x1 - 4).toFixed(2)}" y1="${(dimensionY - 4).toFixed(2)}" x2="${(x1 + 4).toFixed(2)}" y2="${(dimensionY + 4).toFixed(2)}"/>` +
+    `<line data-role="tick" x1="${(x2 - 4).toFixed(2)}" y1="${(dimensionY - 4).toFixed(2)}" x2="${(x2 + 4).toFixed(2)}" y2="${(dimensionY + 4).toFixed(2)}"/>` +
+    text(mid, dimensionY - 6, label, "middle", "dimension-label");
+}
+
+function verticalDimension(
+  y1: number,
+  y2: number,
+  geometryX: number,
+  dimensionX: number,
+  label: string
+): string {
+  const mid = (y1 + y2) / 2;
+  return `<line data-role="extension-line" x1="${geometryX.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${dimensionX.toFixed(2)}" y2="${y1.toFixed(2)}"/>` +
+    `<line data-role="extension-line" x1="${geometryX.toFixed(2)}" y1="${y2.toFixed(2)}" x2="${dimensionX.toFixed(2)}" y2="${y2.toFixed(2)}"/>` +
+    `<line data-role="dimension-line" x1="${dimensionX.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${dimensionX.toFixed(2)}" y2="${y2.toFixed(2)}"/>` +
+    `<line data-role="tick" x1="${(dimensionX - 4).toFixed(2)}" y1="${(y1 - 4).toFixed(2)}" x2="${(dimensionX + 4).toFixed(2)}" y2="${(y1 + 4).toFixed(2)}"/>` +
+    `<line data-role="tick" x1="${(dimensionX - 4).toFixed(2)}" y1="${(y2 - 4).toFixed(2)}" x2="${(dimensionX + 4).toFixed(2)}" y2="${(y2 + 4).toFixed(2)}"/>` +
+    text(dimensionX - 8, mid + 4, label, "end", "dimension-label");
 }
 
 function schematicOrthographicSvg(pkg: TechnicalPresentationPackage, view: TechnicalViewRequest): string {
@@ -86,15 +127,15 @@ function schematicOrthographicSvg(pkg: TechnicalPresentationPackage, view: Techn
       cursorMm += segment.spanMm;
       if (axisIsHorizontal && index < layout.segments.length - 1) {
         const px = x + cursorMm * scale;
-        body += `<line x1="${px.toFixed(2)}" y1="${y.toFixed(2)}" x2="${px.toFixed(2)}" y2="${(y + h).toFixed(2)}"/>`;
+        body += `<line data-role="internal-division" x1="${px.toFixed(2)}" y1="${y.toFixed(2)}" x2="${px.toFixed(2)}" y2="${(y + h).toFixed(2)}"/>`;
       } else if (axisIsVertical && index < layout.segments.length - 1) {
         const py = y + h - cursorMm * scale;
-        body += `<line x1="${x.toFixed(2)}" y1="${py.toFixed(2)}" x2="${(x + w).toFixed(2)}" y2="${py.toFixed(2)}"/>`;
+        body += `<line data-role="internal-division" x1="${x.toFixed(2)}" y1="${py.toFixed(2)}" x2="${(x + w).toFixed(2)}" y2="${py.toFixed(2)}"/>`;
       }
       if (axisIsHorizontal) {
-        body += text(x + (startMm + segment.spanMm / 2) * scale, y + h + 22, fmt(segment.spanMm));
+        body += text(x + (startMm + segment.spanMm / 2) * scale, y + h + 22, fmt(segment.spanMm), "middle", "authored-dimension-label");
       } else if (axisIsVertical) {
-        body += text(x - 8, y + h - (startMm + segment.spanMm / 2) * scale, fmt(segment.spanMm), "end");
+        body += text(x - 8, y + h - (startMm + segment.spanMm / 2) * scale, fmt(segment.spanMm), "end", "authored-dimension-label");
       }
     }
 
@@ -106,15 +147,126 @@ function schematicOrthographicSvg(pkg: TechnicalPresentationPackage, view: Techn
         const sw = segment.spanMm * scale;
         for (let part = 1; part < subdivision.count; part += 1) {
           const py = y + (h * part) / subdivision.count;
-          body += `<line x1="${sx.toFixed(2)}" y1="${py.toFixed(2)}" x2="${(sx + sw).toFixed(2)}" y2="${py.toFixed(2)}"/>`;
+          body += `<line data-role="internal-division" x1="${sx.toFixed(2)}" y1="${py.toFixed(2)}" x2="${(sx + sw).toFixed(2)}" y2="${py.toFixed(2)}"/>`;
         }
       }
     }
   }
 
-  body += dimensionLine(x, y + h + 36, x + w, y + h + 36, `${fmt(horizontalMm)} mm`);
-  body += dimensionLine(x - 30, y + h, x - 30, y, `${fmt(verticalMm)} mm`);
+  body += horizontalDimension(x, x + w, y + h, y + h + 36, `${fmt(horizontalMm)} mm`);
+  body += verticalDimension(y + h, y, x, x - 30, `${fmt(verticalMm)} mm`);
   return svgShell(`${pkg.identity.title} — ${view.label}`, body, "schematic", view.source);
+}
+
+function pointExtent(
+  primitives: CompiledTechnicalViewGeometry["primitives"],
+  predicate: (role: string) => boolean
+): readonly [number, number] | null {
+  const points = primitives
+    .filter(primitive => predicate(primitive.role))
+    .flatMap(primitive => primitive.pointsMm);
+  if (points.length === 0) return null;
+  return [
+    Math.min(...points.map(point => point.horizontalMm)),
+    Math.max(...points.map(point => point.horizontalMm))
+  ];
+}
+
+function screenPoint(point: TechnicalPoint2Mm, x: number, y: number, h: number, scale: number): ScreenPoint {
+  return {
+    x: x + point.horizontalMm * scale,
+    y: y + h - point.verticalMm * scale
+  };
+}
+
+function normalizeVector(vector: ScreenPoint): ScreenPoint {
+  const length = Math.hypot(vector.x, vector.y);
+  if (length < 1e-9) return { x: 0, y: 0 };
+  return { x: vector.x / length, y: vector.y / length };
+}
+
+function isometricLaneNormal(axis: TechnicalAxis, start: ScreenPoint, end: ScreenPoint): ScreenPoint {
+  if (axis === "height") return { x: -1, y: 0 };
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  return axis === "width"
+    ? normalizeVector({ x: -dy, y: dx })
+    : normalizeVector({ x: dy, y: -dx });
+}
+
+function estimateLabelBox(center: ScreenPoint, label: string): LabelBox {
+  const halfWidth = Math.max(16, label.length * 3.35);
+  return {
+    left: center.x - halfWidth,
+    right: center.x + halfWidth,
+    top: center.y - 8,
+    bottom: center.y + 7
+  };
+}
+
+function boxesIntersect(a: LabelBox, b: LabelBox, padding = 4): boolean {
+  return !(a.right + padding < b.left || b.right + padding < a.left || a.bottom + padding < b.top || b.bottom + padding < a.top);
+}
+
+function renderIsometricDimension(
+  guide: TechnicalProjectedDimensionGuide,
+  label: string,
+  start: ScreenPoint,
+  end: ScreenPoint,
+  occupied: LabelBox[]
+): string {
+  const normal = isometricLaneNormal(guide.axis, start, end);
+  const baseOffset = guide.axis === "height" ? 28 : 30;
+  let offset = baseOffset;
+  let labelCenter: ScreenPoint = { x: 0, y: 0 };
+  let labelBox: LabelBox = { left: 0, right: 0, top: 0, bottom: 0 };
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const shiftedStart = { x: start.x + normal.x * offset, y: start.y + normal.y * offset };
+    const shiftedEnd = { x: end.x + normal.x * offset, y: end.y + normal.y * offset };
+    labelCenter = {
+      x: (shiftedStart.x + shiftedEnd.x) / 2 + normal.x * 10,
+      y: (shiftedStart.y + shiftedEnd.y) / 2 + normal.y * 10
+    };
+    labelBox = estimateLabelBox(labelCenter, label);
+    if (!occupied.some(existing => boxesIntersect(labelBox, existing))) break;
+    offset += 14;
+  }
+  occupied.push(labelBox);
+
+  const shiftedStart = { x: start.x + normal.x * offset, y: start.y + normal.y * offset };
+  const shiftedEnd = { x: end.x + normal.x * offset, y: end.y + normal.y * offset };
+  const tick = { x: normal.x * 4, y: normal.y * 4 };
+  const attrs = ` data-axis="${guide.axis}" data-lane-offset="${offset.toFixed(2)}"`;
+  return `<g data-role="isometric-dimension" data-axis="${guide.axis}">` +
+    `<line data-role="extension-line"${attrs} x1="${start.x.toFixed(2)}" y1="${start.y.toFixed(2)}" x2="${shiftedStart.x.toFixed(2)}" y2="${shiftedStart.y.toFixed(2)}"/>` +
+    `<line data-role="extension-line"${attrs} x1="${end.x.toFixed(2)}" y1="${end.y.toFixed(2)}" x2="${shiftedEnd.x.toFixed(2)}" y2="${shiftedEnd.y.toFixed(2)}"/>` +
+    `<line data-role="dimension-line"${attrs} x1="${shiftedStart.x.toFixed(2)}" y1="${shiftedStart.y.toFixed(2)}" x2="${shiftedEnd.x.toFixed(2)}" y2="${shiftedEnd.y.toFixed(2)}"/>` +
+    `<line data-role="tick"${attrs} x1="${(shiftedStart.x - tick.x).toFixed(2)}" y1="${(shiftedStart.y - tick.y).toFixed(2)}" x2="${(shiftedStart.x + tick.x).toFixed(2)}" y2="${(shiftedStart.y + tick.y).toFixed(2)}"/>` +
+    `<line data-role="tick"${attrs} x1="${(shiftedEnd.x - tick.x).toFixed(2)}" y1="${(shiftedEnd.y - tick.y).toFixed(2)}" x2="${(shiftedEnd.x + tick.x).toFixed(2)}" y2="${(shiftedEnd.y + tick.y).toFixed(2)}"/>` +
+    text(labelCenter.x, labelCenter.y + 4, label, "middle", "dimension-label", attrs) +
+    `</g>`;
+}
+
+function isometricDimensions(
+  geometry: CompiledTechnicalViewGeometry,
+  dimensions: NonNullable<TechnicalPresentationPackage["dimensions"]>,
+  x: number,
+  y: number,
+  h: number,
+  scale: number
+): string {
+  const occupied: LabelBox[] = [];
+  const order: readonly TechnicalAxis[] = ["height", "width", "depth"];
+  let body = "";
+  for (const axis of order) {
+    const guide = geometry.dimensionGuides.find(candidate => candidate.axis === axis);
+    if (!guide) continue;
+    const start = screenPoint(guide.startMm, x, y, h, scale);
+    const end = screenPoint(guide.endMm, x, y, h, scale);
+    body += renderIsometricDimension(guide, `${fmt(dimensions.primaryMm[axis])} mm`, start, end, occupied);
+  }
+  return body;
 }
 
 function geometryDerivedSvg(
@@ -123,31 +275,56 @@ function geometryDerivedSvg(
   geometry: CompiledTechnicalViewGeometry
 ): string {
   const dimensions = pkg.dimensions;
-  if (!dimensions || view.plane !== "width-height") throw new Error(`TECHNICAL_VIEW_DIMENSIONS_REQUIRED:${view.id}`);
-  const drawWidth = WIDTH - MARGIN * 2;
-  const drawHeight = HEIGHT - MARGIN * 2;
+  if (!dimensions) throw new Error(`TECHNICAL_VIEW_DIMENSIONS_REQUIRED:${view.id}`);
+  const isometric = geometry.projection === "isometric";
+  const layout = isometric
+    ? { left: 76, right: 72, top: 30, bottom: 74 }
+    : { left: MARGIN, right: MARGIN, top: MARGIN, bottom: MARGIN };
+  const drawWidth = WIDTH - layout.left - layout.right;
+  const drawHeight = HEIGHT - layout.top - layout.bottom;
   const scale = Math.min(
     drawWidth / Math.max(1, geometry.boundsMm.horizontal),
     drawHeight / Math.max(1, geometry.boundsMm.vertical)
   );
   const w = geometry.boundsMm.horizontal * scale;
   const h = geometry.boundsMm.vertical * scale;
-  const x = (WIDTH - w) / 2;
-  const y = (HEIGHT - h) / 2;
-  const pointString = (points: readonly { readonly horizontalMm: number; readonly verticalMm: number }[]): string =>
-    points.map(point => `${(x + point.horizontalMm * scale).toFixed(2)},${(y + h - point.verticalMm * scale).toFixed(2)}`).join(" ");
+  const x = layout.left + (drawWidth - w) / 2;
+  const y = layout.top + (drawHeight - h) / 2;
+  const pointString = (points: readonly TechnicalPoint2Mm[]): string =>
+    points.map(point => {
+      const screen = screenPoint(point, x, y, h, scale);
+      return `${screen.x.toFixed(2)},${screen.y.toFixed(2)}`;
+    }).join(" ");
 
-  let body = `<rect data-role="geometry-envelope" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" stroke-dasharray="4 4"/>`;
+  let body = "";
   for (const primitive of geometry.primitives) {
-    body += `<polygon data-primitive-id="${escapeXml(primitive.id)}" data-role="${escapeXml(primitive.role)}" points="${pointString(primitive.pointsMm)}"/>`;
+    body += `<polygon data-role="primary-geometry" data-primitive-role="${escapeXml(primitive.role)}" data-primitive-id="${escapeXml(primitive.id)}" points="${pointString(primitive.pointsMm)}"/>`;
   }
   for (const opening of geometry.openings) {
-    body += `<polygon data-opening-id="${escapeXml(opening.id)}" data-slot-id="${escapeXml(opening.slotId)}" data-role="${escapeXml(opening.role)}" points="${pointString(opening.pointsMm)}" stroke-dasharray="6 3"/>`;
+    body += `<polygon data-role="opening" data-opening-role="${escapeXml(opening.role)}" data-opening-id="${escapeXml(opening.id)}" data-slot-id="${escapeXml(opening.slotId)}" points="${pointString(opening.pointsMm)}" stroke-dasharray="6 3"/>`;
   }
 
-  body += dimensionLine(x, y + h + 36, x + w, y + h + 36, `${fmt(dimensions.primaryMm.width)} mm`);
-  body += dimensionLine(x - 30, y + h, x - 30, y, `${fmt(dimensions.primaryMm.height)} mm`);
-  return svgShell(`${pkg.identity.title} — ${view.label}`, body, "geometry-derived", view.source);
+  if (isometric) {
+    body += isometricDimensions(geometry, dimensions, x, y, h, scale);
+  } else {
+    const plane = geometry.projection;
+    const [horizontalAxis, verticalAxis] = planeAxes(plane);
+    const horizontalMm = dimensions.primaryMm[horizontalAxis];
+    const verticalMm = dimensions.primaryMm[verticalAxis];
+    const horizontalExtent = plane === "depth-height"
+      ? pointExtent(geometry.primitives, role => role !== "front") ?? [0, geometry.boundsMm.horizontal]
+      : [0, geometry.boundsMm.horizontal] as const;
+    body += horizontalDimension(
+      x + horizontalExtent[0] * scale,
+      x + horizontalExtent[1] * scale,
+      y + h,
+      y + h + 36,
+      `${fmt(horizontalMm)} mm`
+    );
+    body += verticalDimension(y + h, y, x, x - 30, `${fmt(verticalMm)} mm`);
+  }
+
+  return svgShell(`${pkg.identity.title} — ${view.label}`, body, "geometry-derived", "scene-geometry");
 }
 
 function isometricSvg(pkg: TechnicalPresentationPackage, view: TechnicalViewRequest): string {
@@ -173,9 +350,9 @@ function isometricSvg(pkg: TechnicalPresentationPackage, view: TechnicalViewRequ
   let body = "";
   for (const [a, b] of edges) {
     const pa = project(a), pb = project(b);
-    body += `<line x1="${pa[0].toFixed(2)}" y1="${pa[1].toFixed(2)}" x2="${pb[0].toFixed(2)}" y2="${pb[1].toFixed(2)}"/>`;
+    body += `<line data-role="envelope-edge" x1="${pa[0].toFixed(2)}" y1="${pa[1].toFixed(2)}" x2="${pb[0].toFixed(2)}" y2="${pb[1].toFixed(2)}"/>`;
   }
-  body += text(WIDTH / 2, HEIGHT - 12, `${fmt(w)} × ${fmt(h)} × ${fmt(d)} mm`);
+  body += text(WIDTH / 2, HEIGHT - 12, `${fmt(w)} × ${fmt(h)} × ${fmt(d)} mm`, "middle", "dimension-summary");
   return svgShell(`${pkg.identity.title} — ${view.label}`, body, "schematic", view.source);
 }
 
@@ -199,19 +376,21 @@ export function renderTechnicalViewSvg(pkg: TechnicalPresentationPackage, viewId
     };
   }
 
-  if (view.source === "scene-geometry") {
-    const geometry = pkg.technicalViewGeometry.find(candidate => candidate.viewId === view.id);
-    if (!geometry) throw new Error(`TECHNICAL_VIEW_GEOMETRY_REQUIRED:${view.id}`);
+  const geometry = pkg.technicalViewGeometry.find(candidate => candidate.viewId === view.id);
+  if (geometry) {
     return {
       viewId,
       status: "ready",
       fidelity: "geometry-derived",
-      source: view.source,
+      source: "scene-geometry",
       coverage: geometry.coverage,
       omitted: geometry.omitted,
       mediaType: "image/svg+xml",
       svg: geometryDerivedSvg(pkg, view, geometry)
     };
+  }
+  if (view.source === "scene-geometry") {
+    throw new Error(`TECHNICAL_VIEW_GEOMETRY_REQUIRED:${view.id}`);
   }
 
   if (view.kind === "isometric") {
