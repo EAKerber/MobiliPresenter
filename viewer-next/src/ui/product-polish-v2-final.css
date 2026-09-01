@@ -107,7 +107,7 @@
   }
 
   .viewer-stage--finishes {
-    padding-bottom: calc(var(--ui-actions-height) + 34px) !important;
+    padding-bottom: 18px !important;
   }
 
   .viewer-stage--finishes .viewer-stage-heading {
@@ -140,8 +140,8 @@
   }
 
   .viewer-stage--finishes .viewer-option-group + .viewer-option-group {
-    margin-top: 16px;
-    padding-top: 14px;
+    margin-top: 14px;
+    padding-top: 12px;
   }
 
   .viewer-stage--finishes .viewer-option-group h3 {
@@ -180,17 +180,31 @@
     overflow-wrap: normal;
   }
 
-  .viewer-stage--finishes .viewer-choice-card:not([data-product-finish-enhanced="true"]) {
-    padding-left: 42px !important;
-    text-align: left;
-    white-space: normal;
+  .viewer-stage--finishes .viewer-option-group + .viewer-option-group .viewer-option-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
   }
 
-  .viewer-stage--finishes .viewer-choice-card:not([data-product-finish-enhanced="true"])::before {
-    left: 10px;
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
+  .viewer-stage--finishes .viewer-option-group + .viewer-option-group .viewer-choice-card:not([data-product-finish-enhanced="true"]) {
+    min-height: 70px !important;
+    display: grid;
+    grid-template-rows: 28px minmax(0, auto);
+    place-items: center;
+    align-content: center;
+    gap: 6px;
+    padding: 7px 5px !important;
+    text-align: center;
+    white-space: normal;
+    font-size: 10px !important;
+    line-height: 1.08 !important;
+  }
+
+  .viewer-stage--finishes .viewer-option-group + .viewer-option-group .viewer-choice-card:not([data-product-finish-enhanced="true"])::before {
+    position: static;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    transform: none;
   }
 
   .viewer-stage--finishes .viewer-choice-card[aria-pressed="true"]::after {
@@ -220,7 +234,6 @@
     gap: 7px;
   }
 
-  .viewer-stage--finishes .viewer-choice-card,
   .viewer-stage--finishes .viewer-choice-card[data-product-finish-enhanced="true"] {
     min-height: 54px !important;
     padding-top: 7px !important;
@@ -230,5 +243,10 @@
 
   .viewer-stage--finishes .viewer-choice-card__label {
     font-size: 11px;
+  }
+
+  .viewer-stage--finishes .viewer-option-group + .viewer-option-group .viewer-choice-card:not([data-product-finish-enhanced="true"]) {
+    min-height: 66px !important;
+    font-size: 9.5px !important;
   }
 }
