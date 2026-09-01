@@ -48,12 +48,6 @@ function decorateModuleCards(api: ViewerUiApi): void {
       if (meta.textContent !== dimensions) meta.textContent = dimensions;
     }
 
-    const checkbox = card.querySelector<HTMLInputElement>("[data-module-visibility]");
-    if (checkbox) {
-      const verb = card.dataset.visible === "false" ? "Mostrar" : "Ocultar";
-      checkbox.setAttribute("aria-label", `${verb} ${descriptor.title}`);
-    }
-
     const inspect = card.querySelector<HTMLButtonElement>(".viewer-module-card__inspect");
     inspect?.setAttribute("aria-label", `Abrir detalhes de ${descriptor.title}`);
     card.dataset.productDescriptor = "true";
