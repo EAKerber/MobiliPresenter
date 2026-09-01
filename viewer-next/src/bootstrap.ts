@@ -15,6 +15,7 @@ import {
 } from "./ui/product-contract-enhancements.js";
 import { installProductPolishV2, type ProductPolishV2 } from "./ui/product-polish-v2.js";
 import { installProductUiEnhancements, type ProductUiEnhancements } from "./ui/product-enhancements.js";
+import { installGlobalFinishControl } from "./ui/global-finish-readiness.js";
 import { mountRuntimeControls, type RuntimeControlsUi } from "./ui/runtime-controls.js";
 
 const app = document.querySelector<HTMLElement>("#app");
@@ -33,6 +34,7 @@ app.dataset.viewerControls = controlsEnabled ? "true" : "false";
 app.dataset.viewerUiMode = controlsEnabled ? "product" : "renderer-only";
 
 let controls: RuntimeControlsUi | null = null;
+let disposeGlobalFinishControl: (() => void) | null = null;
 let productEnhancements: ProductUiEnhancements | null = null;
 let desktopComposition: DesktopCompositionEnhancement | null = null;
 let productPolishV2: ProductPolishV2 | null = null;
@@ -45,6 +47,7 @@ if (controlsEnabled) {
   const uiApi = createViewerUiApi(runtime);
 
   controls = mountRuntimeControls(document.body, uiApi);
+  disposeGlobalFinishControl = installGlobalFinishControl(uiApi, controls);
   productEnhancements = installProductUiEnhancements(uiApi, controls);
   desktopComposition = installDesktopCompositionEnhancement();
   productPolishV2 = installProductPolishV2(uiApi);
@@ -69,6 +72,8 @@ if (controlsEnabled) {
     desktopComposition = null;
     productEnhancements?.dispose();
     productEnhancements = null;
+    disposeGlobalFinishControl?.();
+    disposeGlobalFinishControl = null;
     controls?.dispose();
     controls = null;
   }, { once: true });
