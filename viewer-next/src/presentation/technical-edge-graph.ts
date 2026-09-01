@@ -250,7 +250,7 @@ export function buildProjectedTechnicalEdgeGraph(
   if (allVertices.length === 0) return [];
   const minDepth = Math.min(...allVertices.map(point => point.y));
   const maxDepth = Math.max(...allVertices.map(point => point.y));
-  const hull = convexHull(allVertices.map(project));
+  const hull = convexHull(allVertices.map(point => project(point)));
 
   return [...accumulators.values()]
     .sort((a, b) => a.key.localeCompare(b.key))
