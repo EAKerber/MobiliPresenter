@@ -9,6 +9,8 @@ on:
       - "viewer-next/public/module-thumbnails/**"
       - "viewer-next/tests/chrome_viewport_capture.mjs"
       - "viewer-next/tests/global_finish_browser_smoke.mjs"
+      - "viewer-next/tests/global_finish_traceback_browser_smoke.mjs"
+      - "viewer-next/tests/global_finish_legacy_override_trace.test.mjs"
       - "viewer-next/tests/mobile_finishes_clearance.mjs"
       - ".github/workflows/product-ui-evidence.yml"
   workflow_dispatch:
@@ -87,6 +89,10 @@ jobs:
         working-directory: viewer-next
         run: node tests/global_finish_browser_smoke.mjs
 
+      - name: Trace legacy MDF override lineage
+        working-directory: viewer-next
+        run: node tests/global_finish_traceback_browser_smoke.mjs
+
       - name: Capture mobile finishes layout
         working-directory: viewer-next
         run: |
@@ -124,5 +130,6 @@ jobs:
           path: |
             viewer-next/artifacts/runtime-ui/
             viewer-next/artifacts/product-ui-navigation/
+            viewer-next/artifacts/global-finish-traceback/
           if-no-files-found: warn
           retention-days: 14
