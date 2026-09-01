@@ -12,6 +12,17 @@ function count(source, pattern) {
   return [...source.matchAll(pattern)].length;
 }
 
+function isometricDimensionGroups(svg) {
+  return [...svg.matchAll(/<g data-role="isometric-dimension"[^>]*>/g)].map(match => match[0]);
+}
+
+function assertSingleOverallDimension(svg, axis) {
+  const groups = isometricDimensionGroups(svg).filter(group =>
+    group.includes(`data-semantic-key="overall/${axis}"`)
+  );
+  assert.equal(groups.length, 1, `expected one overall/${axis} dimension group`);
+}
+
 function labelBoxes(svg) {
   return [...svg.matchAll(/data-role="dimension-label"[^>]*data-label-left="([0-9.-]+)" data-label-top="([0-9.-]+)" data-label-right="([0-9.-]+)" data-label-bottom="([0-9.-]+)"/g)]
     .map(match => ({
@@ -46,9 +57,7 @@ test("module03 geometry-derived isometric owns one semantic overall dimension pe
   assert.match(svg, /data-technical-composition="technical-composition\/v0\.3"/);
   assert.equal(count(svg, /data-role="isometric-dimension"/g), 3);
 
-  for (const axis of ["height", "width", "depth"]) {
-    assert.equal(count(svg, new RegExp(`data-semantic-key="overall/${axis}"`, "g")), 6);
-  }
+  for (const axis of ["height", "width", "depth"]) assertSingleOverallDimension(svg, axis);
   assert.equal(count(svg, />1200 mm</g), 1);
   assert.equal(count(svg, />760 mm</g), 1);
   assert.equal(count(svg, />530 mm</g), 1);
@@ -68,9 +77,7 @@ test("module04 thin panel keeps 2400/600/18 overall dimensions once each without
   assert.equal(count(svg, />2400 mm</g), 1);
   assert.equal(count(svg, />600 mm</g), 1);
   assert.equal(count(svg, />18 mm</g), 1);
-  assert.equal(count(svg, /data-semantic-key="overall\/height"/g), 6);
-  assert.equal(count(svg, /data-semantic-key="overall\/width"/g), 6);
-  assert.equal(count(svg, /data-semantic-key="overall\/depth"/g), 6);
+  for (const axis of ["height", "width", "depth"]) assertSingleOverallDimension(svg, axis);
   assertNoLabelCollisions(svg);
 });
 
