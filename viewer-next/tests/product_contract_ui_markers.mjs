@@ -15,6 +15,13 @@ function requireMarkers(html, source, markers) {
   }
 }
 
+function rejectMarkers(html, source, markers) {
+  const present = markers.filter(marker => html.includes(marker));
+  if (present.length > 0) {
+    throw new Error(`PRODUCT_CONTRACT_UI_INTERNAL_COPY_LEAK:${source}:${JSON.stringify(present)}`);
+  }
+}
+
 const module02 = read(join(runtimeRoot, "runtime-ui-desktop-modules-detail.html"));
 requireMarkers(module02, "module02-detail", [
   'data-product-descriptor="true"',
@@ -32,13 +39,30 @@ requireMarkers(module01, "module01-detail", [
   'data-semantic-icon-key="hardware.hinge"'
 ]);
 
+const accessories = read(join(navigationRoot, "navigation-accessories.html"));
+requireMarkers(accessories, "accessories", [
+  "Acessórios ainda não disponíveis para seleção",
+  "Puxadores e outros opcionais aparecerão aqui"
+]);
+rejectMarkers(accessories, "accessories", [
+  "contrato público",
+  "binding de runtime",
+  "publicadas pelo contrato"
+]);
+
 const summary = read(join(navigationRoot, "navigation-summary.html"));
 requireMarkers(summary, "summary", [
   'data-product-summary-furniture="true"',
   'data-product-finish-source="configuration-state"',
   "Cor dos móveis",
   "Aéreo da lavanderia",
-  "Inferior do fogão"
+  "Inferior do fogão",
+  "Valor ainda não disponível"
+]);
+rejectMarkers(summary, "summary", [
+  "contrato atual",
+  "authority comercial",
+  "Aguardando fonte comercial"
 ]);
 
 process.stdout.write(`${JSON.stringify({
@@ -49,6 +73,7 @@ process.stdout.write(`${JSON.stringify({
     semanticIconsUsePublishedKeys: true,
     finishDotsUsePublishedVisuals: true,
     summaryUsesPublishedModuleIdentity: true,
-    summaryUsesFirstClassFurnitureFinish: true
+    summaryUsesFirstClassFurnitureFinish: true,
+    implementationLanguageDoesNotLeakToProductPlaceholders: true
   }
 }, null, 2)}\n`);
