@@ -1,5 +1,6 @@
 import "./main.js";
 import "./ui/product-polish-v2-final.css";
+import "./ui/product-contract-enhancements.css";
 import { createViewerUiApi, type ViewerEngineControlPort } from "./api/ui-adapter.js";
 import {
   installDesktopCompositionEnhancement,
