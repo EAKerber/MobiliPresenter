@@ -85,7 +85,7 @@ test("scene-geometry views cannot silently fall back to an envelope diagram", ()
   );
 });
 
-test("valid selected modules without TPC degrade to unavailable while real invalid targets still fail", () => {
+test("cataloged module01 resolves ready while null and invalid selections retain fail-closed semantics", () => {
   const configuration = createDefaultViewerConfiguration();
   const module01 = moduleIdFromAlias("01");
 
@@ -94,41 +94,42 @@ test("valid selected modules without TPC degrade to unavailable while real inval
     reason: null,
     presentation: null
   });
-  assert.deepEqual(getSelectedTechnicalPresentationResult(configuration, module01), {
-    status: "unavailable",
-    reason: "technical-catalog-entry-missing",
-    presentation: null
-  });
-  assert.equal(getSelectedTechnicalPresentation(configuration, module01), null);
+
+  const module01Result = getSelectedTechnicalPresentationResult(configuration, module01);
+  assert.equal(module01Result.status, "ready");
+  assert.equal(module01Result.reason, null);
+  assert.equal(module01Result.presentation?.identity.alias, "01");
+  assert.equal(getSelectedTechnicalPresentation(configuration, module01)?.identity.alias, "01");
+
   assert.throws(
     () => getSelectedTechnicalPresentationResult(configuration, "scene/traditional/module/does-not-exist"),
     /TECHNICAL_PRESENTATION_TARGET_NOT_FOUND/
   );
 });
 
-test("UI snapshot exposes unavailable selection semantically and keeps ready TPC behavior intact", () => {
+test("UI snapshot exposes ready technical presentation for cataloged modules and none without selection", () => {
   const configuration = createDefaultViewerConfiguration();
   const module01Interaction = reduceViewerInteraction(createDefaultViewerInteraction(), {
     type: "select-module",
     moduleId: moduleIdFromAlias("01")
   });
-  const unavailable = createViewerUiSnapshot(configuration, module01Interaction);
-  assert.equal(unavailable.selectedModuleAlias, "01");
-  assert.deepEqual(unavailable.selectedTechnicalPresentationAvailability, {
-    status: "unavailable",
-    reason: "technical-catalog-entry-missing"
+  const module01 = createViewerUiSnapshot(configuration, module01Interaction);
+  assert.equal(module01.selectedModuleAlias, "01");
+  assert.deepEqual(module01.selectedTechnicalPresentationAvailability, {
+    status: "ready",
+    reason: null
   });
-  assert.equal(unavailable.selectedTechnicalPresentation, null);
-  assert.deepEqual(unavailable.selectedTechnicalViewAssets, []);
+  assert.equal(module01.selectedTechnicalPresentation?.identity.alias, "01");
+  assert.ok(module01.selectedTechnicalViewAssets.some(asset => asset.fidelity === "geometry-derived"));
 
   const module03Interaction = reduceViewerInteraction(createDefaultViewerInteraction(), {
     type: "select-module",
     moduleId: moduleIdFromAlias("03")
   });
-  const ready = createViewerUiSnapshot(configuration, module03Interaction);
-  assert.deepEqual(ready.selectedTechnicalPresentationAvailability, { status: "ready", reason: null });
-  assert.equal(ready.selectedTechnicalPresentation?.identity.alias, "03");
-  assert.ok(ready.selectedTechnicalViewAssets.some(asset => asset.fidelity === "geometry-derived"));
+  const module03 = createViewerUiSnapshot(configuration, module03Interaction);
+  assert.deepEqual(module03.selectedTechnicalPresentationAvailability, { status: "ready", reason: null });
+  assert.equal(module03.selectedTechnicalPresentation?.identity.alias, "03");
+  assert.ok(module03.selectedTechnicalViewAssets.some(asset => asset.fidelity === "geometry-derived"));
 
   const none = createViewerUiSnapshot(configuration, createDefaultViewerInteraction());
   assert.deepEqual(none.selectedTechnicalPresentationAvailability, { status: "none", reason: null });

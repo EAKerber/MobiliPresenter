@@ -1,7 +1,7 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
-export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.0" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.1" as const;
+export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.1" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.2" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
@@ -36,10 +36,16 @@ export interface TechnicalDimensionPresentation {
   readonly prefer: "nominal" | "geometry";
 }
 
+export interface TechnicalPresentationSpec {
+  readonly primaryEntityId: string;
+  readonly companionEntityIds: readonly string[];
+}
+
 export interface TechnicalTextFact {
   readonly id: string;
   readonly category: "function" | "construction" | "installation" | "finish" | "hardware" | "electrical";
   readonly text: string;
+  readonly semanticKey?: string;
   readonly source: TechnicalSourceRef;
 }
 
@@ -51,6 +57,7 @@ export interface TechnicalComponentRequirement {
   readonly quantity?: number;
   readonly unit?: string;
   readonly linkedEntityId?: string;
+  readonly semanticKey?: string;
   readonly source: TechnicalSourceRef;
 }
 
@@ -153,6 +160,7 @@ export interface TechnicalCatalogEntry {
   readonly target: { readonly kind: TechnicalTargetKind; readonly entityId: string };
   readonly identity: TechnicalIdentity;
   readonly dimensions?: TechnicalDimensionPresentation;
+  readonly presentation?: TechnicalPresentationSpec;
   readonly specifications: readonly TechnicalTextFact[];
   readonly components: readonly TechnicalComponentRequirement[];
   readonly notices: readonly TechnicalNotice[];
@@ -195,6 +203,7 @@ export interface TechnicalPresentationPackage {
   readonly target: TechnicalCatalogEntry["target"];
   readonly identity: TechnicalIdentity;
   readonly dimensions: CompiledTechnicalDimensions | null;
+  readonly presentation: TechnicalPresentationSpec | null;
   readonly specifications: readonly TechnicalTextFact[];
   readonly components: readonly TechnicalComponentRequirement[];
   readonly notices: readonly TechnicalNotice[];

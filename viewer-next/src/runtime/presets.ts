@@ -14,6 +14,8 @@ export const FRONT_PRESETS: Readonly<Record<FrontPresetId, FrontPreset>> = {
   "neutral-greige": { id: "neutral-greige", label: "Greige neutro", materialId: "front-primary" }
 };
 
+export const DEFAULT_FURNITURE_FINISH_PRESET_ID: FrontPresetId = "neutral-greige";
+
 export const LIGHTING_PRESET_IDS = ["canonical", "soft-neutral", "warm-worktop"] as const;
 export type LightingPresetId = typeof LIGHTING_PRESET_IDS[number];
 

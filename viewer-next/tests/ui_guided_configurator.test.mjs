@@ -62,30 +62,23 @@ test("product mode widens the desktop rail and distributes detail to right and b
   ]);
 });
 
-test("product mode publishes global furniture finishes with neutral greige as the initial product default", () => {
+test("product mode consumes first-class global furniture finish and contract-owned visual metadata", () => {
   containsAll(productEnhancements, [
-    '"warm-wood": "#A8744D"',
-    '"neutral-greige": "#B2ADA5"',
-    'const PRODUCT_DEFAULT_FRONT_PRESET: FrontPresetId = "neutral-greige"',
-    "ensureProductDefaultFrontPreset(api)",
-    "hasExplicitFrontPreset",
+    "snapshot.furnitureFinishPresetId",
+    "catalog.furnitureFinishPresets",
+    "visual.previewColorSrgb",
+    "visual.materialId",
+    "api.setFurnitureFinishPreset",
     "Cor dos móveis",
     "Acabamento global",
-    "for (const alias of api.getCatalog().modules)",
-    "api.setFrontPreset(alias",
   ]);
-  containsAll(html, [
-    'const defaultUiMode = "%VITE_DEFAULT_UI_MODE%"',
-    'url.searchParams.get("controls") === "0"',
-    'url.searchParams.get("fidelity") === "1"',
-    'url.searchParams.has("front")',
-    '`${alias}:neutral-greige`',
-    'window.history.replaceState(null, "", url)',
-  ]);
-  assert.ok(
-    html.indexOf('window.history.replaceState(null, "", url)') < html.indexOf('/src/bootstrap.ts'),
-    "neutral product query must be materialized before viewer bootstrap"
-  );
+  assert.equal(productEnhancements.includes("FRONT_SWATCH_COLOR"), false);
+  assert.equal(productEnhancements.includes("PRODUCT_DEFAULT_FRONT_PRESET"), false);
+  assert.equal(productEnhancements.includes("ensureProductDefaultFrontPreset"), false);
+  assert.equal(productEnhancements.includes("for (const alias of api.getCatalog().modules)"), false);
+  assert.equal(html.includes("neutral-greige"), false);
+  assert.equal(html.includes("window.history.replaceState"), false);
+  assert.equal(html.includes('searchParams.set(\n          "front"'), false);
   containsAll(productCss, [".viewer-choice-card__swatch", "border-radius: 10px"]);
 });
 
@@ -116,6 +109,8 @@ test("technical views use semantic iconography and editorial drawing treatment w
     "decorateSemanticCards(api)",
     "factIconKind(fact.category)",
     "componentIconKind(component.kind)",
+    "fact.semanticKey ?? fact.category",
+    "component.semanticKey ?? component.kind",
     "decorateTechnicalFigures(api)",
     'figure.dataset.technicalKind = request.kind',
   ]);
