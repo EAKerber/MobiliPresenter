@@ -1,0 +1,36 @@
+.viewer-semantic-icon--published {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-self: flex-start;
+  margin-top: 1px;
+  color: var(--ui-text-secondary);
+}
+
+.viewer-product-card__list > li[data-product-semantic-icon-source="published-key"],
+.viewer-product-card__stack > li[data-product-semantic-icon-source="published-key"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.viewer-product-card__list > li[data-product-semantic-icon-source="published-key"] .viewer-product-card__semantic-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.viewer-summary__list > li[data-product-summary-furniture="true"] {
+  align-items: center;
+}
+
+.viewer-product-detail__meta [data-product-descriptor-dimensions="true"] {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .viewer-semantic-icon--published {
+    width: 17px;
+    height: 17px;
+    flex-basis: 17px;
+  }
+}
