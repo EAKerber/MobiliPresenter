@@ -10,10 +10,22 @@ function geometry(pkg, viewId) {
   return value;
 }
 
+function tagAttribute(tag, name) {
+  const match = tag.match(new RegExp(`${name}="([^"]+)"`));
+  assert.ok(match, `missing ${name} in ${tag}`);
+  return match[1];
+}
+
 function dimensionLabelCenter(svg, axis) {
-  const match = svg.match(new RegExp(`<text data-role="dimension-label" data-axis="${axis}" data-lane-offset="([0-9.]+)" x="([0-9.-]+)" y="([0-9.-]+)"`));
-  assert.ok(match, `missing ${axis} dimension label`);
-  return { offset: Number(match[1]), x: Number(match[2]), y: Number(match[3]) };
+  const tag = [...svg.matchAll(/<text data-role="dimension-label"[^>]*>/g)]
+    .map(match => match[0])
+    .find(candidate => candidate.includes(`data-axis="${axis}"`));
+  assert.ok(tag, `missing ${axis} dimension label`);
+  return {
+    offset: Number(tagAttribute(tag, "data-lane-offset")),
+    x: Number(tagAttribute(tag, "x")),
+    y: Number(tagAttribute(tag, "y"))
+  };
 }
 
 function distance(a, b) {
