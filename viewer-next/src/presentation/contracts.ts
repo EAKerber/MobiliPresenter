@@ -6,10 +6,16 @@ export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentat
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
 export type TechnicalViewPlane = "width-height" | "depth-height" | "width-depth";
+export type TechnicalViewProjection = TechnicalViewPlane | "isometric";
 export type TechnicalViewKind = "orthographic" | "internal" | "isometric" | "detail";
 export type TechnicalViewFidelity = "schematic" | "geometry-derived" | "authored";
-export type TechnicalViewCoverage = "envelope" | "authored-layout" | "module-front-primitives" | "appliance-front-openings";
-export type TechnicalViewOmission = "hardware" | "hidden-geometry";
+export type TechnicalViewCoverage =
+  | "envelope"
+  | "authored-layout"
+  | "module-front-primitives"
+  | "module-geometry-primitives"
+  | "appliance-front-openings";
+export type TechnicalViewOmission = "hardware" | "hidden-geometry" | "hidden-line-removal";
 export type TechnicalNoticeSeverity = "info" | "important" | "warning";
 export type TechnicalDependencyRelation = "requires-present" | "control-point-host" | "technical-support";
 export type TechnicalControlKind = "visibility" | "activation";
@@ -142,7 +148,7 @@ export interface TechnicalProjectedOpening {
 
 export interface CompiledTechnicalViewGeometry {
   readonly viewId: string;
-  readonly plane: "width-height";
+  readonly projection: TechnicalViewProjection;
   readonly coordinateUnit: "mm";
   readonly boundsMm: {
     readonly horizontal: number;
