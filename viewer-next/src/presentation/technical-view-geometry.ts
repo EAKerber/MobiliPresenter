@@ -1,70 +1,28 @@
 import type {
   GeometryPrimitive,
   ModuleGeometry,
-  RigidTransform,
   Vec3
 } from "@mobilipresenter/scene-core";
 import type {
   CompiledTechnicalViewGeometry,
   TechnicalPoint2Mm,
   TechnicalProjectedDimensionGuide,
+  TechnicalProjectedEdge,
   TechnicalProjectedOpening,
   TechnicalProjectedPrimitive,
   TechnicalViewProjection,
   TechnicalViewRequest
 } from "./contracts.js";
+import {
+  buildProjectedTechnicalEdgeGraph,
+  technicalPrimitivePoints3d,
+  transformTechnicalPoint
+} from "./technical-edge-graph.js";
+import { projectIsometricPoint } from "./technical-isometric.js";
 
 const EPSILON = 1e-6;
-const ISOMETRIC_DEPTH_X = 0.62;
-const ISOMETRIC_DEPTH_Y = 0.28;
 
 type Point2 = readonly [number, number];
-
-function rotateVector(vector: Vec3, transform: RigidTransform): Vec3 {
-  const q = transform.rotation;
-  const tx = 2 * (q.y * vector.z - q.z * vector.y);
-  const ty = 2 * (q.z * vector.x - q.x * vector.z);
-  const tz = 2 * (q.x * vector.y - q.y * vector.x);
-  return {
-    x: vector.x + q.w * tx + (q.y * tz - q.z * ty),
-    y: vector.y + q.w * ty + (q.z * tx - q.x * tz),
-    z: vector.z + q.w * tz + (q.x * ty - q.y * tx)
-  };
-}
-
-function transformPoint(point: Vec3, transform: RigidTransform): Vec3 {
-  const rotated = rotateVector(point, transform);
-  return {
-    x: rotated.x + transform.translationMm.x,
-    y: rotated.y + transform.translationMm.y,
-    z: rotated.z + transform.translationMm.z
-  };
-}
-
-function primitivePoints3d(primitive: GeometryPrimitive): readonly Vec3[] {
-  const points: Vec3[] = [];
-  if (primitive.primitive === "box") {
-    const { width, height, depth } = primitive.sizeMm;
-    for (const x of [0, width]) {
-      for (const y of [0, depth]) {
-        for (const z of [0, height]) points.push(transformPoint({ x, y, z }, primitive.localTransform));
-      }
-    }
-    return points;
-  }
-
-  const [uMm, vMm] = primitive.sizeMm;
-  for (const u of [0, uMm]) {
-    for (const v of [0, vMm]) {
-      points.push(transformPoint({
-        x: primitive.uAxis.x * u + primitive.vAxis.x * v,
-        y: primitive.uAxis.y * u + primitive.vAxis.y * v,
-        z: primitive.uAxis.z * u + primitive.vAxis.z * v
-      }, primitive.localTransform));
-    }
-  }
-  return points;
-}
 
 function projectionForView(view: TechnicalViewRequest): TechnicalViewProjection {
   if (view.kind === "isometric") return "isometric";
@@ -77,11 +35,10 @@ function projectPoint(point: Vec3, projection: TechnicalViewProjection): Point2 
     case "width-height": return [point.x, point.z];
     case "depth-height": return [point.y, point.z];
     case "width-depth": return [point.x, point.y];
-    case "isometric":
-      return [
-        point.x - point.y * ISOMETRIC_DEPTH_X,
-        point.z - (point.x + point.y) * ISOMETRIC_DEPTH_Y
-      ];
+    case "isometric": {
+      const projected = projectIsometricPoint(point);
+      return [projected.horizontalMm, projected.verticalMm];
+    }
   }
 }
 
@@ -129,7 +86,7 @@ function projectPrimitive(
   primitive: GeometryPrimitive,
   projection: TechnicalViewProjection
 ): TechnicalProjectedPrimitive | null {
-  const hull = convexHull(primitivePoints3d(primitive).map(point => projectPoint(point, projection)));
+  const hull = convexHull(technicalPrimitivePoints3d(primitive).map(point => projectPoint(point, projection)));
   if (hull.length < 3) return null;
   return {
     id: primitive.id,
@@ -156,7 +113,7 @@ function openingPoints3d(module: ModuleGeometry): readonly {
       { x: width, y: 0, z: 0 },
       { x: width, y: 0, z: height },
       { x: 0, y: 0, z: height }
-    ].map(point => transformPoint(point, opening.localTransform));
+    ].map(point => transformTechnicalPoint(point, opening.localTransform));
     return [{
       id: `${slot.id}/front-opening`,
       slotId: slot.id,
@@ -257,11 +214,13 @@ function normalizeProjection(
   primitives: readonly TechnicalProjectedPrimitive[],
   openings: readonly TechnicalProjectedOpening[],
   dimensionGuides: readonly TechnicalProjectedDimensionGuide[],
+  edges: readonly TechnicalProjectedEdge[],
   extents: ReturnType<typeof projectionExtents>
 ): {
   readonly primitives: readonly TechnicalProjectedPrimitive[];
   readonly openings: readonly TechnicalProjectedOpening[];
   readonly dimensionGuides: readonly TechnicalProjectedDimensionGuide[];
+  readonly edges: readonly TechnicalProjectedEdge[];
 } {
   const dx = -extents.minHorizontal;
   const dy = -extents.minVertical;
@@ -278,6 +237,11 @@ function normalizeProjection(
       ...guide,
       startMm: translatePoint(guide.startMm, dx, dy),
       endMm: translatePoint(guide.endMm, dx, dy)
+    })),
+    edges: edges.map(edge => ({
+      ...edge,
+      startMm: translatePoint(edge.startMm, dx, dy),
+      endMm: translatePoint(edge.endMm, dx, dy)
     }))
   };
 }
@@ -288,17 +252,26 @@ export function compileGeometryDerivedTechnicalView(
 ): CompiledTechnicalViewGeometry {
   if (!canDeriveGeometry(view)) throw new Error(`TECHNICAL_VIEW_NOT_GEOMETRY_DERIVABLE:${view.id}:${view.source}`);
   const projection = projectionForView(view);
-  const rawPrimitives = primitiveSet(module, view, projection)
+  const sourcePrimitives = primitiveSet(module, view, projection);
+  const rawPrimitives = sourcePrimitives
     .map(primitive => projectPrimitive(primitive, projection))
     .filter((primitive): primitive is TechnicalProjectedPrimitive => primitive !== null);
   const rawOpenings = projectOpenings(module, projection);
   const rawDimensionGuides = projectDimensionGuides(module, projection);
+  const rawEdges = projection === "isometric"
+    ? buildProjectedTechnicalEdgeGraph(sourcePrimitives, projectIsometricPoint)
+    : [];
   const extents = projectionExtents(rawPrimitives, rawOpenings);
 
   const preserveFrontDatum = projection === "width-height";
   const projected = preserveFrontDatum
-    ? { primitives: rawPrimitives, openings: rawOpenings, dimensionGuides: rawDimensionGuides }
-    : normalizeProjection(rawPrimitives, rawOpenings, rawDimensionGuides, extents);
+    ? {
+        primitives: rawPrimitives,
+        openings: rawOpenings,
+        dimensionGuides: rawDimensionGuides,
+        edges: rawEdges
+      }
+    : normalizeProjection(rawPrimitives, rawOpenings, rawDimensionGuides, rawEdges, extents);
   const boundsMm = preserveFrontDatum
     ? {
         horizontal: module.dimensions.geometryMm.width,
@@ -318,6 +291,7 @@ export function compileGeometryDerivedTechnicalView(
     primitives: projected.primitives,
     openings: projected.openings,
     dimensionGuides: projected.dimensionGuides,
+    edges: projected.edges,
     coverage: [
       frontOnly ? "module-front-primitives" : "module-geometry-primitives",
       ...(projected.openings.length > 0 ? ["appliance-front-openings" as const] : [])

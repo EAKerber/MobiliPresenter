@@ -3,6 +3,8 @@ import type {
   TechnicalAxis,
   TechnicalPoint2Mm,
   TechnicalPresentationPackage,
+  TechnicalProjectedEdge,
+  TechnicalProjectedEdgeClass,
   TechnicalViewCoverage,
   TechnicalViewFidelity,
   TechnicalViewOmission,
@@ -14,6 +16,7 @@ import {
   type TechnicalCompositionPoint,
   type TechnicalDimensionPlacement
 } from "./technical-composition.js";
+import { projectIsometricPoint } from "./technical-isometric.js";
 
 export interface TechnicalDiagramAsset {
   readonly viewId: string;
@@ -30,6 +33,14 @@ const WIDTH = 420;
 const HEIGHT = 300;
 const MARGIN = 48;
 const DEFAULT_OMISSIONS: readonly TechnicalViewOmission[] = ["hardware", "hidden-geometry"];
+const EDGE_RENDER_ORDER: Readonly<Record<TechnicalProjectedEdgeClass, number>> = {
+  back: 0,
+  depth: 1,
+  shared: 2,
+  internal: 3,
+  front: 4,
+  silhouette: 5
+};
 
 function escapeXml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -233,6 +244,36 @@ function isometricDimensions(
   return plan.dimensions.map(renderIsometricDimension).join("");
 }
 
+function edgeStyle(edge: TechnicalProjectedEdge): string {
+  switch (edge.classification) {
+    case "back": return ' stroke-width="1.05" opacity="0.72"';
+    case "depth": return ' stroke-width="1.3"';
+    case "shared": return ' stroke-width="1.25"';
+    case "internal": return ' stroke-width="1.25"';
+    case "front": return ' stroke-width="1.55"';
+    case "silhouette": return ' stroke-width="1.9"';
+  }
+}
+
+function renderTechnicalEdges(
+  edges: readonly TechnicalProjectedEdge[],
+  x: number,
+  y: number,
+  h: number,
+  scale: number
+): string {
+  return [...edges]
+    .sort((a, b) => EDGE_RENDER_ORDER[a.classification] - EDGE_RENDER_ORDER[b.classification] || a.id.localeCompare(b.id))
+    .map(edge => {
+      const start = screenPoint(edge.startMm, x, y, h, scale);
+      const end = screenPoint(edge.endMm, x, y, h, scale);
+      const primitiveIds = escapeXml(edge.sourcePrimitiveIds.join("|"));
+      const primitiveRoles = escapeXml(edge.sourcePrimitiveRoles.join("|"));
+      return `<line data-role="technical-edge" data-edge-id="${edge.id}" data-edge-class="${edge.classification}" data-source-primitive-ids="${primitiveIds}" data-source-primitive-roles="${primitiveRoles}" x1="${start.x.toFixed(2)}" y1="${start.y.toFixed(2)}" x2="${end.x.toFixed(2)}" y2="${end.y.toFixed(2)}"${edgeStyle(edge)}/>`;
+    })
+    .join("");
+}
+
 function geometryDerivedSvg(
   pkg: TechnicalPresentationPackage,
   view: TechnicalViewRequest,
@@ -261,8 +302,12 @@ function geometryDerivedSvg(
     }).join(" ");
 
   let body = "";
-  for (const primitive of geometry.primitives) {
-    body += `<polygon data-role="primary-geometry" data-primitive-role="${escapeXml(primitive.role)}" data-primitive-id="${escapeXml(primitive.id)}" points="${pointString(primitive.pointsMm)}"/>`;
+  if (isometric) {
+    body += renderTechnicalEdges(geometry.edges, x, y, h, scale);
+  } else {
+    for (const primitive of geometry.primitives) {
+      body += `<polygon data-role="primary-geometry" data-primitive-role="${escapeXml(primitive.role)}" data-primitive-id="${escapeXml(primitive.id)}" points="${pointString(primitive.pointsMm)}"/>`;
+    }
   }
   for (const opening of geometry.openings) {
     body += `<polygon data-role="opening" data-opening-role="${escapeXml(opening.role)}" data-opening-id="${escapeXml(opening.id)}" data-slot-id="${escapeXml(opening.slotId)}" points="${pointString(opening.pointsMm)}" stroke-dasharray="6 3"/>`;
@@ -289,7 +334,7 @@ function geometryDerivedSvg(
   }
 
   const ownership = isometric
-    ? ' data-product-dimensions="true" data-technical-composition="technical-composition/v0.3"'
+    ? ` data-product-dimensions="true" data-technical-composition="technical-composition/v0.3" data-isometric-constitution="isometric-projection/v0.4" data-technical-edge-count="${geometry.edges.length}"`
     : "";
   return svgShell(`${pkg.identity.title} — ${view.label}`, body, "geometry-derived", "scene-geometry", ownership);
 }
@@ -302,7 +347,10 @@ function isometricSvg(pkg: TechnicalPresentationPackage, view: TechnicalViewRequ
     [0, 0, 0], [w, 0, 0], [w, d, 0], [0, d, 0],
     [0, 0, h], [w, 0, h], [w, d, h], [0, d, h]
   ];
-  const raw = points3d.map(([px, py, pz]) => [px - py * 0.62, -pz + (px + py) * 0.28] as const);
+  const raw = points3d.map(([px, py, pz]) => {
+    const point = projectIsometricPoint({ x: px, y: py, z: pz });
+    return [point.horizontalMm, -point.verticalMm] as const;
+  });
   const xs = raw.map(point => point[0]);
   const ys = raw.map(point => point[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);

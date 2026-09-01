@@ -49,6 +49,7 @@ test("module03 front side and isometric views are deterministic projections of r
   assert.ok(isometricIds.some(id => id.endsWith("drawer-left-side")));
   assert.ok(isometric.boundsMm.horizontal > 0);
   assert.ok(isometric.boundsMm.vertical > 0);
+  assert.ok(isometric.edges.length > 0);
   assert.deepEqual(isometric.dimensionGuides.map(guide => guide.axis), ["width", "depth", "height"]);
   for (const guide of isometric.dimensionGuides) {
     assert.notDeepEqual(guide.startMm, guide.endMm, guide.axis);
@@ -83,7 +84,9 @@ test("module03 geometry-derived SVG exposes stable semantic hooks and authority-
   assert.match(isoA.svg ?? "", /drawer-4/);
   assert.match(isoA.svg ?? "", /door-center/);
   assert.match(isoA.svg ?? "", /door-right/);
-  assert.match(isoA.svg ?? "", /data-role="primary-geometry"/);
+  assert.match(isoA.svg ?? "", /data-role="technical-edge"/);
+  assert.match(isoA.svg ?? "", /data-isometric-constitution="isometric-projection\/v0\.4"/);
+  assert.doesNotMatch(isoA.svg ?? "", /data-role="primary-geometry"/);
   assert.match(isoA.svg ?? "", /data-role="isometric-dimension" data-axis="width"/);
   assert.match(isoA.svg ?? "", /data-role="isometric-dimension" data-axis="height"/);
   assert.match(isoA.svg ?? "", /data-role="isometric-dimension" data-axis="depth"/);
@@ -127,6 +130,7 @@ test("module04 panel views use available panel geometry without pretending to be
   assert.equal(front.projection, "depth-height");
   assert.equal(thickness.projection, "width-height");
   assert.equal(isometric.projection, "isometric");
+  assert.equal(isometric.edges.length, 12);
   assert.deepEqual(isometric.dimensionGuides.map(guide => guide.axis), ["width", "depth", "height"]);
   assert.deepEqual(front.coverage, ["module-geometry-primitives"]);
   assert.deepEqual(thickness.coverage, ["module-geometry-primitives"]);
@@ -141,6 +145,7 @@ test("module04 panel views use available panel geometry without pretending to be
   assert.match(thicknessAsset.svg ?? "", /2400 mm/);
 
   const isoAsset = renderTechnicalViewSvg(pkg, "module04/view/isometric");
+  assert.match(isoAsset.svg ?? "", /data-role="technical-edge"/);
   assert.match(isoAsset.svg ?? "", />18 mm</);
   assert.match(isoAsset.svg ?? "", />600 mm</);
   assert.match(isoAsset.svg ?? "", />2400 mm</);

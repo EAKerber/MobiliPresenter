@@ -1,7 +1,7 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
 export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.1" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.3" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.4" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
@@ -22,6 +22,13 @@ export type TechnicalControlKind = "visibility" | "activation";
 export type FinishOptionFamily = "front-preset" | "stone-preset";
 export type TechnicalComponentKind = "hardware" | "electrical" | "panel" | "interface" | "other";
 export type TechnicalFactStatus = "provided" | "confirmed" | "unverified";
+export type TechnicalProjectedEdgeClass =
+  | "silhouette"
+  | "front"
+  | "back"
+  | "depth"
+  | "shared"
+  | "internal";
 
 export interface TechnicalSourceRef {
   readonly authority: "scene-core" | "technical-catalog" | "appearance-catalog" | "viewer-runtime" | "derived";
@@ -152,6 +159,15 @@ export interface TechnicalProjectedDimensionGuide {
   readonly endMm: TechnicalPoint2Mm;
 }
 
+export interface TechnicalProjectedEdge {
+  readonly id: string;
+  readonly classification: TechnicalProjectedEdgeClass;
+  readonly startMm: TechnicalPoint2Mm;
+  readonly endMm: TechnicalPoint2Mm;
+  readonly sourcePrimitiveIds: readonly string[];
+  readonly sourcePrimitiveRoles: readonly string[];
+}
+
 export interface CompiledTechnicalViewGeometry {
   readonly viewId: string;
   readonly projection: TechnicalViewProjection;
@@ -163,6 +179,7 @@ export interface CompiledTechnicalViewGeometry {
   readonly primitives: readonly TechnicalProjectedPrimitive[];
   readonly openings: readonly TechnicalProjectedOpening[];
   readonly dimensionGuides: readonly TechnicalProjectedDimensionGuide[];
+  readonly edges: readonly TechnicalProjectedEdge[];
   readonly coverage: readonly TechnicalViewCoverage[];
   readonly omitted: readonly TechnicalViewOmission[];
 }
