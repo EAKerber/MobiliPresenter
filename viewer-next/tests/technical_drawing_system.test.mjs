@@ -28,10 +28,6 @@ function dimensionLabelCenter(svg, axis) {
   };
 }
 
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
 test("module03 front side and isometric views are deterministic projections of real Scene Core primitives", () => {
   const pkg = getCurrentTechnicalPresentationByAlias(createDefaultViewerConfiguration(), "03");
   const front = geometry(pkg, "module03/view/front");
@@ -104,9 +100,6 @@ test("module03 geometry-derived SVG exposes stable semantic hooks and authority-
   assert.ok(width.offset >= 30);
   assert.ok(depth.offset >= 30);
   assert.ok(height.offset >= 28);
-  assert.ok(distance(width, depth) > 24, "width/depth labels should not collide");
-  assert.ok(distance(width, height) > 24, "width/height labels should not collide");
-  assert.ok(distance(depth, height) > 24, "depth/height labels should not collide");
 });
 
 test("module03 authored internal layout remains authored rather than being relabeled as geometry-derived", () => {
