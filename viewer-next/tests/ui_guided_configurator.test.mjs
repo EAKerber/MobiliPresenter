@@ -6,6 +6,7 @@ const ui = readFileSync(new URL("../src/ui/runtime-controls.ts", import.meta.url
 const css = readFileSync(new URL("../src/ui/runtime-controls.css", import.meta.url), "utf8");
 const productCss = readFileSync(new URL("../src/ui/product-presentation.css", import.meta.url), "utf8");
 const productEnhancements = readFileSync(new URL("../src/ui/product-enhancements.ts", import.meta.url), "utf8");
+const finishReadiness = readFileSync(new URL("../src/ui/global-finish-readiness.ts", import.meta.url), "utf8");
 const selection = readFileSync(new URL("../src/renderer/three/selection.ts", import.meta.url), "utf8");
 const bootstrap = readFileSync(new URL("../src/bootstrap.ts", import.meta.url), "utf8");
 const thumbnail = readFileSync(new URL("../src/thumbnail.ts", import.meta.url), "utf8");
@@ -72,6 +73,14 @@ test("product mode consumes first-class global furniture finish and contract-own
     "Cor dos móveis",
     "Acabamento global",
   ]);
+  containsAll(finishReadiness, [
+    'FINISH_STAGE_SELECTOR',
+    'FINISH_OPTION_SELECTOR',
+    'option.disabled = false',
+    'new MutationObserver',
+  ]);
+  assert.equal(finishReadiness.includes("setFurnitureFinishPreset"), false);
+  assert.equal(finishReadiness.includes("resetConfiguration"), false);
   assert.equal(productEnhancements.includes("FRONT_SWATCH_COLOR"), false);
   assert.equal(productEnhancements.includes("PRODUCT_DEFAULT_FRONT_PRESET"), false);
   assert.equal(productEnhancements.includes("ensureProductDefaultFrontPreset"), false);
