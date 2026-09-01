@@ -95,7 +95,9 @@ function decoratePublishedFinishDots(api: ViewerUiApi): void {
   const snapshot = api.getSnapshot();
   const selectedFurniture = catalog.furnitureFinishPresets.find(option => option.id === snapshot.furnitureFinishPresetId);
   const selectedStone = catalog.stonePresets.find(option => option.id === snapshot.stonePresetId);
-  const selected = [selectedFurniture, selectedStone].filter((option): option is ViewerUiOption => Boolean(option));
+  const selected: ViewerUiOption[] = [];
+  if (selectedFurniture) selected.push(selectedFurniture);
+  if (selectedStone) selected.push(selectedStone);
 
   for (const meta of document.querySelectorAll<HTMLElement>(".viewer-product-detail__meta > span")) {
     const visual = optionVisualByLabel(selected, meta.textContent?.trim() ?? "");
@@ -106,8 +108,12 @@ function decoratePublishedFinishDots(api: ViewerUiApi): void {
     }
   }
 
+  const allFinishOptions: ViewerUiOption[] = [
+    ...catalog.furnitureFinishPresets,
+    ...catalog.stonePresets
+  ];
   for (const value of document.querySelectorAll<HTMLElement>(".viewer-product-card .viewer-finish-value")) {
-    const visual = optionVisualByLabel([...catalog.furnitureFinishPresets, ...catalog.stonePresets], value.textContent?.trim() ?? "");
+    const visual = optionVisualByLabel(allFinishOptions, value.textContent?.trim() ?? "");
     const dot = value.querySelector<HTMLElement>(".viewer-finish-dot");
     if (visual && dot) {
       dot.style.backgroundColor = visual.previewColorSrgb;
