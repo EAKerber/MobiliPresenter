@@ -1,4 +1,3 @@
-import "./main.js";
 import "./ui/product-polish-v2-final.css";
 import { createViewerUiApi, type ViewerEngineControlPort } from "./api/ui-adapter.js";
 import {
@@ -17,9 +16,24 @@ import { installProductPolishV2, type ProductPolishV2 } from "./ui/product-polis
 import { installProductUiEnhancements, type ProductUiEnhancements } from "./ui/product-enhancements.js";
 import { installGlobalFinishControl } from "./ui/global-finish-readiness.js";
 import { mountRuntimeControls, type RuntimeControlsUi } from "./ui/runtime-controls.js";
+import { migrateLegacyUniformFrontQuery } from "./runtime/query.js";
+
+const initialQuery = new URLSearchParams(window.location.search);
+const queryMigration = migrateLegacyUniformFrontQuery(initialQuery);
+if (queryMigration.migratedLegacyUniformFront) {
+  const canonicalUrl = new URL(window.location.href);
+  canonicalUrl.search = queryMigration.query.toString();
+  window.history.replaceState(window.history.state, "", canonicalUrl);
+}
+
+await import("./main.js");
 
 const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("APP_ROOT_NOT_FOUND");
+
+app.dataset.viewerQueryMigration = queryMigration.migratedLegacyUniformFront
+  ? "legacy-uniform-front-to-finish"
+  : "none";
 
 const query = new URLSearchParams(window.location.search);
 const defaultUiMode = (import.meta as ImportMeta & {
