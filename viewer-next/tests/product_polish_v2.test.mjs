@@ -74,11 +74,12 @@ test("current known finishes receive circular visual swatches without claiming u
   ]);
 });
 
-test("finishes stage remains compact and leaves real clearance above the mobile next-step action", () => {
+test("finishes stage stays compact without double-counting the mobile action bar", () => {
   containsAll(finalCss, [
     '.viewer-stage--finishes',
-    'padding-bottom: calc(var(--ui-actions-height) + 34px)',
-    'min-height: 58px !important',
+    'padding-bottom: 18px !important',
+    'grid-template-columns: repeat(3, minmax(0, 1fr))',
+    'grid-template-rows: 28px minmax(0, auto)',
     '.viewer-choice-card__swatch',
     'max-width: min(64vw, 250px)'
   ]);
