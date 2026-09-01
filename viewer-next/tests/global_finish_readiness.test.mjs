@@ -24,6 +24,7 @@ test("global MDF finish options are interactive before any reset or module selec
 
   assert.equal(readiness.includes("resetConfiguration"), false);
   assert.equal(readiness.includes("setFurnitureFinishPreset"), false);
+  assert.equal(readiness.includes("setFrontPreset"), false);
 });
 
 test("finish readiness loads before viewer bootstrap while product mode retains finish authority", () => {
