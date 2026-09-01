@@ -191,8 +191,14 @@ function canDeriveGeometry(view: TechnicalViewRequest): boolean {
   return view.kind === "orthographic" || view.kind === "isometric";
 }
 
-function primitiveSet(module: ModuleGeometry, projection: TechnicalViewProjection): readonly GeometryPrimitive[] {
-  if (projection === "width-height") return module.geometry.filter(primitive => primitive.role === "front");
+function primitiveSet(
+  module: ModuleGeometry,
+  view: TechnicalViewRequest,
+  projection: TechnicalViewProjection
+): readonly GeometryPrimitive[] {
+  if (projection === "width-height" && view.source === "scene-geometry") {
+    return module.geometry.filter(primitive => primitive.role === "front");
+  }
   return module.geometry;
 }
 
@@ -252,7 +258,7 @@ export function compileGeometryDerivedTechnicalView(
 ): CompiledTechnicalViewGeometry {
   if (!canDeriveGeometry(view)) throw new Error(`TECHNICAL_VIEW_NOT_GEOMETRY_DERIVABLE:${view.id}:${view.source}`);
   const projection = projectionForView(view);
-  const rawPrimitives = primitiveSet(module, projection)
+  const rawPrimitives = primitiveSet(module, view, projection)
     .map(primitive => projectPrimitive(primitive, projection))
     .filter((primitive): primitive is TechnicalProjectedPrimitive => primitive !== null);
   const rawOpenings = projectOpenings(module, projection);
