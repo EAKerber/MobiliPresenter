@@ -28,7 +28,21 @@ const MODULE_ALIASES = {
   "07": module07.id
 } as const;
 
+const MODULE_ALIAS_ORDER = ["01", "02", "03", "04", "05", "06", "07"] as const;
+
 export type ModuleAlias = keyof typeof MODULE_ALIASES;
+
+interface FrontAssignment {
+  readonly alias: ModuleAlias;
+  readonly moduleId: string;
+  readonly presetId: FrontPresetId;
+}
+
+export interface ViewerQueryMigration {
+  readonly query: URLSearchParams;
+  readonly migratedLegacyUniformFront: boolean;
+  readonly migratedFurnitureFinishPresetId: FrontPresetId | null;
+}
 
 export function moduleIdFromAlias(alias: string): string {
   const id = MODULE_ALIASES[alias as ModuleAlias];
@@ -38,6 +52,76 @@ export function moduleIdFromAlias(alias: string): string {
 
 function splitNonEmpty(raw: string | null): readonly string[] {
   return raw ? raw.split(",").map(value => value.trim()).filter(Boolean) : [];
+}
+
+function frontPreset(rawPreset: string): FrontPresetId {
+  if (!FRONT_PRESET_IDS.includes(rawPreset as FrontPresetId)) {
+    throw new Error(`VIEWER_FRONT_PRESET_NOT_FOUND:${rawPreset}`);
+  }
+  return rawPreset as FrontPresetId;
+}
+
+function parseFrontAssignments(raw: string | null): readonly FrontAssignment[] {
+  return splitNonEmpty(raw).map(assignment => {
+    const [rawAlias, rawPreset] = assignment.split(":");
+    if (!rawAlias || !rawPreset) throw new Error(`VIEWER_FRONT_QUERY_INVALID:${assignment}`);
+    const alias = rawAlias as ModuleAlias;
+    return {
+      alias,
+      moduleId: moduleIdFromAlias(alias),
+      presetId: frontPreset(rawPreset)
+    };
+  });
+}
+
+function canonicalFurnitureFinish(query: URLSearchParams): FrontPresetId | null {
+  const raw = query.get("finish");
+  return raw ? frontPreset(raw) : null;
+}
+
+export function migrateLegacyUniformFrontQuery(query: URLSearchParams): ViewerQueryMigration {
+  const next = new URLSearchParams(query.toString());
+  const assignments = parseFrontAssignments(query.get("front"));
+  if (assignments.length !== MODULE_ALIAS_ORDER.length) {
+    return {
+      query: next,
+      migratedLegacyUniformFront: false,
+      migratedFurnitureFinishPresetId: null
+    };
+  }
+
+  const aliases = new Set(assignments.map(assignment => assignment.alias));
+  const coversEveryModule = aliases.size === MODULE_ALIAS_ORDER.length
+    && MODULE_ALIAS_ORDER.every(alias => aliases.has(alias));
+  if (!coversEveryModule) {
+    return {
+      query: next,
+      migratedLegacyUniformFront: false,
+      migratedFurnitureFinishPresetId: null
+    };
+  }
+
+  const presetId = assignments[0]!.presetId;
+  if (assignments.some(assignment => assignment.presetId !== presetId)) {
+    return {
+      query: next,
+      migratedLegacyUniformFront: false,
+      migratedFurnitureFinishPresetId: null
+    };
+  }
+
+  const canonical = canonicalFurnitureFinish(query);
+  if (canonical !== null && canonical !== presetId) {
+    throw new Error(`VIEWER_FINISH_QUERY_CONFLICT:${canonical}:${presetId}`);
+  }
+
+  next.set("finish", presetId);
+  next.delete("front");
+  return {
+    query: next,
+    migratedLegacyUniformFront: true,
+    migratedFurnitureFinishPresetId: presetId
+  };
 }
 
 export function parseViewerConfiguration(query: URLSearchParams): ViewerConfigurationState {
@@ -51,16 +135,19 @@ export function parseViewerConfiguration(query: URLSearchParams): ViewerConfigur
     });
   }
 
-  for (const assignment of splitNonEmpty(query.get("front"))) {
-    const [alias, rawPreset] = assignment.split(":");
-    if (!alias || !rawPreset) throw new Error(`VIEWER_FRONT_QUERY_INVALID:${assignment}`);
-    if (!FRONT_PRESET_IDS.includes(rawPreset as FrontPresetId)) {
-      throw new Error(`VIEWER_FRONT_PRESET_NOT_FOUND:${rawPreset}`);
-    }
+  const finish = canonicalFurnitureFinish(query);
+  if (finish !== null) {
+    state = reduceViewerConfiguration(state, {
+      type: "set-furniture-finish-preset",
+      presetId: finish
+    });
+  }
+
+  for (const assignment of parseFrontAssignments(query.get("front"))) {
     state = reduceViewerConfiguration(state, {
       type: "set-front-preset",
-      moduleId: moduleIdFromAlias(alias),
-      presetId: rawPreset as FrontPresetId
+      moduleId: assignment.moduleId,
+      presetId: assignment.presetId
     });
   }
 
