@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const polish = readFileSync(new URL("../src/ui/product-polish-v2.ts", import.meta.url), "utf8");
+const contractEnhancements = readFileSync(new URL("../src/ui/product-contract-enhancements.ts", import.meta.url), "utf8");
 const finalCss = readFileSync(new URL("../src/ui/product-polish-v2-final.css", import.meta.url), "utf8");
 const bootstrap = readFileSync(new URL("../src/bootstrap.ts", import.meta.url), "utf8");
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -57,32 +58,51 @@ test("wide desktop reuses the existing next-step action inside the module rail a
   ]);
 });
 
-test("current known finishes receive circular visual swatches without claiming unknown visual metadata", () => {
+test("published finish visuals override temporary UI color bridges", () => {
   containsAll(polish, [
     'className = "viewer-finish-dot"',
     'border-radius: 50%',
-    'FRONT_SWATCH_COLOR',
-    'STONE_SWATCH_COLOR',
-    'candidates.find(item => item.label === text)',
-    'if (!candidate) return'
+    'decorateFinishDots(api)'
   ]);
+  containsAll(contractEnhancements, [
+    'catalog.furnitureFinishPresets',
+    'catalog.stonePresets',
+    'previewColorSrgb',
+    'dataset.materialId',
+    'productStoneEnhanced'
+  ]);
+  assert.equal(/#[0-9A-Fa-f]{6}/.test(contractEnhancements), false);
   containsAll(finalCss, [
     '[data-product-card="finishes"]',
     '.viewer-finish-value',
     'width: 14px',
-    'border-radius: 50%'
+    'border-radius: 50%',
+    '[data-product-stone-enhanced="true"]'
   ]);
 });
 
-test("finishes stage stays compact without double-counting the mobile action bar", () => {
+test("module cards consume authoritative descriptors without requiring module selection", () => {
+  containsAll(contractEnhancements, [
+    'catalog.moduleDescriptors',
+    'descriptor.title',
+    'descriptorDimensions(descriptor)',
+    'dimensions.display.prefer',
+    'dimensions.display.order',
+    'productDescriptor'
+  ]);
+});
+
+test("finishes stage keeps the canonical mobile action reservation and compact stone row", () => {
   containsAll(finalCss, [
     '.viewer-stage--finishes',
-    'padding-bottom: 18px !important',
+    'padding-bottom: 22px !important',
     'grid-template-columns: repeat(3, minmax(0, 1fr))',
     'grid-template-rows: 28px minmax(0, auto)',
-    '.viewer-choice-card__swatch',
+    'height: var(--ui-actions-height)',
+    'min-height: var(--ui-actions-height)',
     'max-width: min(64vw, 250px)'
   ]);
+  assert.equal(finalCss.includes('--ui-actions-height: 58px'), false);
 });
 
 test("detail polish reduces avoidable scroll and keeps variable-content cards contained", () => {
@@ -100,6 +120,9 @@ test("product mode installs and disposes the polish lifecycle", () => {
   containsAll(bootstrap, [
     'installProductPolishV2',
     'productPolishV2 = installProductPolishV2(uiApi)',
-    'productPolishV2?.dispose()'
+    'productPolishV2?.dispose()',
+    'installProductContractEnhancements',
+    'productContractEnhancements = installProductContractEnhancements(uiApi)',
+    'productContractEnhancements?.dispose()'
   ]);
 });
