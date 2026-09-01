@@ -278,7 +278,7 @@ export function compileGeometryDerivedTechnicalView(
         vertical: extents.maxVertical - extents.minVertical
       };
 
-  const frontOnly = projection === "width-height";
+  const frontOnly = projection === "width-height" && view.source === "scene-geometry";
   return {
     viewId: view.id,
     projection,
