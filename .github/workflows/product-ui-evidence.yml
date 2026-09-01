@@ -8,6 +8,7 @@ on:
       - "viewer-next/src/renderer/three/selection.ts"
       - "viewer-next/public/module-thumbnails/**"
       - "viewer-next/tests/chrome_viewport_capture.mjs"
+      - "viewer-next/tests/mobile_finishes_clearance.mjs"
       - ".github/workflows/product-ui-evidence.yml"
   workflow_dispatch:
 
@@ -93,6 +94,10 @@ jobs:
             --click-selector '[data-configurator-step="finishes"]' \
             --wait-selector '[data-stage-panel="finishes"]' \
             --expect-step "finishes"
+
+      - name: Gate mobile finishes bottom clearance
+        working-directory: viewer-next
+        run: node tests/mobile_finishes_clearance.mjs
 
       - name: Exercise carousel next control
         working-directory: viewer-next
