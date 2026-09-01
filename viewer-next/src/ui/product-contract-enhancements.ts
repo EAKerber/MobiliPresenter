@@ -123,6 +123,36 @@ function decorateModuleCards(api: ViewerUiApi): void {
   }
 }
 
+function decorateDetailIdentity(api: ViewerUiApi): void {
+  const detail = document.querySelector<HTMLElement>(".viewer-product-detail[data-module-alias]");
+  if (!detail || detail.hidden) return;
+
+  const alias = detail.dataset.moduleAlias;
+  if (!alias) return;
+  const descriptor = api.getCatalog().moduleDescriptors.find(candidate => candidate.alias === alias);
+  if (!descriptor) return;
+
+  const title = detail.querySelector<HTMLElement>(".viewer-product-detail__heading > h2");
+  if (title) title.textContent = descriptor.title;
+
+  const eyebrow = detail.querySelector<HTMLElement>(".viewer-product-detail__eyebrow");
+  if (eyebrow) {
+    const copy = `MÓDULO ${descriptor.alias} · ${descriptor.category.toUpperCase()}`;
+    if (eyebrow.textContent !== copy) eyebrow.textContent = copy;
+  }
+
+  const firstMeta = detail.querySelector<HTMLElement>(".viewer-product-detail__meta > span:first-child");
+  if (firstMeta) {
+    const dimensions = descriptorDimensions(descriptor);
+    if (firstMeta.textContent !== dimensions) firstMeta.textContent = dimensions;
+    firstMeta.dataset.productDescriptorDimensions = "true";
+  }
+
+  const close = detail.querySelector<HTMLButtonElement>(".viewer-product-detail__header .viewer-icon-button");
+  close?.setAttribute("aria-label", `Fechar detalhes de ${descriptor.title}`);
+  detail.dataset.productDescriptor = "true";
+}
+
 function decorateStoneChoices(api: ViewerUiApi): void {
   const catalog = api.getCatalog();
   const stage = document.querySelector<HTMLElement>('[data-stage-panel="finishes"]');
@@ -275,6 +305,7 @@ export function installProductContractEnhancements(api: ViewerUiApi): ProductCon
     scheduledFrame = null;
     if (disposed) return;
     decorateModuleCards(api);
+    decorateDetailIdentity(api);
     decorateStoneChoices(api);
     decoratePublishedFinishDots(api);
     decoratePublishedSemanticIcons();
