@@ -63,6 +63,10 @@ function optionVisualByLabel(
   return options.find(option => option.label === label)?.visual;
 }
 
+function optionLabelById(options: readonly ViewerUiOption[], id: string): string {
+  return options.find(option => option.id === id)?.label ?? id;
+}
+
 function createPublishedFinishDot(visual: NonNullable<ViewerUiOption["visual"]>): HTMLElement {
   const dot = document.createElement("span");
   dot.className = "viewer-finish-dot";
@@ -210,6 +214,59 @@ function decoratePublishedSemanticIcons(): void {
   }
 }
 
+function decorateSummary(api: ViewerUiApi): void {
+  const stage = document.querySelector<HTMLElement>('[data-stage-panel="summary"]');
+  if (!stage) return;
+
+  const catalog = api.getCatalog();
+  const snapshot = api.getSnapshot();
+  const descriptors = new Map(catalog.moduleDescriptors.map(descriptor => [descriptor.alias, descriptor]));
+  const visibleAliases = catalog.modules.filter(alias => snapshot.visibilityByModule[alias] !== "off");
+
+  const cards = Array.from(stage.querySelectorAll<HTMLElement>(".viewer-summary__card"));
+  const modulesCard = cards.find(card => card.querySelector("h3")?.textContent === "Módulos do ambiente");
+  const moduleItems = modulesCard
+    ? Array.from(modulesCard.querySelectorAll<HTMLLIElement>(".viewer-summary__list > li"))
+    : [];
+  moduleItems.forEach((item, index) => {
+    const alias = visibleAliases[index];
+    if (!alias) return;
+    const descriptor = descriptors.get(alias);
+    const label = item.querySelector<HTMLElement>(":scope > strong");
+    const finish = item.querySelector<HTMLElement>(":scope > span");
+    if (label && descriptor) label.textContent = descriptor.title;
+    if (finish) {
+      const effectiveFinish = snapshot.frontPresetByModule[alias] ?? snapshot.furnitureFinishPresetId;
+      finish.textContent = optionLabelById(catalog.furnitureFinishPresets, effectiveFinish);
+    }
+    item.dataset.moduleAlias = alias;
+    item.dataset.productDescriptor = descriptor ? "true" : "false";
+  });
+
+  const finishesCard = cards.find(card => card.querySelector("h3")?.textContent === "Acabamentos");
+  const finishList = finishesCard?.querySelector<HTMLUListElement>(".viewer-summary__list");
+  if (!finishList) return;
+
+  let furnitureItem = finishList.querySelector<HTMLLIElement>('[data-product-summary-furniture="true"]');
+  if (!furnitureItem) {
+    furnitureItem = document.createElement("li");
+    furnitureItem.dataset.productSummaryFurniture = "true";
+    const label = document.createElement("strong");
+    label.textContent = "Cor dos móveis";
+    const value = document.createElement("span");
+    furnitureItem.append(label, value);
+    finishList.prepend(furnitureItem);
+  }
+  const furnitureValue = furnitureItem.querySelector<HTMLElement>(":scope > span");
+  if (furnitureValue) {
+    furnitureValue.textContent = optionLabelById(
+      catalog.furnitureFinishPresets,
+      snapshot.furnitureFinishPresetId
+    );
+  }
+  furnitureItem.dataset.productFinishSource = "configuration-state";
+}
+
 export function installProductContractEnhancements(api: ViewerUiApi): ProductContractEnhancements {
   let disposed = false;
   let scheduledFrame: number | null = null;
@@ -221,6 +278,7 @@ export function installProductContractEnhancements(api: ViewerUiApi): ProductCon
     decorateStoneChoices(api);
     decoratePublishedFinishDots(api);
     decoratePublishedSemanticIcons();
+    decorateSummary(api);
   };
 
   const scheduleDecorate = (): void => {
