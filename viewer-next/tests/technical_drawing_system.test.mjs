@@ -78,3 +78,25 @@ test("module03 authored internal layout remains authored rather than being relab
   assert.match(internal.svg ?? "", />390</);
   assert.match(internal.svg ?? "", />400</);
 });
+
+test("module04 panel views use available panel geometry without pretending to be cabinet fronts", () => {
+  const pkg = getCurrentTechnicalPresentationByAlias(createDefaultViewerConfiguration(), "04");
+  const front = geometry(pkg, "module04/view/front");
+  const thickness = geometry(pkg, "module04/view/thickness");
+  const isometric = geometry(pkg, "module04/view/isometric");
+
+  assert.equal(front.projection, "depth-height");
+  assert.equal(thickness.projection, "width-height");
+  assert.equal(isometric.projection, "isometric");
+  assert.deepEqual(front.coverage, ["module-geometry-primitives"]);
+  assert.deepEqual(thickness.coverage, ["module-geometry-primitives"]);
+  assert.deepEqual(isometric.coverage, ["module-geometry-primitives"]);
+  assert.deepEqual(thickness.omitted, ["hardware", "hidden-line-removal"]);
+
+  const thicknessAsset = renderTechnicalViewSvg(pkg, "module04/view/thickness");
+  assert.equal(thicknessAsset.fidelity, "geometry-derived");
+  assert.equal(thicknessAsset.source, "scene-geometry");
+  assert.deepEqual(thicknessAsset.coverage, ["module-geometry-primitives"]);
+  assert.match(thicknessAsset.svg ?? "", /18 mm/);
+  assert.match(thicknessAsset.svg ?? "", /2400 mm/);
+});
