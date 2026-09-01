@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const readiness = readFileSync(new URL("../src/ui/global-finish-readiness.ts", import.meta.url), "utf8");
+const control = readFileSync(new URL("../src/ui/global-finish-readiness.ts", import.meta.url), "utf8");
+const bootstrap = readFileSync(new URL("../src/bootstrap.ts", import.meta.url), "utf8");
 const productEnhancements = readFileSync(new URL("../src/ui/product-enhancements.ts", import.meta.url), "utf8");
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
@@ -10,32 +11,32 @@ function containsAll(source, values) {
   for (const value of values) assert.ok(source.includes(value), `missing source contract: ${value}`);
 }
 
-test("global MDF finish options are interactive before any reset or module selection", () => {
-  containsAll(readiness, [
-    'const FINISH_STAGE_SELECTOR = \'[data-stage-panel="finishes"]\';',
-    'const FINISH_OPTION_SELECTOR = \'[data-front-preset]\';',
+test("global MDF finish is a first-interaction control backed by the canonical API", () => {
+  containsAll(control, [
+    "installGlobalFinishControl",
+    "api.getSnapshot().furnitureFinishPresetId",
+    "api.setFurnitureFinishPreset",
+    "controls.refresh()",
     'presetId === "original"',
     "option.hidden = true",
-    "if (option.disabled) option.disabled = false",
-    "new MutationObserver",
-    "observer.observe(document.documentElement, { childList: true, subtree: true })",
-    "installGlobalFinishReadiness();",
+    "option.disabled = false",
+    'document.addEventListener("click", handleClick, true)',
+    "event.stopImmediatePropagation()",
   ]);
-
-  assert.equal(readiness.includes("resetConfiguration"), false);
-  assert.equal(readiness.includes("setFurnitureFinishPreset"), false);
-  assert.equal(readiness.includes("setFrontPreset"), false);
+  assert.equal(control.includes("resetConfiguration"), false);
+  assert.equal(control.includes("setFrontPreset"), false);
 });
 
-test("finish readiness loads before viewer bootstrap while product mode retains finish authority", () => {
-  const readinessIndex = html.indexOf('/src/ui/global-finish-readiness.ts');
-  const bootstrapIndex = html.indexOf('/src/bootstrap.ts');
-  assert.ok(readinessIndex >= 0, "global finish readiness module missing from index");
-  assert.ok(bootstrapIndex > readinessIndex, "global finish readiness must load before bootstrap");
+test("bootstrap installs global finish authority before product enhancement compatibility", () => {
+  const controlIndex = bootstrap.indexOf("installGlobalFinishControl(uiApi, controls)");
+  const enhancementIndex = bootstrap.indexOf("installProductUiEnhancements(uiApi, controls)");
+  assert.ok(controlIndex >= 0, "global finish control missing from bootstrap");
+  assert.ok(enhancementIndex > controlIndex, "global finish control must own the click before product enhancements");
 
-  containsAll(productEnhancements, [
-    "api.setFurnitureFinishPreset",
-    "snapshot.furnitureFinishPresetId",
-    "catalog.furnitureFinishPresets",
-  ]);
+  assert.equal(html.includes("/src/ui/global-finish-readiness.ts"), false);
+  assert.ok(html.includes("/src/bootstrap.ts"), "bootstrap entrypoint missing");
+
+  // Product enhancements may continue styling the same cards during the migration,
+  // but the earlier capture handler stops its legacy writer from receiving the click.
+  containsAll(productEnhancements, ["api.setFurnitureFinishPreset", "handleGlobalFinishClick"]);
 });

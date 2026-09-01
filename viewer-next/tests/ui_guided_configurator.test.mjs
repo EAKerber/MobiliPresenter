@@ -69,7 +69,6 @@ test("product mode consumes first-class global furniture finish and contract-own
     "catalog.furnitureFinishPresets",
     "visual.previewColorSrgb",
     "visual.materialId",
-    "api.setFurnitureFinishPreset",
     "Cor dos móveis",
     "Acabamento global",
   ]);
@@ -78,8 +77,11 @@ test("product mode consumes first-class global furniture finish and contract-own
     'FINISH_OPTION_SELECTOR',
     'option.disabled = false',
     'new MutationObserver',
+    'installGlobalFinishControl',
+    'api.setFurnitureFinishPreset',
+    'controls.refresh()',
   ]);
-  assert.equal(finishReadiness.includes("setFurnitureFinishPreset"), false);
+  assert.equal(finishReadiness.includes("setFrontPreset"), false);
   assert.equal(finishReadiness.includes("resetConfiguration"), false);
   assert.equal(productEnhancements.includes("FRONT_SWATCH_COLOR"), false);
   assert.equal(productEnhancements.includes("PRODUCT_DEFAULT_FRONT_PRESET"), false);
