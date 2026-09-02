@@ -1,7 +1,7 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
 export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.1" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.4" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.5" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
@@ -159,11 +159,19 @@ export interface TechnicalProjectedDimensionGuide {
   readonly endMm: TechnicalPoint2Mm;
 }
 
+export interface TechnicalVisibilityInterval {
+  readonly startT: number;
+  readonly endT: number;
+}
+
 export interface TechnicalProjectedEdge {
   readonly id: string;
   readonly classification: TechnicalProjectedEdgeClass;
   readonly startMm: TechnicalPoint2Mm;
   readonly endMm: TechnicalPoint2Mm;
+  readonly startViewDepth: number;
+  readonly endViewDepth: number;
+  readonly visibleIntervals: readonly TechnicalVisibilityInterval[];
   readonly sourcePrimitiveIds: readonly string[];
   readonly sourcePrimitiveRoles: readonly string[];
 }

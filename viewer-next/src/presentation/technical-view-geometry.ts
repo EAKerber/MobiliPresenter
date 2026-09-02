@@ -18,7 +18,11 @@ import {
   technicalPrimitivePoints3d,
   transformTechnicalPoint
 } from "./technical-edge-graph.js";
-import { projectIsometricPoint } from "./technical-isometric.js";
+import {
+  isometricViewDepth,
+  projectIsometricPoint
+} from "./technical-isometric.js";
+import { resolveTechnicalEdgeVisibility } from "./technical-visibility.js";
 
 const EPSILON = 1e-6;
 
@@ -258,9 +262,17 @@ export function compileGeometryDerivedTechnicalView(
     .filter((primitive): primitive is TechnicalProjectedPrimitive => primitive !== null);
   const rawOpenings = projectOpenings(module, projection);
   const rawDimensionGuides = projectDimensionGuides(module, projection);
-  const rawEdges = projection === "isometric"
-    ? buildProjectedTechnicalEdgeGraph(sourcePrimitives, projectIsometricPoint)
+  const rawPhysicalEdges = projection === "isometric"
+    ? buildProjectedTechnicalEdgeGraph(sourcePrimitives, projectIsometricPoint, isometricViewDepth)
     : [];
+  const rawEdges = projection === "isometric"
+    ? resolveTechnicalEdgeVisibility(
+        sourcePrimitives,
+        rawPhysicalEdges,
+        projectIsometricPoint,
+        isometricViewDepth
+      )
+    : rawPhysicalEdges;
   const extents = projectionExtents(rawPrimitives, rawOpenings);
 
   const preserveFrontDatum = projection === "width-height";

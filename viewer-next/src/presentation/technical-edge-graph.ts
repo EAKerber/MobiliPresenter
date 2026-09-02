@@ -15,13 +15,23 @@ const BOX_EDGES: readonly (readonly [number, number])[] = [
   [4, 5], [5, 6], [6, 7], [7, 4],
   [0, 4], [1, 5], [2, 6], [3, 7]
 ];
+const BOX_FACES: readonly (readonly number[])[] = [
+  [0, 1, 2, 3],
+  [4, 5, 6, 7],
+  [0, 1, 5, 4],
+  [1, 2, 6, 5],
+  [2, 3, 7, 6],
+  [3, 0, 4, 7]
+];
 const FACE_EDGES: readonly (readonly [number, number])[] = [
   [0, 1], [1, 2], [2, 3], [3, 0]
 ];
+const FACE_FACES: readonly (readonly number[])[] = [[0, 1, 2, 3]];
 
 export interface TechnicalPrimitiveTopology {
   readonly vertices: readonly Vec3[];
   readonly edges: readonly (readonly [number, number])[];
+  readonly faces: readonly (readonly number[])[];
 }
 
 export function rotateTechnicalVector(vector: Vec3, transform: RigidTransform): Vec3 {
@@ -60,7 +70,8 @@ export function technicalPrimitiveTopology(primitive: GeometryPrimitive): Techni
     ];
     return {
       vertices: local.map(point => transformTechnicalPoint(point, primitive.localTransform)),
-      edges: BOX_EDGES
+      edges: BOX_EDGES,
+      faces: BOX_FACES
     };
   }
 
@@ -85,7 +96,8 @@ export function technicalPrimitiveTopology(primitive: GeometryPrimitive): Techni
   ];
   return {
     vertices: local.map(point => transformTechnicalPoint(point, primitive.localTransform)),
-    edges: FACE_EDGES
+    edges: FACE_EDGES,
+    faces: FACE_FACES
   };
 }
 
@@ -219,7 +231,8 @@ function classifyEdge(input: {
 
 export function buildProjectedTechnicalEdgeGraph(
   primitives: readonly GeometryPrimitive[],
-  project: (point: Vec3) => TechnicalPoint2Mm
+  project: (point: Vec3) => TechnicalPoint2Mm,
+  viewDepth: (point: Vec3) => number = () => 0
 ): readonly TechnicalProjectedEdge[] {
   const accumulators = new Map<string, EdgeAccumulator>();
   const allVertices: Vec3[] = [];
@@ -269,6 +282,9 @@ export function buildProjectedTechnicalEdgeGraph(
         }),
         startMm: projectedStart,
         endMm: projectedEnd,
+        startViewDepth: viewDepth(edge.start3d),
+        endViewDepth: viewDepth(edge.end3d),
+        visibleIntervals: [{ startT: 0, endT: 1 }],
         sourcePrimitiveIds: [...edge.sourcePrimitiveIds].sort(),
         sourcePrimitiveRoles: [...edge.sourcePrimitiveRoles].sort()
       };
