@@ -84,8 +84,9 @@ test("module03 geometry-derived SVG exposes stable semantic hooks and authority-
   assert.match(isoA.svg ?? "", /drawer-4/);
   assert.match(isoA.svg ?? "", /door-center/);
   assert.match(isoA.svg ?? "", /door-right/);
-  assert.match(isoA.svg ?? "", /data-role="technical-edge"/);
-  assert.match(isoA.svg ?? "", /data-isometric-constitution="isometric-projection\/v0\.4"/);
+  assert.match(isoA.svg ?? "", /data-role="technical-line"/);
+  assert.match(isoA.svg ?? "", /data-isometric-constitution="isometric-projection\/v0\.5"/);
+  assert.match(isoA.svg ?? "", /data-technical-line-constitution="technical-line-model\/v0\.6"/);
   assert.doesNotMatch(isoA.svg ?? "", /data-role="primary-geometry"/);
   assert.match(isoA.svg ?? "", /data-role="isometric-dimension" data-axis="width"/);
   assert.match(isoA.svg ?? "", /data-role="isometric-dimension" data-axis="height"/);
@@ -145,7 +146,8 @@ test("module04 panel views use available panel geometry without pretending to be
   assert.match(thicknessAsset.svg ?? "", /2400 mm/);
 
   const isoAsset = renderTechnicalViewSvg(pkg, "module04/view/isometric");
-  assert.match(isoAsset.svg ?? "", /data-role="technical-edge"/);
+  assert.match(isoAsset.svg ?? "", /data-role="technical-line"/);
+  assert.match(isoAsset.svg ?? "", /data-technical-line-constitution="technical-line-model\/v0\.6"/);
   assert.match(isoAsset.svg ?? "", />18 mm</);
   assert.match(isoAsset.svg ?? "", />600 mm</);
   assert.match(isoAsset.svg ?? "", />2400 mm</);
