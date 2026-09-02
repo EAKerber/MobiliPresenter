@@ -3,8 +3,6 @@ import type {
   TechnicalAxis,
   TechnicalPoint2Mm,
   TechnicalPresentationPackage,
-  TechnicalProjectedEdge,
-  TechnicalProjectedEdgeClass,
   TechnicalViewCoverage,
   TechnicalViewFidelity,
   TechnicalViewOmission,
@@ -16,7 +14,16 @@ import {
   type TechnicalCompositionPoint,
   type TechnicalDimensionPlacement
 } from "./technical-composition.js";
-import { projectIsometricPoint } from "./technical-isometric.js";
+import {
+  ISOMETRIC_PROJECTION_CONTRACT_VERSION,
+  projectIsometricPoint
+} from "./technical-isometric.js";
+import {
+  buildTechnicalLineModel,
+  TECHNICAL_LINE_MODEL_VERSION,
+  type TechnicalRenderableEdge,
+  type TechnicalRenderableEdgeClass
+} from "./technical-line-model.js";
 
 export interface TechnicalDiagramAsset {
   readonly viewId: string;
@@ -33,13 +40,11 @@ const WIDTH = 420;
 const HEIGHT = 300;
 const MARGIN = 48;
 const DEFAULT_OMISSIONS: readonly TechnicalViewOmission[] = ["hardware", "hidden-geometry"];
-const EDGE_RENDER_ORDER: Readonly<Record<TechnicalProjectedEdgeClass, number>> = {
-  back: 0,
-  depth: 1,
-  shared: 2,
-  internal: 3,
-  front: 4,
-  silhouette: 5
+const LINE_RENDER_ORDER: Readonly<Record<TechnicalRenderableEdgeClass, number>> = {
+  shared: 0,
+  internal: 1,
+  front: 2,
+  silhouette: 3
 };
 
 function escapeXml(value: string): string {
@@ -244,10 +249,8 @@ function isometricDimensions(
   return plan.dimensions.map(renderIsometricDimension).join("");
 }
 
-function edgeStyle(edge: TechnicalProjectedEdge): string {
+function lineStyle(edge: TechnicalRenderableEdge): string {
   switch (edge.classification) {
-    case "back": return ' stroke-width="1.05" opacity="0.72"';
-    case "depth": return ' stroke-width="1.3"';
     case "shared": return ' stroke-width="1.25"';
     case "internal": return ' stroke-width="1.25"';
     case "front": return ' stroke-width="1.55"';
@@ -255,21 +258,21 @@ function edgeStyle(edge: TechnicalProjectedEdge): string {
   }
 }
 
-function renderTechnicalEdges(
-  edges: readonly TechnicalProjectedEdge[],
+function renderTechnicalLines(
+  edges: readonly TechnicalRenderableEdge[],
   x: number,
   y: number,
   h: number,
   scale: number
 ): string {
   return [...edges]
-    .sort((a, b) => EDGE_RENDER_ORDER[a.classification] - EDGE_RENDER_ORDER[b.classification] || a.id.localeCompare(b.id))
+    .sort((a, b) => LINE_RENDER_ORDER[a.classification] - LINE_RENDER_ORDER[b.classification] || a.id.localeCompare(b.id))
     .map(edge => {
       const start = screenPoint(edge.startMm, x, y, h, scale);
       const end = screenPoint(edge.endMm, x, y, h, scale);
       const primitiveIds = escapeXml(edge.sourcePrimitiveIds.join("|"));
       const primitiveRoles = escapeXml(edge.sourcePrimitiveRoles.join("|"));
-      return `<line data-role="technical-edge" data-edge-id="${edge.id}" data-edge-class="${edge.classification}" data-source-primitive-ids="${primitiveIds}" data-source-primitive-roles="${primitiveRoles}" x1="${start.x.toFixed(2)}" y1="${start.y.toFixed(2)}" x2="${end.x.toFixed(2)}" y2="${end.y.toFixed(2)}"${edgeStyle(edge)}/>`;
+      return `<line data-role="technical-line" data-source-edge-id="${edge.id}" data-line-class="${edge.classification}" data-source-primitive-ids="${primitiveIds}" data-source-primitive-roles="${primitiveRoles}" x1="${start.x.toFixed(2)}" y1="${start.y.toFixed(2)}" x2="${end.x.toFixed(2)}" y2="${end.y.toFixed(2)}"${lineStyle(edge)}/>`;
     })
     .join("");
 }
@@ -282,6 +285,7 @@ function geometryDerivedSvg(
   const dimensions = pkg.dimensions;
   if (!dimensions) throw new Error(`TECHNICAL_VIEW_DIMENSIONS_REQUIRED:${view.id}`);
   const isometric = geometry.projection === "isometric";
+  const lineModel = isometric ? buildTechnicalLineModel(geometry.edges) : null;
   const layout = isometric
     ? { left: 88, right: 88, top: 38, bottom: 82 }
     : { left: MARGIN, right: MARGIN, top: MARGIN, bottom: MARGIN };
@@ -302,8 +306,8 @@ function geometryDerivedSvg(
     }).join(" ");
 
   let body = "";
-  if (isometric) {
-    body += renderTechnicalEdges(geometry.edges, x, y, h, scale);
+  if (lineModel) {
+    body += renderTechnicalLines(lineModel.renderedEdges, x, y, h, scale);
   } else {
     for (const primitive of geometry.primitives) {
       body += `<polygon data-role="primary-geometry" data-primitive-role="${escapeXml(primitive.role)}" data-primitive-id="${escapeXml(primitive.id)}" points="${pointString(primitive.pointsMm)}"/>`;
@@ -333,8 +337,8 @@ function geometryDerivedSvg(
     body += verticalDimension(y + h, y, x, x - 30, `${fmt(verticalMm)} mm`);
   }
 
-  const ownership = isometric
-    ? ` data-product-dimensions="true" data-technical-composition="technical-composition/v0.3" data-isometric-constitution="isometric-projection/v0.4" data-technical-edge-count="${geometry.edges.length}"`
+  const ownership = lineModel
+    ? ` data-product-dimensions="true" data-technical-composition="technical-composition/v0.3" data-isometric-constitution="${ISOMETRIC_PROJECTION_CONTRACT_VERSION}" data-technical-line-constitution="${TECHNICAL_LINE_MODEL_VERSION}" data-technical-edge-count="${lineModel.physicalEdgeCount}" data-technical-line-count="${lineModel.renderedEdgeCount}"`
     : "";
   return svgShell(`${pkg.identity.title} — ${view.label}`, body, "geometry-derived", "scene-geometry", ownership);
 }

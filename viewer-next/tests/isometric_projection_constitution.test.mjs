@@ -10,6 +10,7 @@ import {
   isometricProjectionMetrics,
   projectIsometricPoint
 } from "../dist-ts/src/presentation/technical-isometric.js";
+import { buildTechnicalLineModel } from "../dist-ts/src/presentation/technical-line-model.js";
 import { getCurrentTechnicalPresentationByAlias } from "../dist-ts/src/presentation/current-service.js";
 import { renderTechnicalViewSvg } from "../dist-ts/src/presentation/technical-diagram.js";
 import { createDefaultViewerConfiguration } from "../dist-ts/src/runtime/viewer-state.js";
@@ -121,16 +122,25 @@ test("technical primitive topology is complete before projection", () => {
   assert.equal(face.edges.length, 4);
 });
 
-test("projected edge graph deduplicates physical edges and classifies a closed box", () => {
+test("physical edge graph stays complete while the line model selects technical representation", () => {
   const edges = buildProjectedTechnicalEdgeGraph([syntheticBox], projectIsometricPoint);
   assert.equal(edges.length, 12);
   assert.equal(new Set(edges.map(projectedEdgeKey)).size, 12);
   assert.ok(edges.some(edge => edge.classification === "silhouette"));
   assert.ok(edges.some(edge => edge.classification === "front"));
   assert.ok(edges.some(edge => edge.classification === "depth"));
+
+  const model = buildTechnicalLineModel(edges);
+  assert.equal(model.physicalEdgeCount, 12);
+  assert.equal(model.renderedEdgeCount, 8);
+  assert.equal(model.candidates.length, 12);
+  assert.equal(model.omittedEdgeIds.length, 4);
+  assert.ok(model.renderedEdges.every(edge =>
+    edge.classification !== "back" && edge.classification !== "depth"
+  ));
 });
 
-test("module03 isometric uses the non-degenerate canonical projection", () => {
+test("module03 isometric keeps physical provenance but renders a selected technical line model", () => {
   const pkg = getCurrentTechnicalPresentationByAlias(createDefaultViewerConfiguration(), "03");
   const iso = geometry(pkg, "module03/view/isometric");
   const widthGuide = iso.dimensionGuides.find(guide => guide.axis === "width");
@@ -163,19 +173,55 @@ test("module03 isometric uses the non-degenerate canonical projection", () => {
   assert.ok(iso.edges.some(edge => edge.sourcePrimitiveIds.some(id => id.endsWith("front/door-right"))));
   assert.deepEqual(iso.omitted, ["hardware", "hidden-line-removal"]);
 
+  const lineModel = buildTechnicalLineModel(iso.edges);
+  assert.equal(lineModel.physicalEdgeCount, iso.edges.length);
+  assert.ok(
+    lineModel.renderedEdgeCount < lineModel.physicalEdgeCount / 2,
+    `${lineModel.renderedEdgeCount} rendered from ${lineModel.physicalEdgeCount} physical edges`
+  );
+  assert.ok(lineModel.renderedEdges.every(edge =>
+    edge.classification !== "back" && edge.classification !== "depth"
+  ));
+  assert.equal(
+    lineModel.renderedEdges.some(edge =>
+      edge.classification === "internal" && edge.sourcePrimitiveRoles.includes("front")
+    ),
+    false
+  );
+  assert.ok(lineModel.renderedEdges.some(edge =>
+    edge.sourcePrimitiveIds.some(id => id.endsWith("front/drawer-1"))
+  ));
+  assert.ok(lineModel.renderedEdges.some(edge =>
+    edge.sourcePrimitiveIds.some(id => id.endsWith("front/door-right"))
+  ));
+  const omittedReasons = new Set(
+    lineModel.candidates
+      .filter(candidate => candidate.disposition === "omit")
+      .map(candidate => candidate.reason)
+  );
+  assert.ok(omittedReasons.has("non-silhouette-depth"));
+  assert.ok(omittedReasons.has("rear-plane"));
+  assert.ok(omittedReasons.has("front-thickness-rear"));
+
   const asset = renderTechnicalViewSvg(pkg, "module03/view/isometric");
   const svg = asset.svg ?? "";
-  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.4"/);
-  assert.match(svg, /data-role="technical-edge"/);
-  assert.match(svg, /data-edge-class="front"/);
-  assert.match(svg, /data-edge-class="silhouette"/);
+  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.5"/);
+  assert.match(svg, /data-technical-line-constitution="technical-line-model\/v0\.6"/);
+  assert.match(svg, /data-role="technical-line"/);
+  assert.match(svg, /data-line-class="front"/);
+  assert.match(svg, /data-line-class="silhouette"/);
+  assert.doesNotMatch(svg, /data-role="technical-edge"/);
+  assert.doesNotMatch(svg, /data-line-class="back"/);
+  assert.doesNotMatch(svg, /data-line-class="depth"/);
+  assert.match(svg, new RegExp(`data-technical-edge-count="${lineModel.physicalEdgeCount}"`));
+  assert.match(svg, new RegExp(`data-technical-line-count="${lineModel.renderedEdgeCount}"`));
   assert.doesNotMatch(svg, /data-role="primary-geometry"/);
   assert.equal(countDimensionLabel(svg, "1200 mm"), 1);
   assert.equal(countDimensionLabel(svg, "760 mm"), 1);
   assert.equal(countDimensionLabel(svg, "530 mm"), 1);
 });
 
-test("module04 remains a generic thin-panel stress fixture on the same edge pipeline", () => {
+test("module04 remains a generic thin-panel stress fixture on the same line policy", () => {
   const pkg = getCurrentTechnicalPresentationByAlias(createDefaultViewerConfiguration(), "04");
   const iso = geometry(pkg, "module04/view/isometric");
   const depthGuide = iso.dimensionGuides.find(guide => guide.axis === "depth");
@@ -190,10 +236,17 @@ test("module04 remains a generic thin-panel stress fixture on the same edge pipe
   ));
   assert.deepEqual(iso.omitted, ["hardware", "hidden-line-removal"]);
 
+  const lineModel = buildTechnicalLineModel(iso.edges);
+  assert.equal(lineModel.physicalEdgeCount, 12);
+  assert.equal(lineModel.renderedEdgeCount, 8);
+
   const asset = renderTechnicalViewSvg(pkg, "module04/view/isometric");
   const svg = asset.svg ?? "";
-  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.4"/);
-  assert.match(svg, /data-role="technical-edge"/);
+  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.5"/);
+  assert.match(svg, /data-technical-line-constitution="technical-line-model\/v0\.6"/);
+  assert.match(svg, /data-role="technical-line"/);
+  assert.match(svg, /data-technical-edge-count="12"/);
+  assert.match(svg, /data-technical-line-count="8"/);
   assert.equal(countDimensionLabel(svg, "18 mm"), 1);
   assert.equal(countDimensionLabel(svg, "600 mm"), 1);
   assert.equal(countDimensionLabel(svg, "2400 mm"), 1);
