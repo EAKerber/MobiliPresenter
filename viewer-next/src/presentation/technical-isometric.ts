@@ -1,7 +1,7 @@
 import type { Vec3 } from "@mobilipresenter/scene-core";
 import type { TechnicalPoint2Mm } from "./contracts.js";
 
-export const ISOMETRIC_PROJECTION_CONTRACT_VERSION = "isometric-projection/v0.5" as const;
+export const ISOMETRIC_PROJECTION_CONTRACT_VERSION = "isometric-projection/v0.5.1" as const;
 
 export interface TechnicalProjectionBasisVector {
   readonly horizontalMm: number;
@@ -15,7 +15,8 @@ export interface IsometricProjectionBasis {
 }
 
 export interface IsometricProjectionFrame {
-  readonly viewDirection: Vec3;
+  /** Unit vector from the modeled scene toward the virtual technical camera. */
+  readonly sceneToCameraDirection: Vec3;
   readonly screenRight: Vec3;
   readonly screenUp: Vec3;
   readonly drawingScale: number;
@@ -57,22 +58,26 @@ function dot3(a: Vec3, b: Vec3): number {
 /**
  * Canonical engineering-isometric frame.
  *
- * The frame is the authority. The 2D basis below is derived from it, rather than
- * authored as three independent screen vectors. The view direction has equal
- * contribution from Scene Core x/y/z; screen-right and screen-up form an
- * orthonormal camera plane. A uniform drawingScale removes the common
- * orthographic foreshortening so one millimeter along any Scene Core axis has
- * the same projected length.
+ * Scene Core uses x=width/right, y=depth/back and z=up. Furniture fronts are
+ * on the lower-y side of their module envelope; the current calibrated viewer
+ * camera also observes the product from that front hemisphere. The technical
+ * camera therefore lives in the front-left-above octant: scene->camera has
+ * equal-magnitude negative x/y and positive z components.
+ *
+ * This is a semantic hemisphere contract, not a copy of the perspective viewer
+ * camera. The orthographic technical frame remains independent and keeps equal
+ * foreshortening on all three Scene Core axes.
  *
  * Projection coordinates use technical vertical-up space. The SVG renderer
  * later inverts verticalMm into screen Y.
  */
-const VIEW_DIRECTION = normalize3({ x: 1, y: 1, z: 1 });
-const SCREEN_RIGHT = normalize3({ x: 1, y: -1, z: 0 });
-const SCREEN_UP = normalize3(cross3(SCREEN_RIGHT, VIEW_DIRECTION));
+const WORLD_UP: Vec3 = { x: 0, y: 0, z: 1 };
+const SCENE_TO_CAMERA_DIRECTION = normalize3({ x: -1, y: -1, z: 1 });
+const SCREEN_RIGHT = normalize3(cross3(WORLD_UP, SCENE_TO_CAMERA_DIRECTION));
+const SCREEN_UP = normalize3(cross3(SCENE_TO_CAMERA_DIRECTION, SCREEN_RIGHT));
 
 export const ISOMETRIC_PROJECTION_FRAME: IsometricProjectionFrame = {
-  viewDirection: VIEW_DIRECTION,
+  sceneToCameraDirection: SCENE_TO_CAMERA_DIRECTION,
   screenRight: SCREEN_RIGHT,
   screenUp: SCREEN_UP,
   drawingScale: Math.sqrt(3 / 2)
@@ -114,6 +119,14 @@ export function isometricProjectionMetrics(
     heightScale,
     normalizedWidthDepthArea: widthDepthArea / Math.max(1e-12, widthScale * depthScale)
   };
+}
+
+/** Larger values are closer to the virtual technical camera. */
+export function isometricViewDepth(
+  point: Vec3,
+  frame: IsometricProjectionFrame = ISOMETRIC_PROJECTION_FRAME
+): number {
+  return dot3(point, frame.sceneToCameraDirection);
 }
 
 export function projectIsometricPoint(

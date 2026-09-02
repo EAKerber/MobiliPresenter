@@ -85,7 +85,7 @@ test("module03 geometry-derived SVG exposes stable semantic hooks and authority-
   assert.match(isoA.svg ?? "", /door-center/);
   assert.match(isoA.svg ?? "", /door-right/);
   assert.match(isoA.svg ?? "", /data-role="technical-line"/);
-  assert.match(isoA.svg ?? "", /data-isometric-constitution="isometric-projection\/v0\.5"/);
+  assert.match(isoA.svg ?? "", /data-isometric-constitution="isometric-projection\/v0\.5\.1"/);
   assert.match(isoA.svg ?? "", /data-technical-line-constitution="technical-line-model\/v0\.6"/);
   assert.doesNotMatch(isoA.svg ?? "", /data-role="primary-geometry"/);
   assert.match(isoA.svg ?? "", /data-role="isometric-dimension" data-axis="width"/);

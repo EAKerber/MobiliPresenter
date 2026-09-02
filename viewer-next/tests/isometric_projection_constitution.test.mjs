@@ -8,6 +8,7 @@ import {
   ISOMETRIC_PROJECTION_BASIS,
   ISOMETRIC_PROJECTION_FRAME,
   isometricProjectionMetrics,
+  isometricViewDepth,
   projectIsometricPoint
 } from "../dist-ts/src/presentation/technical-isometric.js";
 import { buildTechnicalLineModel } from "../dist-ts/src/presentation/technical-line-model.js";
@@ -71,14 +72,25 @@ function dot3(a, b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-test("canonical isometric projection is derived from an orthonormal camera frame", () => {
+test("canonical isometric projection uses a front-left-above orthonormal camera frame", () => {
   const frame = ISOMETRIC_PROJECTION_FRAME;
-  approx(length3(frame.viewDirection), 1);
+  approx(length3(frame.sceneToCameraDirection), 1);
   approx(length3(frame.screenRight), 1);
   approx(length3(frame.screenUp), 1);
-  approx(dot3(frame.viewDirection, frame.screenRight), 0);
-  approx(dot3(frame.viewDirection, frame.screenUp), 0);
+  approx(dot3(frame.sceneToCameraDirection, frame.screenRight), 0);
+  approx(dot3(frame.sceneToCameraDirection, frame.screenUp), 0);
   approx(dot3(frame.screenRight, frame.screenUp), 0);
+
+  assert.ok(frame.sceneToCameraDirection.x < 0, "technical camera must remain on the left hemisphere");
+  assert.ok(frame.sceneToCameraDirection.y < 0, "technical camera must observe the furniture front from lower y");
+  assert.ok(frame.sceneToCameraDirection.z > 0, "technical camera must remain above the product");
+  assert.ok(frame.screenUp.z > 0, "positive Scene Core height must remain visually up");
+
+  const frontDepth = isometricViewDepth({ x: 0, y: -18, z: 0 });
+  const carcassFrontDepth = isometricViewDepth({ x: 0, y: 0, z: 0 });
+  const rearDepth = isometricViewDepth({ x: 0, y: 530, z: 0 });
+  assert.ok(frontDepth > carcassFrontDepth);
+  assert.ok(carcassFrontDepth > rearDepth);
 
   const metrics = isometricProjectionMetrics();
   approx(metrics.widthScale, 1);
@@ -87,9 +99,9 @@ test("canonical isometric projection is derived from an orthonormal camera frame
   approx(metrics.normalizedWidthDepthArea, Math.sqrt(3) / 2);
 
   assert.ok(ISOMETRIC_PROJECTION_BASIS.width.horizontalMm > 0);
-  assert.ok(ISOMETRIC_PROJECTION_BASIS.width.verticalMm < 0);
+  assert.ok(ISOMETRIC_PROJECTION_BASIS.width.verticalMm > 0);
   assert.ok(ISOMETRIC_PROJECTION_BASIS.depth.horizontalMm < 0);
-  assert.ok(ISOMETRIC_PROJECTION_BASIS.depth.verticalMm < 0);
+  assert.ok(ISOMETRIC_PROJECTION_BASIS.depth.verticalMm > 0);
   assert.ok(ISOMETRIC_PROJECTION_BASIS.height.verticalMm > 0);
 });
 
@@ -140,7 +152,7 @@ test("physical edge graph stays complete while the line model selects technical 
   ));
 });
 
-test("module03 isometric keeps physical provenance but renders a selected technical line model", () => {
+test("module03 isometric keeps the physical front toward the technical camera", () => {
   const pkg = getCurrentTechnicalPresentationByAlias(createDefaultViewerConfiguration(), "03");
   const iso = geometry(pkg, "module03/view/isometric");
   const widthGuide = iso.dimensionGuides.find(guide => guide.axis === "width");
@@ -148,9 +160,9 @@ test("module03 isometric keeps physical provenance but renders a selected techni
   assert.ok(widthGuide);
   assert.ok(depthGuide);
   assert.ok(widthGuide.endMm.horizontalMm > widthGuide.startMm.horizontalMm);
-  assert.ok(widthGuide.endMm.verticalMm < widthGuide.startMm.verticalMm);
+  assert.ok(widthGuide.endMm.verticalMm > widthGuide.startMm.verticalMm);
   assert.ok(depthGuide.endMm.horizontalMm < depthGuide.startMm.horizontalMm);
-  assert.ok(depthGuide.endMm.verticalMm < depthGuide.startMm.verticalMm);
+  assert.ok(depthGuide.endMm.verticalMm > depthGuide.startMm.verticalMm);
 
   const widthVector = {
     x: widthGuide.endMm.horizontalMm - widthGuide.startMm.horizontalMm,
@@ -205,7 +217,7 @@ test("module03 isometric keeps physical provenance but renders a selected techni
 
   const asset = renderTechnicalViewSvg(pkg, "module03/view/isometric");
   const svg = asset.svg ?? "";
-  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.5"/);
+  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.5\.1"/);
   assert.match(svg, /data-technical-line-constitution="technical-line-model\/v0\.6"/);
   assert.match(svg, /data-role="technical-line"/);
   assert.match(svg, /data-line-class="front"/);
@@ -227,7 +239,7 @@ test("module04 remains a generic thin-panel stress fixture on the same line poli
   const depthGuide = iso.dimensionGuides.find(guide => guide.axis === "depth");
   assert.ok(depthGuide);
   assert.ok(depthGuide.endMm.horizontalMm < depthGuide.startMm.horizontalMm);
-  assert.ok(depthGuide.endMm.verticalMm < depthGuide.startMm.verticalMm);
+  assert.ok(depthGuide.endMm.verticalMm > depthGuide.startMm.verticalMm);
 
   assert.equal(iso.edges.length, 12);
   assert.equal(new Set(iso.edges.map(projectedEdgeKey)).size, 12);
@@ -242,7 +254,7 @@ test("module04 remains a generic thin-panel stress fixture on the same line poli
 
   const asset = renderTechnicalViewSvg(pkg, "module04/view/isometric");
   const svg = asset.svg ?? "";
-  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.5"/);
+  assert.match(svg, /data-isometric-constitution="isometric-projection\/v0\.5\.1"/);
   assert.match(svg, /data-technical-line-constitution="technical-line-model\/v0\.6"/);
   assert.match(svg, /data-role="technical-line"/);
   assert.match(svg, /data-technical-edge-count="12"/);
