@@ -22,6 +22,7 @@ import {
   isometricViewDepth,
   projectIsometricPoint
 } from "./technical-isometric.js";
+import { selectTechnicalLineEdges } from "./technical-line-model.js";
 import { resolveTechnicalEdgeVisibility } from "./technical-visibility.js";
 
 const EPSILON = 1e-6;
@@ -250,6 +251,26 @@ function normalizeProjection(
   };
 }
 
+function resolveSelectedVisibility(
+  primitives: readonly GeometryPrimitive[],
+  physicalEdges: readonly TechnicalProjectedEdge[]
+): readonly TechnicalProjectedEdge[] {
+  const selection = selectTechnicalLineEdges(physicalEdges);
+  const selectedIds = new Set(selection.selectedEdges.map(edge => edge.id));
+  const selectedPhysicalEdges = physicalEdges.filter(edge => selectedIds.has(edge.id));
+  const resolvedSelected = resolveTechnicalEdgeVisibility(
+    primitives,
+    selectedPhysicalEdges,
+    projectIsometricPoint,
+    isometricViewDepth
+  );
+  const resolvedById = new Map(resolvedSelected.map(edge => [edge.id, edge] as const));
+
+  // Omitted physical edges remain untouched: an absent visibility interval now
+  // means "not evaluated because it was not selected", not "geometrically hidden".
+  return physicalEdges.map(edge => resolvedById.get(edge.id) ?? edge);
+}
+
 export function compileGeometryDerivedTechnicalView(
   module: ModuleGeometry,
   view: TechnicalViewRequest
@@ -266,12 +287,7 @@ export function compileGeometryDerivedTechnicalView(
     ? buildProjectedTechnicalEdgeGraph(sourcePrimitives, projectIsometricPoint, isometricViewDepth)
     : [];
   const rawEdges = projection === "isometric"
-    ? resolveTechnicalEdgeVisibility(
-        sourcePrimitives,
-        rawPhysicalEdges,
-        projectIsometricPoint,
-        isometricViewDepth
-      )
+    ? resolveSelectedVisibility(sourcePrimitives, rawPhysicalEdges)
     : rawPhysicalEdges;
   const extents = projectionExtents(rawPrimitives, rawOpenings);
 

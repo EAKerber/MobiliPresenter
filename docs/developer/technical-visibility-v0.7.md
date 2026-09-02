@@ -1,105 +1,222 @@
-# Technical Visibility v0.7
+# Technical Visibility v0.7 — architecture revision
 
 ## Objective
 
-Introduce an explicit geometric visibility stage for geometry-derived technical isometric drawings.
+Repair the technical-isometric line pipeline without accumulating module-specific
+filters or post-render cleanup rules.
 
-R1 repaired the projection kernel. R2 separated the complete physical edge graph from the smaller technical-line representation. R2.1 fixed the semantic camera hemisphere so the furniture front is actually observed from the front and above. The remaining artifact is different: a line can be meaningful to the technical representation and still be hidden by a nearer physical surface.
+R1 repaired projection. R2 introduced a smaller technical-line representation.
+R2.1 fixed the camera hemisphere. The first R3 implementation added real
+surface-depth clipping, but visual review of modules 03 and 06 exposed two
+different facts that must not be conflated:
 
-R3 makes that distinction explicit instead of adding another role/class filter.
+1. module 03 is physically less complete in Scene Core than module 06;
+2. the R2 line-selection policy still used world-axis/depth heuristics as if
+   they were visibility semantics.
+
+This revision corrects the second problem and explicitly refuses to hide the
+first one inside presentation code.
+
+## Source-geometry finding
+
+Module 06 has a comparatively complete modeled carcass: left/right sides,
+bottom, top, divider, shelves and fronts.
+
+Module 03 does not. Its current Scene Core geometry contains:
+
+- drawer base;
+- drawer left side;
+- drawer right side;
+- right base;
+- four drawer fronts;
+- center door;
+- right door.
+
+There is no modeled complete center/right carcass, top or equivalent set of
+structural members in the current authority.
+
+Therefore a geometry-derived technical isometric cannot truthfully "complete"
+module 03 by inventing those missing members. Any future completion must happen
+either:
+
+- upstream in Scene Core from authoritative source evidence; or
+- as an explicitly authored/schematic representation with different fidelity.
+
+The presentation layer must not synthesize cabinet structure merely because a
+bounding envelope exists.
+
+## Architecture correction
+
+The earlier R2 policy classified physical edges as:
+
+- `front`;
+- `back`;
+- `depth`;
+- `internal`;
+- `shared`;
+- `silhouette`.
+
+That mixed three different concepts:
+
+- world-axis direction (`depth`);
+- position in the module envelope (`front` / `back`);
+- drawing semantics (`silhouette` / `shared`).
+
+The most harmful consequence was treating every non-silhouette edge parallel
+to depth as dispensable. That happens to look acceptable on simple solids, but
+it removes legitimate creases/boundaries from compound furniture.
+
+R3 replaces that classification with camera-relative topology semantics:
+
+- `silhouette` — incident faces transition between camera-facing and
+  away/edge-on;
+- `crease` — two or more incident faces are camera-facing;
+- `boundary` — a camera-facing surface boundary has one incident face;
+- `shared` — coincident physical boundary contributed by more than one
+  primitive, with camera-facing support;
+- `back-facing` — no incident surface faces the technical camera.
+
+The classification is derived from primitive face normals and the gradient of
+the canonical `viewDepth` function. It is not inferred from `x/y/z` edge
+direction and no longer requires a projected convex-hull heuristic.
 
 ## Pipeline
 
-The authority chain becomes:
+The authority chain is now:
 
 ```text
 Scene Core geometry
-    -> physical primitive topology
-    -> isometric projection + view depth
-    -> physical projected edge graph
-    -> surface visibility intervals
+    -> primitive topology (vertices + edges + faces + outward normals)
+    -> canonical isometric projection + view depth
+    -> camera-relative physical edge semantics
     -> technical-line selection
+    -> surface-depth visibility on selected lines only
     -> visible technical segments
     -> SVG
 ```
 
-`technical-edge-graph.ts` remains the physical topology/provenance boundary. `technical-visibility.ts` owns occlusion. `technical-line-model.ts` keeps the R2 semantic selection policy and consumes the visibility evidence only after that selection.
+The important ordering rule is **selection before occlusion**.
+
+Occlusion is no longer evaluated for physical edges that have already been
+rejected as `back-facing`. Their absence of `visibleIntervals` means "not
+evaluated", not "hidden".
+
+This preserves a distinction among:
+
+- physical topology exists;
+- topology says the edge is a meaningful line candidate;
+- geometry says part or all of that candidate is occluded.
 
 ## Visibility model
 
-The technical camera remains the R2.1 orthographic isometric camera. `isometricViewDepth(point)` is the ordering authority: larger values are closer to the virtual camera.
+`technical-visibility/v0.1` remains the conservative depth solver introduced by
+R3.
 
-Each primitive topology now exposes its boundary faces in addition to vertices and edges. A face is projected into the same technical 2D plane as the edge graph, while each projected face vertex retains view depth.
+For each selected physical edge:
 
-For every physical edge:
+1. intersections with projected surface boundaries define parametric
+   breakpoints;
+2. each interval is tested at its midpoint;
+3. face depth at the projected point is recovered by affine interpolation;
+4. an interval is hidden only when another surface is strictly nearer than the
+   line by the depth tolerance;
+5. adjacent visible intervals are merged deterministically.
 
-1. start/end projected coordinates and start/end view depth are retained;
-2. projected intersections with all face boundaries become parametric breakpoints on the edge (`t` in `[0, 1]`);
-3. each interval between breakpoints is tested at its midpoint;
-4. face depth at that projected point is recovered by affine interpolation over the projected planar face;
-5. an interval is hidden only when a surface is strictly nearer than the edge by the depth tolerance;
-6. adjacent visible intervals are merged deterministically.
+No minimum-length fragment filter is added in this revision.
 
-The result is visibility evidence on the physical edge, not destructive rewriting of the physical graph.
+If a short visible segment remains after the topology correction, it must be
+diagnosed back to its source edge/surface relation before any cleanup policy is
+considered.
 
-## Representation boundary
+## Render-style compatibility
 
-The R2 line-selection constitution remains `technical-line-model/v0.6`: silhouette/front/shared/planar-detail selection has not been redefined in this slice.
+Physical edge semantics and SVG style classes are now separate concepts.
 
-R3 adds the separate `technical-visibility/v0.1` contract. The line model reports that visibility contract and converts selected edges into zero, one, or multiple visible segments according to their visibility intervals.
+The external `technical-line-model/v0.6` render-style contract remains stable:
 
-This distinction is intentional:
+- physical `silhouette` -> silhouette style;
+- physical `crease` -> internal/detail style;
+- physical `boundary` -> front/boundary style;
+- physical `shared` -> shared style;
+- physical `back-facing` -> omitted.
 
-- physical edge count answers what topology exists;
-- R2 semantic selection answers what lines are technically meaningful;
-- R3 visibility answers which portions of those lines can actually be seen from the canonical technical camera.
+This avoids coupling topology vocabulary to stroke styling.
 
 ## Package evolution
 
-`TechnicalPresentationPackage` advances from `0.1.4` to `0.1.5` because projected physical edges now carry serialized visibility evidence:
+`TechnicalPresentationPackage 0.1.5` remains the R3 package version.
 
-- `startViewDepth`;
-- `endViewDepth`;
-- `visibleIntervals`.
+Selected projected edges may carry `visibleIntervals`. The field is optional:
 
-The added fields are derived from Scene Core geometry and the canonical technical camera. They are not a second physical authority.
+- present = visibility evaluated;
+- absent = edge was not selected for visibility evaluation.
+
+`startViewDepth` and `endViewDepth` remain derived camera-order evidence, not a
+second physical authority.
 
 ## Structural gates
 
-R3 must prove independently that:
+The revised R3 must prove:
 
-- a line behind a nearer opaque face is fully hidden;
-- the equivalent line in front of that face remains fully visible;
-- partial overlap produces stable split intervals rather than dropping the whole edge;
-- the line model turns split intervals into split visible technical segments;
-- module 03 contains real occlusion/clipping evidence;
-- module 03 still preserves drawer/door provenance after visibility is applied;
-- the R1 equal-foreshortening and R2.1 camera-orientation gates remain green;
-- module 04 remains the generic thin-panel stress case;
-- dimensions remain unique and Technical Composition remains unchanged.
+1. a box still has all 12 physical edges;
+2. a front-left-above isometric box selects 9 camera-meaningful edges and
+   rejects the 3 fully back-facing edges;
+3. selection is based on face incidence/orientation, not whether an edge runs
+   along the Scene Core depth axis;
+4. a selected line behind a nearer face is hidden;
+5. a selected line in front is preserved;
+6. partial occlusion splits the selected line deterministically, without a
+   fragment-size cleanup heuristic;
+7. only selected module-03 edges receive visibility evidence;
+8. drawer/door provenance survives selection + clipping;
+9. R1 projection and R2.1 camera invariants stay green;
+10. module 04 remains the thin-panel topology stress fixture.
 
-## Conservative scope
+## Module 03 limitation
 
-This slice intentionally keeps `hidden-line-removal` in the presentation omission list.
+This revision may improve the coherence of module 03 by restoring legitimate
+visible creases that R2 incorrectly discarded. It cannot make the modeled
+cabinet structurally complete because those members do not currently exist in
+Scene Core.
 
-That is not because no hidden lines are removed. R3 now performs real surface-depth clipping for the selected technical lines. The omission remains until the solver is qualified across the full primitive/overlap space and the older R2 back/depth suppressions can be reconsidered without relying on them as a safety net.
+That is an upstream data/geometry question and must remain visible as such.
 
-A later qualification slice may promote visibility from partial/conservative coverage to complete hidden-line removal and then remove that omission.
+## Module 06 dimension note
+
+The visually poor `400 mm` placement is a Technical Composition issue, not a
+visibility issue.
+
+`technical-composition/v0.3` currently checks the dimension **label box**
+against an inflated rectangular geometry envelope. It does not evaluate the
+dimension line/extension lines against actual projected technical geometry, and
+its region normals are global layout directions rather than normals derived
+from the dimension guide itself.
+
+That will be handled in a separate composition slice after R3, generically. No
+module-06-specific offset is introduced here.
+
+Possible partial shelf-height dimensions are an authored/semantic enhancement
+and are explicitly not part of this repair.
 
 ## Non-goals
 
 R3 does not:
 
-- modify Scene Core geometry;
-- modify the calibrated perspective viewer camera;
-- change the canonical technical-isometric orientation;
-- alter Technical Composition/Formator dimension placement;
-- introduce dashed hidden lines;
-- infer hardware or appliance geometry;
-- merge collinear visible segments;
-- remove the legacy schematic-envelope renderer;
-- claim complete hidden-line removal.
+- invent missing module-03 carcass geometry;
+- add a minimum rendered-segment length;
+- special-case module IDs;
+- adjust the `400 mm` dimension with a hard-coded offset;
+- change Scene Core physical authority;
+- change the calibrated perspective viewer camera;
+- claim complete hidden-line removal;
+- add authored shelf dimensions.
 
-## Follow-up
+## Promotion rule
 
-After R3 is visually qualified, inspect whether the R2 `rear-plane` and `non-silhouette-depth` suppressions are still necessary. If visibility can become the sole geometric authority for occlusion, those heuristics should be reduced or removed rather than accumulated indefinitely.
+R3 is not promotable solely because CI is green.
+
+It must first prove that the architectural replacement survives the full Viewer
+Next suite and then be visually rechecked on at least modules 03 and 06. If
+module 03 remains structurally incomplete after legitimate line semantics are
+restored, that result is classified as source-geometry incompleteness rather
+than another presentation defect.

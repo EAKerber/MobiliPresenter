@@ -10,6 +10,8 @@ import type {
 } from "./contracts.js";
 
 const EPSILON = 1e-6;
+const FACING_EPSILON = 1e-9;
+
 const BOX_EDGES: readonly (readonly [number, number])[] = [
   [0, 1], [1, 2], [2, 3], [3, 0],
   [4, 5], [5, 6], [6, 7], [7, 4],
@@ -23,6 +25,14 @@ const BOX_FACES: readonly (readonly number[])[] = [
   [2, 3, 7, 6],
   [3, 0, 4, 7]
 ];
+const BOX_FACE_NORMALS: readonly Vec3[] = [
+  { x: 0, y: 0, z: -1 },
+  { x: 0, y: 0, z: 1 },
+  { x: 0, y: -1, z: 0 },
+  { x: 1, y: 0, z: 0 },
+  { x: 0, y: 1, z: 0 },
+  { x: -1, y: 0, z: 0 }
+];
 const FACE_EDGES: readonly (readonly [number, number])[] = [
   [0, 1], [1, 2], [2, 3], [3, 0]
 ];
@@ -32,6 +42,7 @@ export interface TechnicalPrimitiveTopology {
   readonly vertices: readonly Vec3[];
   readonly edges: readonly (readonly [number, number])[];
   readonly faces: readonly (readonly number[])[];
+  readonly faceNormals: readonly Vec3[];
 }
 
 export function rotateTechnicalVector(vector: Vec3, transform: RigidTransform): Vec3 {
@@ -71,7 +82,8 @@ export function technicalPrimitiveTopology(primitive: GeometryPrimitive): Techni
     return {
       vertices: local.map(point => transformTechnicalPoint(point, primitive.localTransform)),
       edges: BOX_EDGES,
-      faces: BOX_FACES
+      faces: BOX_FACES,
+      faceNormals: BOX_FACE_NORMALS.map(normal => rotateTechnicalVector(normal, primitive.localTransform))
     };
   }
 
@@ -97,7 +109,8 @@ export function technicalPrimitiveTopology(primitive: GeometryPrimitive): Techni
   return {
     vertices: local.map(point => transformTechnicalPoint(point, primitive.localTransform)),
     edges: FACE_EDGES,
-    faces: FACE_FACES
+    faces: FACE_FACES,
+    faceNormals: [rotateTechnicalVector(primitive.normal, primitive.localTransform)]
   };
 }
 
@@ -120,88 +133,59 @@ function edgeKey(a: Vec3, b: Vec3): string {
   return ak < bk ? `${ak}|${bk}` : `${bk}|${ak}`;
 }
 
-function samePoint(a: TechnicalPoint2Mm, b: TechnicalPoint2Mm): boolean {
-  return (
-    Math.abs(a.horizontalMm - b.horizontalMm) < EPSILON &&
-    Math.abs(a.verticalMm - b.verticalMm) < EPSILON
-  );
+function localEdgeKey(a: number, b: number): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
-function cross(origin: TechnicalPoint2Mm, a: TechnicalPoint2Mm, b: TechnicalPoint2Mm): number {
-  return (
-    (a.horizontalMm - origin.horizontalMm) * (b.verticalMm - origin.verticalMm) -
-    (a.verticalMm - origin.verticalMm) * (b.horizontalMm - origin.horizontalMm)
-  );
+function dot3(a: Vec3, b: Vec3): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-function uniqueProjectedPoints(points: readonly TechnicalPoint2Mm[]): TechnicalPoint2Mm[] {
-  const result: TechnicalPoint2Mm[] = [];
-  for (const point of points) {
-    if (!result.some(existing => samePoint(existing, point))) result.push(point);
+function length3(vector: Vec3): number {
+  return Math.hypot(vector.x, vector.y, vector.z);
+}
+
+function normalized(vector: Vec3): Vec3 {
+  const length = length3(vector);
+  if (length <= FACING_EPSILON) {
+    throw new Error("TECHNICAL_EDGE_GRAPH_VIEW_DEPTH_DIRECTION_REQUIRED");
   }
-  return result;
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+    z: vector.z / length
+  };
 }
 
-function convexHull(points: readonly TechnicalPoint2Mm[]): TechnicalPoint2Mm[] {
-  const sorted = uniqueProjectedPoints(points).sort(
-    (a, b) => a.horizontalMm - b.horizontalMm || a.verticalMm - b.verticalMm
-  );
-  if (sorted.length <= 2) return sorted;
+/**
+ * The isometric view-depth function is affine/linear. Sampling the three world
+ * basis vectors recovers its camera-facing gradient without coupling this
+ * generic topology module to the isometric projection implementation.
+ */
+function viewDepthDirection(viewDepth: (point: Vec3) => number): Vec3 {
+  const origin = viewDepth({ x: 0, y: 0, z: 0 });
+  return normalized({
+    x: viewDepth({ x: 1, y: 0, z: 0 }) - origin,
+    y: viewDepth({ x: 0, y: 1, z: 0 }) - origin,
+    z: viewDepth({ x: 0, y: 0, z: 1 }) - origin
+  });
+}
 
-  const lower: TechnicalPoint2Mm[] = [];
-  for (const point of sorted) {
-    while (
-      lower.length >= 2 &&
-      cross(lower[lower.length - 2]!, lower[lower.length - 1]!, point) <= EPSILON
-    ) lower.pop();
-    lower.push(point);
+function incidentFaceNormals(topology: TechnicalPrimitiveTopology): ReadonlyMap<string, readonly Vec3[]> {
+  const byEdge = new Map<string, Vec3[]>();
+  for (let faceIndex = 0; faceIndex < topology.faces.length; faceIndex += 1) {
+    const face = topology.faces[faceIndex]!;
+    const normal = topology.faceNormals[faceIndex]!;
+    for (let index = 0; index < face.length; index += 1) {
+      const a = face[index]!;
+      const b = face[(index + 1) % face.length]!;
+      const key = localEdgeKey(a, b);
+      const normals = byEdge.get(key);
+      if (normals) normals.push(normal);
+      else byEdge.set(key, [normal]);
+    }
   }
-
-  const upper: TechnicalPoint2Mm[] = [];
-  for (let index = sorted.length - 1; index >= 0; index -= 1) {
-    const point = sorted[index]!;
-    while (
-      upper.length >= 2 &&
-      cross(upper[upper.length - 2]!, upper[upper.length - 1]!, point) <= EPSILON
-    ) upper.pop();
-    upper.push(point);
-  }
-
-  lower.pop();
-  upper.pop();
-  return [...lower, ...upper];
-}
-
-function pointOnSegment(
-  point: TechnicalPoint2Mm,
-  start: TechnicalPoint2Mm,
-  end: TechnicalPoint2Mm
-): boolean {
-  if (Math.abs(cross(start, end, point)) > EPSILON) return false;
-  return (
-    point.horizontalMm >= Math.min(start.horizontalMm, end.horizontalMm) - EPSILON &&
-    point.horizontalMm <= Math.max(start.horizontalMm, end.horizontalMm) + EPSILON &&
-    point.verticalMm >= Math.min(start.verticalMm, end.verticalMm) - EPSILON &&
-    point.verticalMm <= Math.max(start.verticalMm, end.verticalMm) + EPSILON
-  );
-}
-
-function edgeOnHull(
-  start: TechnicalPoint2Mm,
-  end: TechnicalPoint2Mm,
-  hull: readonly TechnicalPoint2Mm[]
-): boolean {
-  if (hull.length < 2) return false;
-  for (let index = 0; index < hull.length; index += 1) {
-    const a = hull[index]!;
-    const b = hull[(index + 1) % hull.length]!;
-    if (pointOnSegment(start, a, b) && pointOnSegment(end, a, b)) return true;
-  }
-  return false;
-}
-
-function near(value: number, target: number): boolean {
-  return Math.abs(value - target) < EPSILON;
+  return byEdge;
 }
 
 interface EdgeAccumulator {
@@ -210,60 +194,73 @@ interface EdgeAccumulator {
   readonly end3d: Vec3;
   readonly sourcePrimitiveIds: Set<string>;
   readonly sourcePrimitiveRoles: Set<string>;
+  readonly incidentFaceNormals: Vec3[];
 }
 
-function classifyEdge(input: {
-  readonly edge: EdgeAccumulator;
-  readonly projectedStart: TechnicalPoint2Mm;
-  readonly projectedEnd: TechnicalPoint2Mm;
-  readonly hull: readonly TechnicalPoint2Mm[];
-  readonly minDepth: number;
-  readonly maxDepth: number;
-}): TechnicalProjectedEdgeClass {
-  const { edge, projectedStart, projectedEnd, hull, minDepth, maxDepth } = input;
-  if (edgeOnHull(projectedStart, projectedEnd, hull)) return "silhouette";
-  if (near(edge.start3d.y, minDepth) && near(edge.end3d.y, minDepth)) return "front";
-  if (near(edge.start3d.y, maxDepth) && near(edge.end3d.y, maxDepth)) return "back";
-  if (!near(edge.start3d.y, edge.end3d.y)) return "depth";
+function classifyEdge(edge: EdgeAccumulator, cameraDirection: Vec3): TechnicalProjectedEdgeClass {
+  if (edge.incidentFaceNormals.length === 0) return "boundary";
+
+  let facingCount = 0;
+  let awayCount = 0;
+  let edgeOnCount = 0;
+
+  for (const normal of edge.incidentFaceNormals) {
+    const facing = dot3(normal, cameraDirection);
+    if (facing > FACING_EPSILON) facingCount += 1;
+    else if (facing < -FACING_EPSILON) awayCount += 1;
+    else edgeOnCount += 1;
+  }
+
+  // An edge with no incident camera-facing surface cannot contribute to the
+  // visible technical representation. This is a topology/view statement, not
+  // an occlusion decision.
+  if (facingCount === 0) return "back-facing";
+
+  // A transition between a camera-facing face and an away/edge-on face is a
+  // true primitive silhouette regardless of the world axis of the edge.
+  if (awayCount > 0 || edgeOnCount > 0) return "silhouette";
+
   if (edge.sourcePrimitiveIds.size > 1) return "shared";
-  return "internal";
+  if (edge.incidentFaceNormals.length === 1) return "boundary";
+  return "crease";
 }
 
 export function buildProjectedTechnicalEdgeGraph(
   primitives: readonly GeometryPrimitive[],
   project: (point: Vec3) => TechnicalPoint2Mm,
-  viewDepth: (point: Vec3) => number = () => 0
+  viewDepth: (point: Vec3) => number
 ): readonly TechnicalProjectedEdge[] {
   const accumulators = new Map<string, EdgeAccumulator>();
-  const allVertices: Vec3[] = [];
+  const cameraDirection = viewDepthDirection(viewDepth);
 
   for (const primitive of primitives) {
     const topology = technicalPrimitiveTopology(primitive);
-    allVertices.push(...topology.vertices);
+    const normalsByLocalEdge = incidentFaceNormals(topology);
+
     for (const [startIndex, endIndex] of topology.edges) {
       const start3d = topology.vertices[startIndex]!;
       const end3d = topology.vertices[endIndex]!;
       const key = edgeKey(start3d, end3d);
+      const normals = normalsByLocalEdge.get(localEdgeKey(startIndex, endIndex)) ?? [];
       const existing = accumulators.get(key);
+
       if (existing) {
         existing.sourcePrimitiveIds.add(primitive.id);
         existing.sourcePrimitiveRoles.add(primitive.role);
+        existing.incidentFaceNormals.push(...normals);
         continue;
       }
+
       accumulators.set(key, {
         key,
         start3d,
         end3d,
         sourcePrimitiveIds: new Set([primitive.id]),
-        sourcePrimitiveRoles: new Set([primitive.role])
+        sourcePrimitiveRoles: new Set([primitive.role]),
+        incidentFaceNormals: [...normals]
       });
     }
   }
-
-  if (allVertices.length === 0) return [];
-  const minDepth = Math.min(...allVertices.map(point => point.y));
-  const maxDepth = Math.max(...allVertices.map(point => point.y));
-  const hull = convexHull(allVertices.map(point => project(point)));
 
   return [...accumulators.values()]
     .sort((a, b) => a.key.localeCompare(b.key))
@@ -272,19 +269,11 @@ export function buildProjectedTechnicalEdgeGraph(
       const projectedEnd = project(edge.end3d);
       return {
         id: `edge-${String(index + 1).padStart(3, "0")}`,
-        classification: classifyEdge({
-          edge,
-          projectedStart,
-          projectedEnd,
-          hull,
-          minDepth,
-          maxDepth
-        }),
+        classification: classifyEdge(edge, cameraDirection),
         startMm: projectedStart,
         endMm: projectedEnd,
         startViewDepth: viewDepth(edge.start3d),
         endViewDepth: viewDepth(edge.end3d),
-        visibleIntervals: [{ startT: 0, endT: 1 }],
         sourcePrimitiveIds: [...edge.sourcePrimitiveIds].sort(),
         sourcePrimitiveRoles: [...edge.sourcePrimitiveRoles].sort()
       };
