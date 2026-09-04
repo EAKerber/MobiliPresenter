@@ -1,4 +1,5 @@
 import "./ui/product-polish-v2-final.css";
+import "./ui/product-contract-enhancements.css";
 import { createViewerUiApi, type ViewerEngineControlPort } from "./api/ui-adapter.js";
 import {
   installDesktopCompositionEnhancement,
@@ -12,6 +13,10 @@ import {
   installProductContractEnhancements,
   type ProductContractEnhancements
 } from "./ui/product-contract-enhancements.js";
+import {
+  installProductEditorialHighlights,
+  type ProductEditorialHighlights
+} from "./ui/product-editorial-highlights.js";
 import { installProductPolishV2, type ProductPolishV2 } from "./ui/product-polish-v2.js";
 import { installProductUiEnhancements, type ProductUiEnhancements } from "./ui/product-enhancements.js";
 import { installGlobalFinishControl } from "./ui/global-finish-readiness.js";
@@ -53,6 +58,7 @@ let productEnhancements: ProductUiEnhancements | null = null;
 let desktopComposition: DesktopCompositionEnhancement | null = null;
 let productPolishV2: ProductPolishV2 | null = null;
 let productContractEnhancements: ProductContractEnhancements | null = null;
+let productEditorialHighlights: ProductEditorialHighlights | null = null;
 let productCtaAccessibility: ProductCtaAccessibility | null = null;
 
 if (controlsEnabled) {
@@ -66,6 +72,7 @@ if (controlsEnabled) {
   desktopComposition = installDesktopCompositionEnhancement();
   productPolishV2 = installProductPolishV2(uiApi);
   productContractEnhancements = installProductContractEnhancements(uiApi);
+  productEditorialHighlights = installProductEditorialHighlights(uiApi);
   productCtaAccessibility = installProductCtaAccessibility();
 
   const refreshAfterSceneClick = (event: MouseEvent): void => {
@@ -78,6 +85,8 @@ if (controlsEnabled) {
     document.removeEventListener("click", refreshAfterSceneClick);
     productCtaAccessibility?.dispose();
     productCtaAccessibility = null;
+    productEditorialHighlights?.dispose();
+    productEditorialHighlights = null;
     productContractEnhancements?.dispose();
     productContractEnhancements = null;
     productPolishV2?.dispose();
