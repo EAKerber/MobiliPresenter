@@ -10,6 +10,7 @@ on:
       - "viewer-next/tests/chrome_viewport_capture.mjs"
       - "viewer-next/tests/global_finish_browser_smoke.mjs"
       - "viewer-next/tests/mobile_finishes_clearance.mjs"
+      - "viewer-next/tests/product_contract_ui_markers.mjs"
       - ".github/workflows/product-ui-evidence.yml"
   workflow_dispatch:
 
@@ -86,6 +87,10 @@ jobs:
       - name: Gate global MDF finish first interaction
         working-directory: viewer-next
         run: node tests/global_finish_browser_smoke.mjs
+
+      - name: Gate contract-driven UI markers
+        working-directory: viewer-next
+        run: node tests/product_contract_ui_markers.mjs
 
       - name: Capture mobile finishes layout
         working-directory: viewer-next
