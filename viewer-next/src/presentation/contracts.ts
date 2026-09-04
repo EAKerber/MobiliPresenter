@@ -1,7 +1,7 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
 export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.1" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.4" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.5" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
@@ -22,13 +22,20 @@ export type TechnicalControlKind = "visibility" | "activation";
 export type FinishOptionFamily = "front-preset" | "stone-preset";
 export type TechnicalComponentKind = "hardware" | "electrical" | "panel" | "interface" | "other";
 export type TechnicalFactStatus = "provided" | "confirmed" | "unverified";
+
+/**
+ * Camera-relative topology semantics for a physical projected edge.
+ *
+ * These values say why an edge is or is not a candidate technical line. They
+ * intentionally do not encode its world-axis direction and do not claim
+ * occlusion. Surface-depth visibility is a later, independent stage.
+ */
 export type TechnicalProjectedEdgeClass =
   | "silhouette"
-  | "front"
-  | "back"
-  | "depth"
+  | "crease"
+  | "boundary"
   | "shared"
-  | "internal";
+  | "back-facing";
 
 export interface TechnicalSourceRef {
   readonly authority: "scene-core" | "technical-catalog" | "appearance-catalog" | "viewer-runtime" | "derived";
@@ -159,11 +166,23 @@ export interface TechnicalProjectedDimensionGuide {
   readonly endMm: TechnicalPoint2Mm;
 }
 
+export interface TechnicalVisibilityInterval {
+  readonly startT: number;
+  readonly endT: number;
+}
+
 export interface TechnicalProjectedEdge {
   readonly id: string;
   readonly classification: TechnicalProjectedEdgeClass;
   readonly startMm: TechnicalPoint2Mm;
   readonly endMm: TechnicalPoint2Mm;
+  readonly startViewDepth: number;
+  readonly endViewDepth: number;
+  /**
+   * Present only when this edge was selected as a technical-line candidate and
+   * evaluated by the visibility stage. Omitted physical edges remain untouched.
+   */
+  readonly visibleIntervals?: readonly TechnicalVisibilityInterval[];
   readonly sourcePrimitiveIds: readonly string[];
   readonly sourcePrimitiveRoles: readonly string[];
 }
