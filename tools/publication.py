@@ -5,9 +5,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from tools.canonical import stable_hash
+
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_VERSION = "SourceBuild 1.1"
-FINGERPRINT_KIND = "sha256(sourceBase|sourcePaths|buildCommand|publishPath)"
+SCHEMA_VERSION = "SourceBuild 1.2"
+FINGERPRINT_PAYLOAD_VERSION = "SourceBuildFingerprint 1.0"
+FINGERPRINT_KIND = "sha256(canonical-json(SourceBuildFingerprint 1.0))"
 TOP_FIELDS = {
     "schemaVersion", "release", "sha256", "fingerprintKind", "sourceBranch", "sourceBase",
     "sourcePaths", "buildCommand", "publishPath", "defaultUiMode", "uiPreviewQuery",
@@ -20,6 +23,22 @@ def _nonempty(value: Any) -> bool:
 
 def _hex(value: Any, length: int) -> bool:
     return isinstance(value, str) and len(value) == length and all(char in "0123456789abcdef" for char in value)
+
+
+def fingerprint_payload(value: dict[str, Any]) -> dict[str, Any]:
+    """Return the exact canonical payload bound by the SourceBuild fingerprint."""
+    return {
+        "schemaVersion": FINGERPRINT_PAYLOAD_VERSION,
+        "sourceBase": value.get("sourceBase"),
+        "sourcePaths": list(value.get("sourcePaths") or []),
+        "buildCommand": value.get("buildCommand"),
+        "publishPath": value.get("publishPath"),
+    }
+
+
+def compute_fingerprint(value: dict[str, Any]) -> str:
+    """Compute a reproducible sha256 over the versioned canonical JSON payload."""
+    return stable_hash(fingerprint_payload(value))
 
 
 def validate_manifest(value: dict[str, Any]) -> list[dict[str, str]]:
@@ -35,15 +54,36 @@ def validate_manifest(value: dict[str, Any]) -> list[dict[str, str]]:
             errors.append({"code": "SOURCE_BUILD_FIELD_INVALID", "detail": f"{key} must be a non-empty string"})
     if not isinstance(value.get("uiPreviewQuery"), str):
         errors.append({"code": "SOURCE_BUILD_FIELD_INVALID", "detail": "uiPreviewQuery must be a string"})
-    if not _hex(value.get("sha256"), 64):
+    fingerprint_valid = _hex(value.get("sha256"), 64)
+    if not fingerprint_valid:
         errors.append({"code": "SOURCE_BUILD_FINGERPRINT_INVALID", "detail": "sha256 must be lowercase sha256"})
     if value.get("fingerprintKind") != FINGERPRINT_KIND:
         errors.append({"code": "SOURCE_BUILD_FINGERPRINT_KIND_INVALID", "detail": "fingerprintKind is unsupported"})
-    if not _hex(value.get("sourceBase"), 40):
+    source_base_valid = _hex(value.get("sourceBase"), 40)
+    if not source_base_valid:
         errors.append({"code": "SOURCE_BUILD_SOURCE_BASE_INVALID", "detail": "sourceBase must be a lowercase git SHA"})
     source_paths = value.get("sourcePaths")
-    if not isinstance(source_paths, list) or not source_paths or any(not _nonempty(item) for item in source_paths) or len(source_paths) != len(set(source_paths)):
+    source_paths_valid = (
+        isinstance(source_paths, list)
+        and bool(source_paths)
+        and all(_nonempty(item) for item in source_paths)
+        and len(source_paths) == len(set(source_paths))
+    )
+    if not source_paths_valid:
         errors.append({"code": "SOURCE_BUILD_SOURCE_PATHS_INVALID", "detail": "sourcePaths must contain unique non-empty strings"})
+    fingerprint_inputs_valid = (
+        source_base_valid
+        and source_paths_valid
+        and _nonempty(value.get("buildCommand"))
+        and _nonempty(value.get("publishPath"))
+    )
+    if fingerprint_valid and fingerprint_inputs_valid and value.get("fingerprintKind") == FINGERPRINT_KIND:
+        expected = compute_fingerprint(value)
+        if value["sha256"] != expected:
+            errors.append({
+                "code": "SOURCE_BUILD_FINGERPRINT_MISMATCH",
+                "detail": f"sha256 does not match canonical SourceBuild payload; expected {expected}",
+            })
     return errors
 
 
