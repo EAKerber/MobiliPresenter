@@ -1,13 +1,13 @@
 {
-  "schemaVersion": "SourceBuild 1.1",
-  "release": "ViewerNext-Preview-2026-08-11",
-  "sha256": "84f8fcd8e925c13678d07c646d1c34dcd90e7be62e55ee50ee257cefb6807e19",
-  "fingerprintKind": "sha256(sourceBase|sourcePaths|buildCommand|publishPath)",
-  "sourceBranch": "main",
-  "sourceBase": "cefcff09e3e4fe0d0da356f529964a21cb6313dd",
+  "schemaVersion": "SourceBuild 1.2",
+  "release": "ViewerNext-Product-6eb95a4d",
+  "sha256": "8d1384f7f20de7867fdb4901f9c75e30104f677ebffa6c39cf5e061054a65e74",
+  "fingerprintKind": "sha256(canonical-json(SourceBuildFingerprint 1.0))",
+  "sourceBranch": "work/ui/netlify-guided-configurator-current",
+  "sourceBase": "6eb95a4d71c4ae38d125b488e4cc7fae42727741",
   "sourcePaths": ["scene-core", "viewer-next"],
   "buildCommand": "npm --prefix scene-core install --ignore-scripts --no-audit --no-fund && npm --prefix viewer-next install --ignore-scripts --no-audit --no-fund && npm --prefix viewer-next run build",
   "publishPath": "viewer-next/dist",
-  "defaultUiMode": "renderer-only",
+  "defaultUiMode": "product",
   "uiPreviewQuery": "?controls=1"
 }

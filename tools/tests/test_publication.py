@@ -19,6 +19,36 @@ class PublicationContractTests(unittest.TestCase):
         self.assertNotIn("artifactSha256", state["published"])
         self.assertNotIn("publishedBranch", state["git"])
 
+    def test_live_fingerprint_is_reproducible(self):
+        state = project_state.load_state()
+        view = project_state.operational_view(state)
+        manifest = publication.load_manifest(view["published"]["artifactManifest"])
+        self.assertEqual(publication.compute_fingerprint(manifest), manifest["sha256"])
+        self.assertEqual(
+            publication.fingerprint_payload(manifest)["schemaVersion"],
+            publication.FINGERPRINT_PAYLOAD_VERSION,
+        )
+
+    def test_fingerprint_tampering_fails_closed(self):
+        state = project_state.load_state()
+        view = project_state.operational_view(state)
+        manifest = publication.load_manifest(view["published"]["artifactManifest"])
+        mutations = (
+            ("sourceBase", "0" * 40),
+            ("sourcePaths", [*manifest["sourcePaths"], "extra-source"]),
+            ("buildCommand", manifest["buildCommand"] + " --changed"),
+            ("publishPath", manifest["publishPath"] + "-changed"),
+        )
+        for field, replacement in mutations:
+            with self.subTest(field=field):
+                broken = copy.deepcopy(manifest)
+                broken[field] = replacement
+                errors = publication.validate_manifest(broken)
+                self.assertTrue(
+                    any(item["code"] == "SOURCE_BUILD_FINGERPRINT_MISMATCH" for item in errors),
+                    errors,
+                )
+
     def test_invalid_fingerprint_fails_closed(self):
         state = project_state.load_state()
         view = project_state.operational_view(state)
