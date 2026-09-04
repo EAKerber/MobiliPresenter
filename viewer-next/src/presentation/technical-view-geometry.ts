@@ -7,6 +7,7 @@ import type {
 import type {
   CompiledTechnicalViewGeometry,
   TechnicalPoint2Mm,
+  TechnicalProjectedDimensionGuide,
   TechnicalProjectedOpening,
   TechnicalProjectedPrimitive,
   TechnicalViewProjection,
@@ -185,6 +186,24 @@ function projectOpenings(
   });
 }
 
+function projectDimensionGuides(
+  module: ModuleGeometry,
+  projection: TechnicalViewProjection
+): readonly TechnicalProjectedDimensionGuide[] {
+  if (projection !== "isometric") return [];
+  const { width, height, depth } = module.dimensions.geometryMm;
+  const frames = [
+    { axis: "width" as const, start: { x: 0, y: 0, z: 0 }, end: { x: width, y: 0, z: 0 } },
+    { axis: "depth" as const, start: { x: width, y: 0, z: 0 }, end: { x: width, y: depth, z: 0 } },
+    { axis: "height" as const, start: { x: 0, y: 0, z: 0 }, end: { x: 0, y: 0, z: height } }
+  ];
+  return frames.map(frame => ({
+    axis: frame.axis,
+    startMm: toTechnicalPoint(projectPoint(frame.start, projection)),
+    endMm: toTechnicalPoint(projectPoint(frame.end, projection))
+  }));
+}
+
 function canDeriveGeometry(view: TechnicalViewRequest): boolean {
   if (view.source === "scene-geometry") return true;
   if (view.source !== "scene-envelope") return false;
@@ -219,24 +238,30 @@ function projectionExtents(
   };
 }
 
+function translatePoint(point: TechnicalPoint2Mm, dx: number, dy: number): TechnicalPoint2Mm {
+  return {
+    horizontalMm: point.horizontalMm + dx,
+    verticalMm: point.verticalMm + dy
+  };
+}
+
 function translatePoints(
   points: readonly TechnicalPoint2Mm[],
   dx: number,
   dy: number
 ): readonly TechnicalPoint2Mm[] {
-  return points.map(point => ({
-    horizontalMm: point.horizontalMm + dx,
-    verticalMm: point.verticalMm + dy
-  }));
+  return points.map(point => translatePoint(point, dx, dy));
 }
 
 function normalizeProjection(
   primitives: readonly TechnicalProjectedPrimitive[],
   openings: readonly TechnicalProjectedOpening[],
+  dimensionGuides: readonly TechnicalProjectedDimensionGuide[],
   extents: ReturnType<typeof projectionExtents>
 ): {
   readonly primitives: readonly TechnicalProjectedPrimitive[];
   readonly openings: readonly TechnicalProjectedOpening[];
+  readonly dimensionGuides: readonly TechnicalProjectedDimensionGuide[];
 } {
   const dx = -extents.minHorizontal;
   const dy = -extents.minVertical;
@@ -248,6 +273,11 @@ function normalizeProjection(
     openings: openings.map(opening => ({
       ...opening,
       pointsMm: translatePoints(opening.pointsMm, dx, dy)
+    })),
+    dimensionGuides: dimensionGuides.map(guide => ({
+      ...guide,
+      startMm: translatePoint(guide.startMm, dx, dy),
+      endMm: translatePoint(guide.endMm, dx, dy)
     }))
   };
 }
@@ -262,12 +292,13 @@ export function compileGeometryDerivedTechnicalView(
     .map(primitive => projectPrimitive(primitive, projection))
     .filter((primitive): primitive is TechnicalProjectedPrimitive => primitive !== null);
   const rawOpenings = projectOpenings(module, projection);
+  const rawDimensionGuides = projectDimensionGuides(module, projection);
   const extents = projectionExtents(rawPrimitives, rawOpenings);
 
   const preserveFrontDatum = projection === "width-height";
   const projected = preserveFrontDatum
-    ? { primitives: rawPrimitives, openings: rawOpenings }
-    : normalizeProjection(rawPrimitives, rawOpenings, extents);
+    ? { primitives: rawPrimitives, openings: rawOpenings, dimensionGuides: rawDimensionGuides }
+    : normalizeProjection(rawPrimitives, rawOpenings, rawDimensionGuides, extents);
   const boundsMm = preserveFrontDatum
     ? {
         horizontal: module.dimensions.geometryMm.width,
@@ -286,6 +317,7 @@ export function compileGeometryDerivedTechnicalView(
     boundsMm,
     primitives: projected.primitives,
     openings: projected.openings,
+    dimensionGuides: projected.dimensionGuides,
     coverage: [
       frontOnly ? "module-front-primitives" : "module-geometry-primitives",
       ...(projected.openings.length > 0 ? ["appliance-front-openings" as const] : [])
