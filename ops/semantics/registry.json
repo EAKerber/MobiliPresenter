@@ -3863,6 +3863,18 @@
     ],
     "exclusions": [
       {
+        "path": ".github/workflows/module-thumbnails.yml",
+        "owner": "operations-core",
+        "reason": "Product-domain CI is outside the operational tool-surface map.",
+        "deathCondition": "Remove when Module Thumbnails CI becomes an explicit operational capability surface."
+      },
+      {
+        "path": ".github/workflows/product-ui-evidence.yml",
+        "owner": "operations-core",
+        "reason": "Product-domain CI is outside the operational tool-surface map.",
+        "deathCondition": "Remove when Product UI Evidence CI becomes an explicit operational capability surface."
+      },
+      {
         "path": ".github/workflows/scene-core.yml",
         "owner": "operations-core",
         "reason": "Product-domain CI is outside the operational tool-surface map.",
