@@ -16,7 +16,11 @@ import {
 import { attachParametricAppliances } from "../renderer/three/appliances.js";
 import { applyCabinetFrontEdgeResponse } from "../renderer/three/cabinet-front-edge.js";
 import { applyFh06CooktopContact } from "../renderer/three/cooktop-contact.js";
-import { applyEnvironmentRealism } from "../renderer/three/environment-realism.js";
+import {
+  applyEnvironmentRealism,
+  applyEnvironmentRealismLightingCalibration,
+  environmentRealismEnvironmentIntensity
+} from "../renderer/three/environment-realism.js";
 import { applyFh06FaucetRefinement } from "../renderer/three/faucet-refinement.js";
 import { applyFh06FrontReadability } from "../renderer/three/front-readability.js";
 import { attachCurrentHardware } from "../renderer/three/hardware.js";
@@ -66,7 +70,9 @@ export interface ViewerCompositionDiagnostics {
   readonly wallTileMicroRelief: boolean;
   readonly wallTileReliefMm: number;
   readonly environmentRealismId: string;
+  readonly environmentLightingCalibrationId: string;
   readonly daylightWindowPresent: boolean;
+  readonly daylightIntensity: number;
 }
 
 export interface ViewerComposition {
@@ -151,6 +157,9 @@ export function createViewerComposition(
 
   adapter.scene.background = options.background ?? new Color(0xf0ede7);
   const lighting = buildThreeLighting(initialScenePackage, initialAppearance);
+  const lightingCalibration = realismEnabled
+    ? applyEnvironmentRealismLightingCalibration(lighting)
+    : null;
   adapter.scene.add(lighting.root);
   const ownedPresentationRoots = [
     lighting.root.name,
@@ -160,10 +169,13 @@ export function createViewerComposition(
   const ownership = auditRenderOwnership(adapter, ownedPresentationRoots);
   if (!ownership.pass) throw new Error(`VIEWER_RENDER_OWNERSHIP_FAILED:${ownership.unownedTopLevelNames.join(",")}`);
 
+  const initialEnvironmentIntensity = realismEnabled
+    ? environmentRealismEnvironmentIntensity(initialAppearance.lighting.environment.relativeIntensity)
+    : initialAppearance.lighting.environment.relativeIntensity;
   const environment = installNeutralRoomEnvironment(
     renderer,
     adapter.scene,
-    initialAppearance.lighting.environment.relativeIntensity
+    initialEnvironmentIntensity
   );
   const post = createSelectiveBloomPipeline(
     renderer,
@@ -193,6 +205,13 @@ export function createViewerComposition(
   };
   const refreshMaterialMappings = (): void => {
     bindModuleContinuousMaterialMappings(adapter);
+  };
+  const reapplyEnvironmentRealismLighting = (appearance: AppearancePackage): void => {
+    if (!realismEnabled) return;
+    applyEnvironmentRealismLightingCalibration(lighting);
+    adapter.scene.environmentIntensity = environmentRealismEnvironmentIntensity(
+      appearance.lighting.environment.relativeIntensity
+    );
   };
 
   const result: ViewerComposition = {
@@ -231,7 +250,9 @@ export function createViewerComposition(
       wallTileMicroRelief: tileRefinement.microRelief,
       wallTileReliefMm: tileRefinement.reliefMm,
       environmentRealismId: environmentRealism?.realismId ?? "off",
-      daylightWindowPresent: environmentRealism?.daylightWindow ?? false
+      environmentLightingCalibrationId: lightingCalibration?.calibrationId ?? "off",
+      daylightWindowPresent: environmentRealism?.daylightWindow ?? false,
+      daylightIntensity: environmentRealism?.daylightIntensity ?? 0
     },
     syncVisibility(scenePackage, appearance): void {
       assertActive();
@@ -250,6 +271,7 @@ export function createViewerComposition(
     syncLighting(scenePackage, appearance): void {
       assertActive();
       syncRuntimeLighting(adapter.scene, lighting, post, scenePackage, appearance);
+      reapplyEnvironmentRealismLighting(appearance);
       currentScenePackage = scenePackage;
       currentAppearance = appearance;
     },
@@ -259,6 +281,7 @@ export function createViewerComposition(
       syncRuntimeMaterials(adapter, materials, appearance);
       refreshMaterialMappings();
       syncRuntimeLighting(adapter.scene, lighting, post, scenePackage, appearance);
+      reapplyEnvironmentRealismLighting(appearance);
       currentScenePackage = scenePackage;
       currentAppearance = appearance;
       applyInteractionTargets();
@@ -273,7 +296,7 @@ export function createViewerComposition(
       assertActive();
       post.render();
     },
-    setSize(widthPx: number, heightPx: number): void {
+    setSize(widthPx, heightPx): void {
       assertActive();
       post.setSize(widthPx, heightPx);
     },

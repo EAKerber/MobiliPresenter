@@ -1,6 +1,7 @@
 import type { ScenePackage } from "@mobilipresenter/scene-core";
 import {
   BoxGeometry,
+  DirectionalLight,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -10,10 +11,11 @@ import {
   RectAreaLight
 } from "three";
 import { sceneVectorToThree } from "./coordinates.js";
-import { kelvinToColor } from "./lighting.js";
+import { kelvinToColor, type ThreeLightingAdapter } from "./lighting.js";
 import type { ThreeSceneAdapter } from "./scene-adapter.js";
 
 export const ENVIRONMENT_REALISM_ID = "window-daylight-relief-v1" as const;
+export const ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID = "window-key-balanced-studio-v2" as const;
 
 const ROOT_NAME = "__environment-realism";
 const LAUNDRY_WALL_Y_MM = 8638.827;
@@ -27,13 +29,27 @@ const WINDOW_HEAD_MM = 2250;
 const WINDOW_FRAME_MM = 45;
 const WINDOW_FRAME_DEPTH_MM = 42;
 const WINDOW_LIGHT_OFFSET_MM = 160;
-const WINDOW_DAYLIGHT_INTENSITY = 58;
+const WINDOW_DAYLIGHT_INTENSITY = 76;
 const SURFACE_TOWARD_ROOM_MM = 1.4;
+
+export const ENVIRONMENT_REALISM_LIGHTING_CALIBRATION = {
+  ambientScale: 0.78,
+  keyScale: 0.82,
+  fillScale: 0.62,
+  environmentScale: 1.12
+} as const;
 
 const WINDOW_WIDTH_MM = WINDOW_X_MAX_MM - WINDOW_X_MIN_MM;
 const WINDOW_HEIGHT_MM = WINDOW_HEAD_MM - WINDOW_SILL_MM;
 const WINDOW_CENTER_X_MM = (WINDOW_X_MIN_MM + WINDOW_X_MAX_MM) / 2;
 const WINDOW_CENTER_Z_MM = (WINDOW_SILL_MM + WINDOW_HEAD_MM) / 2;
+
+export const ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM = {
+  x: WINDOW_CENTER_X_MM - 250,
+  y: LAUNDRY_WALL_Y_MM + 900,
+  z: WINDOW_HEAD_MM + 1100
+} as const;
+export const ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN = 5600;
 
 function planePatch(
   name: string,
@@ -230,6 +246,53 @@ function addDaylight(root: Group, scene: ScenePackage): void {
   daylight.userData.colorTemperatureK = 6200;
   daylight.userData.relativePresentationSource = "window";
   root.add(daylight);
+}
+
+export interface EnvironmentRealismLightingCalibrationResult {
+  readonly calibrationId: typeof ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID;
+  readonly ambientScale: number;
+  readonly keyScale: number;
+  readonly fillScale: number;
+  readonly environmentScale: number;
+  readonly shadowKeyAlignedToWindow: true;
+}
+
+export function applyEnvironmentRealismLightingCalibration(
+  lighting: ThreeLightingAdapter
+): EnvironmentRealismLightingCalibrationResult {
+  const scales = new Map<string, number>([
+    ["ambient", ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.ambientScale],
+    ["key-front-high", ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.keyScale],
+    ["fill-side", ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.fillScale]
+  ]);
+
+  for (const [id, scale] of scales) {
+    const light = lighting.baseLights.get(id);
+    if (!light) throw new Error(`ENVIRONMENT_REALISM_BASE_LIGHT_MISSING:${id}`);
+    light.intensity *= scale;
+    light.userData.appearanceOnlyCalibration = ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID;
+    light.userData.presentationIntensityScale = scale;
+  }
+
+  const key = lighting.baseLights.get("key-front-high");
+  if (!(key instanceof DirectionalLight)) {
+    throw new Error("ENVIRONMENT_REALISM_SHADOW_KEY_INVALID:key-front-high");
+  }
+  key.position.copy(sceneVectorToThree(ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM));
+  key.color.copy(kelvinToColor(ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN));
+  key.userData.windowMotivatedShadowKey = true;
+  key.userData.presentationSourceMm = { ...ENVIRONMENT_REALISM_SHADOW_KEY_SOURCE_MM };
+  key.userData.presentationColorTemperatureK = ENVIRONMENT_REALISM_SHADOW_KEY_KELVIN;
+
+  return {
+    calibrationId: ENVIRONMENT_REALISM_LIGHTING_CALIBRATION_ID,
+    ...ENVIRONMENT_REALISM_LIGHTING_CALIBRATION,
+    shadowKeyAlignedToWindow: true
+  };
+}
+
+export function environmentRealismEnvironmentIntensity(relativeIntensity: number): number {
+  return relativeIntensity * ENVIRONMENT_REALISM_LIGHTING_CALIBRATION.environmentScale;
 }
 
 export interface EnvironmentRealismResult {
