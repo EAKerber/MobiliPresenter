@@ -138,3 +138,41 @@ jobs:
           name: agent-ops-handoff
           path: /tmp/agent-handoff.json
           if-no-files-found: error
+
+  post-integration-semantic-coverage-repair:
+    if: github.event_name == 'push' && github.ref_name == 'work/operations/post-integration-semantic-coverage-v0.1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact repair branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: work/operations/post-integration-semantic-coverage-v0.1
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize bounded exclusions
+        run: |
+          python - <<'PY'
+          from tools.post_integration_semantic_coverage_fix import apply
+          apply()
+          PY
+      - name: Validate repaired semantics
+        run: |
+          python -m tools.semantics check --json
+          python -m tools.semantics coverage --json
+          python -m unittest tools.tests.test_semantic_coverage tools.tests.test_agent_cycle_readiness tools.tests.test_agent_cycle_work_binding_r3b0b -v
+      - name: Commit registry patch if changed
+        run: |
+          if git diff --quiet -- ops/semantics/registry.json; then
+            echo "registry already repaired"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ops/semantics/registry.json
+          git commit -m "ops: classify integrated product CI in semantic coverage"
+          git push origin HEAD:work/operations/post-integration-semantic-coverage-v0.1
