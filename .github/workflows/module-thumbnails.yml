@@ -1,0 +1,67 @@
+name: Module Thumbnails
+
+on:
+  pull_request:
+    paths:
+      - "viewer-next/thumbnail.html"
+      - "viewer-next/src/thumbnail.ts"
+      - "viewer-next/tests/module_thumbnail_capture.mjs"
+      - ".github/workflows/module-thumbnails.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Scene Core toolchain
+        working-directory: scene-core
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Install Viewer Next toolchain
+        working-directory: viewer-next
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck thumbnail entry
+        working-directory: viewer-next
+        run: |
+          npm run build:core
+          npx tsc -p tsconfig.json
+
+      - name: Start Vite thumbnail host
+        working-directory: viewer-next
+        run: |
+          npx vite --host 127.0.0.1 --port 4174 > /tmp/module-thumbnail-vite.log 2>&1 &
+          echo $! > /tmp/module-thumbnail-vite.pid
+          for i in {1..30}; do
+            if curl --fail --silent "http://127.0.0.1:4174/thumbnail.html?module=01" >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/module-thumbnail-vite.log
+          exit 1
+
+      - name: Capture transparent module thumbnails
+        working-directory: viewer-next
+        run: node tests/module_thumbnail_capture.mjs http://127.0.0.1:4174/
+
+      - name: Upload module thumbnails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-thumbnails
+          path: viewer-next/artifacts/module-thumbnails/
+          if-no-files-found: warn
+          retention-days: 14

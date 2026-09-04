@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  VITE_DEFAULT_UI_MODE = "product"
 
 [[headers]]
   for = "/*.webp"

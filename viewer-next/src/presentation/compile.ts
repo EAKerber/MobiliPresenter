@@ -72,7 +72,7 @@ function finishOptions(policy: FinishPolicy): readonly CompiledFinishOption[] {
 function currentFinishOption(policy: FinishPolicy, configuration: ViewerConfigurationState): string | null {
   switch (policy.optionFamily) {
     case "front-preset":
-      return configuration.frontPresetByModule[policy.targetEntityId] ?? null;
+      return configuration.frontPresetByModule[policy.targetEntityId] ?? configuration.furnitureFinishPresetId;
     case "stone-preset":
       return configuration.stonePresetId;
   }
@@ -118,6 +118,22 @@ export function validateTechnicalCatalog(scene: ScenePackage, catalog: readonly 
     for (const forbidden of ["primaryMm", "nominalMm", "geometryMm", "widthMm", "heightMm", "depthMm"]) {
       if (dimensionPolicy && forbidden in dimensionPolicy) {
         throw new Error(`TECHNICAL_CATALOG_PHYSICAL_DIMENSION_FORBIDDEN:${entry.id}:${forbidden}`);
+      }
+    }
+
+    if (entry.presentation) {
+      if (entry.presentation.primaryEntityId !== entry.target.entityId) {
+        throw new Error(`TECHNICAL_PRESENTATION_PRIMARY_MISMATCH:${entry.id}:${entry.presentation.primaryEntityId}`);
+      }
+      const seenCompanions = new Set<string>();
+      for (const companionId of entry.presentation.companionEntityIds) {
+        if (!entities.has(companionId)) {
+          throw new Error(`TECHNICAL_PRESENTATION_COMPANION_NOT_FOUND:${entry.id}:${companionId}`);
+        }
+        if (companionId === entry.target.entityId || seenCompanions.has(companionId)) {
+          throw new Error(`TECHNICAL_PRESENTATION_COMPANION_INVALID:${entry.id}:${companionId}`);
+        }
+        seenCompanions.add(companionId);
       }
     }
 
@@ -182,6 +198,7 @@ export function compileTechnicalPresentation(
     target: entry.target,
     identity: entry.identity,
     dimensions: target.kind === "module" ? moduleDimensions(target, entry) : null,
+    presentation: entry.presentation ?? null,
     specifications: entry.specifications,
     components: entry.components,
     notices: entry.notices,

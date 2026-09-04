@@ -1,21 +1,41 @@
 import type { DimensionEvidence, DimensionTripleMm } from "@mobilipresenter/scene-core";
 
-export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.0" as const;
-export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.1" as const;
+export const TECHNICAL_CATALOG_ENTRY_SCHEMA_VERSION = "TechnicalCatalogEntry 0.1.1" as const;
+export const TECHNICAL_PRESENTATION_PACKAGE_SCHEMA_VERSION = "TechnicalPresentationPackage 0.1.5" as const;
 
 export type TechnicalTargetKind = "module" | "item";
 export type TechnicalAxis = "width" | "height" | "depth";
 export type TechnicalViewPlane = "width-height" | "depth-height" | "width-depth";
+export type TechnicalViewProjection = TechnicalViewPlane | "isometric";
 export type TechnicalViewKind = "orthographic" | "internal" | "isometric" | "detail";
 export type TechnicalViewFidelity = "schematic" | "geometry-derived" | "authored";
-export type TechnicalViewCoverage = "envelope" | "authored-layout" | "module-front-primitives" | "appliance-front-openings";
-export type TechnicalViewOmission = "hardware" | "hidden-geometry";
+export type TechnicalViewCoverage =
+  | "envelope"
+  | "authored-layout"
+  | "module-front-primitives"
+  | "module-geometry-primitives"
+  | "appliance-front-openings";
+export type TechnicalViewOmission = "hardware" | "hidden-geometry" | "hidden-line-removal";
 export type TechnicalNoticeSeverity = "info" | "important" | "warning";
 export type TechnicalDependencyRelation = "requires-present" | "control-point-host" | "technical-support";
 export type TechnicalControlKind = "visibility" | "activation";
 export type FinishOptionFamily = "front-preset" | "stone-preset";
 export type TechnicalComponentKind = "hardware" | "electrical" | "panel" | "interface" | "other";
 export type TechnicalFactStatus = "provided" | "confirmed" | "unverified";
+
+/**
+ * Camera-relative topology semantics for a physical projected edge.
+ *
+ * These values say why an edge is or is not a candidate technical line. They
+ * intentionally do not encode its world-axis direction and do not claim
+ * occlusion. Surface-depth visibility is a later, independent stage.
+ */
+export type TechnicalProjectedEdgeClass =
+  | "silhouette"
+  | "crease"
+  | "boundary"
+  | "shared"
+  | "back-facing";
 
 export interface TechnicalSourceRef {
   readonly authority: "scene-core" | "technical-catalog" | "appearance-catalog" | "viewer-runtime" | "derived";
@@ -36,10 +56,16 @@ export interface TechnicalDimensionPresentation {
   readonly prefer: "nominal" | "geometry";
 }
 
+export interface TechnicalPresentationSpec {
+  readonly primaryEntityId: string;
+  readonly companionEntityIds: readonly string[];
+}
+
 export interface TechnicalTextFact {
   readonly id: string;
   readonly category: "function" | "construction" | "installation" | "finish" | "hardware" | "electrical";
   readonly text: string;
+  readonly semanticKey?: string;
   readonly source: TechnicalSourceRef;
 }
 
@@ -51,6 +77,7 @@ export interface TechnicalComponentRequirement {
   readonly quantity?: number;
   readonly unit?: string;
   readonly linkedEntityId?: string;
+  readonly semanticKey?: string;
   readonly source: TechnicalSourceRef;
 }
 
@@ -133,9 +160,36 @@ export interface TechnicalProjectedOpening {
   readonly evidenceRefs: readonly string[];
 }
 
+export interface TechnicalProjectedDimensionGuide {
+  readonly axis: TechnicalAxis;
+  readonly startMm: TechnicalPoint2Mm;
+  readonly endMm: TechnicalPoint2Mm;
+}
+
+export interface TechnicalVisibilityInterval {
+  readonly startT: number;
+  readonly endT: number;
+}
+
+export interface TechnicalProjectedEdge {
+  readonly id: string;
+  readonly classification: TechnicalProjectedEdgeClass;
+  readonly startMm: TechnicalPoint2Mm;
+  readonly endMm: TechnicalPoint2Mm;
+  readonly startViewDepth: number;
+  readonly endViewDepth: number;
+  /**
+   * Present only when this edge was selected as a technical-line candidate and
+   * evaluated by the visibility stage. Omitted physical edges remain untouched.
+   */
+  readonly visibleIntervals?: readonly TechnicalVisibilityInterval[];
+  readonly sourcePrimitiveIds: readonly string[];
+  readonly sourcePrimitiveRoles: readonly string[];
+}
+
 export interface CompiledTechnicalViewGeometry {
   readonly viewId: string;
-  readonly plane: "width-height";
+  readonly projection: TechnicalViewProjection;
   readonly coordinateUnit: "mm";
   readonly boundsMm: {
     readonly horizontal: number;
@@ -143,6 +197,8 @@ export interface CompiledTechnicalViewGeometry {
   };
   readonly primitives: readonly TechnicalProjectedPrimitive[];
   readonly openings: readonly TechnicalProjectedOpening[];
+  readonly dimensionGuides: readonly TechnicalProjectedDimensionGuide[];
+  readonly edges: readonly TechnicalProjectedEdge[];
   readonly coverage: readonly TechnicalViewCoverage[];
   readonly omitted: readonly TechnicalViewOmission[];
 }
@@ -153,6 +209,7 @@ export interface TechnicalCatalogEntry {
   readonly target: { readonly kind: TechnicalTargetKind; readonly entityId: string };
   readonly identity: TechnicalIdentity;
   readonly dimensions?: TechnicalDimensionPresentation;
+  readonly presentation?: TechnicalPresentationSpec;
   readonly specifications: readonly TechnicalTextFact[];
   readonly components: readonly TechnicalComponentRequirement[];
   readonly notices: readonly TechnicalNotice[];
@@ -195,6 +252,7 @@ export interface TechnicalPresentationPackage {
   readonly target: TechnicalCatalogEntry["target"];
   readonly identity: TechnicalIdentity;
   readonly dimensions: CompiledTechnicalDimensions | null;
+  readonly presentation: TechnicalPresentationSpec | null;
   readonly specifications: readonly TechnicalTextFact[];
   readonly components: readonly TechnicalComponentRequirement[];
   readonly notices: readonly TechnicalNotice[];

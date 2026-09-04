@@ -1,0 +1,133 @@
+name: Product UI Evidence
+
+on:
+  pull_request:
+    paths:
+      - "viewer-next/src/ui/**"
+      - "viewer-next/src/bootstrap.ts"
+      - "viewer-next/src/renderer/three/selection.ts"
+      - "viewer-next/public/module-thumbnails/**"
+      - "viewer-next/tests/chrome_viewport_capture.mjs"
+      - "viewer-next/tests/global_finish_browser_smoke.mjs"
+      - "viewer-next/tests/mobile_finishes_clearance.mjs"
+      - "viewer-next/tests/product_contract_ui_markers.mjs"
+      - ".github/workflows/product-ui-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Scene Core toolchain
+        working-directory: scene-core
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Install Viewer Next toolchain
+        working-directory: viewer-next
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Build product UI
+        working-directory: viewer-next
+        env:
+          VITE_DEFAULT_UI_MODE: product
+        run: npm run build
+
+      - name: Start product preview
+        working-directory: viewer-next
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/product-ui-preview.log 2>&1 &
+          echo $! > /tmp/product-ui-preview.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/product-ui-preview.log
+          exit 1
+
+      - name: Capture responsive product UI
+        working-directory: viewer-next
+        run: python3 tests/runtime_ui_smoke.py
+
+      - name: Exercise product stage navigation
+        working-directory: viewer-next
+        run: |
+          mkdir -p artifacts/product-ui-navigation
+          for step in finishes accessories summary; do
+            node tests/chrome_viewport_capture.mjs \
+              --url "http://127.0.0.1:4173/?controls=1" \
+              --name "navigation-${step}" \
+              --width 1366 \
+              --height 768 \
+              --out-dir artifacts/product-ui-navigation \
+              --no-screenshot \
+              --click-selector "[data-configurator-step=\"${step}\"]" \
+              --wait-selector "[data-stage-panel=\"${step}\"]" \
+              --expect-step "${step}"
+          done
+
+      - name: Gate global MDF finish first interaction
+        working-directory: viewer-next
+        run: node tests/global_finish_browser_smoke.mjs
+
+      - name: Gate contract-driven UI markers
+        working-directory: viewer-next
+        run: node tests/product_contract_ui_markers.mjs
+
+      - name: Capture mobile finishes layout
+        working-directory: viewer-next
+        run: |
+          node tests/chrome_viewport_capture.mjs \
+            --url "http://127.0.0.1:4173/?controls=1" \
+            --name "mobile-finishes" \
+            --width 390 \
+            --height 844 \
+            --out-dir artifacts/product-ui-navigation \
+            --click-selector '[data-configurator-step="finishes"]' \
+            --wait-selector '[data-stage-panel="finishes"]' \
+            --expect-step "finishes"
+
+      - name: Gate mobile finishes bottom clearance
+        working-directory: viewer-next
+        run: node tests/mobile_finishes_clearance.mjs
+
+      - name: Exercise carousel next control
+        working-directory: viewer-next
+        run: |
+          node tests/chrome_viewport_capture.mjs \
+            --url "http://127.0.0.1:4173/?controls=1&select=02" \
+            --name "carousel-next-control" \
+            --width 1366 \
+            --height 768 \
+            --out-dir artifacts/product-ui-navigation \
+            --click-selector '.viewer-product-carousel__arrow--next' \
+            --wait-selector '.viewer-product-carousel__dot:nth-child(2)[aria-current="true"]'
+
+      - name: Upload product UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-ui-evidence
+          path: |
+            viewer-next/artifacts/runtime-ui/
+            viewer-next/artifacts/product-ui-navigation/
+          if-no-files-found: warn
+          retention-days: 14

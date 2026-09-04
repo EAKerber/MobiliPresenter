@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mobilipresenter/scene-core": "file:../scene-core",
+    "lucide": "1.38.0",
     "three": "0.185.1"
   },
   "devDependencies": {

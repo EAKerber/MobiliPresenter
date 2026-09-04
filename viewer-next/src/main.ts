@@ -148,6 +148,7 @@ function syncDatasets(): void {
   app.dataset.viewerConfiguration = configurationFingerprint(configuration);
   app.dataset.viewerSelectedModule = interaction.selectedModuleId ?? "none";
   app.dataset.viewerHoveredModule = interaction.hoveredModuleId ?? "none";
+  app.dataset.viewerFurnitureFinishPreset = configuration.furnitureFinishPresetId;
   app.dataset.viewerStonePreset = configuration.stonePresetId;
   app.dataset.viewerLightingPreset = configuration.lightingPresetId;
   app.dataset.viewerLightingPolicy = composition.appearance.lighting.id;
@@ -163,7 +164,6 @@ function syncDatasets(): void {
   app.dataset.viewerInteractionHighlight = diagnostics.interactionHighlightId;
   app.dataset.viewerSelectionHighlightCount = String(selectedCount);
   app.dataset.viewerHoverHighlightCount = String(hoveredCount);
-  // Compatibility marker retained for the VRC-01 browser contract while the visual implementation moves to postprocessing.
   app.dataset.viewerSelectionOverlayCount = String(selectedCount);
   app.dataset.hardwareRefinement = diagnostics.hardwareRefinementId;
   app.dataset.hardwareAnchorCount = String(diagnostics.hardwareAnchorCount);
@@ -205,6 +205,7 @@ function applyConfigurationAction(action: ViewerConfigurationAction): void {
     case "set-module-visibility":
       composition.syncVisibility(nextScene, nextAppearance);
       break;
+    case "set-furniture-finish-preset":
     case "set-front-preset":
     case "clear-front-preset":
     case "set-stone-preset":
@@ -265,6 +266,7 @@ export interface ViewerRuntimeControlApi {
   getConfiguration(): ViewerConfigurationState;
   getInteraction(): ViewerInteractionState;
   setModuleVisibility(alias: string, value: ViewerVisibilityOverride): void;
+  setFurnitureFinishPreset(presetId: FrontPresetId): void;
   setFrontPreset(alias: string, presetId: FrontPresetId): void;
   clearFrontPreset(alias: string): void;
   setStonePreset(presetId: StonePresetId): void;
@@ -278,6 +280,9 @@ const runtimeApi: ViewerRuntimeControlApi = {
   getInteraction: () => interaction,
   setModuleVisibility(alias, value): void {
     applyConfigurationAction({ type: "set-module-visibility", moduleId: moduleIdFromAlias(alias), value });
+  },
+  setFurnitureFinishPreset(presetId): void {
+    applyConfigurationAction({ type: "set-furniture-finish-preset", presetId });
   },
   setFrontPreset(alias, presetId): void {
     applyConfigurationAction({ type: "set-front-preset", moduleId: moduleIdFromAlias(alias), presetId });

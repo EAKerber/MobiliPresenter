@@ -338,15 +338,16 @@ def main() -> None:
         "Detalhes",
     )
 
-    unavailable_params = {"controls": "1", "select": "01"}
-    unavailable_url = BASE_URL + "?" + urlencode(unavailable_params)
-    unavailable_required = (
+    cataloged_params = {"controls": "1", "select": "01"}
+    cataloged_url = BASE_URL + "?" + urlencode(cataloged_params)
+    cataloged_required = (
         'data-viewer-runtime-ui="mounted"',
         'data-module-alias="01"',
         'data-selected="true"',
-        'data-presentation-status="unavailable"',
-        "Detalhes técnicos ainda não publicados",
-        "Informações técnicas ausentes não são inferidas pela interface.",
+        'data-presentation-status="ready"',
+        'data-technical-fidelity="geometry-derived"',
+        "Aéreo da lavanderia",
+        "Dobradiças com amortecimento.",
     )
 
     matrix = (
@@ -375,18 +376,18 @@ def main() -> None:
         open_frames_by_viewport[(width, height)] = frame
         captures.append(capture_summary(capture))
 
-    unavailable_capture = capture_browser(
+    cataloged_capture = capture_browser(
         chrome,
-        unavailable_url,
-        "runtime-ui-desktop-unavailable",
+        cataloged_url,
+        "runtime-ui-desktop-cataloged-01",
         1366,
         768,
     )
-    require(unavailable_capture["dom"], "unavailable", unavailable_required)
+    require(cataloged_capture["dom"], "cataloged-01", cataloged_required)
     viewport_geometries.append(
-        viewport_geometry_evidence(unavailable_capture, "runtime-ui-desktop-unavailable", 1366, 768)
+        viewport_geometry_evidence(cataloged_capture, "runtime-ui-desktop-cataloged-01", 1366, 768)
     )
-    captures.append(capture_summary(unavailable_capture))
+    captures.append(capture_summary(cataloged_capture))
 
     closed_params = {
         "controls": "1",
@@ -437,10 +438,10 @@ def main() -> None:
         breakpoint_evidence.append(geometry)
 
     evidence = {
-        "schemaVersion": "ViewerRuntimeUiEvidence 0.6.0",
+        "schemaVersion": "ViewerRuntimeUiEvidence 0.7.0",
         "status": "PASS",
         "readyUrl": ready_url,
-        "unavailableUrl": unavailable_url,
+        "catalogedModule01Url": cataloged_url,
         "closedDetailUrl": closed_url,
         "captures": captures,
         "viewportGeometry": viewport_geometries,
@@ -448,14 +449,14 @@ def main() -> None:
         "compactDetailAllocations": compact_detail_allocations,
         "breakpointEvidence": breakpoint_evidence,
         "readyRequiredDomMarkers": list(ready_required),
-        "unavailableRequiredDomMarkers": list(unavailable_required),
+        "catalogedModule01RequiredDomMarkers": list(cataloged_required),
         "invariants": {
             "canonicalBaselineControlsRemainOptIn": True,
             "guidedFourStepNavigationMounted": True,
             "sceneRemainsSeparateFromUiState": True,
             "moduleVisibilitySeparatedFromInspection": True,
             "selectedModuleDetailIsContextual": True,
-            "validSelectionWithoutTpcDegradesGracefully": True,
+            "catalogedModule01PublishesTechnicalPresentation": True,
             "technicalFidelityComesFromPublicContract": True,
             "frontPresetProjectedByRuntime": True,
             "stonePresetProjectedByRuntime": True,
