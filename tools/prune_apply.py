@@ -6,10 +6,11 @@ already classified as delete-candidate + autoDeleteEligible by one explicit,
 materialized plan whose hash is supplied separately as expected-plan.
 
 It fails closed on plan mismatch, incomplete observations, repository-wide ref
-drift, control-head drift, open PRs, per-ref SHA mismatch, or failed readback.
-A delete that reports failure may be accepted as ALREADY_ABSENT only when an
-immediate full-inventory readback exactly matches the expected state with that
-single ref removed; any other drift remains a hard failure.
+drift, control-head drift, open PRs, per-ref SHA mismatch, failed atomic
+expected-SHA deletion, or failed readback. A delete that reports failure may be
+accepted as ALREADY_ABSENT only when an immediate full-inventory readback
+exactly matches the expected state with that single ref removed; any other
+drift remains a hard failure.
 """
 from __future__ import annotations
 
@@ -108,21 +109,36 @@ def observe_open_prs_using_branch(repository: str, branch: str) -> list[dict[str
     return [by_number[key] for key in sorted(by_number)]
 
 
-def delete_remote_ref(repository: str, branch: str) -> None:
-    endpoint = f"repos/{repository}/git/refs/heads/{quote(branch, safe='/')}"
-    ok, output = run(["gh", "api", "--method", "DELETE", endpoint])
+def delete_remote_ref_if_expected(repository: str, branch: str, expected_sha: str) -> None:
+    if repository != "EAKerber/MobiliPresenter":
+        raise RuntimeError("DELETE_REF_REPOSITORY_INVALID")
+    ref = f"refs/heads/{branch}"
+    lease = f"--force-with-lease={ref}:{expected_sha}"
+    ok, output = run(["git", "push", "--porcelain", lease, "origin", f":{ref}"])
     if not ok:
-        raise RuntimeError(f"DELETE_REF_FAILED:{branch}:{output}")
+        raise RuntimeError(f"DELETE_REF_LEASE_FAILED:{branch}:{output}")
 
 
-def delete_or_confirm_absent(repository: str, branch: str, expected_after: dict[str, str]) -> str:
+def delete_or_confirm_absent(
+    repository: str,
+    branch: str,
+    expected_sha: str,
+    expected_after: dict[str, str],
+) -> str:
     try:
-        delete_remote_ref(repository, branch)
+        delete_remote_ref_if_expected(repository, branch, expected_sha)
         return "deleted"
     except RuntimeError as exc:
         observed = observe_branch_inventory(repository)
         if observed == expected_after:
             return "already-absent"
+        actual_sha = observed.get(branch)
+        if actual_sha is not None and actual_sha != expected_sha:
+            raise RuntimeError(f"STALE_PLAN:BRANCH_HEAD_DRIFT:{branch}") from exc
+        expected_before = dict(expected_after)
+        expected_before[branch] = expected_sha
+        if observed == expected_before:
+            raise RuntimeError(f"DELETE_REF_LEASE_FAILED:{branch}") from exc
         raise RuntimeError(f"DELETE_REF_FAILED_WITH_DRIFT:{branch}") from exc
 
 
@@ -211,7 +227,7 @@ def apply_plan(plan: dict[str, Any], expected_plan: str | None) -> dict[str, Any
 
         expected_after = dict(expected)
         expected_after.pop(branch)
-        outcome = delete_or_confirm_absent(repository, branch, expected_after)
+        outcome = delete_or_confirm_absent(repository, branch, sha, expected_after)
         expected = expected_after
         deleted_this_run[branch] = sha
         readback_retries += wait_for_consistent_inventory(
@@ -265,7 +281,7 @@ def command(as_json: bool, plan_path: Path, expected_plan: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Apply one exact GitPrunePlan 0.4 with CAS-style readback")
+    parser = argparse.ArgumentParser(description="Apply one exact GitPrunePlan 0.4 with atomic expected-SHA deletion and CAS-style readback")
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--plan", type=Path, required=True, help="Exact materialized GitPrunePlan 0.4")
     parser.add_argument("--expected-plan", required=True, help="Expected planHash observed before destructive execution")
