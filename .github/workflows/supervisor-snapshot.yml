@@ -38,9 +38,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e
           python tools/project_machine.py inspect --live --json > /tmp/project-machine-source.json
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > /tmp/project-machine-source.exit-code
           python -m json.tool /tmp/project-machine-source.json > /dev/null
           python tools/project_machine.py validate /tmp/project-machine-source.json --json
+      - name: Upload source Project Machine diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-machine-source
+          path: |
+            /tmp/project-machine-source.json
+            /tmp/project-machine-source.exit-code
+          if-no-files-found: error
+          retention-days: 7
+      - name: Propagate source Project Machine disposition
+        run: |
+          rc="$(cat /tmp/project-machine-source.exit-code)"
+          if [ "$rc" -ne 0 ]; then
+            echo "Project Machine source inspection exited with $rc after diagnostic preservation."
+            exit "$rc"
+          fi
       - name: Derive routine inspection
         run: |
           python tools/routines.py inspect --input /tmp/project-machine-source.json --json > /tmp/routine-inspection.json
@@ -72,9 +93,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e
           python tools/project_machine.py inspect --live --json > /tmp/project-machine-readback.json
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > /tmp/project-machine-readback.exit-code
           python -m json.tool /tmp/project-machine-readback.json > /dev/null
           python tools/project_machine.py validate /tmp/project-machine-readback.json --json
+      - name: Upload readback Project Machine diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-machine-readback
+          path: |
+            /tmp/project-machine-readback.json
+            /tmp/project-machine-readback.exit-code
+          if-no-files-found: error
+          retention-days: 7
+      - name: Propagate readback Project Machine disposition
+        run: |
+          rc="$(cat /tmp/project-machine-readback.exit-code)"
+          if [ "$rc" -ne 0 ]; then
+            echo "Project Machine readback inspection exited with $rc after diagnostic preservation."
+            exit "$rc"
+          fi
       - name: Validate snapshot lineage and drift
         run: |
           python tools/scheduler_snapshot.py validate \
