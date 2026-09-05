@@ -12,7 +12,15 @@ Comece sempre por:
 python3 tools/agent.py status
 ```
 
-`status` separa a próxima transição de roadmap da **próxima ação operacional segura** e lista os pares de papel/intenção aceitos pelo bootstrap. Depois, abra um ciclo com um dos pares apresentados:
+`status` separa a próxima transição de roadmap da **próxima ação operacional segura** e lista os pares de papel/intenção aceitos pelo bootstrap. Quando já existe um Work conhecido, observe também a disposição de re-entry antes de abrir outro ciclo:
+
+```bash
+python3 tools/agent.py status --work-id <work-id> --json
+```
+
+Esse modo observa a Work authority e o histórico completo do Hosted Agent Cycle bus, reutiliza a classificação canônica de re-entry e pode orientar `BEGIN_NEW_CYCLE`, `RESUME_EXACT_CYCLE`, `WAIT`, `HONOR_HANDOFF`, `RECONCILE_FAILURE`, `OBSERVE` ou `NONE`. Falha/incompletude do provider resulta em `OBSERVE`; nunca é promovida a `PASS`.
+
+Se a orientação permitir um novo ciclo, abra-o com um dos pares apresentados:
 
 ```bash
 python3 tools/agent.py begin --role <role> --intent <intent> --json
