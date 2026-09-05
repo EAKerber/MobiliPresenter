@@ -1,10 +1,7 @@
 """Read-only discovery of materialized Hosted Agent Cycles for one Work item.
 
-This module is intentionally pre-recovery. It does not select a cycle, decide
-whether replay is safe, or authorize any mutation. It only joins canonical
-Hosted begin requests to validated begin-result 0.5 records using the strong
-transport bindings already carried by requestId, commandHash, and the handle
-locator's beginCommentId.
+This is deliberately pre-recovery: it discovers exact Work-bound begin lineage,
+but never selects a cycle, authorizes replay, or mutates an authority.
 """
 from __future__ import annotations
 
@@ -12,42 +9,19 @@ import copy
 import json
 from typing import Any
 
-from tools import agent_cycle
-from tools import hosted_agent_cycle
-from tools import hosted_cycle_artifact
-from tools import hosted_cycle_handle
+from tools import agent_cycle, hosted_agent_cycle, hosted_cycle_artifact, hosted_cycle_handle
 from tools.canonical import stable_hash
 
 LINEAGE_KIND = "work-bound-hosted-cycle-lineage-v0.1"
 RESULT_FIELDS = {
-    "schemaVersion",
-    "requestId",
-    "commandHash",
-    "runId",
-    "sourceSha",
-    "artifactName",
-    "cycleId",
-    "cycleInstanceId",
-    "contextHash",
-    "carrierFeatures",
-    "manifestHash",
-    "handle",
-    "status",
-    "semanticAuthority",
-    "authorizesMutation",
-    "resumability",
-    "resultHash",
+    "schemaVersion", "requestId", "commandHash", "runId", "sourceSha",
+    "artifactName", "cycleId", "cycleInstanceId", "contextHash",
+    "carrierFeatures", "manifestHash", "handle", "status",
+    "semanticAuthority", "authorizesMutation", "resumability", "resultHash",
 }
 LINEAGE_FIELDS = {
-    "kind",
-    "workRef",
-    "issueNumber",
-    "candidates",
-    "pendingRequests",
-    "ambiguous",
-    "readOnly",
-    "semanticAuthority",
-    "authorizesMutation",
+    "kind", "workRef", "issueNumber", "candidates", "pendingRequests",
+    "ambiguous", "readOnly", "semanticAuthority", "authorizesMutation",
     "lineageHash",
 }
 REQUEST_MARKERS = (
@@ -105,7 +79,39 @@ def _request_event(comment: dict[str, Any], issue_number: int) -> dict[str, Any]
     }
 
 
-def _validate_begin_result(value: Any, *, issue_number: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def _result_payload(comment: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a parseable begin-result envelope without assigning it to a Work.
+
+    Deep validation is intentionally deferred until requestId+commandHash claims
+    a target Work request. Malformed or foreign ambient result records therefore
+    cannot poison an unrelated Work reconstruction.
+    """
+    body = _body(comment)
+    marker = hosted_agent_cycle.RESULT_MARKER + "\n"
+    user = comment.get("user")
+    if (
+        not body.startswith(marker)
+        or not isinstance(user, dict)
+        or user.get("login") != "github-actions[bot]"
+    ):
+        return None
+    try:
+        value = json.loads(body[len(marker):].strip())
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    if (
+        value.get("schemaVersion") != hosted_cycle_artifact.BEGIN_RESULT_SCHEMA
+        or value.get("status") != "READY"
+    ):
+        return None
+    return value
+
+
+def _validate_begin_result(
+    value: Any, *, issue_number: int
+) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(value, dict) or set(value) != RESULT_FIELDS:
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_FIELDS_INVALID")
     if (
@@ -115,14 +121,13 @@ def _validate_begin_result(value: Any, *, issue_number: int) -> tuple[dict[str, 
         or value.get("authorizesMutation") is not False
     ):
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_INVALID")
-    request_id = value.get("requestId")
-    if not isinstance(request_id, str) or not request_id.strip():
+    if not isinstance(value.get("requestId"), str) or not value["requestId"].strip():
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_INVALID")
-    _hash(value.get("commandHash"), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_HASH_INVALID")
-    _hash(value.get("contextHash"), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_HASH_INVALID")
-    _hash(value.get("manifestHash"), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_HASH_INVALID")
-    _hash(value.get("resultHash"), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_HASH_INVALID")
-    run_id = _positive_int(value.get("runId"), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_INVALID")
+    for field in ("commandHash", "contextHash", "manifestHash", "resultHash"):
+        _hash(value.get(field), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_HASH_INVALID")
+    run_id = _positive_int(
+        value.get("runId"), "HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_INVALID"
+    )
     source_sha = value.get("sourceSha")
     if not isinstance(source_sha, str) or hosted_agent_cycle.SHA_RE.fullmatch(source_sha) is None:
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_INVALID")
@@ -142,14 +147,14 @@ def _validate_begin_result(value: Any, *, issue_number: int) -> tuple[dict[str, 
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_BINDING_INVALID") from exc
     if resumability["state"] != "AVAILABLE":
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_NOT_RESUMABLE")
-    expected = {
+    expected_locator = {
         "runId": run_id,
         "sourceSha": source_sha,
         "artifactName": value["artifactName"],
         "contextHash": value["contextHash"],
         "cycleInstanceId": value["cycleInstanceId"],
     }
-    if any(locator.get(key) != item for key, item in expected.items()):
+    if any(locator.get(key) != item for key, item in expected_locator.items()):
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_BINDING_MISMATCH")
     if locator.get("issueNumber") != issue_number:
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_ISSUE_MISMATCH")
@@ -164,39 +169,13 @@ def _validate_begin_result(value: Any, *, issue_number: int) -> tuple[dict[str, 
     return value, locator
 
 
-def _parse_result_comment(comment: dict[str, Any], *, issue_number: int) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    body = _body(comment)
-    marker = hosted_agent_cycle.RESULT_MARKER + "\n"
-    if not body.startswith(marker):
-        return None
-    user = comment.get("user")
-    if not isinstance(user, dict) or user.get("login") != "github-actions[bot]":
-        return None
-    try:
-        value = json.loads(body[len(marker):].strip())
-    except json.JSONDecodeError as exc:
-        raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_RESULT_JSON_INVALID") from exc
-    if not isinstance(value, dict):
-        raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_RESULT_INVALID")
-    if (
-        value.get("schemaVersion") != hosted_cycle_artifact.BEGIN_RESULT_SCHEMA
-        or value.get("status") != "READY"
-    ):
-        return None
-    return _validate_begin_result(value, issue_number=issue_number)
-
-
 def build_work_lineage(
     comments: list[dict[str, Any]],
     *,
     work_ref: dict[str, str],
     issue_number: int,
 ) -> dict[str, Any]:
-    """Join one exact Work selector to materialized Hosted begin results.
-
-    The result deliberately has no selected/current/replay decision. Multiple
-    materialized begins remain explicit ambiguity for a later recovery policy.
-    """
+    """Join one exact Work selector to materialized Hosted begin results."""
     try:
         work_ref = agent_cycle.validate_work_ref(work_ref)
     except RuntimeError as exc:
@@ -218,9 +197,13 @@ def build_work_lineage(
         if not any(body.startswith(marker + "\n") for marker in REQUEST_MARKERS):
             continue
         try:
-            command, meta = hosted_agent_cycle.parse_event(_request_event(comment, issue_number))
+            command, meta = hosted_agent_cycle.parse_event(
+                _request_event(comment, issue_number)
+            )
         except hosted_agent_cycle.HostedAgentCycleError as exc:
-            raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_REQUEST_INVALID:" + exc.code) from exc
+            raise HostedCycleLineageError(
+                "HOSTED_CYCLE_LINEAGE_REQUEST_INVALID:" + exc.code
+            ) from exc
         if (
             command.get("schemaVersion") not in {
                 hosted_agent_cycle.COMMAND_SCHEMA_V03,
@@ -237,20 +220,22 @@ def build_work_lineage(
             "commandSchema": command["schemaVersion"],
         }
 
+    target_claims = {
+        (item["requestId"], item["commandHash"])
+        for item in requests.values()
+    }
     matched: dict[int, dict[str, Any]] = {}
     for comment in ordered:
-        parsed = _parse_result_comment(comment, issue_number=issue_number)
-        if parsed is None:
+        raw = _result_payload(comment)
+        if raw is None:
             continue
-        result, locator = parsed
+        claim = (raw.get("requestId"), raw.get("commandHash"))
+        if claim not in target_claims:
+            continue
+        result, locator = _validate_begin_result(raw, issue_number=issue_number)
         request_comment_id = locator["beginCommentId"]
         request = requests.get(request_comment_id)
-        if request is None:
-            continue
-        if (
-            result["requestId"] != request["requestId"]
-            or result["commandHash"] != request["commandHash"]
-        ):
+        if request is None or claim != (request["requestId"], request["commandHash"]):
             raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_REQUEST_RESULT_MISMATCH")
         candidate = {
             "requestCommentId": request_comment_id,
@@ -310,14 +295,13 @@ def validate_work_lineage(value: Any) -> dict[str, Any]:
     if work_ref is None:
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_WORK_REF_REQUIRED")
     _positive_int(value.get("issueNumber"), "HOSTED_CYCLE_LINEAGE_ISSUE_INVALID")
-    candidates = value.get("candidates")
-    pending = value.get("pendingRequests")
+    candidates, pending = value.get("candidates"), value.get("pendingRequests")
     if not isinstance(candidates, list) or not isinstance(pending, list):
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_ENTRIES_INVALID")
     request_ids = [item.get("requestCommentId") for item in candidates if isinstance(item, dict)]
+    pending_ids = [item.get("commentId") for item in pending if isinstance(item, dict)]
     if len(request_ids) != len(candidates) or request_ids != sorted(set(request_ids)):
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_CANDIDATES_INVALID")
-    pending_ids = [item.get("commentId") for item in pending if isinstance(item, dict)]
     if len(pending_ids) != len(pending) or pending_ids != sorted(set(pending_ids)):
         raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_PENDING_INVALID")
     if set(request_ids) & set(pending_ids):
