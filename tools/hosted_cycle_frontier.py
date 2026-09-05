@@ -59,6 +59,7 @@ def _outcome_map(outcomes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         if not isinstance(outcome, dict):
             raise HostedCycleFrontierError("HOSTED_CYCLE_FRONTIER_OUTCOME_INVALID")
         cycle_id = _cycle_id(outcome.get("cycleInstanceId"))
+        _comment_id(outcome.get("beginRequestCommentId"))
         if cycle_id in mapped:
             raise HostedCycleFrontierError("HOSTED_CYCLE_FRONTIER_OUTCOME_DUPLICATE")
         if not isinstance(outcome.get("state"), str):
@@ -67,27 +68,8 @@ def _outcome_map(outcomes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return mapped
 
 
-def _candidate_map(candidates: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    mapped: dict[str, dict[str, Any]] = {}
-    for candidate in candidates:
-        if not isinstance(candidate, dict):
-            raise HostedCycleFrontierError("HOSTED_CYCLE_FRONTIER_CANDIDATE_INVALID")
-        cycle_id = _cycle_id(candidate.get("cycleInstanceId"))
-        begin_id = _comment_id(candidate.get("requestCommentId"))
-        if cycle_id in mapped:
-            raise HostedCycleFrontierError("HOSTED_CYCLE_FRONTIER_CANDIDATE_DUPLICATE")
-        mapped[cycle_id] = {**candidate, "requestCommentId": begin_id}
-    return mapped
-
-
-def build_frontier(
-    candidates: list[dict[str, Any]], outcomes: list[dict[str, Any]]
-) -> dict[str, Any]:
-    candidate_by_id = _candidate_map(candidates)
+def build_frontier(outcomes: list[dict[str, Any]]) -> dict[str, Any]:
     outcome_by_id = _outcome_map(outcomes)
-    if set(candidate_by_id) != set(outcome_by_id):
-        raise HostedCycleFrontierError("HOSTED_CYCLE_FRONTIER_BINDING_MISMATCH")
-
     terminal_ids = sorted(
         cycle_id
         for cycle_id, outcome in outcome_by_id.items()
@@ -99,7 +81,7 @@ def build_frontier(
     succession_proven = True
     if len(active_ids) == 1 and terminal_ids:
         active_id = active_ids[0]
-        active_begin = candidate_by_id[active_id]["requestCommentId"]
+        active_begin = _comment_id(outcome_by_id[active_id]["beginRequestCommentId"])
         for terminal_id in terminal_ids:
             result_ids = outcome_by_id[terminal_id].get("resultCommentIds")
             if not isinstance(result_ids, list) or not result_ids:
