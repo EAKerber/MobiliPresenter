@@ -61,13 +61,44 @@ def recent_commits(control_branch):
     return _commands.recent_commits(control_branch)
 
 
-def _bootstrap_projection() -> dict:
+def _reentry_success(work_id: str, inspection: dict) -> dict:
+    return {
+        "status": "PASS",
+        "workRef": {"workId": work_id},
+        "reentryDisposition": inspection["state"],
+        "nextSafeAction": inspection["nextSafeAction"],
+        "reasonCodes": copy.deepcopy(inspection["reasonCodes"]),
+        "targetCycle": copy.deepcopy(inspection.get("targetCycle")),
+        "inspection": copy.deepcopy(inspection),
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
+def _reentry_unknown(work_id: str, error) -> dict:
+    return {
+        "status": "UNKNOWN",
+        "workRef": {"workId": work_id},
+        "reentryDisposition": "INSUFFICIENT_OBSERVATION",
+        "nextSafeAction": "OBSERVE",
+        "reasonCodes": [error.code],
+        "targetCycle": None,
+        "inspection": None,
+        "detail": error.detail or None,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
+def _bootstrap_projection(reentry: dict | None = None) -> dict:
     policy = agent_tool_policy.load_policy()
     entry_profiles = {
         role: sorted(entries)
         for role, entries in policy["entryProfiles"].items()
     }
-    return {
+    projection = {
         "nextSafeAction": "BEGIN_AGENT_CYCLE",
         "commandTemplate": (
             "python3 tools/agent.py begin --role <role> --intent <intent> --json"
@@ -78,40 +109,84 @@ def _bootstrap_projection() -> dict:
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
+    if reentry is None:
+        return projection
+    action = reentry["nextSafeAction"]
+    projection.update({
+        "nextSafeAction": action,
+        "commandTemplate": (
+            "python3 tools/agent.py begin --role <role> --intent <intent> --json"
+            if action == "BEGIN_NEW_CYCLE"
+            else None
+        ),
+        "reentryDisposition": reentry["reentryDisposition"],
+        "workRef": copy.deepcopy(reentry["workRef"]),
+        "reasonCodes": copy.deepcopy(reentry["reasonCodes"]),
+        "targetCycle": copy.deepcopy(reentry["targetCycle"]),
+    })
+    return projection
 
 
-def _status_payload(state, view, published, observed) -> dict:
+def _status_payload(state, view, published, observed, reentry: dict | None = None) -> dict:
     next_transition = view["development"]["nextTransition"]
-    return {
+    payload = {
         "project": project_summary(view),
         "projectStateHash": stable_hash(state),
         "published": published,
         "observedGit": observed,
         "next": next_transition,
         "roadmapNextTransition": next_transition,
-        "bootstrap": _bootstrap_projection(),
+        "bootstrap": _bootstrap_projection(reentry),
     }
+    if reentry is not None:
+        payload["reentry"] = copy.deepcopy(reentry)
+    return payload
 
 
-def command_status(as_json):
+def command_status(as_json, work_id: str | None = None):
     state, view, published = _state_and_publication()
-    payload = _status_payload(state, view, published, observed_git())
+    reentry = None
+    if work_id is not None:
+        reentry_module = importlib.import_module("tools.agent_reentry_guidance")
+        try:
+            inspection = reentry_module.observe_live(work_id)
+            reentry = _reentry_success(work_id, inspection)
+        except reentry_module.AgentReentryGuidanceError as exc:
+            reentry = _reentry_unknown(work_id, exc)
+    payload = _status_payload(state, view, published, observed_git(), reentry)
     if as_json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         roles = ", ".join(payload["bootstrap"]["entryProfiles"])
-        print(
-            f"PROJECT\n"
-            f"  id: {payload['project']['id']}\n"
-            f"  repository: {payload['project']['repository']}\n"
-            f"  phase: {payload['project']['phase']}\n"
-            f"  checkpoint: {payload['project']['checkpoint']}\n\n"
-            f"ROADMAP NEXT\n  {payload['roadmapNextTransition']}\n\n"
-            f"NEXT SAFE ACTION\n"
-            f"  {payload['bootstrap']['nextSafeAction']}\n"
-            f"  {payload['bootstrap']['commandTemplate']}\n"
-            f"  roles: {roles}"
-        )
+        lines = [
+            "PROJECT",
+            f"  id: {payload['project']['id']}",
+            f"  repository: {payload['project']['repository']}",
+            f"  phase: {payload['project']['phase']}",
+            f"  checkpoint: {payload['project']['checkpoint']}",
+            "",
+            "ROADMAP NEXT",
+            f"  {payload['roadmapNextTransition']}",
+        ]
+        if reentry is not None:
+            reasons = ", ".join(reentry["reasonCodes"]) or "-"
+            lines.extend([
+                "",
+                "RE-ENTRY",
+                f"  work: {reentry['workRef']['workId']}",
+                f"  observation: {reentry['status']}",
+                f"  disposition: {reentry['reentryDisposition']}",
+                f"  reasons: {reasons}",
+            ])
+        lines.extend([
+            "",
+            "NEXT SAFE ACTION",
+            f"  {payload['bootstrap']['nextSafeAction']}",
+        ])
+        if payload["bootstrap"]["commandTemplate"] is not None:
+            lines.append(f"  {payload['bootstrap']['commandTemplate']}")
+        lines.append(f"  roles: {roles}")
+        print("\n".join(lines))
     return 0
 
 
@@ -159,6 +234,32 @@ def _argument_value(argv: list[str], name: str) -> str | None:
             value = token[len(prefix):]
         index += 1
     return value
+
+
+def _status_arguments(argv: list[str]) -> tuple[bool, str | None]:
+    as_json = False
+    work_id = None
+    index = 2
+    while index < len(argv):
+        token = argv[index]
+        if token == "--json":
+            as_json = True
+            index += 1
+            continue
+        if token == "--work-id":
+            if index + 1 >= len(argv):
+                raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--work-id")
+            work_id = argv[index + 1]
+            index += 2
+            continue
+        if token.startswith("--work-id="):
+            work_id = token.split("=", 1)[1]
+            index += 1
+            continue
+        raise RuntimeError(f"UNEXPECTED_STATUS_ARGUMENT:{token}")
+    if work_id == "":
+        raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--work-id")
+    return as_json, work_id
 
 
 def _extract_runtime_tool_surfaces(
@@ -224,12 +325,9 @@ def _runtime_surface_base(
 def _run_with_runtime_tool_surfaces(argv: list[str]) -> int:
     clean, surfaces, inventory_complete, observed = _extract_runtime_tool_surfaces(argv)
     if not observed:
-        if (
-            len(clean) >= 2
-            and clean[1] == "status"
-            and all(token == "--json" for token in clean[2:])
-        ):
-            return command_status("--json" in clean)
+        if len(clean) >= 2 and clean[1] == "status":
+            as_json, work_id = _status_arguments(clean)
+            return command_status(as_json, work_id=work_id)
         return _commands.main()
     base = _runtime_surface_base(
         clean,
