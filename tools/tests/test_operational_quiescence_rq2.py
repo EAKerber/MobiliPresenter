@@ -221,6 +221,7 @@ class OperationalQuiescenceRQ2Tests(unittest.TestCase):
             operational_quiescence.evaluate_window([b, a])
         duplicate = copy.deepcopy(b)
         duplicate["observationId"] = "other"
+        duplicate["sequence"] = 701
         body = {
             key: copy.deepcopy(item)
             for key, item in duplicate.items()
