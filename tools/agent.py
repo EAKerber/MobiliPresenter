@@ -19,7 +19,7 @@ from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 TOOLBOX_COMMANDS = {
-    "begin", "close", "close-review", "status", "doctor", "verify", "checkpoint", "handoff",
+    "begin", "close", "close-review", "reflection-eligibility", "status", "doctor", "verify", "checkpoint", "handoff",
     "git prune-plan", "git mutation-plan",
 }
 _RUNTIME_TOOL_SURFACE = "--runtime-tool-surface"
@@ -350,6 +350,8 @@ def main():
         return __getattr__("agent_cycle_close").main(sys.argv[2:])
     if len(sys.argv) >= 2 and sys.argv[1] == "close-review":
         return importlib.import_module("tools.agent_cycle_close_review").run(sys.argv[2:])
+    if len(sys.argv) >= 2 and sys.argv[1] == "reflection-eligibility":
+        return importlib.import_module("tools.reflection_eligibility").run(sys.argv[2:])
     try:
         return _run_with_runtime_tool_surfaces(list(sys.argv))
     except RuntimeError as exc:
