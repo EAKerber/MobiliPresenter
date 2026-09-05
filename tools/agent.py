@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from tools import agent_commands as _commands
 from tools import runtime_capabilities, runtime_provider_adapter
+from tools.agent_tools import policy as agent_tool_policy
 from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
@@ -60,25 +61,56 @@ def recent_commits(control_branch):
     return _commands.recent_commits(control_branch)
 
 
-def command_status(as_json):
-    state, view, published = _state_and_publication()
-    payload = {
+def _bootstrap_projection() -> dict:
+    policy = agent_tool_policy.load_policy()
+    entry_profiles = {
+        role: sorted(entries)
+        for role, entries in policy["entryProfiles"].items()
+    }
+    return {
+        "nextSafeAction": "BEGIN_AGENT_CYCLE",
+        "commandTemplate": (
+            "python3 tools/agent.py begin --role <role> --intent <intent> --json"
+        ),
+        "roleContractPattern": "docs/kickstarts/roles/<role>.md",
+        "entryProfiles": entry_profiles,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
+def _status_payload(state, view, published, observed) -> dict:
+    next_transition = view["development"]["nextTransition"]
+    return {
         "project": project_summary(view),
         "projectStateHash": stable_hash(state),
         "published": published,
-        "observedGit": observed_git(),
-        "next": view["development"]["nextTransition"],
+        "observedGit": observed,
+        "next": next_transition,
+        "roadmapNextTransition": next_transition,
+        "bootstrap": _bootstrap_projection(),
     }
+
+
+def command_status(as_json):
+    state, view, published = _state_and_publication()
+    payload = _status_payload(state, view, published, observed_git())
     if as_json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
+        roles = ", ".join(payload["bootstrap"]["entryProfiles"])
         print(
             f"PROJECT\n"
             f"  id: {payload['project']['id']}\n"
             f"  repository: {payload['project']['repository']}\n"
             f"  phase: {payload['project']['phase']}\n"
             f"  checkpoint: {payload['project']['checkpoint']}\n\n"
-            f"NEXT\n  {payload['next']}"
+            f"ROADMAP NEXT\n  {payload['roadmapNextTransition']}\n\n"
+            f"NEXT SAFE ACTION\n"
+            f"  {payload['bootstrap']['nextSafeAction']}\n"
+            f"  {payload['bootstrap']['commandTemplate']}\n"
+            f"  roles: {roles}"
         )
     return 0
 
@@ -192,6 +224,12 @@ def _runtime_surface_base(
 def _run_with_runtime_tool_surfaces(argv: list[str]) -> int:
     clean, surfaces, inventory_complete, observed = _extract_runtime_tool_surfaces(argv)
     if not observed:
+        if (
+            len(clean) >= 2
+            and clean[1] == "status"
+            and all(token == "--json" for token in clean[2:])
+        ):
+            return command_status("--json" in clean)
         return _commands.main()
     base = _runtime_surface_base(
         clean,

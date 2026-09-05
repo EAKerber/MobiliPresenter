@@ -4,36 +4,44 @@ Apresentador modular de mobiliário com composição métrica, câmera fixa e fo
 
 ## Entrada para desenvolvimento por agentes
 
-O estado operacional canônico não deve ser inferido deste README. Após confirmar o repositório ativo, use:
+Este README é uma porta de entrada, não uma authority operacional. O estado corrente deve ser derivado do tooling e das authorities do repositório.
+
+Comece sempre por:
 
 ```bash
 python3 tools/agent.py status
-python3 tools/agent.py doctor
-python3 tools/agent.py verify
 ```
 
-A authority de estado é `ops/state/project.json`. Regras permanentes e transversais para agentes ficam em `AGENTS.md`; regras específicas de papel são localizadas pelos ponteiros correntes em `docs/kickstarts/roles/*-current.md`. Tooling, authorities e contratos observados prevalecem sobre narrativa histórica.
+`status` separa a próxima transição de roadmap da **próxima ação operacional segura** e lista os pares de papel/intenção aceitos pelo bootstrap. Depois, abra um ciclo com um dos pares apresentados:
+
+```bash
+python3 tools/agent.py begin --role <role> --intent <intent> --json
+```
+
+O `begin` materializa um `AgentCycleContext` read-only e inclui `readiness.nextSafeAction`. Essa orientação é derivada: ela pode indicar seleção de intenção/ferramenta, resolução de provider, planejamento ou resolução de autorização, mas nunca autoriza mutação por si só.
+
+Authorities e contratos de entrada:
+
+- estado do projeto: `ops/state/project.json`;
+- regras transversais: `AGENTS.md`;
+- contratos estáveis de papel: `docs/kickstarts/roles/<role>.md`;
+- capabilities, providers e superfícies: derivados pelo tooling e pelo registro semântico;
+- publicação corrente: derivada do manifesto apontado por `ops/state/project.json`.
+
+Não existem ponteiros operacionais `*-current.md` para dados de papel. Não copie checkpoint, branch publicada, versões de runtime ou próxima transição para documentos de bootstrap: esses valores mudam e devem continuar sendo observados da fonte autoritativa.
 
 ## Estado publicado
 
-A publicação corrente é identificada pelo manifesto apontado em `ops/state/project.json`. No baseline atual:
+A publicação corrente é identificada pelo manifesto referenciado em `ops/state/project.json`. Para descobrir release, source branch, source base, fingerprint, build command e publish path atuais, leia a projeção de `status` ou o manifesto apontado pelo ProjectState; não os infira deste README.
 
-- release: **ViewerNext-Preview-2026-08-11**;
-- branch publicada: `main`;
-- URL canônica: **https://mobilipresenter.netlify.app/**;
-- manifesto: `ops/published/viewer-next-current.json`;
-- fonte do build: `scene-core` + `viewer-next`;
-- modo padrão de UI: `renderer-only`;
-- preview dos controles: `?controls=1`.
+A URL canônica do produto também vem do ProjectState. Divergências entre ProjectState, manifesto e observações de publicação devem ser tratadas como problema de coerência, não corrigidas por narrativa neste arquivo.
 
 O requisito de produto permanece **viewer em câmera fixa**, priorizando fidelidade contextual sobre liberdade de navegação 3D.
 
 ## Publicação determinística
 
-O Netlify usa a branch `main`, instala as dependências de `scene-core` e `viewer-next`, executa o build de `viewer-next` e publica `viewer-next/dist`, conforme `netlify.toml` e o manifesto corrente.
-
-`ops/published/viewer-next-current.json` registra a identidade do SourceBuild, incluindo base, paths de fonte, comando de build e publish path. Divergências entre esse manifesto e `ops/state/project.json` devem ser tratadas como erro de coerência operacional.
+A configuração de publicação vive em `netlify.toml` e na authority de SourceBuild indicada pelo ProjectState. O manifesto registra a identidade reproduzível da fonte, incluindo base, paths, comando de build e publish path. Nenhuma branch específica deve ser presumida a partir deste README.
 
 ## Governança Git
 
-Este repositório é exclusivo do projeto MobiliPresenter. Operações em qualquer outro repositório exigem confirmação explícita no chat ativo. `AGENTS.md` contém apenas regras permanentes transversais; procedimentos correntes devem ser descobertos pelo tooling e contratos do repositório, e comportamento específico de papel pelos Kickstarts correntes.
+Este repositório é exclusivo do projeto MobiliPresenter. Operações em qualquer outro repositório exigem confirmação explícita no chat ativo. `AGENTS.md` contém regras permanentes transversais; procedimentos correntes devem ser descobertos pelo tooling e pelas authorities do repositório, e comportamento específico de papel pelos contratos diretos em `docs/kickstarts/roles/*.md`.
