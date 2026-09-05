@@ -62,7 +62,9 @@ HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 COLD_ARCHIVE_BRANCH = "archive/cold"
 COLD_ARCHIVE_INDEX_PATH = "COLD_ARCHIVE.json"
-COLD_ARCHIVE_INDEX_SCHEMA = "ColdArchiveIndex 0.1"
+COLD_ARCHIVE_LEGACY_INDEX_SCHEMA = "ColdArchiveIndex 0.1"
+COLD_ARCHIVE_INDEX_SCHEMA = "ColdArchiveIndex 0.2"
+COLD_ARCHIVE_INDEX_SCHEMAS = {COLD_ARCHIVE_LEGACY_INDEX_SCHEMA, COLD_ARCHIVE_INDEX_SCHEMA}
 COLD_ARCHIVE_INDEX_FIELDS = {"schemaVersion", "repository", "archiveBranch", "controlSha", "entries"}
 COLD_ARCHIVE_ENTRY_FIELDS = {"branch", "headSha", "classification", "evidencePath"}
 COLD_ARCHIVE_DELETE_CLASSES = {
@@ -311,7 +313,10 @@ def observe_cold_archive(
 
     Cold archive is optional evidence. Any malformed index, stale source head,
     non-historical classification, or failed reachability proof yields no
-    delete evidence rather than blocking unrelated sanitation.
+    delete evidence rather than blocking unrelated sanitation. Index 0.1 keeps
+    its legacy one-entry-per-branch rule; cumulative Index 0.2 keys historical
+    identity by (branch, headSha), allowing a branch name to be archived again
+    at a different immutable head.
     """
     archive_head = refs.get(COLD_ARCHIVE_BRANCH)
     if not isinstance(archive_head, str) or not SHA_RE.fullmatch(archive_head):
@@ -325,7 +330,8 @@ def observe_cold_archive(
         return {}
     if not isinstance(index, dict) or set(index) != COLD_ARCHIVE_INDEX_FIELDS:
         return {}
-    if index.get("schemaVersion") != COLD_ARCHIVE_INDEX_SCHEMA:
+    schema = index.get("schemaVersion")
+    if schema not in COLD_ARCHIVE_INDEX_SCHEMAS:
         return {}
     if index.get("repository") != repository or index.get("archiveBranch") != COLD_ARCHIVE_BRANCH:
         return {}
@@ -337,7 +343,7 @@ def observe_cold_archive(
         return {}
 
     validated: list[dict[str, str]] = []
-    seen: set[str] = set()
+    seen: set[Any] = set()
     for item in entries:
         if not isinstance(item, dict) or set(item) != COLD_ARCHIVE_ENTRY_FIELDS:
             return {}
@@ -346,14 +352,17 @@ def observe_cold_archive(
         classification = item.get("classification")
         evidence_path = item.get("evidencePath")
         if (
-            not isinstance(branch, str) or not branch or branch in seen
+            not isinstance(branch, str) or not branch
             or branch in {control_branch, COLD_ARCHIVE_BRANCH}
             or not isinstance(head_sha, str) or not SHA_RE.fullmatch(head_sha)
             or classification not in COLD_ARCHIVE_DELETE_CLASSES
             or not isinstance(evidence_path, str) or not evidence_path
         ):
             return {}
-        seen.add(branch)
+        identity: Any = branch if schema == COLD_ARCHIVE_LEGACY_INDEX_SCHEMA else (branch, head_sha)
+        if identity in seen:
+            return {}
+        seen.add(identity)
         validated.append({
             "branch": branch,
             "headSha": head_sha,
@@ -370,7 +379,6 @@ def observe_cold_archive(
         if reachable:
             evidence[branch] = f"cold-archive:{archive_head}"
     return evidence
-
 
 def ancestry_for_ref(sha: str, control_sha: str) -> str:
     if sha == control_sha:
