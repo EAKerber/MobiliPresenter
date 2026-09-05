@@ -230,6 +230,44 @@ jobs:
             --result /tmp/hosted-result.json
           cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
 
+      - name: Materialize close termination review shadow
+        if: steps.close.outcome == 'success'
+        run: |
+          args=(
+            close-review
+            --context /tmp/agent-cycle-begin/context.json
+            --manifest /tmp/agent-cycle-begin/manifest.json
+            --closure /tmp/agent-cycle-close/closure.json
+            --resources /tmp/agent-cycle-close/agent-cycle-touched-resources.json
+            --inventory /tmp/agent-cycle-close/agent-cycle-obligation-inventory.json
+            --dispositions /tmp/agent-cycle-close/agent-cycle-obligation-dispositions.json
+            --output /tmp/agent-cycle-close/close-review.json
+            --json
+          )
+          for path in /tmp/hosted-evidence/evidence-*.json; do
+            if [ -e "$path" ]; then
+              args+=(--evidence "$path")
+            fi
+          done
+          if ! python tools/agent.py "${args[@]}"; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          value = {
+              "schemaVersion": "AgentCycleCloseReviewShadowDiagnostic 0.1",
+              "status": "UNKNOWN",
+              "reasonCode": "AGENT_CYCLE_CLOSE_REVIEW_MATERIALIZATION_FAILED",
+              "readOnly": True,
+              "semanticAuthority": False,
+              "authorizesMutation": False,
+          }
+          Path('/tmp/agent-cycle-close/close-review.error.json').write_text(
+              json.dumps(value, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          fi
+
       - name: Promote observational close gap
         if: steps.checkout_begin.outcome == 'success' && steps.close.outcome != 'success'
         env:
