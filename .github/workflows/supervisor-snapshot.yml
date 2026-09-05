@@ -33,7 +33,7 @@ jobs:
           python-version: '3.12'
       - name: Snapshot regression tests
         run: |
-          python -m unittest tools.tests.test_routines tools.tests.test_maintenance_inspect tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot tools.tests.test_supervisor_pipeline -v
+          python -m unittest tools.tests.test_routines tools.tests.test_maintenance_inspect tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot tools.tests.test_reflection_eligibility_rq1 tools.tests.test_agent_reflection_eligibility_facade_rq1 tools.tests.test_supervisor_pipeline -v
       - name: Observe source Project Machine
         env:
           GH_TOKEN: ${{ github.token }}
@@ -126,6 +126,17 @@ jobs:
             --readback-machine /tmp/project-machine-readback.json \
             --json > /tmp/scheduler-snapshot-validation.json
           python -m json.tool /tmp/scheduler-snapshot-validation.json > /dev/null
+      - name: Derive Reflection Eligibility
+        run: |
+          python tools/agent.py reflection-eligibility \
+            --snapshot /tmp/scheduler-snapshot.json \
+            --source-machine /tmp/project-machine-source.json \
+            --routines /tmp/routine-inspection.json \
+            --readback-machine /tmp/project-machine-readback.json \
+            --output /tmp/reflection-eligibility.json \
+            --json > /tmp/reflection-eligibility-result.json
+          python -m json.tool /tmp/reflection-eligibility.json > /dev/null
+          python -m json.tool /tmp/reflection-eligibility-result.json > /dev/null
       - name: Upload Supervisor Snapshot
         uses: actions/upload-artifact@v4
         with:
@@ -138,5 +149,6 @@ jobs:
             /tmp/scheduler-snapshot.json
             /tmp/project-machine-readback.json
             /tmp/scheduler-snapshot-validation.json
+            /tmp/reflection-eligibility.json
           if-no-files-found: error
           retention-days: 7
