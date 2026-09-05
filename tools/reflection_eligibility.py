@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 from typing import Any
 
 from tools import maintenance_inspect, scheduler_plan, scheduler_snapshot
@@ -10,13 +12,13 @@ from tools.semantics.actions import OperationalAction
 SCHEMA_VERSION = "ReflectionEligibility 0.1"
 REPOSITORY = scheduler_snapshot.REPOSITORY
 STATUSES = {
-    "OPERATIONAL_PRIORITY",
+    "PRIORITY_OPERATION_REQUIRED",
     "LEGITIMATE_WAIT",
     "INSUFFICIENT_OBSERVATION",
     "REFLECTION_ELIGIBLE",
 }
 NEXT_SAFE_ACTIONS = {
-    "OPERATIONAL_PRIORITY": "HONOR_OPERATIONAL_PRIORITY",
+    "PRIORITY_OPERATION_REQUIRED": "HONOR_OPERATIONAL_PRIORITY",
     "LEGITIMATE_WAIT": "WAIT_OR_REFLECT",
     "INSUFFICIENT_OBSERVATION": "OBSERVE",
     "REFLECTION_ELIGIBLE": "REFLECT",
@@ -53,6 +55,16 @@ FIELDS = {
 }
 
 
+def _load_json(path: str | Path) -> dict[str, Any]:
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("REFLECTION_ELIGIBILITY_INPUT_INVALID") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("REFLECTION_ELIGIBILITY_INPUT_INVALID")
+    return value
+
+
 def _text_or_none(value: Any, code: str) -> str | None:
     if value is None:
         return None
@@ -70,7 +82,7 @@ def _classification(action: str, reason_code: str) -> tuple[str, list[str]]:
         OperationalAction.RECONCILE.value,
         OperationalAction.HANDOFF.value,
     }:
-        return "OPERATIONAL_PRIORITY", [reason_code]
+        return "PRIORITY_OPERATION_REQUIRED", [reason_code]
 
     if action == OperationalAction.CONTINUE.value:
         if reason_code == "NEXT_TRANSITION_AVAILABLE":
@@ -78,7 +90,7 @@ def _classification(action: str, reason_code: str) -> tuple[str, list[str]]:
                 "NEXT_TRANSITION_AVAILABLE",
                 "ROADMAP_DIRECTION_NOT_ASSIGNMENT",
             ]
-        return "OPERATIONAL_PRIORITY", [reason_code]
+        return "PRIORITY_OPERATION_REQUIRED", [reason_code]
 
     if action == OperationalAction.PAUSE.value:
         if reason_code in WAIT_REASON_CODES:
@@ -87,7 +99,7 @@ def _classification(action: str, reason_code: str) -> tuple[str, list[str]]:
 
     if action == OperationalAction.NEEDS_HUMAN.value:
         if reason_code in HUMAN_PRIORITY_CODES:
-            return "OPERATIONAL_PRIORITY", [reason_code]
+            return "PRIORITY_OPERATION_REQUIRED", [reason_code]
         return "INSUFFICIENT_OBSERVATION", [reason_code]
 
     raise RuntimeError("REFLECTION_ELIGIBILITY_ACTION_INVALID")
@@ -132,8 +144,11 @@ def build_inspection(
         focus != "development"
         or work_id is not None
         or plan["dispatch"].get("channelClass") != "supervisor"
+        or plan["dispatch"].get("workId") is not None
     ):
         raise RuntimeError("REFLECTION_ELIGIBILITY_ROADMAP_DIRECTION_INVALID")
+    if status == "LEGITIMATE_WAIT" and work_id is None:
+        raise RuntimeError("REFLECTION_ELIGIBILITY_WAIT_WORK_ID_REQUIRED")
 
     body = {
         "schemaVersion": SCHEMA_VERSION,
@@ -181,8 +196,21 @@ def validate_inspection(value: Any) -> dict[str, Any]:
         raise RuntimeError("REFLECTION_ELIGIBILITY_NEXT_ACTION_MISMATCH")
     if value.get("reasonCodes") != sorted(set(reasons)):
         raise RuntimeError("REFLECTION_ELIGIBILITY_REASONS_MISMATCH")
-    _text_or_none(value.get("focus"), "REFLECTION_ELIGIBILITY_FOCUS_INVALID")
-    _text_or_none(value.get("workId"), "REFLECTION_ELIGIBILITY_WORK_ID_INVALID")
+    focus = _text_or_none(
+        value.get("focus"), "REFLECTION_ELIGIBILITY_FOCUS_INVALID"
+    )
+    work_id = _text_or_none(
+        value.get("workId"), "REFLECTION_ELIGIBILITY_WORK_ID_INVALID"
+    )
+    if status == "REFLECTION_ELIGIBLE" and (
+        action != OperationalAction.CONTINUE.value
+        or reason_code != "NEXT_TRANSITION_AVAILABLE"
+        or focus != "development"
+        or work_id is not None
+    ):
+        raise RuntimeError("REFLECTION_ELIGIBILITY_ROADMAP_DIRECTION_INVALID")
+    if status == "LEGITIMATE_WAIT" and work_id is None:
+        raise RuntimeError("REFLECTION_ELIGIBILITY_WAIT_WORK_ID_REQUIRED")
     if (
         value.get("decisionScope") != "reflection-eligibility-only"
         or value.get("readOnly") is not True
@@ -235,3 +263,41 @@ def validate_derivation(
     if value != expected:
         raise RuntimeError("REFLECTION_ELIGIBILITY_DERIVATION_MISMATCH")
     return value
+
+
+def run(argv: list[str] | None = None) -> int:
+    # tools/agent.py is the public entrypoint. Importing the parser this way keeps
+    # this module a helper rather than a second OperationalSemantics entrypoint.
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(prog="agent reflection-eligibility")
+    parser.add_argument("--snapshot", required=True)
+    parser.add_argument("--source-machine", required=True)
+    parser.add_argument("--routines", required=True)
+    parser.add_argument("--readback-machine", required=True)
+    parser.add_argument("--output")
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args(argv)
+    try:
+        snapshot = _load_json(args.snapshot)
+        source_machine = _load_json(args.source_machine)
+        routine_inspection = _load_json(args.routines)
+        readback_machine = _load_json(args.readback_machine)
+        value = build_inspection(
+            snapshot,
+            source_machine=source_machine,
+            routine_inspection=routine_inspection,
+            readback_machine=readback_machine,
+        )
+        if args.output:
+            Path(args.output).write_text(
+                json.dumps(value, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        print(
+            json.dumps(value, indent=2 if args.as_json else None, ensure_ascii=False)
+        )
+        return 0
+    except RuntimeError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+        return 2
