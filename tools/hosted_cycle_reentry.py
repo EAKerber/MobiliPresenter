@@ -1,8 +1,9 @@
 """Read-only Recovery & Re-entry classification for one canonical Work item.
 
 This projection composes the canonical Work authority, the Work-bound Hosted
-cycle lineage, and exact Hosted close transport records. It does not mutate
-Work, replay operations, take over peer identity, or authorize any action.
+cycle lineage, exact Hosted close transport records, and a deterministic active
+frontier. It does not mutate Work, replay operations, take over peer identity,
+or authorize any action.
 """
 from __future__ import annotations
 
@@ -13,12 +14,13 @@ from tools import agent_failure
 from tools import continuation
 from tools import hosted_agent_cycle
 from tools import hosted_agent_cycle_waiting
+from tools import hosted_cycle_frontier
 from tools import hosted_cycle_handle
 from tools import hosted_cycle_lineage
 from tools import hosted_cycle_records
 from tools.canonical import stable_hash
 
-SCHEMA = "HostedCycleReentryInspection 0.1"
+SCHEMA = "HostedCycleReentryInspection 0.2"
 STATES = {
     "CLEAN_REENTRY",
     "LEGITIMATE_WAIT",
@@ -46,12 +48,12 @@ OUTCOME_STATES = {
 FIELDS = {
     "schemaVersion", "workRef", "workAuthorityHead", "workStateHash",
     "lineageHash", "workStatus", "state", "reasonCodes", "nextSafeAction",
-    "targetCycle", "cycleOutcomes", "readOnly", "semanticAuthority",
-    "authorizesMutation", "inspectionHash",
+    "targetCycle", "cycleOutcomes", "cycleFrontier", "readOnly",
+    "semanticAuthority", "authorizesMutation", "inspectionHash",
 }
 OUTCOME_FIELDS = {
-    "cycleInstanceId", "state", "closeRequestCommentId", "resultCommentIds",
-    "resultHash", "reasonCodes",
+    "cycleInstanceId", "beginRequestCommentId", "state", "closeRequestCommentId",
+    "resultCommentIds", "resultHash", "reasonCodes",
 }
 CLOSE_RESULT_FIELDS = {
     "schemaVersion", "requestId", "commandHash", "runId", "sourceSha",
@@ -245,12 +247,22 @@ def _normalize_result(
     return None
 
 
+def _base_outcome(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "cycleInstanceId": candidate["cycleInstanceId"],
+        "beginRequestCommentId": _positive_int(
+            candidate.get("requestCommentId"), "HOSTED_CYCLE_REENTRY_BEGIN_COMMENT_INVALID"
+        ),
+    }
+
+
 def _outcome_for_candidate(
     comments: list[dict[str, Any]],
     *,
     candidate: dict[str, Any],
     issue_number: int,
 ) -> dict[str, Any]:
+    base = _base_outcome(candidate)
     close = _first_close_request(
         comments,
         candidate=candidate,
@@ -258,7 +270,7 @@ def _outcome_for_candidate(
     )
     if close is None:
         return {
-            "cycleInstanceId": candidate["cycleInstanceId"],
+            **base,
             "state": "OPEN",
             "closeRequestCommentId": None,
             "resultCommentIds": [],
@@ -288,7 +300,7 @@ def _outcome_for_candidate(
         matches.append((cid, state, result_hash, reasons))
     if not matches:
         return {
-            "cycleInstanceId": candidate["cycleInstanceId"],
+            **base,
             "state": "PENDING_CLOSE_RESULT",
             "closeRequestCommentId": close_comment_id,
             "resultCommentIds": [],
@@ -298,7 +310,7 @@ def _outcome_for_candidate(
     identities = {(state, digest) for _, state, digest, _ in matches}
     if len(identities) != 1:
         return {
-            "cycleInstanceId": candidate["cycleInstanceId"],
+            **base,
             "state": "AMBIGUOUS_CLOSE_RESULT",
             "closeRequestCommentId": close_comment_id,
             "resultCommentIds": [cid for cid, *_ in matches],
@@ -310,7 +322,7 @@ def _outcome_for_candidate(
     for _, _, _, items in matches:
         reasons.update(items)
     return {
-        "cycleInstanceId": candidate["cycleInstanceId"],
+        **base,
         "state": state,
         "closeRequestCommentId": close_comment_id,
         "resultCommentIds": [cid for cid, *_ in matches],
@@ -328,57 +340,9 @@ def _target(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
-def _classify(
-    *,
-    work: dict[str, Any],
-    lineage: dict[str, Any],
-    outcomes: list[dict[str, Any]],
+def _classify_active(
+    candidate: dict[str, Any], outcome: dict[str, Any]
 ) -> tuple[str, str, list[str], dict[str, Any] | None]:
-    status = work["status"]
-    if status == "WAITING":
-        return "LEGITIMATE_WAIT", "WAIT", ["WORK_WAITING"], None
-    if status == "HANDOFF":
-        return "PRIORITY_OPERATION_REQUIRED", "HONOR_HANDOFF", ["WORK_HANDOFF"], None
-
-    pending = lineage["pendingRequests"]
-    if pending:
-        return (
-            "INSUFFICIENT_OBSERVATION",
-            "OBSERVE",
-            ["HOSTED_BEGIN_PENDING"],
-            None,
-        )
-    if lineage["ambiguous"]:
-        return (
-            "INSUFFICIENT_OBSERVATION",
-            "OBSERVE",
-            ["HOSTED_CYCLE_LINEAGE_AMBIGUOUS"],
-            None,
-        )
-
-    if status == "DONE":
-        nonterminal = [item for item in outcomes if item["state"] != "PASS"]
-        if nonterminal:
-            return (
-                "INSUFFICIENT_OBSERVATION",
-                "OBSERVE",
-                ["WORK_DONE_WITH_NONTERMINAL_CYCLE"],
-                None,
-            )
-        return "NO_REENTRY_REQUIRED", "NONE", ["WORK_DONE"], None
-
-    candidates = lineage["candidates"]
-    if not candidates:
-        return "CLEAN_REENTRY", "BEGIN_NEW_CYCLE", ["NO_MATERIALIZED_CYCLE"], None
-    if len(candidates) != 1 or len(outcomes) != 1:
-        return (
-            "INSUFFICIENT_OBSERVATION",
-            "OBSERVE",
-            ["HOSTED_CYCLE_LINEAGE_AMBIGUOUS"],
-            None,
-        )
-
-    candidate, outcome = candidates[0], outcomes[0]
     state = outcome["state"]
     if state == "OPEN":
         return (
@@ -387,8 +351,6 @@ def _classify(
             ["EXACT_RESUMABLE_CYCLE"],
             _target(candidate),
         )
-    if state == "PASS":
-        return "CLEAN_REENTRY", "BEGIN_NEW_CYCLE", ["PREVIOUS_CYCLE_CLOSED"], None
     if state == "WAITING":
         return (
             "LEGITIMATE_WAIT",
@@ -409,6 +371,67 @@ def _classify(
         list(outcome["reasonCodes"] or ["HOSTED_CYCLE_OUTCOME_UNKNOWN"]),
         _target(candidate),
     )
+
+
+def _classify(
+    *,
+    work: dict[str, Any],
+    lineage: dict[str, Any],
+    outcomes: list[dict[str, Any]],
+    frontier: dict[str, Any],
+) -> tuple[str, str, list[str], dict[str, Any] | None]:
+    status = work["status"]
+    if status == "WAITING":
+        return "LEGITIMATE_WAIT", "WAIT", ["WORK_WAITING"], None
+    if status == "HANDOFF":
+        return "PRIORITY_OPERATION_REQUIRED", "HONOR_HANDOFF", ["WORK_HANDOFF"], None
+
+    if lineage["pendingRequests"]:
+        return (
+            "INSUFFICIENT_OBSERVATION",
+            "OBSERVE",
+            ["HOSTED_BEGIN_PENDING"],
+            None,
+        )
+
+    active_ids = frontier["activeCycleIds"]
+    if status == "DONE":
+        if active_ids:
+            return (
+                "INSUFFICIENT_OBSERVATION",
+                "OBSERVE",
+                ["WORK_DONE_WITH_NONTERMINAL_CYCLE"],
+                None,
+            )
+        return "NO_REENTRY_REQUIRED", "NONE", ["WORK_DONE"], None
+
+    if frontier["state"] == "CONCURRENT":
+        return (
+            "INSUFFICIENT_OBSERVATION",
+            "OBSERVE",
+            ["HOSTED_CYCLE_LINEAGE_AMBIGUOUS"],
+            None,
+        )
+    if frontier["state"] == "SUCCESSION_UNPROVEN":
+        return (
+            "INSUFFICIENT_OBSERVATION",
+            "OBSERVE",
+            ["HOSTED_CYCLE_SUCCESSION_UNPROVEN"],
+            None,
+        )
+    if frontier["state"] == "NONE":
+        if not lineage["candidates"]:
+            return "CLEAN_REENTRY", "BEGIN_NEW_CYCLE", ["NO_MATERIALIZED_CYCLE"], None
+        return "CLEAN_REENTRY", "BEGIN_NEW_CYCLE", ["PREVIOUS_CYCLE_CLOSED"], None
+
+    active_id = active_ids[0]
+    candidates = {item["cycleInstanceId"]: item for item in lineage["candidates"]}
+    outcome_by_id = {item["cycleInstanceId"]: item for item in outcomes}
+    candidate = candidates.get(active_id)
+    outcome = outcome_by_id.get(active_id)
+    if candidate is None or outcome is None:
+        raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_BINDING_MISMATCH")
+    return _classify_active(candidate, outcome)
 
 
 def inspect_reentry(
@@ -434,10 +457,15 @@ def inspect_reentry(
         for item in lineage["candidates"]
     ]
     outcomes.sort(key=lambda item: item["cycleInstanceId"])
+    try:
+        frontier = hosted_cycle_frontier.build_frontier(outcomes)
+    except RuntimeError as exc:
+        raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_INVALID") from exc
     state, action, reasons, target = _classify(
         work=work,
         lineage=lineage,
         outcomes=outcomes,
+        frontier=frontier,
     )
     core = {
         "schemaVersion": SCHEMA,
@@ -451,6 +479,7 @@ def inspect_reentry(
         "nextSafeAction": action,
         "targetCycle": target,
         "cycleOutcomes": outcomes,
+        "cycleFrontier": frontier,
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -464,6 +493,7 @@ def _validate_outcome(value: Any) -> dict[str, Any]:
     cycle_id = value.get("cycleInstanceId")
     if not isinstance(cycle_id, str) or hosted_agent_cycle.CYCLE_INSTANCE_RE.fullmatch(cycle_id) is None:
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOME_INVALID")
+    _positive_int(value.get("beginRequestCommentId"), "HOSTED_CYCLE_REENTRY_OUTCOME_INVALID")
     if value.get("state") not in OUTCOME_STATES:
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOME_INVALID")
     close_id = value.get("closeRequestCommentId")
@@ -495,6 +525,24 @@ def _validate_outcome(value: Any) -> dict[str, Any]:
     ):
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOME_BINDING_INVALID")
     return value
+
+
+def _validate_frontier_bindings(
+    frontier: dict[str, Any], outcomes: list[dict[str, Any]]
+) -> None:
+    by_id = {item["cycleInstanceId"]: item for item in outcomes}
+    terminal = sorted(item["cycleInstanceId"] for item in outcomes if item["state"] == "PASS")
+    active = sorted(item["cycleInstanceId"] for item in outcomes if item["state"] != "PASS")
+    if frontier["terminalCycleIds"] != terminal or frontier["activeCycleIds"] != active:
+        raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_BINDING_MISMATCH")
+    for evidence in frontier["successionEvidence"]:
+        terminal_outcome = by_id[evidence["terminalCycleInstanceId"]]
+        active_outcome = by_id[evidence["activeCycleInstanceId"]]
+        if (
+            evidence["terminalResultCommentId"] != max(terminal_outcome["resultCommentIds"])
+            or evidence["activeBeginCommentId"] != active_outcome["beginRequestCommentId"]
+        ):
+            raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_EVIDENCE_MISMATCH")
 
 
 def validate_reentry(value: Any) -> dict[str, Any]:
@@ -535,6 +583,12 @@ def validate_reentry(value: Any) -> dict[str, Any]:
     cycle_ids = [item["cycleInstanceId"] for item in outcomes]
     if cycle_ids != sorted(set(cycle_ids)):
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOMES_INVALID")
+    try:
+        frontier = hosted_cycle_frontier.validate_frontier(value.get("cycleFrontier"))
+    except RuntimeError as exc:
+        raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_INVALID") from exc
+    _validate_frontier_bindings(frontier, outcomes)
+
     target = value.get("targetCycle")
     if target is not None:
         if not isinstance(target, dict) or set(target) != {"cycleInstanceId", "handle"}:
@@ -547,7 +601,7 @@ def validate_reentry(value: Any) -> dict[str, Any]:
             raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_TARGET_INVALID") from exc
         if handle.get("cycleInstanceId") != target.get("cycleInstanceId"):
             raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_TARGET_INVALID")
-        if target["cycleInstanceId"] not in set(cycle_ids):
+        if target["cycleInstanceId"] not in set(frontier["activeCycleIds"]):
             raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_TARGET_INVALID")
     if value["nextSafeAction"] == "RESUME_EXACT_CYCLE" and target is None:
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_TARGET_REQUIRED")
