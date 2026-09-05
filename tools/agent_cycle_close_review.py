@@ -341,7 +341,11 @@ def validate_review(value: Any) -> dict[str, Any]:
         ):
             raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
         assessment_hash = item.get("assessmentHash")
-        body = {key: copy.deepcopy(entry) for key, entry in item.items() if key != "assessmentHash"}
+        body = {
+            key: copy.deepcopy(entry)
+            for key, entry in item.items()
+            if key != "assessmentHash"
+        }
         if assessment_hash != stable_hash(body):
             raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_HASH_MISMATCH")
         hashes.append(item["obligationHash"])
@@ -350,7 +354,10 @@ def validate_review(value: Any) -> dict[str, Any]:
     summary = value.get("summary")
     if not isinstance(summary, dict) or set(summary) != SUMMARY_FIELDS:
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_SUMMARY_INVALID")
-    if any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in summary.values()):
+    if any(
+        not isinstance(item, int) or isinstance(item, bool) or item < 0
+        for item in summary.values()
+    ):
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_SUMMARY_INVALID")
     reasons = value.get("reasonCodes")
     if (
@@ -359,7 +366,11 @@ def validate_review(value: Any) -> dict[str, Any]:
         or any(not isinstance(item, str) or not item for item in reasons)
     ):
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_REASONS_INVALID")
-    body = {key: copy.deepcopy(item) for key, item in value.items() if key != "reviewHash"}
+    body = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "reviewHash"
+    }
     if value.get("reviewHash") != stable_hash(body):
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_HASH_MISMATCH")
     return value
@@ -386,10 +397,12 @@ def review_from_files(
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    import argparse
+def run(argv: list[str] | None = None) -> int:
+    # The stable public entrypoint is tools/agent.py. Keeping the parser here
+    # behind that facade avoids creating a second operational entrypoint.
+    from argparse import ArgumentParser
 
-    parser = argparse.ArgumentParser(prog="agent close-review")
+    parser = ArgumentParser(prog="agent close-review")
     parser.add_argument("--context", required=True)
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--closure", required=True)
@@ -437,7 +450,3 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"BLOCKED\n{exc}")
         return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
