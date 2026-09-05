@@ -205,7 +205,6 @@ class HostedCycleLineageR0Tests(unittest.TestCase):
         core = {key: copy.deepcopy(item) for key, item in payload.items() if key != "resultHash"}
         payload["resultHash"] = stable_hash(core)
         other_result["body"] = hosted.RESULT_MARKER + "\n" + json.dumps(payload)
-
         lineage = hosted_cycle_lineage.build_work_lineage(
             [other_request, other_result, target_request, target_result],
             work_ref={"workId": WORK_ID}, issue_number=ISSUE_NUMBER,
@@ -242,6 +241,17 @@ class HostedCycleLineageR0Tests(unittest.TestCase):
         )
         self.assertEqual(1, len(lineage["candidates"]))
         self.assertEqual([2001, 2009], lineage["candidates"][0]["resultCommentIds"])
+
+    def test_rehashed_lineage_cannot_hide_candidate_binding_drift(self):
+        _, request, result = _pair()
+        lineage = hosted_cycle_lineage.build_work_lineage(
+            [request, result], work_ref={"workId": WORK_ID}, issue_number=ISSUE_NUMBER
+        )
+        lineage["candidates"][0]["sourceSha"] = "f" * 40
+        core = {key: copy.deepcopy(item) for key, item in lineage.items() if key != "lineageHash"}
+        lineage["lineageHash"] = stable_hash(core)
+        with self.assertRaisesRegex(RuntimeError, "HOSTED_CYCLE_LINEAGE_CANDIDATE_BINDING_MISMATCH"):
+            hosted_cycle_lineage.validate_work_lineage(lineage)
 
     def test_lineage_hash_tamper_is_rejected(self):
         _, request, result = _pair()
