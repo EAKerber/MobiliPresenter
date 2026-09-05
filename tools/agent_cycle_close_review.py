@@ -35,6 +35,7 @@ FIELDS = {
     "dispositionSetHash",
     "coverage",
     "closureStatus",
+    "closureBlockers",
     "mutationReadback",
     "obligations",
     "summary",
@@ -88,6 +89,16 @@ def _canonical_reasons(values: list[str]) -> list[str]:
     return sorted(set(values))
 
 
+def _reason_list(value: Any, code: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or value != sorted(set(value))
+        or any(not isinstance(item, str) or not item for item in value)
+    ):
+        raise RuntimeError(code)
+    return value
+
+
 def _classify_work(disposition: dict[str, Any]) -> tuple[str, list[str]]:
     if disposition["observationStatus"] == "UNKNOWN":
         return "UNKNOWN", list(disposition["reasonCodes"])
@@ -131,18 +142,23 @@ def _classify_lifecycle(disposition: dict[str, Any]) -> tuple[str, list[str]]:
     return "UNKNOWN", ["AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE"]
 
 
+def _classify(
+    kind: str, disposition: dict[str, Any]
+) -> tuple[str, list[str]]:
+    if kind == "work-disposition":
+        return _classify_work(disposition)
+    if kind == "git-branch-disposition":
+        return _classify_git(disposition)
+    if kind == "write-lifecycle-disposition":
+        return _classify_lifecycle(disposition)
+    raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_KIND_UNSUPPORTED")
+
+
 def _assess_obligation(
     obligation: dict[str, Any], disposition: dict[str, Any]
 ) -> dict[str, Any]:
     kind = obligation["kind"]
-    if kind == "work-disposition":
-        outcome, reasons = _classify_work(disposition)
-    elif kind == "git-branch-disposition":
-        outcome, reasons = _classify_git(disposition)
-    elif kind == "write-lifecycle-disposition":
-        outcome, reasons = _classify_lifecycle(disposition)
-    else:
-        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_KIND_UNSUPPORTED")
+    outcome, reasons = _classify(kind, disposition)
     body = {
         "obligationHash": obligation["obligationHash"],
         "kind": kind,
@@ -193,6 +209,48 @@ def _status(
     if any(item["outcome"] == "CARRIED_FORWARD" for item in obligations):
         return "CARRIED_FORWARD"
     return "CLEAN_TERMINATION"
+
+
+def _summary(
+    obligations: list[dict[str, Any]], mutation_readback: dict[str, Any]
+) -> dict[str, int]:
+    durable_count = len(mutation_readback["coveredDurableChanges"]) + len(
+        mutation_readback["uncoveredDurableChanges"]
+    )
+    return {
+        "obligationCount": len(obligations),
+        "dischargedCount": sum(item["outcome"] == "DISCHARGED" for item in obligations),
+        "carriedForwardCount": sum(
+            item["outcome"] == "CARRIED_FORWARD" for item in obligations
+        ),
+        "outstandingCount": sum(item["outcome"] == "OUTSTANDING" for item in obligations),
+        "unknownCount": sum(item["outcome"] == "UNKNOWN" for item in obligations),
+        "handoffCount": sum(
+            item["kind"] == "work-disposition"
+            and item["domainState"].get("status") == "HANDOFF"
+            for item in obligations
+        ),
+        "durableChangeCount": durable_count,
+        "uncoveredDurableChangeCount": len(
+            mutation_readback["uncoveredDurableChanges"]
+        ),
+    }
+
+
+def _review_reasons(
+    coverage: dict[str, Any],
+    closure_blockers: list[str],
+    obligations: list[dict[str, Any]],
+) -> list[str]:
+    reasons = list(closure_blockers)
+    if coverage.get("status") != "PASS":
+        reason = coverage.get("reasonCode")
+        if isinstance(reason, str) and reason:
+            reasons.append(reason)
+    for item in obligations:
+        if item["outcome"] != "DISCHARGED":
+            reasons.extend(item["reasonCodes"])
+    return _canonical_reasons(reasons)
 
 
 def build_review(
@@ -247,37 +305,13 @@ def build_review(
         for key in sorted(obligations_by_hash)
     ]
     mutation = _mutation_readback(closure)
+    closure_blockers = copy.deepcopy(closure["receipt"].get("blockers") or [])
     status = _status(
         closure_status=closure["status"],
         coverage=disposition_set["coverage"],
         obligations=assessed,
         mutation_readback=mutation,
     )
-
-    reasons: list[str] = []
-    if disposition_set["coverage"].get("status") != "PASS":
-        reason = disposition_set["coverage"].get("reasonCode")
-        if isinstance(reason, str) and reason:
-            reasons.append(reason)
-    reasons.extend(closure["receipt"].get("blockers") or [])
-    for item in assessed:
-        if item["outcome"] != "DISCHARGED":
-            reasons.extend(item["reasonCodes"])
-
-    summary = {
-        "obligationCount": len(assessed),
-        "dischargedCount": sum(item["outcome"] == "DISCHARGED" for item in assessed),
-        "carriedForwardCount": sum(item["outcome"] == "CARRIED_FORWARD" for item in assessed),
-        "outstandingCount": sum(item["outcome"] == "OUTSTANDING" for item in assessed),
-        "unknownCount": sum(item["outcome"] == "UNKNOWN" for item in assessed),
-        "handoffCount": sum(
-            item["kind"] == "work-disposition"
-            and item["domainState"].get("status") == "HANDOFF"
-            for item in assessed
-        ),
-        "durableChangeCount": len(closure["receipt"]["delta"]["durableChanges"]),
-        "uncoveredDurableChangeCount": len(mutation["uncoveredDurableChanges"]),
-    }
     body = {
         "schemaVersion": SCHEMA_VERSION,
         "repository": context["repository"],
@@ -291,11 +325,14 @@ def build_review(
         "dispositionSetHash": disposition_set["dispositionSetHash"],
         "coverage": copy.deepcopy(disposition_set["coverage"]),
         "closureStatus": closure["status"],
+        "closureBlockers": closure_blockers,
         "mutationReadback": mutation,
         "obligations": assessed,
-        "summary": summary,
+        "summary": _summary(assessed, mutation),
         "status": status,
-        "reasonCodes": _canonical_reasons(reasons),
+        "reasonCodes": _review_reasons(
+            disposition_set["coverage"], closure_blockers, assessed
+        ),
         "cleanTerminationProven": status == "CLEAN_TERMINATION",
         "readOnly": True,
         "semanticAuthority": False,
@@ -306,6 +343,78 @@ def build_review(
     return value
 
 
+def _validate_mutation_readback(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != MUTATION_READBACK_FIELDS:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    if type(value.get("required")) is not bool:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    if value.get("status") not in {"PASS", "UNKNOWN"}:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    count = value.get("evidenceCount")
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    covered = value.get("coveredDurableChanges")
+    uncovered = value.get("uncoveredDurableChanges")
+    for items in (covered, uncovered):
+        if (
+            not isinstance(items, list)
+            or len(items) != len(set(items))
+            or any(not isinstance(item, str) or not item for item in items)
+        ):
+            raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    if set(covered) & set(uncovered):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    if value["required"] is not bool(covered or uncovered):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    if value["status"] != ("UNKNOWN" if uncovered else "PASS"):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    digest = value.get("readbackHash")
+    if not isinstance(digest, str) or agent_cycle_resources.HASH_RE.fullmatch(digest) is None:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    return value
+
+
+def _validate_assessment(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict) or set(item) != OBLIGATION_FIELDS:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
+    kind = item.get("kind")
+    if item.get("outcome") not in OUTCOMES:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
+    reasons = _reason_list(
+        item.get("reasonCodes"), "AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID"
+    )
+    try:
+        obligation = agent_cycle_obligations.obligation(kind, item.get("locator"))
+    except RuntimeError as exc:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID") from exc
+    if obligation["obligationHash"] != item.get("obligationHash"):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
+    observation_status = item.get("observationStatus")
+    source_reasons = [] if observation_status == "PASS" else reasons
+    try:
+        disposition = agent_cycle_obligations.disposition(
+            obligation,
+            observation_status=observation_status,
+            reason_codes=source_reasons,
+            domain_state=item.get("domainState"),
+        )
+    except RuntimeError as exc:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID") from exc
+    if disposition["dispositionHash"] != item.get("dispositionHash"):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_DISPOSITION_HASH_MISMATCH")
+    expected_outcome, expected_reasons = _classify(kind, disposition)
+    if item["outcome"] != expected_outcome or reasons != _canonical_reasons(expected_reasons):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_ASSESSMENT_MISMATCH")
+    body = {
+        key: copy.deepcopy(entry)
+        for key, entry in item.items()
+        if key != "assessmentHash"
+    }
+    if item.get("assessmentHash") != stable_hash(body):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_HASH_MISMATCH")
+    return item
+
+
 def validate_review(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != FIELDS:
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_FIELDS_INVALID")
@@ -313,59 +422,63 @@ def validate_review(value: Any) -> dict[str, Any]:
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_SCHEMA_INVALID")
     if value.get("status") not in STATUSES:
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_STATUS_INVALID")
+    if value.get("closureStatus") not in agent_cycle_close.RECEIPT_STATUSES:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_CLOSURE_STATUS_INVALID")
+    closure_blockers = _reason_list(
+        value.get("closureBlockers"), "AGENT_CYCLE_CLOSE_REVIEW_BLOCKERS_INVALID"
+    )
     if (
-        value.get("cleanTerminationProven") is not (value["status"] == "CLEAN_TERMINATION")
-        or value.get("readOnly") is not True
+        value.get("readOnly") is not True
         or value.get("semanticAuthority") is not False
         or value.get("authorizesMutation") is not False
     ):
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_AUTHORITY_INVALID")
-    agent_cycle_resources.validate_coverage(value.get("coverage"))
-    mutation = value.get("mutationReadback")
-    if not isinstance(mutation, dict) or set(mutation) != MUTATION_READBACK_FIELDS:
-        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_MUTATION_READBACK_INVALID")
+    coverage = agent_cycle_resources.validate_coverage(value.get("coverage"))
+    mutation = _validate_mutation_readback(value.get("mutationReadback"))
     obligations = value.get("obligations")
     if not isinstance(obligations, list):
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATIONS_INVALID")
-    hashes: list[str] = []
-    for item in obligations:
-        if not isinstance(item, dict) or set(item) != OBLIGATION_FIELDS:
-            raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
-        if item.get("outcome") not in OUTCOMES:
-            raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
-        reasons = item.get("reasonCodes")
-        if (
-            not isinstance(reasons, list)
-            or reasons != sorted(set(reasons))
-            or any(not isinstance(reason, str) or not reason for reason in reasons)
-        ):
-            raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_INVALID")
-        assessment_hash = item.get("assessmentHash")
-        body = {
-            key: copy.deepcopy(entry)
-            for key, entry in item.items()
-            if key != "assessmentHash"
-        }
-        if assessment_hash != stable_hash(body):
-            raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATION_HASH_MISMATCH")
-        hashes.append(item["obligationHash"])
+    checked = [copy.deepcopy(_validate_assessment(item)) for item in obligations]
+    hashes = [item["obligationHash"] for item in checked]
     if hashes != sorted(hashes) or len(hashes) != len(set(hashes)):
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_OBLIGATIONS_NOT_CANONICAL")
-    summary = value.get("summary")
-    if not isinstance(summary, dict) or set(summary) != SUMMARY_FIELDS:
+
+    expected_summary = _summary(checked, mutation)
+    if value.get("summary") != expected_summary:
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_SUMMARY_INVALID")
-    if any(
-        not isinstance(item, int) or isinstance(item, bool) or item < 0
-        for item in summary.values()
+    expected_status = _status(
+        closure_status=value["closureStatus"],
+        coverage=coverage,
+        obligations=checked,
+        mutation_readback=mutation,
+    )
+    if value["status"] != expected_status:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_STATUS_MISMATCH")
+    if value.get("cleanTerminationProven") is not (
+        expected_status == "CLEAN_TERMINATION"
     ):
-        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_SUMMARY_INVALID")
-    reasons = value.get("reasonCodes")
-    if (
-        not isinstance(reasons, list)
-        or reasons != sorted(set(reasons))
-        or any(not isinstance(item, str) or not item for item in reasons)
-    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_AUTHORITY_INVALID")
+    expected_reasons = _review_reasons(coverage, closure_blockers, checked)
+    if value.get("reasonCodes") != expected_reasons:
         raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_REASONS_INVALID")
+
+    for field in (
+        "contextHash",
+        "closureHash",
+        "receiptHash",
+        "resourceSetHash",
+        "inventoryHash",
+        "dispositionSetHash",
+    ):
+        digest = value.get(field)
+        if not isinstance(digest, str) or agent_cycle_resources.HASH_RE.fullmatch(digest) is None:
+            raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_BINDING_HASH_INVALID")
+    cycle_instance_id = value.get("cycleInstanceId")
+    if (
+        not isinstance(cycle_instance_id, str)
+        or agent_cycle_resources.CYCLE_RE.fullmatch(cycle_instance_id) is None
+    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_REVIEW_CYCLE_INSTANCE_INVALID")
     body = {
         key: copy.deepcopy(item)
         for key, item in value.items()
