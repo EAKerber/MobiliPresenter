@@ -2,7 +2,7 @@
 """Pure cross-authority coherence for ProjectMachineInspection."""
 from __future__ import annotations
 import json
-from tools import work_graph
+from tools import project_ci_observation,work_graph
 from tools.semantics.branches import parse_branch_name
 from tools.semantics.observation import ObservationStatus
 
@@ -54,6 +54,15 @@ def _pr_classification_check(project,sensors,scope):
     if unclassified and not work_available:return coherence_check("pull-requests.classification","UNKNOWN","WORK_AUTHORITY_UNAVAILABLE_FOR_PR_CLASSIFICATION",["continuations","github-pull-requests"],required=required,detail={"items":items,"unclassified":unclassified})
     if unclassified:return coherence_check("pull-requests.classification","FAIL","UNCLASSIFIED_OPEN_PR",["continuations","github-pull-requests"],required=required,detail={"items":items,"unclassified":unclassified})
     return coherence_check("pull-requests.classification","PASS","OPEN_PRS_CLASSIFIED",["continuations","github-pull-requests"],required=required,detail={"items":items})
+def _pr_ci_observation_check(sensors):
+    try:projection=project_ci_observation.build(sensors.get("pullRequests"))
+    except RuntimeError as exc:return coherence_check("pull-requests.ci-observation","FAIL","PR_CI_EVIDENCE_INVALID",["github-pull-requests"],required=False,detail={"error":getattr(exc,"code",str(exc).split(":",1)[0])})
+    state=projection["state"]
+    if state in {"NOT_APPLICABLE","GREEN"}:status="PASS";code="NO_OPEN_PRS" if state=="NOT_APPLICABLE" else "PR_CI_GREEN"
+    elif state=="FAILED":status="FAIL";code="PR_CI_FAILED"
+    elif state=="PENDING":status="UNKNOWN";code="PR_CI_PENDING"
+    else:status="UNKNOWN";code="PR_CI_OBSERVATION_INCOMPLETE"
+    return coherence_check("pull-requests.ci-observation",status,code,["github-pull-requests"],required=False,detail=projection)
 def _lease_pr_check(sensors,scope):
     required=scope in {"base","live"};coordination=_data(sensors,"coordination")
     if coordination.get("available") is not True:return coherence_check("coordination.lease.pr","UNKNOWN","COORDINATION_AUTHORITY_UNAVAILABLE",["coordination","github-pull-requests"],required=required)
@@ -96,4 +105,4 @@ def _work_pr_checks(project,sensors,scope):
     return [open_check,head_check,base_check]
 def evaluate_coherence(project,sensors,*,scope):
     if scope not in {"local","base","live"}:raise RuntimeError("PROJECT_COHERENCE_SCOPE_INVALID")
-    checks=[_pr_classification_check(project,sensors,scope),_lease_pr_check(sensors,scope),*_work_pr_checks(project,sensors,scope)];return aggregate_coherence(checks)
+    checks=[_pr_classification_check(project,sensors,scope),_pr_ci_observation_check(sensors),_lease_pr_check(sensors,scope),*_work_pr_checks(project,sensors,scope)];return aggregate_coherence(checks)
