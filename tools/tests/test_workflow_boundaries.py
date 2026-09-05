@@ -70,6 +70,21 @@ class WorkflowBoundaryTests(unittest.TestCase):
         self.assertIn("name: agent-tool-${{ github.event.workflow_run.id }}",remote)
         self.assertIn("run-id: ${{ github.event.workflow_run.id }}",remote)
         self.assertGreaterEqual(remote.count('--hosted-run-id "$HOSTED_RUN_ID"'),2)
+    def test_privileged_dispatch_hosts_preserve_evidence_before_fail_closed_gate(self):
+        cases=(
+            ("remote-canonical-execution.yml","Preserve remote canonical execution evidence","Fail closed on blocked execution","remote-canonical-execution-${{ github.run_id }}-${{ github.run_attempt }}","/tmp/remote-canonical-result.json"),
+            ("remote-canonical-execution.yml","Preserve Agent Tool dispatch evidence","Require terminal dispatch outcome","agent-tool-dispatch-${{ github.run_id }}-${{ github.run_attempt }}","/tmp/agent-tool-*.json"),
+            ("agent-write-lease-dispatch.yml","Preserve Agent Write Lease dispatch evidence","Require terminal lifecycle outcome","agent-write-lease-dispatch-${{ github.run_id }}-${{ github.run_attempt }}","/tmp/agent-write-lease-*.json"),
+        )
+        for workflow,upload_name,gate_name,artifact_name,path in cases:
+            text=self.text(workflow);upload=f"- name: {upload_name}";gate=f"- name: {gate_name}"
+            self.assertIn(upload,text);self.assertIn(gate,text);self.assertLess(text.index(upload),text.index(gate))
+            segment=text[text.index(upload):text.index(gate)]
+            self.assertIn("if: always()",segment);self.assertIn("uses: actions/upload-artifact@v4",segment)
+            self.assertIn(f"name: {artifact_name}",segment);self.assertIn(path,segment)
+            self.assertIn("if-no-files-found: warn",segment);self.assertIn("retention-days: 14",segment)
+            self.assertNotIn("continue-on-error: true",segment)
+            self.assertIn(f"- name: {gate_name}\n        if: always()",text)
     def test_operational_workflows_do_not_implement_domain_hashing_or_direct_ref_writes(self):
         for name in ("agent-ops.yml","branch-hygiene.yml","coordination-guard.yml","supervisor-snapshot.yml"):
             text=self.text(name);self.assertNotIn("stable_hash",text);self.assertNotIn("git update-ref",text);self.assertNotIn("git push",text);self.assertNotRegex(text,r"gh\s+api[^\n]*(?:--method|-X)\s+(?:POST|PATCH|PUT|DELETE)")
