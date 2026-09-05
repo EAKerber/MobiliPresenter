@@ -32,6 +32,46 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
         self.assertIn("/tmp/project-machine-readback.json", supervisor)
         self.assertLess(supervisor.index("routines.py inspect"), supervisor.index("maintenance_inspect.py --input"))
 
+    def test_project_machine_failures_preserve_diagnostics_before_propagation(self):
+        agent = (ROOT / ".github/workflows/agent-ops.yml").read_text(encoding="utf-8")
+        supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
+
+        self.assertIn("set +e", agent)
+        self.assertIn("/tmp/project-machine-inspection.exit-code", agent)
+        self.assertLess(agent.index("Generate Project Machine inspection"), agent.index("Upload Project Machine inspection"))
+        self.assertLess(agent.index("Upload Project Machine inspection"), agent.index("Propagate Project Machine disposition"))
+        agent_upload = agent.split("- name: Upload Project Machine inspection", 1)[1].split(
+            "- name: Propagate Project Machine disposition", 1
+        )[0]
+        self.assertIn("always()", agent_upload)
+        self.assertIn("/tmp/project-machine-inspection.json", agent_upload)
+        self.assertIn("/tmp/project-machine-inspection.exit-code", agent_upload)
+
+        self.assertEqual(2, supervisor.count("set +e"))
+        for label, artifact, exit_code, propagate in (
+            (
+                "Observe source Project Machine",
+                "Upload source Project Machine diagnostic",
+                "/tmp/project-machine-source.exit-code",
+                "Propagate source Project Machine disposition",
+            ),
+            (
+                "Observe readback Project Machine",
+                "Upload readback Project Machine diagnostic",
+                "/tmp/project-machine-readback.exit-code",
+                "Propagate readback Project Machine disposition",
+            ),
+        ):
+            self.assertIn(exit_code, supervisor)
+            self.assertLess(supervisor.index(label), supervisor.index(artifact))
+            self.assertLess(supervisor.index(artifact), supervisor.index(propagate))
+            upload = supervisor.split(f"- name: {artifact}", 1)[1].split(f"- name: {propagate}", 1)[0]
+            self.assertIn("if: always()", upload)
+            self.assertIn(exit_code, upload)
+
+        self.assertNotIn("continue-on-error", agent)
+        self.assertNotIn("continue-on-error", supervisor)
+
     def test_supervisor_snapshot_artifact_contains_routine_lineage_input(self):
         supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
         upload = supervisor.split("name: supervisor-snapshot", 1)[1]
