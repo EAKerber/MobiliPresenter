@@ -3,9 +3,9 @@ from __future__ import annotations
 import copy
 import unittest
 
-from tools import maintenance_inspect, reflection_eligibility, routines, scheduler_plan, scheduler_snapshot
+from tools import maintenance_inspect, project_machine, reflection_eligibility, routines, scheduler_plan, scheduler_snapshot
 from tools.canonical import stable_hash
-from tools.tests.test_maintenance_inspect import cap, machine, work
+from tools.tests.test_maintenance_inspect import cap, machine, sensors, state, work
 
 
 def pipeline(m):
@@ -131,7 +131,9 @@ class ReflectionEligibilityRQ1Tests(unittest.TestCase):
     def test_readback_drift_fails_before_reflection_classification(self):
         source = machine()
         routine, _, _, snapshot = pipeline(source)
-        readback = machine([work("a")])
+        changed = sensors()
+        changed["continuations"]["data"]["authorityHead"] = "9" * 40
+        readback = project_machine.build_inspection(state(), changed, scope="live")
         with self.assertRaisesRegex(RuntimeError, "SCHEDULER_SNAPSHOT_STALE_CONTINUATION"):
             reflection_eligibility.build_inspection(
                 snapshot,
