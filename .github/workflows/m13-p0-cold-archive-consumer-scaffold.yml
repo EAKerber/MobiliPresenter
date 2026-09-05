@@ -1,0 +1,241 @@
+name: M13 P0 Cold Archive Consumer Scaffold
+
+on:
+  push:
+    branches:
+      - work/operations/m13-p0-cold-archive-cumulative-index-v0.2
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/operations/m13-p0-cold-archive-cumulative-index-v0.2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Patch prune consumer for cumulative index
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("tools/prune_plan.py")
+          text = p.read_text(encoding="utf-8")
+          old = 'COLD_ARCHIVE_INDEX_SCHEMA = "ColdArchiveIndex 0.1"'
+          new = 'COLD_ARCHIVE_LEGACY_INDEX_SCHEMA = "ColdArchiveIndex 0.1"\nCOLD_ARCHIVE_INDEX_SCHEMA = "ColdArchiveIndex 0.2"\nCOLD_ARCHIVE_INDEX_SCHEMAS = {COLD_ARCHIVE_LEGACY_INDEX_SCHEMA, COLD_ARCHIVE_INDEX_SCHEMA}'
+          if old not in text:
+              raise SystemExit("schema constant not found")
+          text = text.replace(old, new, 1)
+          start = text.index("def observe_cold_archive(")
+          end = text.index("\ndef ancestry_for_ref", start)
+          replacement = '''def observe_cold_archive(
+    refs: dict[str, str], repository: str, *, control_branch: str,
+) -> dict[str, str]:
+    """Return strong evidence only for exact heads safely retained by archive/cold.
+
+    Cold archive is optional evidence. Any malformed index, stale source head,
+    non-historical classification, or failed reachability proof yields no
+    delete evidence rather than blocking unrelated sanitation. Index 0.1 keeps
+    its legacy one-entry-per-branch rule; cumulative Index 0.2 keys historical
+    identity by (branch, headSha), allowing a branch name to be archived again
+    at a different immutable head.
+    """
+    archive_head = refs.get(COLD_ARCHIVE_BRANCH)
+    if not isinstance(archive_head, str) or not SHA_RE.fullmatch(archive_head):
+        return {}
+    ok, raw = run_git("show", f"{archive_head}:{COLD_ARCHIVE_INDEX_PATH}")
+    if not ok:
+        return {}
+    try:
+        index = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(index, dict) or set(index) != COLD_ARCHIVE_INDEX_FIELDS:
+        return {}
+    schema = index.get("schemaVersion")
+    if schema not in COLD_ARCHIVE_INDEX_SCHEMAS:
+        return {}
+    if index.get("repository") != repository or index.get("archiveBranch") != COLD_ARCHIVE_BRANCH:
+        return {}
+    control_sha = index.get("controlSha")
+    if not isinstance(control_sha, str) or not SHA_RE.fullmatch(control_sha):
+        return {}
+    entries = index.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return {}
+
+    validated: list[dict[str, str]] = []
+    seen: set[Any] = set()
+    for item in entries:
+        if not isinstance(item, dict) or set(item) != COLD_ARCHIVE_ENTRY_FIELDS:
+            return {}
+        branch = item.get("branch")
+        head_sha = item.get("headSha")
+        classification = item.get("classification")
+        evidence_path = item.get("evidencePath")
+        if (
+            not isinstance(branch, str) or not branch
+            or branch in {control_branch, COLD_ARCHIVE_BRANCH}
+            or not isinstance(head_sha, str) or not SHA_RE.fullmatch(head_sha)
+            or classification not in COLD_ARCHIVE_DELETE_CLASSES
+            or not isinstance(evidence_path, str) or not evidence_path
+        ):
+            return {}
+        identity: Any = branch if schema == COLD_ARCHIVE_LEGACY_INDEX_SCHEMA else (branch, head_sha)
+        if identity in seen:
+            return {}
+        seen.add(identity)
+        validated.append({
+            "branch": branch,
+            "headSha": head_sha,
+            "classification": classification,
+            "evidencePath": evidence_path,
+        })
+
+    evidence: dict[str, str] = {}
+    for item in validated:
+        branch, head_sha = item["branch"], item["headSha"]
+        if refs.get(branch) != head_sha:
+            continue
+        reachable, _ = run_git("merge-base", "--is-ancestor", head_sha, archive_head)
+        if reachable:
+            evidence[branch] = f"cold-archive:{archive_head}"
+    return evidence
+'''
+          text = text[:start] + replacement + "\n" + text[end+1:]
+          p.write_text(text, encoding="utf-8")
+
+          p = Path("tools/tests/test_prune_plan.py")
+          text = p.read_text(encoding="utf-8")
+          marker = '\n\nif __name__ == "__main__":\n'
+          if marker not in text:
+              raise SystemExit("test insertion marker not found")
+          methods = '''    def test_cold_archive_02_allows_same_branch_at_multiple_historical_heads(self):
+        refs = {
+            "main": "f" * 40,
+            "archive/cold": "c" * 40,
+            "work/reused": "b" * 40,
+        }
+        index = {
+            "schemaVersion": "ColdArchiveIndex 0.2",
+            "repository": "EAKerber/MobiliPresenter",
+            "archiveBranch": "archive/cold",
+            "controlSha": "f" * 40,
+            "entries": [
+                {
+                    "branch": "work/reused",
+                    "headSha": "a" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-a.md",
+                },
+                {
+                    "branch": "work/reused",
+                    "headSha": "b" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-b.md",
+                },
+            ],
+        }
+
+        def fake_git(*args):
+            if args[0] == "show":
+                return True, __import__("json").dumps(index)
+            if args[:2] == ("merge-base", "--is-ancestor"):
+                return True, ""
+            return False, "unexpected"
+
+        with mock.patch.object(prune, "run_git", side_effect=fake_git):
+            evidence = prune.observe_cold_archive(
+                refs, "EAKerber/MobiliPresenter", control_branch="main"
+            )
+        self.assertEqual(evidence["work/reused"], "cold-archive:" + "c" * 40)
+
+    def test_cold_archive_02_duplicate_exact_identity_fails_closed(self):
+        refs = {
+            "main": "f" * 40,
+            "archive/cold": "c" * 40,
+            "work/reused": "a" * 40,
+        }
+        entry = {
+            "branch": "work/reused",
+            "headSha": "a" * 40,
+            "classification": "HISTORICAL_EVIDENCE",
+            "evidencePath": "docs/old.md",
+        }
+        index = {
+            "schemaVersion": "ColdArchiveIndex 0.2",
+            "repository": "EAKerber/MobiliPresenter",
+            "archiveBranch": "archive/cold",
+            "controlSha": "f" * 40,
+            "entries": [entry, dict(entry)],
+        }
+        with mock.patch.object(
+            prune, "run_git", return_value=(True, __import__("json").dumps(index))
+        ):
+            self.assertEqual(
+                prune.observe_cold_archive(
+                    refs, "EAKerber/MobiliPresenter", control_branch="main"
+                ),
+                {},
+            )
+
+    def test_cold_archive_01_keeps_legacy_unique_branch_rule(self):
+        refs = {
+            "main": "f" * 40,
+            "archive/cold": "c" * 40,
+            "work/reused": "b" * 40,
+        }
+        index = {
+            "schemaVersion": "ColdArchiveIndex 0.1",
+            "repository": "EAKerber/MobiliPresenter",
+            "archiveBranch": "archive/cold",
+            "controlSha": "f" * 40,
+            "entries": [
+                {
+                    "branch": "work/reused",
+                    "headSha": "a" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-a.md",
+                },
+                {
+                    "branch": "work/reused",
+                    "headSha": "b" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-b.md",
+                },
+            ],
+        }
+        with mock.patch.object(
+            prune, "run_git", return_value=(True, __import__("json").dumps(index))
+        ):
+            self.assertEqual(
+                prune.observe_cold_archive(
+                    refs, "EAKerber/MobiliPresenter", control_branch="main"
+                ),
+                {},
+            )
+'''
+          text = text.replace(marker, "\n" + methods + marker, 1)
+          p.write_text(text, encoding="utf-8")
+          PY
+      - name: Run focused archive and hygiene tests
+        run: |
+          python -m unittest tools.tests.test_cold_archive_plan tools.tests.test_prune_plan
+          python -m py_compile tools/cold_archive_plan.py tools/prune_plan.py
+      - name: Remove scaffold and commit permanent delta
+        run: |
+          rm -f .github/workflows/m13-p0-cold-archive-consumer-scaffold.yml
+          git config user.name "MobiliPresenter Qualification"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No permanent delta materialized"
+            exit 1
+          fi
+          git commit -m "Ops: teach branch hygiene cumulative cold archive"
+          git push origin HEAD:work/operations/m13-p0-cold-archive-cumulative-index-v0.2
