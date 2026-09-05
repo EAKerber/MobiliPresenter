@@ -22,7 +22,7 @@ jobs:
       - name: Fetch current authorities
         run: git fetch origin main archive/cold
       - name: Reconstruct cumulative archive projection and reindex plan
-        run: python .github/qualification/m13_p0_reindex.py
+        run: PYTHONPATH=. python .github/qualification/m13_p0_reindex.py
       - name: Upload migration qualification evidence
         uses: actions/upload-artifact@v4
         with:
