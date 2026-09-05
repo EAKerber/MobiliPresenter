@@ -13,7 +13,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools import agent_commands as _commands
-from tools import agent_reentry_guidance
 from tools import runtime_capabilities, runtime_provider_adapter
 from tools.agent_tools import policy as agent_tool_policy
 from tools.canonical import stable_hash
@@ -77,9 +76,7 @@ def _reentry_success(work_id: str, inspection: dict) -> dict:
     }
 
 
-def _reentry_unknown(
-    work_id: str, error: agent_reentry_guidance.AgentReentryGuidanceError
-) -> dict:
+def _reentry_unknown(work_id: str, error) -> dict:
     return {
         "status": "UNKNOWN",
         "workRef": {"workId": work_id},
@@ -150,10 +147,11 @@ def command_status(as_json, work_id: str | None = None):
     state, view, published = _state_and_publication()
     reentry = None
     if work_id is not None:
+        reentry_module = importlib.import_module("tools.agent_reentry_guidance")
         try:
-            inspection = agent_reentry_guidance.observe_live(work_id)
+            inspection = reentry_module.observe_live(work_id)
             reentry = _reentry_success(work_id, inspection)
-        except agent_reentry_guidance.AgentReentryGuidanceError as exc:
+        except reentry_module.AgentReentryGuidanceError as exc:
             reentry = _reentry_unknown(work_id, exc)
     payload = _status_payload(state, view, published, observed_git(), reentry)
     if as_json:
