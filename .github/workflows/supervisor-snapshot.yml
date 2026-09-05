@@ -33,7 +33,7 @@ jobs:
           python-version: '3.12'
       - name: Snapshot regression tests
         run: |
-          python -m unittest tools.tests.test_routines tools.tests.test_maintenance_inspect tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot tools.tests.test_reflection_eligibility_rq1 tools.tests.test_agent_reflection_eligibility_facade_rq1 tools.tests.test_supervisor_pipeline -v
+          python -m unittest tools.tests.test_routines tools.tests.test_maintenance_inspect tools.tests.test_scheduler_plan tools.tests.test_scheduler_snapshot tools.tests.test_reflection_eligibility_rq1 tools.tests.test_agent_reflection_eligibility_facade_rq1 tools.tests.test_operational_quiescence_rq2 tools.tests.test_agent_operational_quiescence_facade_rq2 tools.tests.test_supervisor_pipeline -v
       - name: Observe source Project Machine
         env:
           GH_TOKEN: ${{ github.token }}
@@ -137,6 +137,20 @@ jobs:
             --json > /tmp/reflection-eligibility-result.json
           python -m json.tool /tmp/reflection-eligibility.json > /dev/null
           python -m json.tool /tmp/reflection-eligibility-result.json > /dev/null
+      - name: Derive Operational Quiescence Sample
+        run: |
+          python tools/agent.py operational-quiescence sample \
+            --snapshot /tmp/scheduler-snapshot.json \
+            --reflection /tmp/reflection-eligibility.json \
+            --source-machine /tmp/project-machine-source.json \
+            --routines /tmp/routine-inspection.json \
+            --readback-machine /tmp/project-machine-readback.json \
+            --observation-id "${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" \
+            --sequence "${GITHUB_RUN_NUMBER}" \
+            --output /tmp/operational-quiescence-sample.json \
+            --json > /tmp/operational-quiescence-sample-result.json
+          python -m json.tool /tmp/operational-quiescence-sample.json > /dev/null
+          python -m json.tool /tmp/operational-quiescence-sample-result.json > /dev/null
       - name: Upload Supervisor Snapshot
         uses: actions/upload-artifact@v4
         with:
@@ -150,5 +164,6 @@ jobs:
             /tmp/project-machine-readback.json
             /tmp/scheduler-snapshot-validation.json
             /tmp/reflection-eligibility.json
+            /tmp/operational-quiescence-sample.json
           if-no-files-found: error
           retention-days: 7
