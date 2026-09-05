@@ -3,7 +3,13 @@ from __future__ import annotations
 import copy
 import unittest
 
-from tools import agent_cycle, agent_cycle_close, project_machine, runtime_capabilities
+from tools import (
+    agent_cycle,
+    agent_cycle_close,
+    agent_cycle_readiness,
+    project_machine,
+    runtime_capabilities,
+)
 from tools.canonical import stable_hash
 
 
@@ -51,6 +57,13 @@ def _rehash(value: dict) -> dict:
     return value
 
 
+def _rehash_tool_projection(value: dict) -> dict:
+    value["projectionHash"] = stable_hash(
+        {key: item for key, item in value.items() if key != "projectionHash"}
+    )
+    return value
+
+
 def _historical_context_fixture(version: str) -> dict:
     """Freeze historical outer contracts instead of following moving version aliases.
 
@@ -77,6 +90,7 @@ class AgentCycleReadinessTests(unittest.TestCase):
 
         self.assertEqual(context["schemaVersion"], agent_cycle.SCHEMA_VERSION)
         self.assertEqual(context["schemaVersion"], "AgentCycleContext 0.4")
+        self.assertEqual(readiness["schemaVersion"], "AgentCycleReadiness 0.2")
         self.assertEqual(context["status"], "READY")
         self.assertEqual(readiness["legacyStatus"], "READY")
         self.assertEqual(readiness["contextStatus"], {"status": "PASS", "reasonCodes": []})
@@ -93,9 +107,19 @@ class AgentCycleReadinessTests(unittest.TestCase):
                 "reasonCodes": ["OPERATION_AUTHORIZATION_NOT_EVALUATED"],
             },
         )
+        self.assertEqual(
+            readiness["nextSafeAction"]["action"],
+            "RESOLVE_PROVIDER",
+        )
+        self.assertEqual(readiness["nextSafeAction"]["toolId"], "git.files.mutate")
+        self.assertEqual(
+            readiness["nextSafeAction"]["reasonCodes"],
+            ["CAPABILITY_NOT_AVAILABLE:remote.canonical.execute"],
+        )
+        self.assertFalse(readiness["nextSafeAction"]["authorizesMutation"])
         self.assertFalse(readiness["authorizesMutation"])
 
-    def test_multi_tool_intent_does_not_claim_a_provider_before_operation_selection(self):
+    def test_multi_tool_intent_requires_explicit_tool_selection(self):
         readiness = _context("inspect-and-plan")["readiness"]
 
         self.assertEqual(readiness["toolReadiness"]["status"], "PASS")
@@ -107,8 +131,13 @@ class AgentCycleReadinessTests(unittest.TestCase):
             readiness["mutationAuthorization"],
             {"status": "NOT_APPLICABLE", "reasonCodes": []},
         )
+        action = readiness["nextSafeAction"]
+        self.assertEqual(action["action"], "SELECT_TOOL")
+        self.assertGreaterEqual(len(action["candidateToolIds"]), 2)
+        self.assertEqual(action["candidateToolIds"], sorted(action["candidateToolIds"]))
+        self.assertFalse(action["authorizesMutation"])
 
-    def test_intent_without_agent_tool_surface_is_explicitly_blocked_at_tool_dimension(self):
+    def test_bootstrap_discovery_routes_to_supported_intent_without_archaeology(self):
         context = _context("bootstrap-discovery")
 
         self.assertEqual(context["status"], "READY")
@@ -122,6 +151,52 @@ class AgentCycleReadinessTests(unittest.TestCase):
                 "status": "UNKNOWN",
                 "reasonCodes": ["NO_TOOL_SURFACE_FOR_PROVIDER_RESOLUTION"],
             },
+        )
+        action = context["readiness"]["nextSafeAction"]
+        self.assertEqual(action["action"], "SELECT_INTENT")
+        self.assertEqual(
+            action["candidateIntents"],
+            ["governed-mutation", "inspect-and-plan"],
+        )
+        self.assertFalse(action["semanticAuthority"])
+        self.assertFalse(action["authorizesMutation"])
+
+    def test_available_mutation_routes_to_authorization_resolution_not_execution(self):
+        context = _context("governed-mutation")
+        tools = copy.deepcopy(context["agentTools"])
+        entry = tools["conditional"].pop()
+        entry.pop("reasonCode")
+        tools["available"] = [entry]
+        _rehash_tool_projection(tools)
+
+        readiness = agent_cycle_readiness.build_projection(
+            legacy_status="READY",
+            blocking_unknowns=[],
+            tools=tools,
+        )
+        action = readiness["nextSafeAction"]
+        self.assertEqual(action["action"], "RESOLVE_MUTATION_AUTHORIZATION")
+        self.assertEqual(action["mode"], "mutation-execute")
+        self.assertFalse(action["authorizesMutation"])
+        self.assertNotIn("EXECUTE_MUTATION", agent_cycle_readiness.NEXT_ACTIONS)
+
+    def test_readiness_01_remains_validatable_after_guidance_upgrade(self):
+        context = _context("inspect-and-plan")
+        legacy = copy.deepcopy(context["readiness"])
+        legacy["schemaVersion"] = "AgentCycleReadiness 0.1"
+        legacy.pop("nextSafeAction")
+        legacy["readinessHash"] = stable_hash(
+            {key: item for key, item in legacy.items() if key != "readinessHash"}
+        )
+
+        self.assertEqual(
+            agent_cycle_readiness.validate_projection(
+                legacy,
+                legacy_status=context["status"],
+                blocking_unknowns=context["blockingUnknowns"],
+                tools=context["agentTools"],
+            ),
+            legacy,
         )
 
     def test_v03_context_remains_readable_without_work_binding(self):
