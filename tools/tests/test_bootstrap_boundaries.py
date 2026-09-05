@@ -50,6 +50,26 @@ class BootstrapBoundaryTests(unittest.TestCase):
         ):
             self.assertNotIn(copied_runtime_contract, manager)
 
+    def test_readme_is_a_cold_start_router_not_a_mutable_authority_copy(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        state = json.loads((ROOT / "ops" / "state" / "project.json").read_text(encoding="utf-8"))
+        manifest = json.loads(
+            (ROOT / state["published"]["artifactManifest"]).read_text(encoding="utf-8")
+        )
+        self.assertIn("python3 tools/agent.py status", readme)
+        self.assertIn("python3 tools/agent.py begin --role <role> --intent <intent> --json", readme)
+        self.assertIn("readiness.nextSafeAction", readme)
+        self.assertIn("docs/kickstarts/roles/<role>.md", readme)
+        self.assertNotIn("docs/kickstarts/roles/*-current.md", readme)
+        for mutable in (
+            state["development"]["checkpoint"],
+            state["development"]["nextTransition"],
+            manifest["release"],
+            manifest["sourceBranch"],
+            manifest["sourceBase"],
+        ):
+            self.assertNotIn(mutable, readme)
+
     def test_bootstrap_discovers_capabilities_without_provider_authority_leak(self):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         manager = (ROLE_DIR / "manager-gitops.md").read_text(encoding="utf-8")
