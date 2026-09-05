@@ -45,6 +45,20 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
         upload = supervisor.split("name: supervisor-snapshot", 1)[1]
         self.assertIn("/tmp/reflection-eligibility.json", upload)
 
+    def test_operational_quiescence_sample_is_derived_after_reflection_without_window_evaluation(self):
+        supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
+        reflection_command = "tools/agent.py reflection-eligibility"
+        sample_command = "tools/agent.py operational-quiescence sample"
+        self.assertIn(sample_command, supervisor)
+        self.assertIn("--reflection /tmp/reflection-eligibility.json", supervisor)
+        self.assertIn('--observation-id "${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"', supervisor)
+        self.assertIn('--sequence "${GITHUB_RUN_NUMBER}"', supervisor)
+        self.assertIn("--output /tmp/operational-quiescence-sample.json", supervisor)
+        self.assertLess(supervisor.index(reflection_command), supervisor.index(sample_command))
+        self.assertNotIn("operational-quiescence evaluate", supervisor)
+        upload = supervisor.split("name: supervisor-snapshot", 1)[1]
+        self.assertIn("/tmp/operational-quiescence-sample.json", upload)
+
     def test_project_machine_failures_preserve_diagnostics_before_propagation(self):
         agent = (ROOT / ".github/workflows/agent-ops.yml").read_text(encoding="utf-8")
         supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
@@ -99,6 +113,8 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
             "SchedulerPlan 0.",
             "SchedulerSnapshot 0.",
             "ReflectionEligibility 0.",
+            "OperationalQuiescenceSample 0.",
+            "OperationalQuiescence 0.",
             "projectMachineInspectionHash",
             "routineInspectionHash",
             "sourceHeads =",
