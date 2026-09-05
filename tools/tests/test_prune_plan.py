@@ -203,6 +203,111 @@ class PrunePlan04Tests(unittest.TestCase):
         live = next(item for item in plan["entries"] if item["branch"] == "work/operations/live")
         self.assertIn("active-work", live["protections"])
 
+    def test_cold_archive_02_allows_same_branch_at_multiple_historical_heads(self):
+        refs = {
+            "main": "f" * 40,
+            "archive/cold": "c" * 40,
+            "work/reused": "b" * 40,
+        }
+        index = {
+            "schemaVersion": "ColdArchiveIndex 0.2",
+            "repository": "EAKerber/MobiliPresenter",
+            "archiveBranch": "archive/cold",
+            "controlSha": "f" * 40,
+            "entries": [
+                {
+                    "branch": "work/reused",
+                    "headSha": "a" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-a.md",
+                },
+                {
+                    "branch": "work/reused",
+                    "headSha": "b" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-b.md",
+                },
+            ],
+        }
+
+        def fake_git(*args):
+            if args[0] == "show":
+                return True, __import__("json").dumps(index)
+            if args[:2] == ("merge-base", "--is-ancestor"):
+                return True, ""
+            return False, "unexpected"
+
+        with mock.patch.object(prune, "run_git", side_effect=fake_git):
+            evidence = prune.observe_cold_archive(
+                refs, "EAKerber/MobiliPresenter", control_branch="main"
+            )
+        self.assertEqual(evidence["work/reused"], "cold-archive:" + "c" * 40)
+
+    def test_cold_archive_02_duplicate_exact_identity_fails_closed(self):
+        refs = {
+            "main": "f" * 40,
+            "archive/cold": "c" * 40,
+            "work/reused": "a" * 40,
+        }
+        entry = {
+            "branch": "work/reused",
+            "headSha": "a" * 40,
+            "classification": "HISTORICAL_EVIDENCE",
+            "evidencePath": "docs/old.md",
+        }
+        index = {
+            "schemaVersion": "ColdArchiveIndex 0.2",
+            "repository": "EAKerber/MobiliPresenter",
+            "archiveBranch": "archive/cold",
+            "controlSha": "f" * 40,
+            "entries": [entry, dict(entry)],
+        }
+        with mock.patch.object(
+            prune, "run_git", return_value=(True, __import__("json").dumps(index))
+        ):
+            self.assertEqual(
+                prune.observe_cold_archive(
+                    refs, "EAKerber/MobiliPresenter", control_branch="main"
+                ),
+                {},
+            )
+
+    def test_cold_archive_01_keeps_legacy_unique_branch_rule(self):
+        refs = {
+            "main": "f" * 40,
+            "archive/cold": "c" * 40,
+            "work/reused": "b" * 40,
+        }
+        index = {
+            "schemaVersion": "ColdArchiveIndex 0.1",
+            "repository": "EAKerber/MobiliPresenter",
+            "archiveBranch": "archive/cold",
+            "controlSha": "f" * 40,
+            "entries": [
+                {
+                    "branch": "work/reused",
+                    "headSha": "a" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-a.md",
+                },
+                {
+                    "branch": "work/reused",
+                    "headSha": "b" * 40,
+                    "classification": "HISTORICAL_EVIDENCE",
+                    "evidencePath": "docs/old-b.md",
+                },
+            ],
+        }
+        with mock.patch.object(
+            prune, "run_git", return_value=(True, __import__("json").dumps(index))
+        ):
+            self.assertEqual(
+                prune.observe_cold_archive(
+                    refs, "EAKerber/MobiliPresenter", control_branch="main"
+                ),
+                {},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
