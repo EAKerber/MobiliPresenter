@@ -23,6 +23,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import base64
 
           p = Path("tools/prune_plan.py")
           text = p.read_text(encoding="utf-8")
@@ -33,80 +34,7 @@ jobs:
           text = text.replace(old, new, 1)
           start = text.index("def observe_cold_archive(")
           end = text.index("\ndef ancestry_for_ref", start)
-          replacement = '''def observe_cold_archive(
-    refs: dict[str, str], repository: str, *, control_branch: str,
-) -> dict[str, str]:
-    """Return strong evidence only for exact heads safely retained by archive/cold.
-
-    Cold archive is optional evidence. Any malformed index, stale source head,
-    non-historical classification, or failed reachability proof yields no
-    delete evidence rather than blocking unrelated sanitation. Index 0.1 keeps
-    its legacy one-entry-per-branch rule; cumulative Index 0.2 keys historical
-    identity by (branch, headSha), allowing a branch name to be archived again
-    at a different immutable head.
-    """
-    archive_head = refs.get(COLD_ARCHIVE_BRANCH)
-    if not isinstance(archive_head, str) or not SHA_RE.fullmatch(archive_head):
-        return {}
-    ok, raw = run_git("show", f"{archive_head}:{COLD_ARCHIVE_INDEX_PATH}")
-    if not ok:
-        return {}
-    try:
-        index = json.loads(raw)
-    except json.JSONDecodeError:
-        return {}
-    if not isinstance(index, dict) or set(index) != COLD_ARCHIVE_INDEX_FIELDS:
-        return {}
-    schema = index.get("schemaVersion")
-    if schema not in COLD_ARCHIVE_INDEX_SCHEMAS:
-        return {}
-    if index.get("repository") != repository or index.get("archiveBranch") != COLD_ARCHIVE_BRANCH:
-        return {}
-    control_sha = index.get("controlSha")
-    if not isinstance(control_sha, str) or not SHA_RE.fullmatch(control_sha):
-        return {}
-    entries = index.get("entries")
-    if not isinstance(entries, list) or not entries:
-        return {}
-
-    validated: list[dict[str, str]] = []
-    seen: set[Any] = set()
-    for item in entries:
-        if not isinstance(item, dict) or set(item) != COLD_ARCHIVE_ENTRY_FIELDS:
-            return {}
-        branch = item.get("branch")
-        head_sha = item.get("headSha")
-        classification = item.get("classification")
-        evidence_path = item.get("evidencePath")
-        if (
-            not isinstance(branch, str) or not branch
-            or branch in {control_branch, COLD_ARCHIVE_BRANCH}
-            or not isinstance(head_sha, str) or not SHA_RE.fullmatch(head_sha)
-            or classification not in COLD_ARCHIVE_DELETE_CLASSES
-            or not isinstance(evidence_path, str) or not evidence_path
-        ):
-            return {}
-        identity: Any = branch if schema == COLD_ARCHIVE_LEGACY_INDEX_SCHEMA else (branch, head_sha)
-        if identity in seen:
-            return {}
-        seen.add(identity)
-        validated.append({
-            "branch": branch,
-            "headSha": head_sha,
-            "classification": classification,
-            "evidencePath": evidence_path,
-        })
-
-    evidence: dict[str, str] = {}
-    for item in validated:
-        branch, head_sha = item["branch"], item["headSha"]
-        if refs.get(branch) != head_sha:
-            continue
-        reachable, _ = run_git("merge-base", "--is-ancestor", head_sha, archive_head)
-        if reachable:
-            evidence[branch] = f"cold-archive:{archive_head}"
-    return evidence
-'''
+          replacement = base64.b64decode("ZGVmIG9ic2VydmVfY29sZF9hcmNoaXZlKAogICAgcmVmczogZGljdFtzdHIsIHN0cl0sIHJlcG9zaXRvcnk6IHN0ciwgKiwgY29udHJvbF9icmFuY2g6IHN0ciwKKSAtPiBkaWN0W3N0ciwgc3RyXToKICAgICIiIlJldHVybiBzdHJvbmcgZXZpZGVuY2Ugb25seSBmb3IgZXhhY3QgaGVhZHMgc2FmZWx5IHJldGFpbmVkIGJ5IGFyY2hpdmUvY29sZC4KCiAgICBDb2xkIGFyY2hpdmUgaXMgb3B0aW9uYWwgZXZpZGVuY2UuIEFueSBtYWxmb3JtZWQgaW5kZXgsIHN0YWxlIHNvdXJjZSBoZWFkLAogICAgbm9uLWhpc3RvcmljYWwgY2xhc3NpZmljYXRpb24sIG9yIGZhaWxlZCByZWFjaGFiaWxpdHkgcHJvb2YgeWllbGRzIG5vCiAgICBkZWxldGUgZXZpZGVuY2UgcmF0aGVyIHRoYW4gYmxvY2tpbmcgdW5yZWxhdGVkIHNhbml0YXRpb24uIEluZGV4IDAuMSBrZWVwcwogICAgaXRzIGxlZ2FjeSBvbmUtZW50cnktcGVyLWJyYW5jaCBydWxlOyBjdW11bGF0aXZlIEluZGV4IDAuMiBrZXlzIGhpc3RvcmljYWwKICAgIGlkZW50aXR5IGJ5IChicmFuY2gsIGhlYWRTaGEpLCBhbGxvd2luZyBhIGJyYW5jaCBuYW1lIHRvIGJlIGFyY2hpdmVkIGFnYWluCiAgICBhdCBhIGRpZmZlcmVudCBpbW11dGFibGUgaGVhZC4KICAgICIiIgogICAgYXJjaGl2ZV9oZWFkID0gcmVmcy5nZXQoQ09MRF9BUkNISVZFX0JSQU5DSCkKICAgIGlmIG5vdCBpc2luc3RhbmNlKGFyY2hpdmVfaGVhZCwgc3RyKSBvciBub3QgU0hBX1JFLmZ1bGxtYXRjaChhcmNoaXZlX2hlYWQpOgogICAgICAgIHJldHVybiB7fQogICAgb2ssIHJhdyA9IHJ1bl9naXQoInNob3ciLCBmInthcmNoaXZlX2hlYWR9OntDT0xEX0FSQ0hJVkVfSU5ERVhfUEFUSH0iKQogICAgaWYgbm90IG9rOgogICAgICAgIHJldHVybiB7fQogICAgdHJ5OgogICAgICAgIGluZGV4ID0ganNvbi5sb2FkcyhyYXcpCiAgICBleGNlcHQganNvbi5KU09ORGVjb2RlRXJyb3I6CiAgICAgICAgcmV0dXJuIHt9CiAgICBpZiBub3QgaXNpbnN0YW5jZShpbmRleCwgZGljdCkgb3Igc2V0KGluZGV4KSAhPSBDT0xEX0FSQ0hJVkVfSU5ERVhfRklFTERTOgogICAgICAgIHJldHVybiB7fQogICAgc2NoZW1hID0gaW5kZXguZ2V0KCJzY2hlbWFWZXJzaW9uIikKICAgIGlmIHNjaGVtYSBub3QgaW4gQ09MRF9BUkNISVZFX0lOREVYX1NDSEVNQVM6CiAgICAgICAgcmV0dXJuIHt9CiAgICBpZiBpbmRleC5nZXQoInJlcG9zaXRvcnkiKSAhPSByZXBvc2l0b3J5IG9yIGluZGV4LmdldCgiYXJjaGl2ZUJyYW5jaCIpICE9IENPTERfQVJDSElWRV9CUkFOQ0g6CiAgICAgICAgcmV0dXJuIHt9CiAgICBjb250cm9sX3NoYSA9IGluZGV4LmdldCgiY29udHJvbFNoYSIpCiAgICBpZiBub3QgaXNpbnN0YW5jZShjb250cm9sX3NoYSwgc3RyKSBvciBub3QgU0hBX1JFLmZ1bGxtYXRjaChjb250cm9sX3NoYSk6CiAgICAgICAgcmV0dXJuIHt9CiAgICBlbnRyaWVzID0gaW5kZXguZ2V0KCJlbnRyaWVzIikKICAgIGlmIG5vdCBpc2luc3RhbmNlKGVudHJpZXMsIGxpc3QpIG9yIG5vdCBlbnRyaWVzOgogICAgICAgIHJldHVybiB7fQoKICAgIHZhbGlkYXRlZDogbGlzdFtkaWN0W3N0ciwgc3RyXV0gPSBbXQogICAgc2Vlbjogc2V0W0FueV0gPSBzZXQoKQogICAgZm9yIGl0ZW0gaW4gZW50cmllczoKICAgICAgICBpZiBub3QgaXNpbnN0YW5jZShpdGVtLCBkaWN0KSBvciBzZXQoaXRlbSkgIT0gQ09MRF9BUkNISVZFX0VOVFJZX0ZJRUxEUzoKICAgICAgICAgICAgcmV0dXJuIHt9CiAgICAgICAgYnJhbmNoID0gaXRlbS5nZXQoImJyYW5jaCIpCiAgICAgICAgaGVhZF9zaGEgPSBpdGVtLmdldCgiaGVhZFNoYSIpCiAgICAgICAgY2xhc3NpZmljYXRpb24gPSBpdGVtLmdldCgiY2xhc3NpZmljYXRpb24iKQogICAgICAgIGV2aWRlbmNlX3BhdGggPSBpdGVtLmdldCgiZXZpZGVuY2VQYXRoIikKICAgICAgICBpZiAoCiAgICAgICAgICAgIG5vdCBpc2luc3RhbmNlKGJyYW5jaCwgc3RyKSBvciBub3QgYnJhbmNoCiAgICAgICAgICAgIG9yIGJyYW5jaCBpbiB7Y29udHJvbF9icmFuY2gsIENPTERfQVJDSElWRV9CUkFOQ0h9CiAgICAgICAgICAgIG9yIG5vdCBpc2luc3RhbmNlKGhlYWRfc2hhLCBzdHIpIG9yIG5vdCBTSEFfUkUuZnVsbG1hdGNoKGhlYWRfc2hhKQogICAgICAgICAgICBvciBjbGFzc2lmaWNhdGlvbiBub3QgaW4gQ09MRF9BUkNISVZFX0RFTEVURV9DTEFTU0VTCiAgICAgICAgICAgIG9yIG5vdCBpc2luc3RhbmNlKGV2aWRlbmNlX3BhdGgsIHN0cikgb3Igbm90IGV2aWRlbmNlX3BhdGgKICAgICAgICApOgogICAgICAgICAgICByZXR1cm4ge30KICAgICAgICBpZGVudGl0eTogQW55ID0gYnJhbmNoIGlmIHNjaGVtYSA9PSBDT0xEX0FSQ0hJVkVfTEVHQUNZX0lOREVYX1NDSEVNQSBlbHNlIChicmFuY2gsIGhlYWRfc2hhKQogICAgICAgIGlmIGlkZW50aXR5IGluIHNlZW46CiAgICAgICAgICAgIHJldHVybiB7fQogICAgICAgIHNlZW4uYWRkKGlkZW50aXR5KQogICAgICAgIHZhbGlkYXRlZC5hcHBlbmQoewogICAgICAgICAgICAiYnJhbmNoIjogYnJhbmNoLAogICAgICAgICAgICAiaGVhZFNoYSI6IGhlYWRfc2hhLAogICAgICAgICAgICAiY2xhc3NpZmljYXRpb24iOiBjbGFzc2lmaWNhdGlvbiwKICAgICAgICAgICAgImV2aWRlbmNlUGF0aCI6IGV2aWRlbmNlX3BhdGgsCiAgICAgICAgfSkKCiAgICBldmlkZW5jZTogZGljdFtzdHIsIHN0cl0gPSB7fQogICAgZm9yIGl0ZW0gaW4gdmFsaWRhdGVkOgogICAgICAgIGJyYW5jaCwgaGVhZF9zaGEgPSBpdGVtWyJicmFuY2giXSwgaXRlbVsiaGVhZFNoYSJdCiAgICAgICAgaWYgcmVmcy5nZXQoYnJhbmNoKSAhPSBoZWFkX3NoYToKICAgICAgICAgICAgY29udGludWUKICAgICAgICByZWFjaGFibGUsIF8gPSBydW5fZ2l0KCJtZXJnZS1iYXNlIiwgIi0taXMtYW5jZXN0b3IiLCBoZWFkX3NoYSwgYXJjaGl2ZV9oZWFkKQogICAgICAgIGlmIHJlYWNoYWJsZToKICAgICAgICAgICAgZXZpZGVuY2VbYnJhbmNoXSA9IGYiY29sZC1hcmNoaXZlOnthcmNoaXZlX2hlYWR9IgogICAgcmV0dXJuIGV2aWRlbmNlCg==").decode("utf-8")
           text = text[:start] + replacement + "\n" + text[end+1:]
           p.write_text(text, encoding="utf-8")
 
@@ -115,111 +43,7 @@ jobs:
           marker = '\n\nif __name__ == "__main__":\n'
           if marker not in text:
               raise SystemExit("test insertion marker not found")
-          methods = '''    def test_cold_archive_02_allows_same_branch_at_multiple_historical_heads(self):
-        refs = {
-            "main": "f" * 40,
-            "archive/cold": "c" * 40,
-            "work/reused": "b" * 40,
-        }
-        index = {
-            "schemaVersion": "ColdArchiveIndex 0.2",
-            "repository": "EAKerber/MobiliPresenter",
-            "archiveBranch": "archive/cold",
-            "controlSha": "f" * 40,
-            "entries": [
-                {
-                    "branch": "work/reused",
-                    "headSha": "a" * 40,
-                    "classification": "HISTORICAL_EVIDENCE",
-                    "evidencePath": "docs/old-a.md",
-                },
-                {
-                    "branch": "work/reused",
-                    "headSha": "b" * 40,
-                    "classification": "HISTORICAL_EVIDENCE",
-                    "evidencePath": "docs/old-b.md",
-                },
-            ],
-        }
-
-        def fake_git(*args):
-            if args[0] == "show":
-                return True, __import__("json").dumps(index)
-            if args[:2] == ("merge-base", "--is-ancestor"):
-                return True, ""
-            return False, "unexpected"
-
-        with mock.patch.object(prune, "run_git", side_effect=fake_git):
-            evidence = prune.observe_cold_archive(
-                refs, "EAKerber/MobiliPresenter", control_branch="main"
-            )
-        self.assertEqual(evidence["work/reused"], "cold-archive:" + "c" * 40)
-
-    def test_cold_archive_02_duplicate_exact_identity_fails_closed(self):
-        refs = {
-            "main": "f" * 40,
-            "archive/cold": "c" * 40,
-            "work/reused": "a" * 40,
-        }
-        entry = {
-            "branch": "work/reused",
-            "headSha": "a" * 40,
-            "classification": "HISTORICAL_EVIDENCE",
-            "evidencePath": "docs/old.md",
-        }
-        index = {
-            "schemaVersion": "ColdArchiveIndex 0.2",
-            "repository": "EAKerber/MobiliPresenter",
-            "archiveBranch": "archive/cold",
-            "controlSha": "f" * 40,
-            "entries": [entry, dict(entry)],
-        }
-        with mock.patch.object(
-            prune, "run_git", return_value=(True, __import__("json").dumps(index))
-        ):
-            self.assertEqual(
-                prune.observe_cold_archive(
-                    refs, "EAKerber/MobiliPresenter", control_branch="main"
-                ),
-                {},
-            )
-
-    def test_cold_archive_01_keeps_legacy_unique_branch_rule(self):
-        refs = {
-            "main": "f" * 40,
-            "archive/cold": "c" * 40,
-            "work/reused": "b" * 40,
-        }
-        index = {
-            "schemaVersion": "ColdArchiveIndex 0.1",
-            "repository": "EAKerber/MobiliPresenter",
-            "archiveBranch": "archive/cold",
-            "controlSha": "f" * 40,
-            "entries": [
-                {
-                    "branch": "work/reused",
-                    "headSha": "a" * 40,
-                    "classification": "HISTORICAL_EVIDENCE",
-                    "evidencePath": "docs/old-a.md",
-                },
-                {
-                    "branch": "work/reused",
-                    "headSha": "b" * 40,
-                    "classification": "HISTORICAL_EVIDENCE",
-                    "evidencePath": "docs/old-b.md",
-                },
-            ],
-        }
-        with mock.patch.object(
-            prune, "run_git", return_value=(True, __import__("json").dumps(index))
-        ):
-            self.assertEqual(
-                prune.observe_cold_archive(
-                    refs, "EAKerber/MobiliPresenter", control_branch="main"
-                ),
-                {},
-            )
-'''
+          methods = base64.b64decode("ICAgIGRlZiB0ZXN0X2NvbGRfYXJjaGl2ZV8wMl9hbGxvd3Nfc2FtZV9icmFuY2hfYXRfbXVsdGlwbGVfaGlzdG9yaWNhbF9oZWFkcyhzZWxmKToKICAgICAgICByZWZzID0gewogICAgICAgICAgICAibWFpbiI6ICJmIiAqIDQwLAogICAgICAgICAgICAiYXJjaGl2ZS9jb2xkIjogImMiICogNDAsCiAgICAgICAgICAgICJ3b3JrL3JldXNlZCI6ICJiIiAqIDQwLAogICAgICAgIH0KICAgICAgICBpbmRleCA9IHsKICAgICAgICAgICAgInNjaGVtYVZlcnNpb24iOiAiQ29sZEFyY2hpdmVJbmRleCAwLjIiLAogICAgICAgICAgICAicmVwb3NpdG9yeSI6ICJFQUtlcmJlci9Nb2JpbGlQcmVzZW50ZXIiLAogICAgICAgICAgICAiYXJjaGl2ZUJyYW5jaCI6ICJhcmNoaXZlL2NvbGQiLAogICAgICAgICAgICAiY29udHJvbFNoYSI6ICJmIiAqIDQwLAogICAgICAgICAgICAiZW50cmllcyI6IFsKICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAiYnJhbmNoIjogIndvcmsvcmV1c2VkIiwKICAgICAgICAgICAgICAgICAgICAiaGVhZFNoYSI6ICJhIiAqIDQwLAogICAgICAgICAgICAgICAgICAgICJjbGFzc2lmaWNhdGlvbiI6ICJISVNUT1JJQ0FMX0VWSURFTkNFIiwKICAgICAgICAgICAgICAgICAgICAiZXZpZGVuY2VQYXRoIjogImRvY3Mvb2xkLWEubWQiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAiYnJhbmNoIjogIndvcmsvcmV1c2VkIiwKICAgICAgICAgICAgICAgICAgICAiaGVhZFNoYSI6ICJiIiAqIDQwLAogICAgICAgICAgICAgICAgICAgICJjbGFzc2lmaWNhdGlvbiI6ICJISVNUT1JJQ0FMX0VWSURFTkNFIiwKICAgICAgICAgICAgICAgICAgICAiZXZpZGVuY2VQYXRoIjogImRvY3Mvb2xkLWIubWQiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgXSwKICAgICAgICB9CgogICAgICAgIGRlZiBmYWtlX2dpdCgqYXJncyk6CiAgICAgICAgICAgIGlmIGFyZ3NbMF0gPT0gInNob3ciOgogICAgICAgICAgICAgICAgcmV0dXJuIFRydWUsIF9faW1wb3J0X18oImpzb24iKS5kdW1wcyhpbmRleCkKICAgICAgICAgICAgaWYgYXJnc1s6Ml0gPT0gKCJtZXJnZS1iYXNlIiwgIi0taXMtYW5jZXN0b3IiKToKICAgICAgICAgICAgICAgIHJldHVybiBUcnVlLCAiIgogICAgICAgICAgICByZXR1cm4gRmFsc2UsICJ1bmV4cGVjdGVkIgoKICAgICAgICB3aXRoIG1vY2sucGF0Y2gub2JqZWN0KHBydW5lLCAicnVuX2dpdCIsIHNpZGVfZWZmZWN0PWZha2VfZ2l0KToKICAgICAgICAgICAgZXZpZGVuY2UgPSBwcnVuZS5vYnNlcnZlX2NvbGRfYXJjaGl2ZSgKICAgICAgICAgICAgICAgIHJlZnMsICJFQUtlcmJlci9Nb2JpbGlQcmVzZW50ZXIiLCBjb250cm9sX2JyYW5jaD0ibWFpbiIKICAgICAgICAgICAgKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwoZXZpZGVuY2VbIndvcmsvcmV1c2VkIl0sICJjb2xkLWFyY2hpdmU6IiArICJjIiAqIDQwKQoKICAgIGRlZiB0ZXN0X2NvbGRfYXJjaGl2ZV8wMl9kdXBsaWNhdGVfZXhhY3RfaWRlbnRpdHlfZmFpbHNfY2xvc2VkKHNlbGYpOgogICAgICAgIHJlZnMgPSB7CiAgICAgICAgICAgICJtYWluIjogImYiICogNDAsCiAgICAgICAgICAgICJhcmNoaXZlL2NvbGQiOiAiYyIgKiA0MCwKICAgICAgICAgICAgIndvcmsvcmV1c2VkIjogImEiICogNDAsCiAgICAgICAgfQogICAgICAgIGVudHJ5ID0gewogICAgICAgICAgICAiYnJhbmNoIjogIndvcmsvcmV1c2VkIiwKICAgICAgICAgICAgImhlYWRTaGEiOiAiYSIgKiA0MCwKICAgICAgICAgICAgImNsYXNzaWZpY2F0aW9uIjogIkhJU1RPUklDQUxfRVZJREVOQ0UiLAogICAgICAgICAgICAiZXZpZGVuY2VQYXRoIjogImRvY3Mvb2xkLm1kIiwKICAgICAgICB9CiAgICAgICAgaW5kZXggPSB7CiAgICAgICAgICAgICJzY2hlbWFWZXJzaW9uIjogIkNvbGRBcmNoaXZlSW5kZXggMC4yIiwKICAgICAgICAgICAgInJlcG9zaXRvcnkiOiAiRUFLZXJiZXIvTW9iaWxpUHJlc2VudGVyIiwKICAgICAgICAgICAgImFyY2hpdmVCcmFuY2giOiAiYXJjaGl2ZS9jb2xkIiwKICAgICAgICAgICAgImNvbnRyb2xTaGEiOiAiZiIgKiA0MCwKICAgICAgICAgICAgImVudHJpZXMiOiBbZW50cnksIGRpY3QoZW50cnkpXSwKICAgICAgICB9CiAgICAgICAgd2l0aCBtb2NrLnBhdGNoLm9iamVjdCgKICAgICAgICAgICAgcHJ1bmUsICJydW5fZ2l0IiwgcmV0dXJuX3ZhbHVlPShUcnVlLCBfX2ltcG9ydF9fKCJqc29uIikuZHVtcHMoaW5kZXgpKQogICAgICAgICk6CiAgICAgICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwoCiAgICAgICAgICAgICAgICBwcnVuZS5vYnNlcnZlX2NvbGRfYXJjaGl2ZSgKICAgICAgICAgICAgICAgICAgICByZWZzLCAiRUFLZXJiZXIvTW9iaWxpUHJlc2VudGVyIiwgY29udHJvbF9icmFuY2g9Im1haW4iCiAgICAgICAgICAgICAgICApLAogICAgICAgICAgICAgICAge30sCiAgICAgICAgICAgICkKCiAgICBkZWYgdGVzdF9jb2xkX2FyY2hpdmVfMDFfa2VlcHNfbGVnYWN5X3VuaXF1ZV9icmFuY2hfcnVsZShzZWxmKToKICAgICAgICByZWZzID0gewogICAgICAgICAgICAibWFpbiI6ICJmIiAqIDQwLAogICAgICAgICAgICAiYXJjaGl2ZS9jb2xkIjogImMiICogNDAsCiAgICAgICAgICAgICJ3b3JrL3JldXNlZCI6ICJiIiAqIDQwLAogICAgICAgIH0KICAgICAgICBpbmRleCA9IHsKICAgICAgICAgICAgInNjaGVtYVZlcnNpb24iOiAiQ29sZEFyY2hpdmVJbmRleCAwLjEiLAogICAgICAgICAgICAicmVwb3NpdG9yeSI6ICJFQUtlcmJlci9Nb2JpbGlQcmVzZW50ZXIiLAogICAgICAgICAgICAiYXJjaGl2ZUJyYW5jaCI6ICJhcmNoaXZlL2NvbGQiLAogICAgICAgICAgICAiY29udHJvbFNoYSI6ICJmIiAqIDQwLAogICAgICAgICAgICAiZW50cmllcyI6IFsKICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAiYnJhbmNoIjogIndvcmsvcmV1c2VkIiwKICAgICAgICAgICAgICAgICAgICAiaGVhZFNoYSI6ICJhIiAqIDQwLAogICAgICAgICAgICAgICAgICAgICJjbGFzc2lmaWNhdGlvbiI6ICJISVNUT1JJQ0FMX0VWSURFTkNFIiwKICAgICAgICAgICAgICAgICAgICAiZXZpZGVuY2VQYXRoIjogImRvY3Mvb2xkLWEubWQiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAiYnJhbmNoIjogIndvcmsvcmV1c2VkIiwKICAgICAgICAgICAgICAgICAgICAiaGVhZFNoYSI6ICJiIiAqIDQwLAogICAgICAgICAgICAgICAgICAgICJjbGFzc2lmaWNhdGlvbiI6ICJISVNUT1JJQ0FMX0VWSURFTkNFIiwKICAgICAgICAgICAgICAgICAgICAiZXZpZGVuY2VQYXRoIjogImRvY3Mvb2xkLWIubWQiLAogICAgICAgICAgICAgICAgfSwKICAgICAgICAgICAgXSwKICAgICAgICB9CiAgICAgICAgd2l0aCBtb2NrLnBhdGNoLm9iamVjdCgKICAgICAgICAgICAgcHJ1bmUsICJydW5fZ2l0IiwgcmV0dXJuX3ZhbHVlPShUcnVlLCBfX2ltcG9ydF9fKCJqc29uIikuZHVtcHMoaW5kZXgpKQogICAgICAgICk6CiAgICAgICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwoCiAgICAgICAgICAgICAgICBwcnVuZS5vYnNlcnZlX2NvbGRfYXJjaGl2ZSgKICAgICAgICAgICAgICAgICAgICByZWZzLCAiRUFLZXJiZXIvTW9iaWxpUHJlc2VudGVyIiwgY29udHJvbF9icmFuY2g9Im1haW4iCiAgICAgICAgICAgICAgICApLAogICAgICAgICAgICAgICAge30sCiAgICAgICAgICAgICkK").decode("utf-8")
           text = text.replace(marker, "\n" + methods + marker, 1)
           p.write_text(text, encoding="utf-8")
           PY
