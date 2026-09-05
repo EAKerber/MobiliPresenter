@@ -32,6 +32,19 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
         self.assertIn("/tmp/project-machine-readback.json", supervisor)
         self.assertLess(supervisor.index("routines.py inspect"), supervisor.index("maintenance_inspect.py --input"))
 
+    def test_reflection_eligibility_is_derived_only_after_snapshot_readback_validation(self):
+        supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
+        command = "tools/agent.py reflection-eligibility"
+        self.assertIn(command, supervisor)
+        self.assertIn("--snapshot /tmp/scheduler-snapshot.json", supervisor)
+        self.assertIn("--source-machine /tmp/project-machine-source.json", supervisor)
+        self.assertIn("--routines /tmp/routine-inspection.json", supervisor)
+        self.assertIn("--readback-machine /tmp/project-machine-readback.json", supervisor)
+        self.assertIn("--output /tmp/reflection-eligibility.json", supervisor)
+        self.assertLess(supervisor.index("scheduler_snapshot.py validate"), supervisor.index(command))
+        upload = supervisor.split("name: supervisor-snapshot", 1)[1]
+        self.assertIn("/tmp/reflection-eligibility.json", upload)
+
     def test_project_machine_failures_preserve_diagnostics_before_propagation(self):
         agent = (ROOT / ".github/workflows/agent-ops.yml").read_text(encoding="utf-8")
         supervisor = (ROOT / ".github/workflows/supervisor-snapshot.yml").read_text(encoding="utf-8")
@@ -85,6 +98,7 @@ class SupervisorPipelineBoundaryTests(unittest.TestCase):
             "MaintenanceInspection 0.",
             "SchedulerPlan 0.",
             "SchedulerSnapshot 0.",
+            "ReflectionEligibility 0.",
             "projectMachineInspectionHash",
             "routineInspectionHash",
             "sourceHeads =",
