@@ -81,12 +81,14 @@ def _bootstrap_projection() -> dict:
 
 
 def _status_payload(state, view, published, observed) -> dict:
+    next_transition = view["development"]["nextTransition"]
     return {
         "project": project_summary(view),
         "projectStateHash": stable_hash(state),
         "published": published,
         "observedGit": observed,
-        "roadmapNextTransition": view["development"]["nextTransition"],
+        "next": next_transition,
+        "roadmapNextTransition": next_transition,
         "bootstrap": _bootstrap_projection(),
     }
 
