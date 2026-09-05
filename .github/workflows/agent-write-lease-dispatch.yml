@@ -255,6 +255,15 @@ jobs:
               --input /tmp/receipt-comment.json
           fi
 
+      - name: Preserve Agent Write Lease dispatch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-write-lease-dispatch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/agent-write-lease-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Require terminal lifecycle outcome
         if: always()
         run: |

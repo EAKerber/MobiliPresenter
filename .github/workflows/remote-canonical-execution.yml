@@ -75,6 +75,17 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
             --input /tmp/remote-canonical-comment.json
 
+      - name: Preserve remote canonical execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-canonical-execution-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/remote-canonical-result.json
+            /tmp/remote-canonical-comment.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Fail closed on blocked execution
         if: always()
         run: test "${{ steps.execute.outputs.exit_code }}" = "0"
@@ -330,6 +341,15 @@ jobs:
               "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
               --input /tmp/agent-tool-receipt-comment.json
           fi
+
+      - name: Preserve Agent Tool dispatch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-tool-dispatch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/agent-tool-*.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Require terminal dispatch outcome
         if: always()
