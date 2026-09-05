@@ -66,16 +66,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e
           python tools/project_machine.py inspect --live --json > /tmp/project-machine-inspection.json
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > /tmp/project-machine-inspection.exit-code
           python -m json.tool /tmp/project-machine-inspection.json > /dev/null
           python tools/project_machine.py validate /tmp/project-machine-inspection.json --json
       - name: Upload Project Machine inspection
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && always()
         uses: actions/upload-artifact@v4
         with:
           name: project-machine-inspection
-          path: /tmp/project-machine-inspection.json
+          path: |
+            /tmp/project-machine-inspection.json
+            /tmp/project-machine-inspection.exit-code
           if-no-files-found: error
+      - name: Propagate Project Machine disposition
+        if: github.event_name == 'pull_request'
+        run: |
+          rc="$(cat /tmp/project-machine-inspection.exit-code)"
+          if [ "$rc" -ne 0 ]; then
+            echo "Project Machine inspection exited with $rc after diagnostic preservation."
+            exit "$rc"
+          fi
       - name: Derive routine inspection
         if: github.event_name == 'pull_request'
         run: |
