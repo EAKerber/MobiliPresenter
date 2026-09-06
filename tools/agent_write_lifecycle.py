@@ -60,6 +60,14 @@ def _sha(value: Any, code: str) -> str:
     return value
 
 
+def _expected_branch_head(value: Any, action: str, code: str) -> str | None:
+    if value is None:
+        if action == "acquire":
+            return None
+        raise AgentWriteLifecycleError(code)
+    return _sha(value, code)
+
+
 def _hash(value: Any, code: str) -> str:
     if not isinstance(value, str) or not HASH_RE.fullmatch(value):
         raise AgentWriteLifecycleError(code)
@@ -105,7 +113,11 @@ def validate_request(value: Any) -> dict[str, Any]:
     if branch != value["branch"] or branch == "main":
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BRANCH_FORBIDDEN")
     _sha(value.get("expectedAuthorityHead"), "AGENT_WRITE_LIFECYCLE_AUTHORITY_HEAD_INVALID")
-    _sha(value.get("expectedBranchHead"), "AGENT_WRITE_LIFECYCLE_BRANCH_HEAD_INVALID")
+    _expected_branch_head(
+        value.get("expectedBranchHead"),
+        action,
+        "AGENT_WRITE_LIFECYCLE_BRANCH_HEAD_INVALID",
+    )
 
     expected_binding = value.get("expectedBindingHash")
     ttl = value.get("ttlSeconds")
@@ -328,8 +340,17 @@ def prepare_dispatch(
     validate_begin_binding(request, manifest, context)
     carrier = transport or GhApiTransport()
 
-    observed_branch = git_observation.observe_branch(request["branch"], transport=carrier)
-    if observed_branch["branchHead"] != request["expectedBranchHead"]:
+    expected_branch_head = request["expectedBranchHead"]
+    if expected_branch_head is None:
+        observed_branch_head = git_observation.ref_head(
+            carrier,
+            request["branch"],
+            missing_ok=True,
+        )
+    else:
+        observed_branch = git_observation.observe_branch(request["branch"], transport=carrier)
+        observed_branch_head = observed_branch["branchHead"]
+    if observed_branch_head != expected_branch_head:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BRANCH_DRIFT")
 
     authority = GitHubCoordinationAuthority(transport=carrier)
@@ -452,7 +473,11 @@ def validate_dispatch(value: Any) -> dict[str, Any]:
     if action not in ACTIONS:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_ACTION_INVALID")
     git_observation.canonical_branch(value.get("branch"))
-    _sha(value.get("expectedBranchHead"), "AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
+    _expected_branch_head(
+        value.get("expectedBranchHead"),
+        action,
+        "AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID",
+    )
     _sha(value.get("authorityHead"), "AGENT_WRITE_LIFECYCLE_DISPATCH_INVALID")
 
     previous_binding_hash = value.get("previousBindingHash")
