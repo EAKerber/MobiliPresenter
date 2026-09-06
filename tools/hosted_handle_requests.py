@@ -106,10 +106,17 @@ def validate_write_lease(value: Any, *, repository: str) -> dict[str, Any]:
     branch = value.get("branch")
     if not isinstance(branch, str) or not branch.strip() or branch == "main":
         raise HostedHandleRequestError("HOSTED_HANDLE_WRITE_LEASE_BRANCH_INVALID")
-    for key in ("expectedAuthorityHead", "expectedBranchHead"):
-        item = value.get(key)
-        if not isinstance(item, str) or SHA_RE.fullmatch(item) is None:
+    authority_head = value.get("expectedAuthorityHead")
+    if not isinstance(authority_head, str) or SHA_RE.fullmatch(authority_head) is None:
+        raise HostedHandleRequestError("HOSTED_HANDLE_WRITE_LEASE_HEAD_INVALID")
+    branch_head = value.get("expectedBranchHead")
+    if action == "acquire":
+        if branch_head is not None and (
+            not isinstance(branch_head, str) or SHA_RE.fullmatch(branch_head) is None
+        ):
             raise HostedHandleRequestError("HOSTED_HANDLE_WRITE_LEASE_HEAD_INVALID")
+    elif not isinstance(branch_head, str) or SHA_RE.fullmatch(branch_head) is None:
+        raise HostedHandleRequestError("HOSTED_HANDLE_WRITE_LEASE_HEAD_INVALID")
     prior = value.get("expectedBindingHash")
     ttl = value.get("ttlSeconds")
     if action == "acquire":
