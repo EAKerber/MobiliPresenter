@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "M13BoundedWriteCanary 0.1",
+  "canary": "m13-bounded-write-canary-v2-20260906",
+  "status": "written",
+  "semanticAuthority": false,
+  "authorizesMutation": false
+}
