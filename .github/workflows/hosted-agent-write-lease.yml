@@ -116,7 +116,7 @@ jobs:
           from tools import agent_write_lifecycle as lifecycle
           from tools import coordination
           from tools import hosted_agent_write_lease as hosted
-          from tools.coordination_remote import GitHubCoordinationAuthority
+          from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
           request_path=Path('/tmp/agent-write-lease-request.json')
           request=json.loads(request_path.read_text(encoding='utf-8'))
@@ -137,7 +137,7 @@ jobs:
               raise RuntimeError('HOSTED_AGENT_WRITE_LEASE_RECOVERY_RELEASE_ONLY')
 
           dispatch=hosted.prepare(request, manifest, context, meta=meta)
-          authority=GitHubCoordinationAuthority().observe()
+          authority=GitHubCoordinationAuthority(transport=GhApiTransport()).observe()
           if authority.head_sha != dispatch['authorityHead']:
               raise RuntimeError('HOSTED_AGENT_WRITE_LEASE_RECOVERY_AUTHORITY_DRIFT')
           matches=lifecycle._matching_exact_leases(
