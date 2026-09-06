@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-9b036f844c1a97fb26fec2b6:0",
-      "resource": "branch:work/operations/m13-quiescence-window-collector",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m13-quiescence-window-collector-20260906",
-        "branch": "work/operations/m13-quiescence-window-collector",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-171c05d32885846f821ff052",
-      "acquiredAt": "2026-09-06T18:55:28Z",
-      "renewedAt": "2026-09-06T18:55:28Z",
-      "expiresAt": "2026-09-06T19:55:28Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "325db7f132a2f7a6d510ad3c46a6a3dc4f82d259",
+  "leases": [],
+  "revision": "5b2185cf19454fa968f7f3380fbf219c4599328b",
   "schemaVersion": "CoordinationState 0.1"
 }
