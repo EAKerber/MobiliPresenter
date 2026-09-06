@@ -229,6 +229,19 @@ class HostedExpiredReleaseRecoveryWorkflowTests(unittest.TestCase):
         self.assertIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_LEASE_NOT_EXPIRED", text)
         self.assertIn("steps.prepare_recovery.outcome != 'success'", text)
 
+    def test_recovery_reobservation_uses_explicit_github_transport(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority",
+            text,
+        )
+        self.assertIn(
+            "GitHubCoordinationAuthority(transport=GhApiTransport()).observe()",
+            text,
+        )
+        self.assertNotIn("GitHubCoordinationAuthority().observe()", text)
+
 
 if __name__ == "__main__":
     unittest.main()
