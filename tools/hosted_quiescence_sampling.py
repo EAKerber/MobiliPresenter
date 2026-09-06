@@ -17,6 +17,16 @@ APPLICABLE_ROLE = "manager-gitops"
 APPLICABLE_INTENT = "inspect-and-plan"
 
 
+def _load_json(path: str | Path) -> dict[str, Any]:
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("HOSTED_QUIESCENCE_INPUT_INVALID") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("HOSTED_QUIESCENCE_INPUT_INVALID")
+    return value
+
+
 def _write_json(path: str | Path, value: dict[str, Any]) -> None:
     Path(path).write_text(
         json.dumps(value, indent=2, ensure_ascii=False) + "\n",
@@ -158,3 +168,34 @@ def materialize(
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
+
+
+def materialize_from_files(
+    *,
+    context_path: str | Path,
+    observation_id: str,
+    sequence: int,
+    output_dir: str | Path,
+) -> int:
+    root = Path(output_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    try:
+        result = materialize(
+            _load_json(context_path),
+            observation_id=observation_id,
+            sequence=sequence,
+            output_dir=root,
+        )
+        rc = 0
+    except (RuntimeError, OSError, ValueError, KeyError) as exc:
+        result = {
+            "ok": False,
+            "error": str(exc),
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        rc = 2
+    _write_json(root / "result.json", result)
+    print(json.dumps(result, ensure_ascii=False))
+    return rc
