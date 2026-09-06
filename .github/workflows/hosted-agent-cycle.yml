@@ -218,13 +218,6 @@ jobs:
           raise SystemExit(2)
           PY
 
-      - name: Preserve close compatibility qualifier
-        id: preserve_close_recovery_qualifier
-        if: steps.download_begin.outcome == 'success'
-        continue-on-error: true
-        run: |
-          cp tools/hosted_cycle_close_compat_recovery.py /tmp/hosted-cycle-close-compat-recovery.py
-
       - name: Checkout exact begin semantic host
         id: checkout_begin
         if: steps.download_begin.outcome == 'success'
@@ -271,13 +264,48 @@ jobs:
 
       - name: Qualify observational close compatibility recovery
         id: close_recovery_eligibility
-        if: >-
-          steps.checkout_begin.outcome == 'success' &&
-          steps.close.outcome != 'success' &&
-          steps.preserve_close_recovery_qualifier.outcome == 'success'
+        if: steps.checkout_begin.outcome == 'success' && steps.close.outcome != 'success'
         continue-on-error: true
         run: |
-          python /tmp/hosted-cycle-close-compat-recovery.py --result /tmp/hosted-result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          try:
+              value = json.loads(
+                  Path('/tmp/hosted-result.json').read_text(encoding='utf-8')
+              )
+          except (OSError, json.JSONDecodeError):
+              raise SystemExit(2)
+
+          cause = {
+              'code': 'HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID',
+              'source': 'hosted-agent-cycle-trace',
+              'phase': 'CLOSE',
+          }
+          core = value.get('failureCore') if isinstance(value, dict) else None
+          recovery = core.get('recovery') if isinstance(core, dict) else None
+          eligible = (
+              isinstance(value, dict)
+              and value.get('schemaVersion') == 'HostedAgentCycleFailure 0.2'
+              and value.get('status') in {'BLOCKED', 'UNKNOWN'}
+              and isinstance(core, dict)
+              and core.get('schemaVersion') == 'AgentFailureCore 0.1'
+              and core.get('surface') == 'AGENT_CYCLE'
+              and core.get('phase') == 'CLOSE'
+              and core.get('status') in {'BLOCKED', 'UNKNOWN'}
+              and core.get('causes') == [cause]
+              and isinstance(recovery, dict)
+              and recovery.get('observationRetry') == 'UNKNOWN'
+              and recovery.get('operationReplay') == 'NOT_APPLICABLE'
+              and core.get('mutationState') == 'NOT_APPLICABLE'
+              and core.get('lossyProjection') is False
+              and core.get('readOnly') is True
+              and core.get('semanticAuthority') is False
+              and core.get('authorizesMutation') is False
+          )
+          raise SystemExit(0 if eligible else 2)
+          PY
           cp /tmp/hosted-result.json /tmp/hosted-close-compatibility-failure.json
 
       - name: Restore current hosted-cycle carrier for compatible close observation
