@@ -128,6 +128,38 @@ jobs:
             --command /tmp/hosted-command.json \
             --result /tmp/hosted-result.json
 
+      - name: Derive hosted quiescence sample
+        id: hosted_quiescence
+        if: >-
+          steps.begin.outcome == 'success' &&
+          steps.begin_artifact.outcome == 'success' &&
+          steps.begin_resumability.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/hosted-quiescence
+          python - <<'PY'
+          import os
+          from tools import hosted_quiescence_sampling
+          raise SystemExit(hosted_quiescence_sampling.materialize_from_files(
+              context_path='/tmp/agent-cycle-begin/context.json',
+              observation_id=f"{os.environ['GITHUB_RUN_ID']}:{os.environ['GITHUB_RUN_ATTEMPT']}",
+              sequence=int(os.environ['GITHUB_RUN_NUMBER']),
+              output_dir='/tmp/hosted-quiescence',
+          ))
+          PY
+
+      - name: Upload hosted quiescence evidence
+        if: steps.hosted_quiescence.outcome == 'success' || steps.hosted_quiescence.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosted-quiescence-${{ github.run_id }}
+          path: /tmp/hosted-quiescence
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Observe exact begin artifact
         id: observe_begin
         if: steps.parse.outcome == 'success' && steps.parse.outputs.action == 'close'
