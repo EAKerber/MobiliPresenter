@@ -218,6 +218,13 @@ jobs:
           raise SystemExit(2)
           PY
 
+      - name: Preserve close compatibility qualifier
+        id: preserve_close_recovery_qualifier
+        if: steps.download_begin.outcome == 'success'
+        continue-on-error: true
+        run: |
+          cp tools/hosted_cycle_close_compat_recovery.py /tmp/hosted-cycle-close-compat-recovery.py
+
       - name: Checkout exact begin semantic host
         id: checkout_begin
         if: steps.download_begin.outcome == 'success'
@@ -262,8 +269,49 @@ jobs:
             --result /tmp/hosted-result.json
           cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
 
+      - name: Qualify observational close compatibility recovery
+        id: close_recovery_eligibility
+        if: >-
+          steps.checkout_begin.outcome == 'success' &&
+          steps.close.outcome != 'success' &&
+          steps.preserve_close_recovery_qualifier.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python /tmp/hosted-cycle-close-compat-recovery.py --result /tmp/hosted-result.json
+          cp /tmp/hosted-result.json /tmp/hosted-close-compatibility-failure.json
+
+      - name: Restore current hosted-cycle carrier for compatible close observation
+        id: checkout_close_recovery
+        if: steps.close_recovery_eligibility.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Run canonical close compatibility recovery
+        id: close_recovery
+        if: steps.checkout_close_recovery.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOSTED_AGENT_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          rm -rf /tmp/hosted-evidence /tmp/agent-cycle-close
+          mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
+          cp /tmp/hosted-close-compatibility-failure.json \
+            /tmp/agent-cycle-close/compatibility-recovery-source.json
+          python tools/hosted_agent_cycle.py close \
+            --command /tmp/hosted-command.json \
+            --meta /tmp/hosted-meta.json \
+            --begin-dir /tmp/agent-cycle-begin \
+            --closure /tmp/agent-cycle-close/closure.json \
+            --evidence-dir /tmp/hosted-evidence \
+            --result /tmp/hosted-result.json
+          cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
+
       - name: Materialize close termination review shadow
-        if: steps.close.outcome == 'success'
+        if: steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success'
         run: |
           args=(
             close-review
@@ -301,7 +349,10 @@ jobs:
           fi
 
       - name: Promote observational close gap
-        if: steps.checkout_begin.outcome == 'success' && steps.close.outcome != 'success'
+        if: >-
+          steps.checkout_begin.outcome == 'success' &&
+          steps.close.outcome != 'success' &&
+          steps.close_recovery.outcome != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -318,7 +369,7 @@ jobs:
 
       - name: Upload close proof
         id: close_artifact
-        if: steps.close.outcome == 'success'
+        if: steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -328,9 +379,11 @@ jobs:
           retention-days: 14
 
       - name: Fail close if proof was not preserved
-        if: steps.close.outcome == 'success' && steps.close_artifact.outcome != 'success'
+        if: >-
+          (steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success') &&
+          steps.close_artifact.outcome != 'success'
         env:
-          HOSTED_AGENT_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
+          HOSTED_AGENT_SOURCE_SHA: ${{ steps.close_recovery.outcome == 'success' && github.sha || steps.parse.outputs.begin_source_sha }}
         run: |
           python tools/hosted_agent_cycle.py failure \
             --error HOSTED_AGENT_CLOSE_ARTIFACT_UPLOAD_FAILED \
