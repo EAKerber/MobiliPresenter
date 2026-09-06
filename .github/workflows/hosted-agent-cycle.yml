@@ -262,8 +262,84 @@ jobs:
             --result /tmp/hosted-result.json
           cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
 
+      - name: Qualify observational close compatibility recovery
+        id: close_recovery_eligibility
+        if: steps.checkout_begin.outcome == 'success' && steps.close.outcome != 'success'
+        continue-on-error: true
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          try:
+              value = json.loads(
+                  Path('/tmp/hosted-result.json').read_text(encoding='utf-8')
+              )
+          except (OSError, json.JSONDecodeError):
+              raise SystemExit(2)
+
+          cause = {
+              'code': 'HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID',
+              'source': 'hosted-agent-cycle-trace',
+              'phase': 'CLOSE',
+          }
+          core = value.get('failureCore') if isinstance(value, dict) else None
+          recovery = core.get('recovery') if isinstance(core, dict) else None
+          eligible = (
+              isinstance(value, dict)
+              and value.get('schemaVersion') == 'HostedAgentCycleFailure 0.2'
+              and value.get('status') in {'BLOCKED', 'UNKNOWN'}
+              and isinstance(core, dict)
+              and core.get('schemaVersion') == 'AgentFailureCore 0.1'
+              and core.get('surface') == 'AGENT_CYCLE'
+              and core.get('phase') == 'CLOSE'
+              and core.get('status') in {'BLOCKED', 'UNKNOWN'}
+              and core.get('causes') == [cause]
+              and isinstance(recovery, dict)
+              and recovery.get('observationRetry') == 'UNKNOWN'
+              and recovery.get('operationReplay') == 'NOT_APPLICABLE'
+              and core.get('mutationState') == 'NOT_APPLICABLE'
+              and core.get('lossyProjection') is False
+              and core.get('readOnly') is True
+              and core.get('semanticAuthority') is False
+              and core.get('authorizesMutation') is False
+          )
+          raise SystemExit(0 if eligible else 2)
+          PY
+          cp /tmp/hosted-result.json /tmp/hosted-close-compatibility-failure.json
+
+      - name: Restore current hosted-cycle carrier for compatible close observation
+        id: checkout_close_recovery
+        if: steps.close_recovery_eligibility.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Run canonical close compatibility recovery
+        id: close_recovery
+        if: steps.checkout_close_recovery.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOSTED_AGENT_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          rm -rf /tmp/hosted-evidence /tmp/agent-cycle-close
+          mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
+          cp /tmp/hosted-close-compatibility-failure.json \
+            /tmp/agent-cycle-close/compatibility-recovery-source.json
+          python tools/hosted_agent_cycle.py close \
+            --command /tmp/hosted-command.json \
+            --meta /tmp/hosted-meta.json \
+            --begin-dir /tmp/agent-cycle-begin \
+            --closure /tmp/agent-cycle-close/closure.json \
+            --evidence-dir /tmp/hosted-evidence \
+            --result /tmp/hosted-result.json
+          cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
+
       - name: Materialize close termination review shadow
-        if: steps.close.outcome == 'success'
+        if: steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success'
         run: |
           args=(
             close-review
@@ -301,7 +377,10 @@ jobs:
           fi
 
       - name: Promote observational close gap
-        if: steps.checkout_begin.outcome == 'success' && steps.close.outcome != 'success'
+        if: >-
+          steps.checkout_begin.outcome == 'success' &&
+          steps.close.outcome != 'success' &&
+          steps.close_recovery.outcome != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -318,7 +397,7 @@ jobs:
 
       - name: Upload close proof
         id: close_artifact
-        if: steps.close.outcome == 'success'
+        if: steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -328,9 +407,11 @@ jobs:
           retention-days: 14
 
       - name: Fail close if proof was not preserved
-        if: steps.close.outcome == 'success' && steps.close_artifact.outcome != 'success'
+        if: >-
+          (steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success') &&
+          steps.close_artifact.outcome != 'success'
         env:
-          HOSTED_AGENT_SOURCE_SHA: ${{ steps.parse.outputs.begin_source_sha }}
+          HOSTED_AGENT_SOURCE_SHA: ${{ steps.close_recovery.outcome == 'success' && github.sha || steps.parse.outputs.begin_source_sha }}
         run: |
           python tools/hosted_agent_cycle.py failure \
             --error HOSTED_AGENT_CLOSE_ARTIFACT_UPLOAD_FAILED \
