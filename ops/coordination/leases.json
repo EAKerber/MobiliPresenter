@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "2d826062a77aadd76fa5d01889ea9d2c60537d5c",
+  "leases": [
+    {
+      "leaseId": "agent-write-db3bd665b5abf6e04906f83f:0",
+      "resource": "branch:work/operations/m13-rq2-bounded-write-canary",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m13-rq2-write-canary-20260905",
+        "branch": "work/operations/m13-rq2-bounded-write-canary",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-bb11ffda82fe398efc0cab56",
+      "acquiredAt": "2026-09-06T01:14:53Z",
+      "renewedAt": "2026-09-06T01:14:53Z",
+      "expiresAt": "2026-09-06T02:14:53Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "987060ca96c9ab64e0c99f78bfe695198255c043",
   "schemaVersion": "CoordinationState 0.1"
 }
