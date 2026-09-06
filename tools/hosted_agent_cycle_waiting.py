@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from tools import agent_cycle_close
 from tools import agent_failure
 from tools import agent_write_lifecycle_guard
 from tools import hosted_agent_cycle
@@ -22,6 +23,7 @@ from tools.canonical import stable_hash
 
 WAITING_SCHEMA = "HostedAgentCycleCloseWaiting 0.1"
 CLOSE_DELTA_DIAGNOSTIC_SCHEMA = "HostedAgentCycleCloseDeltaDiagnostic 0.1"
+CLOSE_DELTA_DIAGNOSTIC_ERROR_SCHEMA = "HostedAgentCycleCloseDeltaDiagnosticError 0.1"
 WAITING_FIELDS = {
     "schemaVersion",
     "requestId",
@@ -118,13 +120,7 @@ def validate_waiting(value: Any) -> dict[str, Any]:
 
 
 def build_close_delta_diagnostic(closure: Any) -> dict[str, Any] | None:
-    """Project one already-materialized unattributed close delta for durable logs.
-
-    This does not validate or reinterpret the canonical closure. The Hosted close
-    path has already done that before producing its failure wrapper. This helper
-    only copies the canonical receipt fields needed to diagnose the existing
-    UNATTRIBUTED_DURABLE_DELTA blocker and refuses every other shape.
-    """
+    """Project a validated unattributed close delta without reinterpreting it."""
     if not isinstance(closure, dict):
         return None
     if closure.get("schemaVersion") != "AgentCycleClosure 0.1":
@@ -195,16 +191,89 @@ def build_close_delta_diagnostic(closure: Any) -> dict[str, Any] | None:
     return {**body, "diagnosticHash": stable_hash(body)}
 
 
-def _emit_close_delta_diagnostic(closure_path: str) -> bool:
+def _diagnostic_error(code: str) -> dict[str, Any]:
+    body = {
+        "schemaVersion": CLOSE_DELTA_DIAGNOSTIC_ERROR_SCHEMA,
+        "status": "UNKNOWN",
+        "reasonCode": "HOSTED_AGENT_CLOSE_DELTA_DIAGNOSTIC_UNAVAILABLE",
+        "detailCode": code,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**body, "diagnosticHash": stable_hash(body)}
+
+
+def _materialize_close_delta_diagnostic(
+    command: dict[str, Any],
+    *,
+    begin_dir: str,
+    closure_path: str,
+) -> bool:
+    """Reobserve canonical close once for diagnosis; never rewrite operational result."""
+    root = Path(closure_path).parent
+    root.mkdir(parents=True, exist_ok=True)
+    attempt_path = root / "closure-attempt.json"
+    diagnostic_path = root / "close-delta-diagnostic.json"
+    error_path = root / "close-delta-diagnostic.error.json"
     try:
-        closure = _json(closure_path)
-    except HostedAgentCycleWaitingError:
+        outer = hosted_agent_cycle.validate_transport_command(command)
+        if outer.get("action") != "close":
+            raise HostedAgentCycleWaitingError("HOSTED_AGENT_CLOSE_ACTION_REQUIRED")
+        context_path = Path(begin_dir) / "context.json"
+        context = _json(context_path)
+
+        evidence_root = root / "close-delta-evidence"
+        evidence_root.mkdir(parents=True, exist_ok=True)
+        evidence_paths: list[str] = []
+        evidence_ids = outer.get("evidenceCommentIds")
+        if not isinstance(evidence_ids, list):
+            raise HostedAgentCycleWaitingError("HOSTED_AGENT_CLOSE_EVIDENCE_IDS_INVALID")
+        for index, comment_id in enumerate(evidence_ids):
+            if (
+                not isinstance(comment_id, int)
+                or isinstance(comment_id, bool)
+                or comment_id <= 0
+            ):
+                raise HostedAgentCycleWaitingError("HOSTED_AGENT_CLOSE_EVIDENCE_ID_INVALID")
+            normalized = hosted_agent_cycle.normalize_remote_evidence(
+                hosted_agent_cycle._remote_result_payload(comment_id)
+            )
+            path = evidence_root / f"evidence-{index:03d}.json"
+            _write_json(path, normalized)
+            evidence_paths.append(str(path))
+
+        closure = agent_cycle_close.close_from_files(
+            context_path=str(context_path),
+            machine_scope="live",
+            evidence_paths=evidence_paths,
+        )
+        evidence = agent_cycle_close.load_evidence(evidence_paths)
+        agent_cycle_close.validate_closure(closure, context, evidence=evidence)
+        _write_json(attempt_path, closure)
+
+        diagnostic = build_close_delta_diagnostic(closure)
+        if diagnostic is None:
+            raise HostedAgentCycleWaitingError(
+                "HOSTED_AGENT_CLOSE_DELTA_DIAGNOSTIC_MISMATCH"
+            )
+        _write_json(diagnostic_path, diagnostic)
+        if error_path.exists():
+            error_path.unlink()
+        print(
+            "HOSTED_AGENT_CLOSE_DELTA_DIAGNOSTIC "
+            + json.dumps(diagnostic, sort_keys=True, ensure_ascii=False)
+        )
+        return True
+    except Exception as exc:
+        code = str(exc).split(":", 1)[0] or exc.__class__.__name__
+        diagnostic = _diagnostic_error(code)
+        _write_json(error_path, diagnostic)
+        print(
+            "HOSTED_AGENT_CLOSE_DELTA_DIAGNOSTIC "
+            + json.dumps(diagnostic, sort_keys=True, ensure_ascii=False)
+        )
         return False
-    diagnostic = build_close_delta_diagnostic(closure)
-    if diagnostic is None:
-        return False
-    print(json.dumps(diagnostic, sort_keys=True, ensure_ascii=False))
-    return True
 
 
 def _failure_codes(failure: dict[str, Any]) -> set[str]:
@@ -343,7 +412,16 @@ def promote_close_result(
         output_path=closure_path,
     )
     if not waiting_for:
-        _emit_close_delta_diagnostic(closure_path)
+        try:
+            codes = _failure_codes(failure)
+        except Exception:
+            codes = set()
+        if "UNATTRIBUTED_DURABLE_DELTA" in codes:
+            _materialize_close_delta_diagnostic(
+                command,
+                begin_dir=begin_dir,
+                closure_path=closure_path,
+            )
         return False
     waiting = build_waiting(command, manifest, failure, waiting_for)
     _write_json(result_path, waiting)
