@@ -1002,6 +1002,7 @@ def close_from_envelope(
     evidence = agent_cycle_close.load_evidence(evidence_paths)
     structured_failure = _closure_failure_core(closure, context, evidence)
     if structured_failure is not None:
+        _write_json(output_path, closure)
         raise HostedAgentCycleError(
             "HOSTED_AGENT_CLOSE_NOT_PASS",
             failure_core=structured_failure,
