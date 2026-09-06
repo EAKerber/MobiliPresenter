@@ -33,6 +33,11 @@ _CYCLE_CLOSE_V02_FIELDS = {
     "schemaVersion", "requestId", "action", "handle", "evidenceCommentIds",
     "semanticAuthority", "authorizesMutation",
 }
+_LEASE_FAILURE_FIELDS = {
+    "schemaVersion", "requestId", "requestHash", "action", "begin", "actor",
+    "branch", "authorityHead", "status", "blockers", "semanticAuthority",
+    "authorizesMutation", "failureHash",
+}
 
 
 class HostedCycleRecordError(RuntimeError):
@@ -386,6 +391,53 @@ def _validate_strong_lease_v02(
         raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID") from exc
 
 
+def _hex_digest(value: Any, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(char in "0123456789abcdef" for char in value)
+    )
+
+
+def _validate_strong_lease_failure(
+    payload: dict[str, Any], begin: dict[str, Any], actor: dict[str, Any]
+) -> dict[str, Any]:
+    from tools import agent_write_lifecycle as lifecycle
+
+    blockers = payload.get("blockers")
+    authority_head = payload.get("authorityHead")
+    if (
+        set(payload) != _LEASE_FAILURE_FIELDS
+        or payload.get("schemaVersion") != lifecycle.FAILURE_SCHEMA
+        or not isinstance(payload.get("requestId"), str)
+        or not payload["requestId"].strip()
+        or not _hex_digest(payload.get("requestHash"), 64)
+        or payload.get("action") not in lifecycle.ACTIONS
+        or payload.get("begin") != begin
+        or payload.get("actor") != actor
+        or not isinstance(payload.get("branch"), str)
+        or not payload["branch"].strip()
+        or (authority_head is not None and not _hex_digest(authority_head, 40))
+        or payload.get("status") not in {"BLOCKED", "UNKNOWN"}
+        or not isinstance(blockers, list)
+        or not blockers
+        or any(not isinstance(item, str) or not item for item in blockers)
+        or blockers != sorted(set(blockers))
+        or payload.get("semanticAuthority") is not False
+        or payload.get("authorizesMutation") is not False
+        or not _hex_digest(payload.get("failureHash"), 64)
+    ):
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_LEASE_FAILURE_INVALID")
+    core = {
+        key: copy.deepcopy(item)
+        for key, item in payload.items()
+        if key != "failureHash"
+    }
+    if payload["failureHash"] != stable_hash(core):
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_LEASE_FAILURE_HASH_MISMATCH")
+    return payload
+
+
 def collect(
     comments: list[dict[str, Any]], manifest: dict[str, Any], *, close_comment_id: int,
 ) -> dict[str, Any]:
@@ -543,6 +595,16 @@ def collect(
                 ):
                     from tools import agent_write_lifecycle as lifecycle
 
+                    if lease_result.get("schemaVersion") == lifecycle.FAILURE_SCHEMA:
+                        normalized = _validate_strong_lease_failure(
+                            lease_result, begin, actor
+                        )
+                        records.append(_record(
+                            kind="write-lease-failure", comment=comment,
+                            marker=WRITE_LEASE_RESULT_MARKER, binding=STRONG,
+                            payload=lease_result, normalized=normalized,
+                        ))
+                        continue
                     try:
                         normalized = lifecycle.validate_result(lease_result)
                     except RuntimeError as exc:
