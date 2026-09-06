@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import copy
 import json
 from pathlib import Path
@@ -16,17 +15,6 @@ from tools import (
 
 APPLICABLE_ROLE = "manager-gitops"
 APPLICABLE_INTENT = "inspect-and-plan"
-ERROR_EXIT = 2
-
-
-def _load_json(path: str | Path) -> dict[str, Any]:
-    try:
-        value = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError("HOSTED_QUIESCENCE_INPUT_INVALID") from exc
-    if not isinstance(value, dict):
-        raise RuntimeError("HOSTED_QUIESCENCE_INPUT_INVALID")
-    return value
 
 
 def _write_json(path: str | Path, value: dict[str, Any]) -> None:
@@ -130,6 +118,9 @@ def materialize(
             "applicable": False,
             "role": context["semanticContext"]["role"],
             "declaredIntent": context["semanticContext"]["declaredIntent"],
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
         }
 
     root = Path(output_dir)
@@ -167,42 +158,3 @@ def materialize(
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
-
-
-def run(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="hosted-quiescence-sampling")
-    parser.add_argument("--context", required=True)
-    parser.add_argument("--observation-id", required=True)
-    parser.add_argument("--sequence", required=True, type=int)
-    parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--json", action="store_true", dest="as_json")
-    args = parser.parse_args(argv)
-
-    try:
-        context = _load_json(args.context)
-        value = materialize(
-            context,
-            observation_id=args.observation_id,
-            sequence=args.sequence,
-            output_dir=args.output_dir,
-        )
-        print(json.dumps(value, indent=2 if args.as_json else None, ensure_ascii=False))
-        return 0
-    except RuntimeError as exc:
-        print(
-            json.dumps(
-                {
-                    "ok": False,
-                    "error": str(exc),
-                    "readOnly": True,
-                    "semanticAuthority": False,
-                    "authorizesMutation": False,
-                },
-                ensure_ascii=False,
-            )
-        )
-        return ERROR_EXIT
-
-
-if __name__ == "__main__":
-    raise SystemExit(run())
