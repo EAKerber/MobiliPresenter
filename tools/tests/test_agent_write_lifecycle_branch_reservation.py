@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from tools import agent_write_lifecycle as lifecycle
 from tools import git_observation
@@ -85,7 +85,7 @@ class AgentWriteLifecycleBranchReservationTests(unittest.TestCase):
                 hosted_run_id=456,
                 transport=object(),
             )
-        ref_head.assert_called_once_with(object.__class__ if False else unittest.mock.ANY, BRANCH, missing_ok=True)
+        ref_head.assert_called_once_with(ANY, BRANCH, missing_ok=True)
         self.assertIsNone(dispatch["expectedBranchHead"])
         self.assertIsNone(lifecycle.validate_dispatch(dispatch)["expectedBranchHead"])
         self.assertEqual([f"branch:{BRANCH}"], dispatch["command"]["payload"]["resources"])
