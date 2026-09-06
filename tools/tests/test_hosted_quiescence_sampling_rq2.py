@@ -90,6 +90,9 @@ class HostedQuiescenceSamplingRQ2Tests(unittest.TestCase):
                 "applicable": False,
                 "role": "ui-ux",
                 "declaredIntent": "inspect-and-plan",
+                "readOnly": True,
+                "semanticAuthority": False,
+                "authorizesMutation": False,
             },
             result,
         )
