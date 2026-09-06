@@ -263,21 +263,51 @@ def _active_session_leases(observation: Any, session_id: str) -> list[dict[str, 
     ]
 
 
+def _matching_exact_leases(
+    request: dict[str, Any],
+    leases: list[dict[str, Any]],
+    *,
+    lease_id: str,
+) -> list[dict[str, Any]]:
+    resource = f"branch:{request['branch']}"
+    expected_owner = _owner(request)
+    return [
+        copy.deepcopy(lease)
+        for lease in leases
+        if lease.get("leaseId") == lease_id
+        and lease.get("resource") == resource
+        and lease.get("owner") == expected_owner
+    ]
+
+
 def _exact_active_lease(
     request: dict[str, Any],
     observation: Any,
     *,
     lease_id: str,
 ) -> dict[str, Any]:
-    resource = f"branch:{request['branch']}"
-    expected_owner = _owner(request)
-    matches = [
-        lease
-        for lease in coordination.active_leases(observation.state, observation.authority_now)
-        if lease.get("leaseId") == lease_id
-        and lease.get("resource") == resource
-        and lease.get("owner") == expected_owner
-    ]
+    matches = _matching_exact_leases(
+        request,
+        coordination.active_leases(observation.state, observation.authority_now),
+        lease_id=lease_id,
+    )
+    if len(matches) != 1:
+        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BOUND_LEASE_NOT_FOUND")
+    return matches[0]
+
+
+def _exact_materialized_lease(
+    request: dict[str, Any],
+    observation: Any,
+    *,
+    lease_id: str,
+) -> dict[str, Any]:
+    coordination.validate_state(observation.state)
+    matches = _matching_exact_leases(
+        request,
+        observation.state["leases"],
+        lease_id=lease_id,
+    )
     if len(matches) != 1:
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BOUND_LEASE_NOT_FOUND")
     return matches[0]
@@ -312,11 +342,25 @@ def _prepare_previous_binding(
     if latest["state"] != "ACTIVE":
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_NOT_ACTIVE")
 
-    bound_lease = _exact_active_lease(
-        request,
-        observation,
-        lease_id=latest["leaseId"],
-    )
+    if action == "release":
+        # Release is the finalization path for the exact lease identity already
+        # bound to this cycle. Chronological expiry removes write authority but
+        # does not erase the materialized lease from Coordination, so cleanup
+        # must still be able to prove and remove that exact stale record.
+        bound_lease = _exact_materialized_lease(
+            request,
+            observation,
+            lease_id=latest["leaseId"],
+        )
+    else:
+        # Renew remains an active-lease operation. Expired materialized state
+        # must never be revived implicitly by lifecycle continuation.
+        bound_lease = _exact_active_lease(
+            request,
+            observation,
+            lease_id=latest["leaseId"],
+        )
+
     if action == "renew":
         session_leases = _active_session_leases(
             observation,
