@@ -425,6 +425,8 @@ def collect_prior_samples(
             raise HostedQuiescenceHistoryError(
                 "HOSTED_QUIESCENCE_HISTORY_CONCURRENT_RUN"
             )
+        if run.get("conclusion") == "skipped":
+            continue
         sample = _download_sample_from_run(repository, run)
         if sample is None:
             continue
