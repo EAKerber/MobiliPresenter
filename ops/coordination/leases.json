@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-5a87d0a1ed7e66402d5f5950:0",
-      "resource": "branch:work/operations/m13-nonpass-close-proof-upload",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m13-nonpass-close-proof-upload-20260906",
-        "branch": "work/operations/m13-nonpass-close-proof-upload",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-380e7d801cc97fd810dbc192",
-      "acquiredAt": "2026-09-06T18:09:33Z",
-      "renewedAt": "2026-09-06T18:09:33Z",
-      "expiresAt": "2026-09-06T19:09:33Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "5ba881050b6c93280a4717be4fe33e6112091011",
+  "leases": [],
+  "revision": "1876f23aaff88e3d40b7e623a9543d2df21490b9",
   "schemaVersion": "CoordinationState 0.1"
 }
