@@ -3,19 +3,28 @@ from __future__ import annotations
 import copy
 from typing import Any, Callable
 
-from tools import agent_write_lifecycle_guard
 from tools.agent_tools import contracts
 from tools.agent_tools import guard_proofs
 from tools.canonical import stable_hash
 
 MUTATION_EFFECT = "shared-durable-mutation"
 
+
+def _prove_agent_write_lifecycle_bound(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    # Keep the lifecycle guard out of module import-time. The guard imports the
+    # hosted cycle graph, which reaches agent_tools.admission again through
+    # AgentCycle readiness. Resolve it only when this proof is actually needed.
+    from tools import agent_write_lifecycle_guard
+
+    return agent_write_lifecycle_guard.prove_active_binding(*args, **kwargs)
+
+
 # Proof providers materialize admission evidence only. Their availability does
 # not authorize a write: mutation-execute still requires an intent-scoped plan,
 # a positive proof set, dispatch to the canonical host, and execution-time
 # guard revalidation before the existing writer is invoked.
 GUARD_PROOF_PROVIDERS: dict[str, Callable[..., dict[str, Any]]] = {
-    "agent-write-lifecycle-bound": agent_write_lifecycle_guard.prove_active_binding,
+    "agent-write-lifecycle-bound": _prove_agent_write_lifecycle_bound,
     "coordination-lease-owned": guard_proofs.prove_coordination_lease_owned,
     "git-cas": guard_proofs.prove_git_cas,
 }
