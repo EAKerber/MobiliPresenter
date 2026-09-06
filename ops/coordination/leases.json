@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "5b2185cf19454fa968f7f3380fbf219c4599328b",
+  "leases": [
+    {
+      "leaseId": "agent-write-bba9b904575d10af869a1525:0",
+      "resource": "branch:work/operations/m13-project-state-route-enablement",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "m13-finalize-project-state-v2-20260906",
+        "branch": "work/operations/m13-project-state-route-enablement",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-2251b406449fb4d19003b9b3",
+      "acquiredAt": "2026-09-06T23:45:43Z",
+      "renewedAt": "2026-09-06T23:45:43Z",
+      "expiresAt": "2026-09-07T00:45:43Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "7027ecea759867f4669648605480a90402a562db",
   "schemaVersion": "CoordinationState 0.1"
 }
