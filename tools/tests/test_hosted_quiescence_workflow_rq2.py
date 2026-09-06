@@ -38,7 +38,7 @@ class HostedQuiescenceWorkflowRQ2Tests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         require = workflow.split("- name: Require operational result", 1)[1]
         self.assertNotIn("hosted_quiescence", require)
-        self.assertEqual(1, workflow.count("steps.hosted_quiescence.outcome"))
+        self.assertEqual(2, workflow.count("steps.hosted_quiescence.outcome"))
         upload = workflow.split("- name: Upload hosted quiescence evidence", 1)[1].split(
             "- name: Observe exact begin artifact", 1
         )[0]
