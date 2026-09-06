@@ -21,6 +21,7 @@ from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
 
 WAITING_SCHEMA = "HostedAgentCycleCloseWaiting 0.1"
+CLOSE_DELTA_DIAGNOSTIC_SCHEMA = "HostedAgentCycleCloseDeltaDiagnostic 0.1"
 WAITING_FIELDS = {
     "schemaVersion",
     "requestId",
@@ -114,6 +115,96 @@ def validate_waiting(value: Any) -> dict[str, Any]:
     if value["resultHash"] != stable_hash(core):
         raise HostedAgentCycleWaitingError("HOSTED_AGENT_WAITING_RESULT_HASH_MISMATCH")
     return value
+
+
+def build_close_delta_diagnostic(closure: Any) -> dict[str, Any] | None:
+    """Project one already-materialized unattributed close delta for durable logs.
+
+    This does not validate or reinterpret the canonical closure. The Hosted close
+    path has already done that before producing its failure wrapper. This helper
+    only copies the canonical receipt fields needed to diagnose the existing
+    UNATTRIBUTED_DURABLE_DELTA blocker and refuses every other shape.
+    """
+    if not isinstance(closure, dict):
+        return None
+    if closure.get("schemaVersion") != "AgentCycleClosure 0.1":
+        return None
+    if closure.get("status") not in {"UNKNOWN", "BLOCKED"}:
+        return None
+    closure_hash = closure.get("closureHash")
+    if not isinstance(closure_hash, str) or not HASH_RE.fullmatch(closure_hash):
+        return None
+    cycle_id = closure.get("cycleId")
+    if not isinstance(cycle_id, str) or not cycle_id:
+        return None
+
+    receipt = closure.get("receipt")
+    if not isinstance(receipt, dict) or receipt.get("status") not in {"UNKNOWN", "BLOCKED"}:
+        return None
+    receipt_hash = receipt.get("receiptHash")
+    if not isinstance(receipt_hash, str) or not HASH_RE.fullmatch(receipt_hash):
+        return None
+    blockers = receipt.get("blockers")
+    if (
+        not isinstance(blockers, list)
+        or any(not isinstance(item, str) or not item for item in blockers)
+        or "UNATTRIBUTED_DURABLE_DELTA" not in blockers
+    ):
+        return None
+
+    delta = receipt.get("delta")
+    aggregate = receipt.get("aggregateReadback")
+    if not isinstance(delta, dict) or not isinstance(aggregate, dict):
+        return None
+    durable = delta.get("durableChanges")
+    covered = aggregate.get("coveredDurableChanges")
+    uncovered = aggregate.get("uncoveredDurableChanges")
+    evidence_count = aggregate.get("evidenceCount")
+    source_heads = aggregate.get("sourceHeads")
+    if (
+        not isinstance(durable, list)
+        or any(not isinstance(item, dict) for item in durable)
+        or not isinstance(covered, list)
+        or any(not isinstance(item, str) for item in covered)
+        or not isinstance(uncovered, list)
+        or any(not isinstance(item, str) for item in uncovered)
+        or not isinstance(evidence_count, int)
+        or isinstance(evidence_count, bool)
+        or evidence_count < 0
+        or not isinstance(source_heads, dict)
+    ):
+        return None
+
+    body = {
+        "schemaVersion": CLOSE_DELTA_DIAGNOSTIC_SCHEMA,
+        "status": closure["status"],
+        "cycleId": cycle_id,
+        "sourceClosureHash": closure_hash,
+        "sourceReceiptHash": receipt_hash,
+        "receiptStatus": receipt["status"],
+        "blockers": copy.deepcopy(blockers),
+        "durableChanges": copy.deepcopy(durable),
+        "coveredDurableChanges": copy.deepcopy(covered),
+        "uncoveredDurableChanges": copy.deepcopy(uncovered),
+        "evidenceCount": evidence_count,
+        "sourceHeads": copy.deepcopy(source_heads),
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**body, "diagnosticHash": stable_hash(body)}
+
+
+def _emit_close_delta_diagnostic(closure_path: str) -> bool:
+    try:
+        closure = _json(closure_path)
+    except HostedAgentCycleWaitingError:
+        return False
+    diagnostic = build_close_delta_diagnostic(closure)
+    if diagnostic is None:
+        return False
+    print(json.dumps(diagnostic, sort_keys=True, ensure_ascii=False))
+    return True
 
 
 def _failure_codes(failure: dict[str, Any]) -> set[str]:
@@ -252,6 +343,7 @@ def promote_close_result(
         output_path=closure_path,
     )
     if not waiting_for:
+        _emit_close_delta_diagnostic(closure_path)
         return False
     waiting = build_waiting(command, manifest, failure, waiting_for)
     _write_json(result_path, waiting)
