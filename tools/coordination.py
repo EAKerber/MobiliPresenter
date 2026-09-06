@@ -465,16 +465,25 @@ def plan_release(
     canonical_owner = validate_owner(owner)
     if mine == (resources is not None):
         raise CoordinationError("RELEASE_INVALID", "choose exactly one of resources or mine=True")
-    candidate = compact_expired(state, current)
 
     if mine:
+        # Session-wide release remains an active-lease operation. Expired entries
+        # are compacted exactly as before so `mine=True` cannot become a broad
+        # cleanup primitive for stale materialized state.
+        candidate = compact_expired(state, current)
         target_resources = sorted(
             lease["resource"] for lease in candidate["leases"] if _same_session(lease["owner"], canonical_owner)
         )
         if not target_resources:
             raise CoordinationError("LEASE_NOT_OWNER", "session owns no active leases")
     else:
+        # Exact-resource release is also the canonical finalization path for a
+        # lease that expired chronologically but is still materialized in the
+        # authority. Work from the validated raw state and remove only the
+        # explicitly named, same-session resources; unrelated expired entries
+        # are intentionally preserved rather than compacted as a side effect.
         assert resources is not None
+        candidate = copy.deepcopy(state)
         target_resources = normalize_resources(resources)
         by_resource = {lease["resource"]: lease for lease in candidate["leases"]}
         for resource in target_resources:
