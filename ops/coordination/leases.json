@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-d3efd0c951e75c789feb7ea6:0",
-      "resource": "branch:work/operations/post-m13-invalid-lease-record-hardening",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "post-m13-invalid-lease-record-hardening-20260907",
-        "branch": "work/operations/post-m13-invalid-lease-record-hardening",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-75b52410b26856066a5c2786",
-      "acquiredAt": "2026-09-07T21:05:49Z",
-      "renewedAt": "2026-09-07T21:05:49Z",
-      "expiresAt": "2026-09-07T22:05:49Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "2140a7eae133e235de5809478edb512f7e760870",
+  "leases": [],
+  "revision": "c664da70f78a674085732efffc0b3a82eeeeb720",
   "schemaVersion": "CoordinationState 0.1"
 }
