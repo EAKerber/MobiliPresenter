@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "dd96088470f6e24386d07f109dd6741791f4db53",
+  "leases": [
+    {
+      "leaseId": "post-m13-r2-lease-v2:0",
+      "resource": "branch:work/operations/post-m13-r2-remote-canonical-preflight",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "post-m13-r2-remote-canonical-preflight",
+        "branch": "work/operations/post-m13-r2-remote-canonical-preflight",
+        "pr": null
+      },
+      "reason": "POST-M13-R2 RemoteCanonical request preflight",
+      "acquiredAt": "2026-09-07T23:24:08Z",
+      "renewedAt": "2026-09-07T23:24:08Z",
+      "expiresAt": "2026-09-08T00:24:08Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "990c051e41091b5e0754bad315d2a011ee9a2da8",
   "schemaVersion": "CoordinationState 0.1"
 }
