@@ -17,6 +17,7 @@ from tools.agent_commands.agent_owned_git import execute_agent_owned_git
 from tools.canonical import stable_hash
 from tools.remote_canonical_execution import (
     RemoteCanonicalExecutionError,
+    command_hash,
     execute_command as execute_remote_command,
     validate_command,
 )
@@ -54,6 +55,22 @@ def authorize_role_route(command: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(path, str) or not any(path.startswith(prefix) and len(path) > len(prefix) for prefix in UI_ALLOWED_PATH_PREFIXES):
         raise RemoteCanonicalExecutionError("REMOTE_COMMAND_ROLE_PATH_FORBIDDEN")
     return command
+
+
+def prepare_comment(command: dict[str, Any]) -> dict[str, Any]:
+    """Validate one manual command and render the exact existing bus envelope."""
+    canonical = authorize_role_route(command)
+    comment_body = REQUEST_MARKER + "\n" + json.dumps(
+        canonical, ensure_ascii=False, indent=2, sort_keys=True
+    )
+    return {
+        "command": canonical,
+        "commandHash": command_hash(canonical),
+        "commentBody": comment_body,
+        "transportReady": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
 
 
 def execute_command(
@@ -148,11 +165,16 @@ def build_source(event_meta: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def failure_payload(exc: BaseException, command: dict[str, Any] | None = None) -> dict[str, Any]:
+def _error_code(exc: BaseException) -> str:
     code = getattr(exc, "code", None)
-    if not isinstance(code, str) or not code:
-        text = str(exc)
-        code = text.split(":", 1)[0] if text else exc.__class__.__name__
+    if isinstance(code, str) and code:
+        return code
+    text = str(exc)
+    return text.split(":", 1)[0] if text else exc.__class__.__name__
+
+
+def failure_payload(exc: BaseException, command: dict[str, Any] | None = None) -> dict[str, Any]:
+    code = _error_code(exc)
     core = {
         "schemaVersion": FAILURE_SCHEMA,
         "executionId": command.get("executionId") if isinstance(command, dict) else None,
@@ -166,15 +188,58 @@ def failure_payload(exc: BaseException, command: dict[str, Any] | None = None) -
     return {**core, "failureHash": stable_hash(core)}
 
 
+def _preflight_failure_payload(exc: BaseException) -> dict[str, Any]:
+    return {
+        "status": "BLOCKED",
+        "blockers": [_error_code(exc)],
+        "detail": str(exc),
+        "transportReady": False,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
 def _write(path: str, payload: dict[str, Any]) -> None:
     Path(path).write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def _run_preflight(command_path: str, comment_output: str | None) -> int:
+    try:
+        command = json.loads(Path(command_path).read_text(encoding="utf-8"))
+        result = prepare_comment(command)
+        if comment_output:
+            Path(comment_output).write_text(result["commentBody"] + "\n", encoding="utf-8")
+    except (RemoteCanonicalExecutionError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        print(json.dumps(_preflight_failure_payload(exc), ensure_ascii=False), file=sys.stderr)
+        return 2
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="remote-canonical-issue")
-    parser.add_argument("--event", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--event")
+    parser.add_argument("--output")
+    parser.add_argument(
+        "--preflight-command",
+        help="Validate a manual RemoteCanonicalCommand and render its existing issue-comment envelope without publishing.",
+    )
+    parser.add_argument(
+        "--comment-output",
+        help="Optional output path for the validated issue-comment body. Valid only with --preflight-command.",
+    )
     args = parser.parse_args(argv)
+
+    if args.preflight_command is not None:
+        if args.event is not None or args.output is not None:
+            parser.error("--preflight-command cannot be combined with --event or --output")
+        return _run_preflight(args.preflight_command, args.comment_output)
+
+    if args.event is None or args.output is None:
+        parser.error("--event and --output are required unless --preflight-command is used")
+    if args.comment_output is not None:
+        parser.error("--comment-output requires --preflight-command")
+
     raw_command: Any = None
     command: dict[str, Any] | None = None
     event_meta: dict[str, Any] | None = None

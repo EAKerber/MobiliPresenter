@@ -9,7 +9,6 @@ from pathlib import Path
 
 from tools import remote_canonical_execution as bridge
 from tools import remote_canonical_issue as issue_adapter
-from tools import remote_canonical_preflight as preflight
 
 
 ACTOR = {
@@ -53,7 +52,7 @@ def event(comment_body: str) -> dict:
 class RemoteCanonicalPreflightPostM13Tests(unittest.TestCase):
     def test_valid_update_renders_exact_receiver_compatible_comment(self):
         command = update_command()
-        result = preflight.preflight(command)
+        result = issue_adapter.prepare_comment(command)
         parsed, meta = issue_adapter.parse_event(event(result["commentBody"]))
         self.assertEqual(parsed, command)
         self.assertEqual(meta, {"issueNumber": 145, "commentId": 9001})
@@ -66,7 +65,7 @@ class RemoteCanonicalPreflightPostM13Tests(unittest.TestCase):
         command = update_command()
         del command["payload"]["message"]
         with self.assertRaisesRegex(RuntimeError, "REMOTE_COMMAND_PAYLOAD_INVALID"):
-            preflight.preflight(command)
+            issue_adapter.prepare_comment(command)
 
     def test_cli_blocked_preflight_does_not_materialize_comment_output(self):
         command = update_command()
@@ -78,9 +77,9 @@ class RemoteCanonicalPreflightPostM13Tests(unittest.TestCase):
             stdout = StringIO()
             stderr = StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
-                status = preflight.main(
+                status = issue_adapter.main(
                     [
-                        "--command",
+                        "--preflight-command",
                         str(command_path),
                         "--comment-output",
                         str(output_path),
