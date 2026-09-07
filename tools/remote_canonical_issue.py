@@ -76,7 +76,13 @@ def execute_command(
     return execute_remote_command(command, source=source, transport=transport)
 
 
-def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+def _parse_event_transport(value: Any) -> tuple[Any, dict[str, Any], dict[str, Any]]:
+    """Parse trusted transport framing without consuming command semantics.
+
+    Keeping the raw JSON value alive until semantic admission lets a rejected
+    command retain deterministic request identity without weakening parse_event's
+    fail-closed admission contract.
+    """
     if not isinstance(value, dict):
         raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_EVENT_INVALID")
     issue = value.get("issue")
@@ -103,7 +109,10 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         command = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_JSON_INVALID") from exc
-    command = authorize_role_route(validate_command(command))
+    return command, issue, comment
+
+
+def _event_meta(issue: dict[str, Any], comment: dict[str, Any]) -> dict[str, Any]:
     issue_number = issue.get("number")
     comment_id = comment.get("id")
     if (
@@ -115,11 +124,16 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         or comment_id <= 0
     ):
         raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_IDENTITY_INVALID")
-    event_meta = {
+    return {
         "issueNumber": issue_number,
         "commentId": comment_id,
     }
-    return command, event_meta
+
+
+def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    command, issue, comment = _parse_event_transport(value)
+    command = authorize_role_route(validate_command(command))
+    return command, _event_meta(issue, comment)
 
 
 def build_source(event_meta: dict[str, Any]) -> dict[str, Any]:
@@ -161,16 +175,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--event", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args(argv)
+    raw_command: Any = None
     command: dict[str, Any] | None = None
+    event_meta: dict[str, Any] | None = None
     try:
         event = json.loads(Path(args.event).read_text(encoding="utf-8"))
-        command, event_meta = parse_event(event)
+        raw_command, issue, comment = _parse_event_transport(event)
+        command = authorize_role_route(validate_command(raw_command))
+        event_meta = _event_meta(issue, comment)
         receipt = execute_command(command, source=build_source(event_meta))
         _write(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False))
         return 0
     except (RemoteCanonicalExecutionError, RuntimeError, OSError, json.JSONDecodeError) as exc:
-        payload = failure_payload(exc, command)
+        if command is None and isinstance(raw_command, dict):
+            failure_command = raw_command
+        elif event_meta is not None and isinstance(command, dict):
+            failure_command = command
+        else:
+            failure_command = None
+        payload = failure_payload(exc, failure_command)
         _write(args.output, payload)
         print(json.dumps(payload, ensure_ascii=False))
         return 2
