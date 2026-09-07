@@ -377,18 +377,44 @@ def _validate_strong_lease_v02(
 ) -> dict[str, Any]:
     from tools import agent_write_lifecycle as lifecycle, hosted_handle_requests
 
+    if not hosted_handle_requests.matches_manifest(
+        payload.get("handle"), manifest, repository=CURRENT_REPOSITORY
+    ):
+        raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_LEASE_HANDLE_BINDING_MISMATCH")
     try:
         hosted_handle_requests.validate_write_lease(payload, repository=CURRENT_REPOSITORY)
-        if not hosted_handle_requests.matches_manifest(
-            payload.get("handle"), manifest, repository=CURRENT_REPOSITORY
-        ):
-            raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_LEASE_HANDLE_BINDING_MISMATCH")
         value = hosted_handle_requests.build_write_lease_inner(payload, begin=begin, actor=actor)
         return lifecycle.validate_request(value)
-    except HostedCycleRecordError:
-        raise
     except RuntimeError as exc:
         raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID") from exc
+
+
+def _invalid_strong_lease_v02_diagnostic(
+    payload: dict[str, Any], manifest: dict[str, Any]
+) -> dict[str, Any] | None:
+    from tools import hosted_handle_requests
+
+    if not hosted_handle_requests.matches_manifest(
+        payload.get("handle"), manifest, repository=CURRENT_REPOSITORY
+    ):
+        return None
+    try:
+        hosted_handle_requests.validate_write_lease(
+            payload, repository=CURRENT_REPOSITORY
+        )
+    except RuntimeError as exc:
+        code = getattr(exc, "code", None)
+        if not isinstance(code, str) or not code:
+            code = str(exc).split(":", 1)[0] or exc.__class__.__name__
+        return {
+            "schemaVersion": "HostedCycleInvalidRecord 0.1",
+            "recordType": "write-lease-request",
+            "error": code,
+            "payloadHash": stable_hash(payload),
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+    return None
 
 
 def _hex_digest(value: Any, length: int) -> bool:
@@ -520,11 +546,21 @@ def collect(
 
             lease_outer = json_after_marker(body, WRITE_LEASE_REQUEST_MARKER_V02)
             if isinstance(lease_outer, dict) and _handle_claims_manifest(lease_outer.get("handle"), manifest, cycle_id):
-                normalized = _validate_strong_lease_v02(lease_outer, manifest, begin, actor)
+                diagnostic = _invalid_strong_lease_v02_diagnostic(
+                    lease_outer, manifest
+                )
+                if diagnostic is None:
+                    normalized = _validate_strong_lease_v02(
+                        lease_outer, manifest, begin, actor
+                    )
+                    kind = "write-lease-request"
+                else:
+                    normalized = diagnostic
+                    kind = "write-lease-invalid-request"
                 if not before_seal:
                     raise HostedCycleRecordError("HOSTED_CYCLE_RECORD_POST_SEAL_REQUEST")
                 records.append(_record(
-                    kind="write-lease-request", comment=comment,
+                    kind=kind, comment=comment,
                     marker=WRITE_LEASE_REQUEST_MARKER_V02, binding=STRONG,
                     payload=lease_outer,
                     normalized=normalized,
