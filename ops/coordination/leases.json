@@ -2,22 +2,22 @@
   "intents": [],
   "leases": [
     {
-      "leaseId": "agent-write-fb4674d72c40dc9b421d3381:0",
+      "leaseId": "agent-write-3647e2673e0d10bf33796748:0",
       "resource": "branch:work/operations/m13-project-state-route-enablement",
       "mode": "exclusive-write",
       "owner": {
         "role": "manager-gitops",
-        "session": "m13-project-state-route-ci-fix-write-20260907",
+        "session": "m13-route-registry-reconcile-20260907",
         "branch": "work/operations/m13-project-state-route-enablement",
         "pr": null
       },
-      "reason": "Agent write lifecycle cycle-instance-7e958eecc9717d34771f3004",
-      "acquiredAt": "2026-09-07T14:10:45Z",
-      "renewedAt": "2026-09-07T15:10:03Z",
-      "expiresAt": "2026-09-07T16:10:03Z",
+      "reason": "Agent write lifecycle cycle-instance-339a18a4be21c04195c4ea85",
+      "acquiredAt": "2026-09-07T16:20:50Z",
+      "renewedAt": "2026-09-07T16:20:50Z",
+      "expiresAt": "2026-09-07T17:20:50Z",
       "ttlSeconds": 3600
     }
   ],
-  "revision": "d7a85a6f0ae441d7fb726efda76bc1bd61e84fff",
+  "revision": "27c30c4fd39ada05f07deb26593500ee711d0ab7",
   "schemaVersion": "CoordinationState 0.1"
 }
