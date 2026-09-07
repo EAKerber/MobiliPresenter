@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "TransitionPlan 0.1",
+  "domain": "project-state",
+  "action": "checkpoint",
+  "subject": {
+    "kind": "project-state",
+    "id": "mobilipresenter"
+  },
+  "authority": {
+    "kind": "repository-file",
+    "locator": {
+      "path": "ops/state/project.json"
+    }
+  },
+  "beforeStateHash": "3a891a6025731b316d422e22342337afa98dcd95cd071616c5607f849067689e",
+  "afterStateHash": "ff88741dda65c7ce1ac7e2d460fef2eed47b9ee6e0d455c5e7f0611ff825d3a5",
+  "intent": {
+    "checkpoint": "M13-REFLECTION-QUIESCENCE-0.1-CLOSED",
+    "nextTransition": "reassess-pcs-01b-module-presentation-metadata-admission-v0.1",
+    "phase": "between-increments"
+  },
+  "candidate": {
+    "schemaVersion": "ProjectState 2.1",
+    "project": {
+      "id": "mobilipresenter",
+      "repository": "EAKerber/MobiliPresenter"
+    },
+    "git": {
+      "controlBranch": "main",
+      "protectedBranches": []
+    },
+    "published": {
+      "url": "https://mobilipresenter.netlify.app/",
+      "artifactManifest": "ops/published/viewer-next-current.json"
+    },
+    "development": {
+      "initiative": "Viewer Next — Responsive Fixed-Frame",
+      "phase": "between-increments",
+      "checkpoint": "M13-REFLECTION-QUIESCENCE-0.1-CLOSED",
+      "nextTransition": "reassess-pcs-01b-module-presentation-metadata-admission-v0.1"
+    }
+  },
+  "reversibility": "revertible",
+  "planHash": "b1a026d0b0dfd54b9af0d99c7ce65b872ac3be73133868fb8d8431fb323047bf"
+}
