@@ -491,6 +491,11 @@
       "semanticValidator": "tools.agent_write_lifecycle.validate_dispatch",
       "structuralSchema": "ops/schemas/agent-write-lease-dispatch.schema.json"
     },
+    "agent-write-lease-proof": {
+      "owner": "coordination",
+      "semanticValidator": "tools.agent_tools.guard_proofs.validate_agent_write_lease_proof",
+      "structuralSchema": "ops/schemas/agent-write-lease-proof.schema.json"
+    },
     "agent-write-lease-request": {
       "owner": "coordination",
       "semanticValidator": "tools.agent_write_lifecycle.validate_request",
