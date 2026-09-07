@@ -13,11 +13,11 @@
       },
       "reason": "Agent write lifecycle cycle-instance-7e958eecc9717d34771f3004",
       "acquiredAt": "2026-09-07T14:10:45Z",
-      "renewedAt": "2026-09-07T14:10:45Z",
-      "expiresAt": "2026-09-07T15:10:45Z",
+      "renewedAt": "2026-09-07T15:10:03Z",
+      "expiresAt": "2026-09-07T16:10:03Z",
       "ttlSeconds": 3600
     }
   ],
-  "revision": "6bc5d734f984cc3235b44cb1aee4cb9183559b9c",
+  "revision": "d7a85a6f0ae441d7fb726efda76bc1bd61e84fff",
   "schemaVersion": "CoordinationState 0.1"
 }
