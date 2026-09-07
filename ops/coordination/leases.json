@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-c03dc690a885cb9516ac835b:0",
-      "resource": "branch:work/operations/m13-finalize-reflection-quiescence-v2",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "m13-final-project-state-closure-20260907",
-        "branch": "work/operations/m13-finalize-reflection-quiescence-v2",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-b688fea9ef16909410485ac3",
-      "acquiredAt": "2026-09-07T19:19:56Z",
-      "renewedAt": "2026-09-07T19:19:56Z",
-      "expiresAt": "2026-09-07T20:19:56Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "dfbe85710eec4409064043a1346a39c403f104b6",
+  "leases": [],
+  "revision": "2930a3bfdd6e423dcd02391a12141db487e4d7e0",
   "schemaVersion": "CoordinationState 0.1"
 }
