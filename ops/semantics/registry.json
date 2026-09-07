@@ -1149,6 +1149,31 @@
       "canonicalWriterFor": [],
       "delegatesTo": []
     },
+    "hosted-project-state-checkpoint-cli": {
+      "module": "tools.hosted_project_state_checkpoint",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "coordination-leases",
+        "project-state"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [
+        "git-branch-refs"
+      ],
+      "writesResources": [
+        "git-branch-refs"
+      ],
+      "produces": [
+        "artifact.receipt",
+        "artifact.transition-plan"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "project-state-executor"
+      ]
+    },
     "integration-reconcile-plan": {
       "module": "tools.integration_reconcile",
       "owner": "operations-core",
@@ -2737,6 +2762,7 @@
       ],
       "providerRequirements": {},
       "toolSurfaces": [
+        "github-actions-workflows",
         "python-module-cli"
       ],
       "fallbackPolicy": "forbidden"
@@ -3530,6 +3556,13 @@
         },
         {
           "targetKind": "workflow",
+          "target": ".github/workflows/hosted-project-state-checkpoint.yml",
+          "capabilities": [
+            "project-state.mutate"
+          ]
+        },
+        {
+          "targetKind": "workflow",
           "target": ".github/workflows/remote-canonical-execution.yml",
           "capabilities": [
             "remote.canonical.execute",
@@ -3722,6 +3755,13 @@
           "target": "hosted-agent-write-lease-cli",
           "capabilities": [
             "agent.write-lease.lifecycle"
+          ]
+        },
+        {
+          "targetKind": "component",
+          "target": "hosted-project-state-checkpoint-cli",
+          "capabilities": [
+            "project-state.mutate"
           ]
         },
         {
