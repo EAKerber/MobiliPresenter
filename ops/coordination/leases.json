@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "fa2aa1d12efcf1bf7c6d292c6ae621459c7af9bc",
+  "leases": [
+    {
+      "leaseId": "agent-write-34a76c3a3abd3755c27e2f0e:0",
+      "resource": "branch:work/operations/roadmap-freshness-agent-tool-discovery",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "post278-ci-fixture-v0-1",
+        "branch": "work/operations/roadmap-freshness-agent-tool-discovery",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-15a6c338b280ed78b52613ec",
+      "acquiredAt": "2026-09-08T16:12:15Z",
+      "renewedAt": "2026-09-08T16:12:15Z",
+      "expiresAt": "2026-09-08T16:42:15Z",
+      "ttlSeconds": 1800
+    }
+  ],
+  "revision": "4833984bb281ef923eab13d1f19b1a890d0e9aea",
   "schemaVersion": "CoordinationState 0.1"
 }
