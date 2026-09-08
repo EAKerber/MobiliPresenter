@@ -97,6 +97,9 @@ class AgentToolPolicyTests(unittest.TestCase):
         self.assertEqual(policy.effective_mode(tool, manager, "inspect-and-plan"), "plan-only")
         self.assertEqual(policy.effective_mode(tool, manager, "governed-mutation"), "mutation-execute")
         self.assertEqual(policy.effective_mode(tool, ui, "inspect-and-plan"), "plan-only")
+        rerun = catalog["tools"]["ci.workflow.rerun"]
+        self.assertEqual(rerun["effectClass"], "transport-side-effect")
+        self.assertEqual(rerun["mode"], "plan-only")
 
     def test_projection_separates_planning_from_governed_mutation(self):
         manager = projection.build_projection(
@@ -113,7 +116,7 @@ class AgentToolPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["toolId"] for item in manager["plannable"]],
-            ["git.files.mutate"],
+            ["ci.workflow.rerun", "git.files.mutate"],
         )
         self.assertEqual(manager["conditional"], [])
         self.assertTrue(all(item["mode"] == "plan-only" for item in manager["plannable"]))
@@ -145,6 +148,7 @@ class AgentToolPolicyTests(unittest.TestCase):
             ["git.files.mutate"],
         )
         self.assertNotIn("routine.inspect", [item["toolId"] for item in ui["available"]])
+        self.assertNotIn("ci.workflow.rerun", [item["toolId"] for item in ui["plannable"]])
 
     def test_mutation_execute_requires_positive_guards_and_canonical_host(self):
         catalog = copy.deepcopy(policy.load_policy())

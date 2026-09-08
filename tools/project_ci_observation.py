@@ -12,8 +12,10 @@ from typing import Any
 from tools.canonical import stable_hash
 
 SCHEMA = "ProjectCIObservation 0.1"
-STATES = {"NOT_APPLICABLE", "GREEN", "PENDING", "FAILED", "UNKNOWN"}
-CI_VALUES = {"green", "pending", "failed", "unknown"}
+STATES = {"NOT_APPLICABLE", "GREEN", "PENDING", "FAILED", "REENTRY_REQUIRED", "UNKNOWN"}
+CI_VALUES = {"green", "pending", "failed", "reentry_required", "unknown"}
+SUCCESS_CONCLUSIONS = {"success", "neutral", "skipped"}
+FAILURE_CONCLUSIONS = {"failure", "cancelled", "timed_out", "startup_failure"}
 FIELDS = {
     "schemaVersion",
     "state",
@@ -31,6 +33,20 @@ ITEM_FIELDS = {
     "ciObserved",
     "state",
     "reasonCode",
+}
+RUN_FIELDS = {
+    "name",
+    "id",
+    "status",
+    "conclusion",
+    "event",
+    "headSha",
+    "actor",
+    "triggeringActor",
+    "sameRepository",
+    "runAttempt",
+    "jobsObserved",
+    "jobCount",
 }
 
 
@@ -54,6 +70,164 @@ def _sha(value: Any, code: str) -> str:
     ):
         raise ProjectCIObservationError(code)
     return value
+
+
+def _login(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, dict):
+        login = value.get("login")
+        if isinstance(login, str) and login:
+            return login
+    return None
+
+
+def normalize_run(
+    raw: Any,
+    *,
+    repository: str,
+    jobs_observed: bool = False,
+    job_count: int | None = None,
+) -> dict[str, Any]:
+    """Normalize one GitHub workflow run into the facts needed for CI semantics."""
+    if not isinstance(raw, dict):
+        raise ProjectCIObservationError("PROJECT_CI_RUN_INVALID")
+    if not isinstance(repository, str) or not repository:
+        raise ProjectCIObservationError("PROJECT_CI_REPOSITORY_INVALID")
+    run_id = _positive_int(raw.get("id"), "PROJECT_CI_RUN_ID_INVALID")
+    name = raw.get("name")
+    if not isinstance(name, str) or not name:
+        raise ProjectCIObservationError("PROJECT_CI_RUN_NAME_INVALID")
+    status = str(raw.get("status") or "").lower()
+    conclusion = str(raw.get("conclusion") or "").lower() or None
+    event = str(raw.get("event") or "").lower() or None
+    head_sha = raw.get("headSha") if isinstance(raw.get("headSha"), str) else raw.get("head_sha")
+    if head_sha is not None:
+        _sha(head_sha, "PROJECT_CI_RUN_HEAD_INVALID")
+    actor = _login(raw.get("actor"))
+    triggering = _login(raw.get("triggeringActor")) or _login(raw.get("triggering_actor"))
+    same_repository = raw.get("sameRepository")
+    if not isinstance(same_repository, bool):
+        head_repository = raw.get("head_repository")
+        full_name = head_repository.get("full_name") if isinstance(head_repository, dict) else None
+        same_repository = full_name == repository if isinstance(full_name, str) else False
+    run_attempt = raw.get("runAttempt") if type(raw.get("runAttempt")) is int else raw.get("run_attempt")
+    if run_attempt is not None and (type(run_attempt) is not int or run_attempt <= 0):
+        raise ProjectCIObservationError("PROJECT_CI_RUN_ATTEMPT_INVALID")
+    if not isinstance(jobs_observed, bool):
+        raise ProjectCIObservationError("PROJECT_CI_RUN_JOBS_OBSERVED_INVALID")
+    if job_count is not None and (type(job_count) is not int or job_count < 0):
+        raise ProjectCIObservationError("PROJECT_CI_RUN_JOB_COUNT_INVALID")
+    if not jobs_observed:
+        job_count = None
+    return {
+        "name": name,
+        "id": run_id,
+        "status": status,
+        "conclusion": conclusion,
+        "event": event,
+        "headSha": head_sha,
+        "actor": actor,
+        "triggeringActor": triggering,
+        "sameRepository": same_repository,
+        "runAttempt": run_attempt,
+        "jobsObserved": jobs_observed,
+        "jobCount": job_count,
+    }
+
+
+def _classification_run(raw: Any) -> dict[str, Any]:
+    """Accept enriched sensor runs and legacy minimal run fixtures.
+
+    Re-entry is provable only from the enriched shape. Minimal historical callers
+    retain success/failure/pending classification but can never prove re-entry.
+    """
+    if not isinstance(raw, dict):
+        raise ProjectCIObservationError("PROJECT_CI_RUN_INVALID")
+    if set(raw) == RUN_FIELDS:
+        return raw
+    name = raw.get("name")
+    run_id = raw.get("id")
+    if not isinstance(name, str) or not name or type(run_id) is not int or run_id <= 0:
+        raise ProjectCIObservationError("PROJECT_CI_RUN_FIELDS_INVALID")
+    status = str(raw.get("status") or "").lower()
+    conclusion = str(raw.get("conclusion") or "").lower() or None
+    return {
+        "name": name,
+        "id": run_id,
+        "status": status,
+        "conclusion": conclusion,
+        "event": None,
+        "headSha": None,
+        "actor": None,
+        "triggeringActor": None,
+        "sameRepository": False,
+        "runAttempt": None,
+        "jobsObserved": False,
+        "jobCount": None,
+    }
+
+
+def _latest_runs(runs: list[dict[str, Any]], *, include_agent_ops: bool) -> list[dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
+    for raw in runs:
+        run = _classification_run(raw)
+        name = run["name"]
+        if name == "Agent Ops" and not include_agent_ops:
+            continue
+        latest.setdefault(name, run)
+    return list(latest.values())
+
+
+def _proven_reentry(run: dict[str, Any], head_sha: str) -> bool:
+    return (
+        run["status"] == "completed"
+        and run["conclusion"] == "action_required"
+        and run["event"] == "pull_request"
+        and run["headSha"] == head_sha
+        and run["sameRepository"] is True
+        and run["jobsObserved"] is True
+        and run["jobCount"] == 0
+        and "github-actions[bot]" in {run["actor"], run["triggeringActor"]}
+    )
+
+
+def classify_runs(
+    runs: list[dict[str, Any]],
+    head_sha: str,
+    *,
+    include_agent_ops: bool = False,
+) -> str:
+    """Classify latest exact-head runs while preserving known GitHub CI re-entry."""
+    head_sha = _sha(head_sha, "PROJECT_CI_PR_HEAD_INVALID")
+    selected = _latest_runs(runs, include_agent_ops=include_agent_ops)
+    if not selected:
+        return "unknown"
+    if any(run["status"] != "completed" for run in selected):
+        return "pending"
+    conclusions = {run["conclusion"] for run in selected}
+    if conclusions <= SUCCESS_CONCLUSIONS:
+        return "green"
+    if conclusions & FAILURE_CONCLUSIONS:
+        return "failed"
+    action_required = [run for run in selected if run["conclusion"] == "action_required"]
+    if action_required:
+        if all(_proven_reentry(run, head_sha) for run in action_required):
+            return "reentry_required"
+        return "unknown"
+    return "unknown"
+
+
+def reentry_run_ids(
+    runs: list[dict[str, Any]], head_sha: str, *, include_agent_ops: bool = False
+) -> list[int]:
+    if classify_runs(runs, head_sha, include_agent_ops=include_agent_ops) != "reentry_required":
+        return []
+    return sorted(
+        run["id"]
+        for run in _latest_runs(runs, include_agent_ops=include_agent_ops)
+        if _proven_reentry(run, head_sha)
+    )
 
 
 def _item(pr: Any) -> dict[str, Any]:
@@ -80,6 +254,9 @@ def _item(pr: Any) -> dict[str, Any]:
     elif ci == "failed":
         state = "FAILED"
         reason = "PR_CI_FAILED"
+    elif ci == "reentry_required":
+        state = "REENTRY_REQUIRED"
+        reason = "PR_CI_REENTRY_REQUIRED"
     else:
         state = "UNKNOWN"
         reason = "PR_CI_STATE_UNKNOWN"
@@ -100,6 +277,8 @@ def _summary_state(items: list[dict[str, Any]]) -> str:
     states = {item["state"] for item in items}
     if "FAILED" in states:
         return "FAILED"
+    if "REENTRY_REQUIRED" in states:
+        return "REENTRY_REQUIRED"
     if "UNKNOWN" in states:
         return "UNKNOWN"
     if "PENDING" in states:
