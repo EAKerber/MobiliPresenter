@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "pcs-01b-reassessment-lease-v0-1:0",
-      "resource": "branch:work/operations/pcs-01b-module-presentation-reassessment",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "pcs-01b-reassessment-v0-1",
-        "branch": "work/operations/pcs-01b-module-presentation-reassessment",
-        "pr": null
-      },
-      "reason": "PCS-01B module presentation metadata reassessment checkpoint",
-      "acquiredAt": "2026-09-08T01:02:32Z",
-      "renewedAt": "2026-09-08T01:02:32Z",
-      "expiresAt": "2026-09-08T02:02:32Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "7df173c4e669f31302b66272e839a67d807cd61e",
+  "leases": [],
+  "revision": "7766ea2dbf26678bba1d0b64fb8b4efe60fe7b47",
   "schemaVersion": "CoordinationState 0.1"
 }
