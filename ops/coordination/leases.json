@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "bab2212ddf072bbe481b8c48ac61f935d76497dc",
+  "leases": [
+    {
+      "leaseId": "pcs-01b-reassessment-freshness-lease-v0-1b:0",
+      "resource": "branch:work/operations/pcs-01b-module-presentation-reassessment",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "pcs-01b-reassessment-v0-1",
+        "branch": "work/operations/pcs-01b-module-presentation-reassessment",
+        "pr": null
+      },
+      "reason": "Refresh roadmap freshness coverage after ProjectState reassessment",
+      "acquiredAt": "2026-09-08T01:16:03Z",
+      "renewedAt": "2026-09-08T01:16:03Z",
+      "expiresAt": "2026-09-08T02:16:03Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "8bfb3cc8769b116aeed7a7b2aeae0e41da26343d",
   "schemaVersion": "CoordinationState 0.1"
 }
