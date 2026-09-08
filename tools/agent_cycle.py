@@ -72,7 +72,9 @@ def _slot_unknown(reason: Exception | str) -> dict[str, Any]:
     return {"status": "UNKNOWN", "value": None, "reasonCode": code}
 
 
-def _validate_slot(slot: Any, *, validator: Callable[[dict[str, Any]], Any] | None = None) -> dict[str, Any]:
+def _validate_slot(
+    slot: Any, *, validator: Callable[[dict[str, Any]], Any] | None = None
+) -> dict[str, Any]:
     if not isinstance(slot, dict) or set(slot) != SLOT_FIELDS:
         raise RuntimeError("AGENT_CYCLE_ARTIFACT_SLOT_FIELDS_INVALID")
     status = slot.get("status")
@@ -100,35 +102,50 @@ def _aggregate_status(machine, routine_slot, maintenance_slot, scheduler_slot, b
         ("PROJECT_MACHINE_COHERENCE", machine["coherence"]["status"]),
     ):
         if status == "FAIL":
-            hard = True; blockers.append(f"{name}_FAIL")
+            hard = True
+            blockers.append(f"{name}_FAIL")
         elif status == "UNKNOWN":
-            unknown = True; blockers.append(f"{name}_UNKNOWN")
+            unknown = True
+            blockers.append(f"{name}_UNKNOWN")
     for name, slot in (
         ("ROUTINE_INSPECTION", routine_slot),
         ("MAINTENANCE_INSPECTION", maintenance_slot),
         ("SCHEDULER_PLAN", scheduler_slot),
     ):
         if slot["status"] == "UNKNOWN":
-            unknown = True; blockers.append(f"{name}_UNKNOWN:{slot['reasonCode']}")
+            unknown = True
+            blockers.append(f"{name}_UNKNOWN:{slot['reasonCode']}")
         elif name == "ROUTINE_INSPECTION":
             routine_status = slot["value"]["status"]
             if routine_status == "FAIL":
-                hard = True; blockers.append("ROUTINE_INSPECTION_FAIL")
+                hard = True
+                blockers.append("ROUTINE_INSPECTION_FAIL")
             elif routine_status == "UNKNOWN":
-                unknown = True; blockers.append("ROUTINE_INSPECTION_RESULT_UNKNOWN")
+                unknown = True
+                blockers.append("ROUTINE_INSPECTION_RESULT_UNKNOWN")
     projection = brief["capabilityProjection"]
     if projection["missingCoverage"]:
         hard = True
-        blockers.extend(f"SEMANTIC_COVERAGE:{item}" for item in projection["missingCoverage"])
+        blockers.extend(
+            f"SEMANTIC_COVERAGE:{item}" for item in projection["missingCoverage"]
+        )
     if projection["requiredUnavailable"]:
         unknown = True
-        blockers.extend(f"REQUIRED_CAPABILITY_UNAVAILABLE:{item}" for item in projection["requiredUnavailable"])
-    return ("BLOCKED" if hard else ("UNKNOWN" if unknown else "READY"), sorted(set(blockers)))
+        blockers.extend(
+            f"REQUIRED_CAPABILITY_UNAVAILABLE:{item}"
+            for item in projection["requiredUnavailable"]
+        )
+    return (
+        "BLOCKED" if hard else ("UNKNOWN" if unknown else "READY"),
+        sorted(set(blockers)),
+    )
 
 
 def _derive_routine(machine):
     try:
-        value = routines.build_inspection(machine); routines.validate_inspection(value, machine); return _slot_pass(value)
+        value = routines.build_inspection(machine)
+        routines.validate_inspection(value, machine)
+        return _slot_pass(value)
     except RuntimeError as exc:
         return _slot_unknown(exc)
 
@@ -137,7 +154,9 @@ def _derive_maintenance(machine, routine_slot):
     if routine_slot["status"] != "PASS":
         return _slot_unknown("ROUTINE_INSPECTION_UNAVAILABLE")
     try:
-        value = maintenance_inspect.from_inputs(machine, routine_slot["value"]); maintenance_inspect.validate_inspection(value); return _slot_pass(value)
+        value = maintenance_inspect.from_inputs(machine, routine_slot["value"])
+        maintenance_inspect.validate_inspection(value)
+        return _slot_pass(value)
     except RuntimeError as exc:
         return _slot_unknown(exc)
 
@@ -146,7 +165,9 @@ def _derive_scheduler(maintenance_slot):
     if maintenance_slot["status"] != "PASS":
         return _slot_unknown("MAINTENANCE_INSPECTION_UNAVAILABLE")
     try:
-        value = scheduler_plan.build_plan(maintenance_slot["value"]); scheduler_plan.validate_plan(value); return _slot_pass(value)
+        value = scheduler_plan.build_plan(maintenance_slot["value"])
+        scheduler_plan.validate_plan(value)
+        return _slot_pass(value)
     except RuntimeError as exc:
         return _slot_unknown(exc)
 
@@ -162,38 +183,69 @@ def _close_requirements() -> dict[str, Any]:
     }
 
 
-def build_context(*, role, declared_intent, lifecycle_phase, objects, operations, scopes, machine, runtime_inspection, work_ref=None):
+def build_context(
+    *,
+    role,
+    declared_intent,
+    lifecycle_phase,
+    objects,
+    operations,
+    scopes,
+    machine,
+    runtime_inspection,
+    work_ref=None,
+):
     project_machine.validate_inspection(machine)
     runtime_capabilities.validate_inspection(runtime_inspection)
     work_ref = validate_work_ref(work_ref)
     semantic_context = semantic_brief.normalize_context(
-        role=role, declared_intent=declared_intent, lifecycle_phase=lifecycle_phase,
-        objects=objects, operations=operations, scopes=scopes,
+        role=role,
+        declared_intent=declared_intent,
+        lifecycle_phase=lifecycle_phase,
+        objects=objects,
+        operations=operations,
+        scopes=scopes,
     )
     routine_slot = _derive_routine(machine)
     maintenance_slot = _derive_maintenance(machine, routine_slot)
     scheduler_slot = _derive_scheduler(maintenance_slot)
     brief = semantic_brief.build_brief(semantic_context, runtime_inspection)
     tools = agent_tool_projection.build_projection(semantic_context, brief)
-    status, blockers = _aggregate_status(machine, routine_slot, maintenance_slot, scheduler_slot, brief)
+    status, blockers = _aggregate_status(
+        machine, routine_slot, maintenance_slot, scheduler_slot, brief
+    )
     readiness = agent_cycle_readiness.build_projection(
         legacy_status=status,
         blocking_unknowns=blockers,
         tools=tools,
+        machine=machine,
     )
     baseline = {
         "projectMachineInspectionHash": machine["inspectionHash"],
         "projectStateHash": machine["project"]["stateHash"],
         "runtimeCapabilityInspectionHash": runtime_inspection["inspectionHash"],
-        "routineInspectionHash": routine_slot["value"]["inspectionHash"] if routine_slot["status"] == "PASS" else None,
-        "maintenanceInspectionHash": maintenance_slot["value"]["inspectionHash"] if maintenance_slot["status"] == "PASS" else None,
-        "schedulerPlanHash": scheduler_slot["value"]["planHash"] if scheduler_slot["status"] == "PASS" else None,
+        "routineInspectionHash": (
+            routine_slot["value"]["inspectionHash"]
+            if routine_slot["status"] == "PASS"
+            else None
+        ),
+        "maintenanceInspectionHash": (
+            maintenance_slot["value"]["inspectionHash"]
+            if maintenance_slot["status"] == "PASS"
+            else None
+        ),
+        "schedulerPlanHash": (
+            scheduler_slot["value"]["planHash"]
+            if scheduler_slot["status"] == "PASS"
+            else None
+        ),
         "semanticBriefHash": brief["briefHash"],
         "agentToolProjectionHash": tools["projectionHash"],
         "readinessHash": readiness["readinessHash"],
         "sourceHeads": deepcopy(machine["sourceHeads"]),
     }
-    baseline_hash = stable_hash(baseline); baseline["baselineHash"] = baseline_hash
+    baseline_hash = stable_hash(baseline)
+    baseline["baselineHash"] = baseline_hash
     body = {
         "schemaVersion": SCHEMA_VERSION,
         "cycleId": f"cycle-{baseline_hash[:20]}",
@@ -229,7 +281,9 @@ def bind_work_ref(context: dict[str, Any], work_ref: Any) -> dict[str, Any]:
     if value["workRef"] is not None and value["workRef"] != normalized:
         raise RuntimeError("AGENT_CYCLE_WORK_REF_REBIND_FORBIDDEN")
     value["workRef"] = normalized
-    body = {key: deepcopy(item) for key, item in value.items() if key != "contextHash"}
+    body = {
+        key: deepcopy(item) for key, item in value.items() if key != "contextHash"
+    }
     value["contextHash"] = stable_hash(body)
     return validate_context(value)
 
@@ -242,12 +296,28 @@ def _expected_baseline(value: dict[str, Any]) -> dict[str, Any]:
         "projectMachineInspectionHash": value["projectMachine"]["inspectionHash"],
         "projectStateHash": value["projectMachine"]["project"]["stateHash"],
         "runtimeCapabilityInspectionHash": value["runtimeCapabilities"]["inspectionHash"],
-        "routineInspectionHash": routine_slot["value"]["inspectionHash"] if routine_slot["status"] == "PASS" else None,
-        "maintenanceInspectionHash": maintenance_slot["value"]["inspectionHash"] if maintenance_slot["status"] == "PASS" else None,
-        "schedulerPlanHash": scheduler_slot["value"]["planHash"] if scheduler_slot["status"] == "PASS" else None,
+        "routineInspectionHash": (
+            routine_slot["value"]["inspectionHash"]
+            if routine_slot["status"] == "PASS"
+            else None
+        ),
+        "maintenanceInspectionHash": (
+            maintenance_slot["value"]["inspectionHash"]
+            if maintenance_slot["status"] == "PASS"
+            else None
+        ),
+        "schedulerPlanHash": (
+            scheduler_slot["value"]["planHash"]
+            if scheduler_slot["status"] == "PASS"
+            else None
+        ),
         "semanticBriefHash": value["semanticBrief"]["briefHash"],
     }
-    if value.get("schemaVersion") in {SCHEMA_VERSION, PREVIOUS_SCHEMA_VERSION, PRIOR_SCHEMA_VERSION}:
+    if value.get("schemaVersion") in {
+        SCHEMA_VERSION,
+        PREVIOUS_SCHEMA_VERSION,
+        PRIOR_SCHEMA_VERSION,
+    }:
         body["agentToolProjectionHash"] = value["agentTools"]["projectionHash"]
     if value.get("schemaVersion") in {SCHEMA_VERSION, PREVIOUS_SCHEMA_VERSION}:
         body["readinessHash"] = value["readiness"]["readinessHash"]
@@ -302,19 +372,34 @@ def validate_context(value: Any) -> dict[str, Any]:
     cycle_id = value.get("cycleId")
     if not isinstance(cycle_id, str) or not cycle_id.startswith("cycle-") or len(cycle_id) != 26:
         raise RuntimeError("AGENT_CYCLE_ID_INVALID")
-    if value.get("readOnly") is not True or value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
+    if (
+        value.get("readOnly") is not True
+        or value.get("semanticAuthority") is not False
+        or value.get("authorizesMutation") is not False
+    ):
         raise RuntimeError("AGENT_CYCLE_CONTEXT_BOUNDARY_INVALID")
     project_machine.validate_inspection(value.get("projectMachine"))
     runtime_capabilities.validate_inspection(value.get("runtimeCapabilities"))
-    _validate_slot(value.get("routineInspection"), validator=lambda item: routines.validate_inspection(item, value["projectMachine"]))
-    _validate_slot(value.get("maintenanceInspection"), validator=maintenance_inspect.validate_inspection)
+    _validate_slot(
+        value.get("routineInspection"),
+        validator=lambda item: routines.validate_inspection(item, value["projectMachine"]),
+    )
+    _validate_slot(
+        value.get("maintenanceInspection"),
+        validator=maintenance_inspect.validate_inspection,
+    )
     _validate_slot(value.get("schedulerPlan"), validator=scheduler_plan.validate_plan)
-    semantic_brief.validate_brief(value.get("semanticBrief")); semantic_brief.validate_context(value.get("semanticContext"))
+    semantic_brief.validate_brief(value.get("semanticBrief"))
+    semantic_brief.validate_context(value.get("semanticContext"))
     if value["semanticBrief"]["context"] != value["semanticContext"]:
         raise RuntimeError("AGENT_CYCLE_SEMANTIC_CONTEXT_MISMATCH")
     if version in {SCHEMA_VERSION, PREVIOUS_SCHEMA_VERSION, PRIOR_SCHEMA_VERSION}:
         agent_tool_projection.validate_projection(value.get("agentTools"))
-        if value["agentTools"]["role"] != value["semanticContext"]["role"] or value["agentTools"]["declaredIntent"] != value["semanticContext"]["declaredIntent"]:
+        if (
+            value["agentTools"]["role"] != value["semanticContext"]["role"]
+            or value["agentTools"]["declaredIntent"]
+            != value["semanticContext"]["declaredIntent"]
+        ):
             raise RuntimeError("AGENT_CYCLE_AGENT_TOOL_CONTEXT_MISMATCH")
     if version in {SCHEMA_VERSION, PREVIOUS_SCHEMA_VERSION}:
         agent_cycle_readiness.validate_projection(
@@ -322,12 +407,15 @@ def validate_context(value: Any) -> dict[str, Any]:
             legacy_status=value["status"],
             blocking_unknowns=value["blockingUnknowns"],
             tools=value["agentTools"],
+            machine=value["projectMachine"] if version == SCHEMA_VERSION else None,
         )
     baseline = value.get("baseline")
     if not isinstance(baseline, dict) or "baselineHash" not in baseline:
         raise RuntimeError("AGENT_CYCLE_BASELINE_INVALID")
     supplied_baseline = baseline.get("baselineHash")
-    expected_baseline_hash = stable_hash({key: deepcopy(item) for key, item in baseline.items() if key != "baselineHash"})
+    expected_baseline_hash = stable_hash(
+        {key: deepcopy(item) for key, item in baseline.items() if key != "baselineHash"}
+    )
     if supplied_baseline != expected_baseline_hash:
         raise RuntimeError("AGENT_CYCLE_BASELINE_HASH_MISMATCH")
     if baseline != _expected_baseline(value):
