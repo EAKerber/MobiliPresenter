@@ -98,6 +98,19 @@
         }
       }
     },
+    "roadmap.freshness.inspect": {
+      "adapter": "roadmap-freshness-inspect",
+      "effectClass": "read-only",
+      "mode": "read-only-execute",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": [],
+          "requiredCapabilities": ["roadmap.freshness.inspect"],
+          "targetPolicy": "none"
+        }
+      }
+    },
     "routine.inspect": {
       "adapter": "routine-inspect",
       "effectClass": "read-only",
