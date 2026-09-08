@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "e49c7eba8f27a5f6c0ff43954da00bde83b9b83c",
+  "leases": [
+    {
+      "leaseId": "agent-write-2a5172a80aef1d434fbcaa35:0",
+      "resource": "branch:work/operations/hosted-agent-tool-payload-reference",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "hosted-agent-tool-payload-ref-v0-1",
+        "branch": "work/operations/hosted-agent-tool-payload-reference",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-f48be2d6a6392074e69c41a2",
+      "acquiredAt": "2026-09-08T21:55:50Z",
+      "renewedAt": "2026-09-08T21:55:50Z",
+      "expiresAt": "2026-09-08T22:55:50Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "cdfc4e3103b740dded3609d7bfa0a61192688744",
   "schemaVersion": "CoordinationState 0.1"
 }
