@@ -57,6 +57,19 @@
     }
   },
   "tools": {
+    "ci.workflow.rerun": {
+      "adapter": "ci-workflow-rerun",
+      "effectClass": "transport-side-effect",
+      "mode": "plan-only",
+      "roles": {
+        "manager-gitops": {
+          "allowedIntents": ["inspect-and-plan"],
+          "guards": [],
+          "requiredCapabilities": ["agent.tools.hosted"],
+          "targetPolicy": "none"
+        }
+      }
+    },
     "git.files.mutate": {
       "adapter": "remote-git-files",
       "effectClass": "shared-durable-mutation",
