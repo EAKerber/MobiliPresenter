@@ -2,22 +2,22 @@
   "intents": [],
   "leases": [
     {
-      "leaseId": "post-m13-r2-lease-v2:0",
-      "resource": "branch:work/operations/post-m13-r2-remote-canonical-preflight",
+      "leaseId": "pcs-01b-reassessment-lease-v0-1:0",
+      "resource": "branch:work/operations/pcs-01b-module-presentation-reassessment",
       "mode": "exclusive-write",
       "owner": {
         "role": "manager-gitops",
-        "session": "post-m13-r2-remote-canonical-preflight",
-        "branch": "work/operations/post-m13-r2-remote-canonical-preflight",
+        "session": "pcs-01b-reassessment-v0-1",
+        "branch": "work/operations/pcs-01b-module-presentation-reassessment",
         "pr": null
       },
-      "reason": "POST-M13-R2 RemoteCanonical request preflight",
-      "acquiredAt": "2026-09-07T23:24:08Z",
-      "renewedAt": "2026-09-07T23:24:08Z",
-      "expiresAt": "2026-09-08T00:24:08Z",
+      "reason": "PCS-01B module presentation metadata reassessment checkpoint",
+      "acquiredAt": "2026-09-08T01:02:32Z",
+      "renewedAt": "2026-09-08T01:02:32Z",
+      "expiresAt": "2026-09-08T02:02:32Z",
       "ttlSeconds": 3600
     }
   ],
-  "revision": "990c051e41091b5e0754bad315d2a011ee9a2da8",
+  "revision": "7df173c4e669f31302b66272e839a67d807cd61e",
   "schemaVersion": "CoordinationState 0.1"
 }
