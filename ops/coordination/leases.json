@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "a1fe020ffe097d5c413bda2d3c8243ea50b8d135",
+  "leases": [
+    {
+      "leaseId": "agent-write-483cf30a5ded81d14449d0ad:0",
+      "resource": "branch:work/operations/ci-reentry-intent-resolution",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "ci-reentry-intent-resolution-v0-1",
+        "branch": "work/operations/ci-reentry-intent-resolution",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-dd6c6a33426e47249379c7b5",
+      "acquiredAt": "2026-09-08T18:36:16Z",
+      "renewedAt": "2026-09-08T18:36:16Z",
+      "expiresAt": "2026-09-08T19:36:16Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "3b5327b3468a16946b50b0de3821dc188409ebbe",
   "schemaVersion": "CoordinationState 0.1"
 }
