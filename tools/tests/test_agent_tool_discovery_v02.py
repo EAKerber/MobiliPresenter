@@ -32,7 +32,12 @@ class AgentToolDiscoveryV02Tests(unittest.TestCase):
         self.assertEqual(value["conditional"], [])
         self.assertEqual(
             [item["toolId"] for item in value["discoverable"]],
-            ["git.files.mutate", "project.inspect", "routine.inspect"],
+            [
+                "git.files.mutate",
+                "project.inspect",
+                "roadmap.freshness.inspect",
+                "routine.inspect",
+            ],
         )
         git_tool = value["discoverable"][0]
         self.assertFalse(git_tool["currentIntentAllowed"])
@@ -55,6 +60,10 @@ class AgentToolDiscoveryV02Tests(unittest.TestCase):
         )
         self.assertNotIn(
             "routine.inspect", [item["toolId"] for item in value["discoverable"]]
+        )
+        self.assertNotIn(
+            "roadmap.freshness.inspect",
+            [item["toolId"] for item in value["discoverable"]],
         )
 
     def test_discoverable_does_not_promote_readiness(self):

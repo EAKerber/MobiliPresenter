@@ -101,9 +101,16 @@ class AgentToolPolicyTests(unittest.TestCase):
     def test_projection_separates_planning_from_governed_mutation(self):
         manager = projection.build_projection(
             {"role": "manager-gitops", "declaredIntent": "inspect-and-plan"},
-            brief("project.inspect", "routine.inspect"),
+            brief(
+                "project.inspect",
+                "roadmap.freshness.inspect",
+                "routine.inspect",
+            ),
         )
-        self.assertEqual([item["toolId"] for item in manager["available"]], ["project.inspect", "routine.inspect"])
+        self.assertEqual(
+            [item["toolId"] for item in manager["available"]],
+            ["project.inspect", "roadmap.freshness.inspect", "routine.inspect"],
+        )
         self.assertEqual(
             [item["toolId"] for item in manager["plannable"]],
             ["git.files.mutate"],

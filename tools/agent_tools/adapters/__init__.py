@@ -1,7 +1,8 @@
-from . import project_inspect, remote_git_files, routine_inspect
+from . import project_inspect, remote_git_files, roadmap_freshness_inspect, routine_inspect
 
 ADAPTERS = {
     "project-inspect": project_inspect,
     "remote-git-files": remote_git_files,
+    "roadmap-freshness-inspect": roadmap_freshness_inspect,
     "routine-inspect": routine_inspect,
 }
