@@ -3,8 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from tools import project_ci_observation
 from tools.agent_tools import projection as agent_tool_projection
 from tools.canonical import stable_hash
+from tools.semantics.branches import parse_branch_name
 
 SCHEMA_VERSION = "AgentCycleReadiness 0.2"
 LEGACY_SCHEMA_VERSION = "AgentCycleReadiness 0.1"
@@ -85,7 +87,74 @@ def _tool_dimension(tools: dict[str, Any]) -> dict[str, Any]:
     return _dimension("BLOCKED", ["NO_TOOL_SURFACE_FOR_INTENT"])
 
 
-def _provider_dimension(tools: dict[str, Any]) -> dict[str, Any]:
+def _operations_branch(branch: Any) -> bool:
+    if not isinstance(branch, str):
+        return False
+    try:
+        identity = parse_branch_name(branch)
+    except RuntimeError:
+        return False
+    if identity.get("semanticDomain") != "operations":
+        return False
+    if identity.get("grammar") == "canonical":
+        return identity.get("declaredClass") in {"work", "experiment"}
+    return identity.get("grammar") == "legacy"
+
+
+def _proven_ci_reentry(machine: dict[str, Any] | None) -> bool:
+    if not isinstance(machine, dict):
+        return False
+    sensors = machine.get("sensors")
+    pull_sensor = sensors.get("pullRequests") if isinstance(sensors, dict) else None
+    data = pull_sensor.get("data") if isinstance(pull_sensor, dict) else None
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return False
+    candidates: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            return False
+        ci = item.get("ci")
+        if ci == "reentry_required":
+            candidates.append(item)
+        elif ci != "green":
+            return False
+    if len(candidates) != 1:
+        return False
+    item = candidates[0]
+    head_sha = item.get("headSha")
+    runs = item.get("workflows")
+    if not isinstance(head_sha, str) or not isinstance(runs, list):
+        return False
+    try:
+        observed = project_ci_observation.classify_runs(
+            runs,
+            head_sha,
+            include_agent_ops=_operations_branch(item.get("headRef")),
+        )
+    except RuntimeError:
+        return False
+    return observed == "reentry_required"
+
+
+def _ci_reentry_entry(
+    tools: dict[str, Any], machine: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    if not _proven_ci_reentry(machine):
+        return None
+    for entry in _tool_entries(tools):
+        if entry.get("toolId") == "ci.workflow.rerun" and entry.get("mode") == "plan-only":
+            return entry
+    return None
+
+
+def _provider_dimension(
+    tools: dict[str, Any], machine: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    if _ci_reentry_entry(tools, machine) is not None:
+        return _dimension(
+            "NOT_APPLICABLE", ["EXECUTION_PROVIDER_NOT_REQUIRED_FOR_PLAN_ONLY"]
+        )
     entries = _tool_entries(tools)
     if not entries:
         return _dimension("UNKNOWN", ["NO_TOOL_SURFACE_FOR_PROVIDER_RESOLUTION"])
@@ -145,12 +214,24 @@ def _candidate_intents(tools: dict[str, Any]) -> list[str]:
 
 
 def _next_safe_action(
-    legacy_status: str, blocking_unknowns: list[str], tools: dict[str, Any]
+    legacy_status: str,
+    blocking_unknowns: list[str],
+    tools: dict[str, Any],
+    machine: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if legacy_status == "BLOCKED":
         return _action("STOP_BLOCKED", reason_codes=blocking_unknowns)
     if legacy_status == "UNKNOWN":
         return _action("RESOLVE_CONTEXT", reason_codes=blocking_unknowns)
+
+    reentry = _ci_reentry_entry(tools, machine)
+    if reentry is not None:
+        return _action(
+            "PLAN_TOOL",
+            tool_id=reentry["toolId"],
+            mode=reentry["mode"],
+            reason_codes=["CI_REENTRY_REQUIRED"],
+        )
 
     entries = _tool_entries(tools)
     if not entries:
@@ -241,13 +322,18 @@ def _validate_inputs(
 
 
 def build_projection(
-    *, legacy_status: str, blocking_unknowns: list[str], tools: dict[str, Any]
+    *,
+    legacy_status: str,
+    blocking_unknowns: list[str],
+    tools: dict[str, Any],
+    machine: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     _validate_inputs(legacy_status, blocking_unknowns, tools)
     result = _build_unvalidated(
         legacy_status=legacy_status,
         blocking_unknowns=blocking_unknowns,
         tools=tools,
+        machine=machine,
         schema_version=SCHEMA_VERSION,
     )
     return validate_projection(
@@ -255,6 +341,7 @@ def build_projection(
         legacy_status=legacy_status,
         blocking_unknowns=blocking_unknowns,
         tools=tools,
+        machine=machine,
     )
 
 
@@ -264,6 +351,7 @@ def validate_projection(
     legacy_status: str,
     blocking_unknowns: list[str],
     tools: dict[str, Any],
+    machine: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     _validate_inputs(legacy_status, blocking_unknowns, tools)
     if not isinstance(value, dict):
@@ -306,6 +394,7 @@ def validate_projection(
         legacy_status=legacy_status,
         blocking_unknowns=blocking_unknowns,
         tools=tools,
+        machine=machine,
         schema_version=version,
     )
     if value != canonical:
@@ -318,6 +407,7 @@ def _build_unvalidated(
     legacy_status: str,
     blocking_unknowns: list[str],
     tools: dict[str, Any],
+    machine: dict[str, Any] | None,
     schema_version: str,
 ) -> dict[str, Any]:
     core = {
@@ -326,7 +416,7 @@ def _build_unvalidated(
         "contextStatus": _context_dimension(legacy_status, blocking_unknowns),
         "intentReadiness": _dimension("PASS"),
         "toolReadiness": _tool_dimension(tools),
-        "providerResolution": _provider_dimension(tools),
+        "providerResolution": _provider_dimension(tools, machine),
         "mutationAuthorization": _authorization_dimension(tools),
         "readOnly": True,
         "semanticAuthority": False,
@@ -334,6 +424,6 @@ def _build_unvalidated(
     }
     if schema_version == SCHEMA_VERSION:
         core["nextSafeAction"] = _next_safe_action(
-            legacy_status, blocking_unknowns, tools
+            legacy_status, blocking_unknowns, tools, machine
         )
     return {**core, "readinessHash": stable_hash(core)}
