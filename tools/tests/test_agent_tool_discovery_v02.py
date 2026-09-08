@@ -33,13 +33,16 @@ class AgentToolDiscoveryV02Tests(unittest.TestCase):
         self.assertEqual(
             [item["toolId"] for item in value["discoverable"]],
             [
+                "ci.workflow.rerun",
                 "git.files.mutate",
                 "project.inspect",
                 "roadmap.freshness.inspect",
                 "routine.inspect",
             ],
         )
-        git_tool = value["discoverable"][0]
+        git_tool = next(
+            item for item in value["discoverable"] if item["toolId"] == "git.files.mutate"
+        )
         self.assertFalse(git_tool["currentIntentAllowed"])
         self.assertEqual(
             git_tool["allowedIntents"], ["governed-mutation", "inspect-and-plan"]
@@ -47,6 +50,12 @@ class AgentToolDiscoveryV02Tests(unittest.TestCase):
         self.assertEqual(
             git_tool["requiredCapabilities"], ["remote.canonical.execute"]
         )
+        rerun = next(
+            item for item in value["discoverable"] if item["toolId"] == "ci.workflow.rerun"
+        )
+        self.assertFalse(rerun["currentIntentAllowed"])
+        self.assertEqual(rerun["allowedIntents"], ["inspect-and-plan"])
+        self.assertEqual(rerun["effectClass"], "transport-side-effect")
 
     def test_ui_discovery_stays_role_bounded(self):
         value = projection.build_projection(
@@ -63,6 +72,10 @@ class AgentToolDiscoveryV02Tests(unittest.TestCase):
         )
         self.assertNotIn(
             "roadmap.freshness.inspect",
+            [item["toolId"] for item in value["discoverable"]],
+        )
+        self.assertNotIn(
+            "ci.workflow.rerun",
             [item["toolId"] for item in value["discoverable"]],
         )
 
