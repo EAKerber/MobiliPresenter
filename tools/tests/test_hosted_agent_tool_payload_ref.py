@@ -173,7 +173,7 @@ class HostedAgentToolPayloadRefTests(unittest.TestCase):
             completed = subprocess.run(
                 [
                     sys.executable,
-                    str(Path(payload_ref.__file__).resolve()),
+                    str(Path(hosted.__file__).resolve()),
                     "normalize-event",
                     "--event",
                     str(event_path),
@@ -189,6 +189,32 @@ class HostedAgentToolPayloadRefTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertTrue(output_path.exists())
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), event)
+
+    def test_cli_normalize_event_failure_is_fail_closed_without_result_argument(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_path = Path(tmp) / "missing-event.json"
+            output_path = Path(tmp) / "normalized.json"
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(hosted.__file__).resolve()),
+                    "normalize-event",
+                    "--event",
+                    str(missing_path),
+                    "--event-out",
+                    str(output_path),
+                ],
+                cwd=payload_ref.ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 2)
+            self.assertFalse(output_path.exists())
+            self.assertIn("HOSTED_AGENT_TOOL_ARTIFACT_INVALID", completed.stdout)
+            self.assertNotIn("AttributeError", completed.stderr)
 
 
 if __name__ == "__main__":
