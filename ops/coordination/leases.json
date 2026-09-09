@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-93e76b94b27f079d1ce5af1e:0",
-      "resource": "branch:work/operations/delivery-boundary-consolidation",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "delivery-boundary-consolidation-20260909",
-        "branch": "work/operations/delivery-boundary-consolidation",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-4dd53973e0e4f9c51736e31d",
-      "acquiredAt": "2026-09-09T23:27:59Z",
-      "renewedAt": "2026-09-09T23:27:59Z",
-      "expiresAt": "2026-09-09T23:57:59Z",
-      "ttlSeconds": 1800
-    }
-  ],
-  "revision": "50cc712d33bc9270dbc16265f94ac1f72b79ccd2",
+  "leases": [],
+  "revision": "501224fa7229d65872aed2e9100bf73adf11a169",
   "schemaVersion": "CoordinationState 0.1"
 }
