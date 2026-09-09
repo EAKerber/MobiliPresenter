@@ -332,6 +332,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="hosted-agent-tool")
     sub = parser.add_subparsers(dest="command_name", required=True)
 
+    normalize = sub.add_parser("normalize-event")
+    normalize.add_argument("--event", required=True)
+    normalize.add_argument("--event-out", required=True)
+
     parse = sub.add_parser("parse-event")
     parse.add_argument("--event", required=True)
     parse.add_argument("--request-out", required=True)
@@ -355,6 +359,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     request: Any = None
     try:
+        if args.command_name == "normalize-event":
+            from tools import hosted_agent_tool_payload_ref
+
+            event = json.loads(Path(args.event).read_text(encoding="utf-8"))
+            normalized = hosted_agent_tool_payload_ref.normalize_event(event)
+            _write(args.event_out, normalized)
+            return 0
+
         if args.command_name == "parse-event":
             event = json.loads(Path(args.event).read_text(encoding="utf-8"))
             request, meta = parse_event(event)
@@ -398,7 +410,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if payload.get("status") in {"PASS", "PLANNED"} else 2
     except Exception as exc:
         payload = failure_payload(exc, request)
-        _write(args.result, payload)
+        result_path = getattr(args, "result", None)
+        if result_path:
+            _write(result_path, payload)
         print(json.dumps(payload, ensure_ascii=False))
         return 2
 

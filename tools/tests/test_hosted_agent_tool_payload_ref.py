@@ -4,6 +4,10 @@ import base64
 import copy
 import hashlib
 import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -154,6 +158,67 @@ class HostedAgentToolPayloadRefTests(unittest.TestCase):
         ):
             event = {"comment": {"body": marker + "\n{}"}}
             self.assertEqual(payload_ref.normalize_event(event), event)
+
+    def test_cli_normalize_event_writes_passthrough_event(self):
+        event = {
+            "comment": {
+                "body": hosted_record_vocabulary.AGENT_TOOL_REQUEST_V02 + "\n{}"
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "event.json"
+            output_path = Path(tmp) / "normalized.json"
+            event_path.write_text(json.dumps(event), encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(hosted.__file__).resolve()),
+                    "normalize-event",
+                    "--event",
+                    str(event_path),
+                    "--event-out",
+                    str(output_path),
+                ],
+                cwd=payload_ref.ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(output_path.exists())
+            self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), event)
+
+    def test_cli_normalize_event_failure_is_fail_closed_without_result_argument(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_path = Path(tmp) / "missing-event.json"
+            output_path = Path(tmp) / "normalized.json"
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(hosted.__file__).resolve()),
+                    "normalize-event",
+                    "--event",
+                    str(missing_path),
+                    "--event-out",
+                    str(output_path),
+                ],
+                cwd=payload_ref.ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(completed.returncode, 2)
+            self.assertFalse(output_path.exists())
+            failure = json.loads(completed.stdout)
+            self.assertEqual(failure["schemaVersion"], hosted.FAILURE_SCHEMA)
+            self.assertEqual(failure["status"], "BLOCKED")
+            self.assertFalse(failure["semanticAuthority"])
+            self.assertFalse(failure["authorizesMutation"])
+            self.assertNotIn("AttributeError", completed.stderr)
 
 
 if __name__ == "__main__":
