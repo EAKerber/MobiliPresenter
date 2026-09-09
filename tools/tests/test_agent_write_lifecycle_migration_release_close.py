@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools import agent_write_lifecycle_guard as guard
+from tools.canonical import stable_hash
 
 
 BRANCH = "work/operations/migration-close-test"
@@ -35,7 +36,7 @@ def manifest() -> dict:
 
 
 def binding() -> dict:
-    return {
+    core = {
         "schemaVersion": "AgentWriteLeaseBinding 0.1",
         "cycleInstanceId": CYCLE_INSTANCE_ID,
         "begin": {
@@ -54,8 +55,8 @@ def binding() -> dict:
         "receiptHash": "e" * 64,
         "semanticAuthority": False,
         "authorizesMutation": False,
-        "bindingHash": "f" * 64,
     }
+    return {**core, "bindingHash": stable_hash(core)}
 
 
 def expected_owner() -> dict:
