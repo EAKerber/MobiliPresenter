@@ -62,7 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python tools/hosted_agent_tool_payload_ref.py normalize-event \
+          python tools/hosted_agent_tool.py normalize-event \
             --event "$GITHUB_EVENT_PATH" \
             --event-out /tmp/agent-tool-normalized-event.json
 
