@@ -88,7 +88,7 @@ def request(action: str, current: dict) -> dict:
         "actor": copy.deepcopy(ACTOR),
         "branch": BRANCH,
         "expectedAuthorityHead": "c" * 40,
-        "expectedBranchHead": "d" * 40,
+        "expectedBranchHead": None if action == "release" else "d" * 40,
         "expectedBindingHash": current["bindingHash"],
         "ttlSeconds": None,
         "semanticAuthority": False,
@@ -213,34 +213,33 @@ class LifecycleExpiredReleaseTests(unittest.TestCase):
                 )
 
 
-class HostedExpiredReleaseRecoveryWorkflowTests(unittest.TestCase):
-    def test_recovery_is_post_failure_release_only_and_expired_only(self) -> None:
+class HostedExpiredReleaseWorkflowTests(unittest.TestCase):
+    def test_release_uses_the_normal_prepare_path_only(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn("Checkout exact begin semantic host", text)
         self.assertIn("ref: ${{ steps.parse.outputs.begin_source_sha }}", text)
-        self.assertIn("Restore current carrier for expired release recovery", text)
-        self.assertIn("steps.prepare.outcome != 'success'", text)
-        self.assertIn("ref: ${{ github.sha }}", text)
-        self.assertIn("if request.get('action') != 'release':", text)
-        self.assertIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_RELEASE_ONLY", text)
-        self.assertIn("lifecycle._matching_exact_leases", text)
-        self.assertIn("coordination._is_expired", text)
-        self.assertIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_LEASE_NOT_EXPIRED", text)
-        self.assertIn("steps.prepare_recovery.outcome != 'success'", text)
+        self.assertIn("- name: Prepare lifecycle dispatch", text)
+        self.assertIn(
+            "steps.checkout_begin.outcome == 'success' && steps.prepare.outcome != 'success'",
+            text,
+        )
 
-    def test_recovery_reobservation_uses_explicit_github_transport(self) -> None:
+        self.assertNotIn("expired release recovery", text.lower())
+        self.assertNotIn("Prepare exact expired release recovery", text)
+        self.assertNotIn("steps.prepare_recovery", text)
+        self.assertNotIn("lifecycle._matching_exact_leases", text)
+        self.assertNotIn("coordination._is_expired", text)
+        self.assertNotIn("GitHubCoordinationAuthority", text)
+
+    def test_workflow_does_not_reimplement_release_authority_rules(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
 
-        self.assertIn(
-            "from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority",
-            text,
-        )
-        self.assertIn(
-            "GitHubCoordinationAuthority(transport=GhApiTransport()).observe()",
-            text,
-        )
-        self.assertNotIn("GitHubCoordinationAuthority().observe()", text)
+        self.assertNotIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_RELEASE_ONLY", text)
+        self.assertNotIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_AUTHORITY_DRIFT", text)
+        self.assertNotIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_BOUND_LEASE_NOT_FOUND", text)
+        self.assertNotIn("HOSTED_AGENT_WRITE_LEASE_RECOVERY_LEASE_NOT_EXPIRED", text)
+        self.assertEqual(1, text.count("python tools/hosted_agent_write_lease.py prepare"))
 
 
 if __name__ == "__main__":

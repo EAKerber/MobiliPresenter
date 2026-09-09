@@ -62,7 +62,7 @@ def _sha(value: Any, code: str) -> str:
 
 def _expected_branch_head(value: Any, action: str, code: str) -> str | None:
     if value is None:
-        if action == "acquire":
+        if action in {"acquire", "release"}:
             return None
         raise AgentWriteLifecycleError(code)
     return _sha(value, code)
@@ -383,19 +383,21 @@ def prepare_dispatch(
 ) -> dict[str, Any]:
     validate_begin_binding(request, manifest, context)
     carrier = transport or GhApiTransport()
+    action = request["action"]
 
     expected_branch_head = request["expectedBranchHead"]
-    if expected_branch_head is None:
-        observed_branch_head = git_observation.ref_head(
-            carrier,
-            request["branch"],
-            missing_ok=True,
-        )
-    else:
-        observed_branch = git_observation.observe_branch(request["branch"], transport=carrier)
-        observed_branch_head = observed_branch["branchHead"]
-    if observed_branch_head != expected_branch_head:
-        raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BRANCH_DRIFT")
+    if action != "release":
+        if expected_branch_head is None:
+            observed_branch_head = git_observation.ref_head(
+                carrier,
+                request["branch"],
+                missing_ok=True,
+            )
+        else:
+            observed_branch = git_observation.observe_branch(request["branch"], transport=carrier)
+            observed_branch_head = observed_branch["branchHead"]
+        if observed_branch_head != expected_branch_head:
+            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BRANCH_DRIFT")
 
     authority = GitHubCoordinationAuthority(transport=carrier)
     authority_observation = authority.observe()
@@ -411,7 +413,6 @@ def prepare_dispatch(
         transport=carrier,
     )
 
-    action = request["action"]
     exact_request_hash = request_hash(request)
     transition_id = f"agent-write-{exact_request_hash[:24]}"
     payload: dict[str, Any] = {
@@ -717,7 +718,6 @@ def validate_binding(value: Any) -> dict[str, Any]:
         or not CYCLE_RE.fullmatch(value["cycleInstanceId"])
     ):
         raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_BINDING_INVALID")
-
     _begin(value.get("begin"))
     _actor(value.get("actor"))
     git_observation.canonical_branch(value.get("branch"))
