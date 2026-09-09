@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "delivery-pr-285",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/delivery-boundary-consolidation",
+  "prNumber": 285,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "integrate-pr-285"
+  ],
+  "nextAction": "Integrate PR 285 after Agent Cycle continuity handoff",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
