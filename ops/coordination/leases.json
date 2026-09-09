@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "4dd5bda90b082bab415f08662a1faad7e793c36b",
+  "leases": [
+    {
+      "leaseId": "agent-write-d1e0c80e2e2c110335c9201f:0",
+      "resource": "branch:work/operations/hosted-agent-tool-inputref-v03-cli-fix",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "hosted-agent-tool-inputref-v03-cli-fix-20260909",
+        "branch": "work/operations/hosted-agent-tool-inputref-v03-cli-fix",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-29f8adb12e8c8222a23c2cbc",
+      "acquiredAt": "2026-09-09T03:18:17Z",
+      "renewedAt": "2026-09-09T03:18:17Z",
+      "expiresAt": "2026-09-09T04:18:17Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "325578977685552fe5d533ab827c4929b07d6191",
   "schemaVersion": "CoordinationState 0.1"
 }
