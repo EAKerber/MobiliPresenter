@@ -16,8 +16,24 @@
       "renewedAt": "2026-09-09T13:09:00Z",
       "expiresAt": "2026-09-09T14:09:00Z",
       "ttlSeconds": 3600
+    },
+    {
+      "leaseId": "agent-write-c62782c8af54bb6e8cd672e7:0",
+      "resource": "branch:work/operations/hosted-write-lease-release-canary-post282",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "hosted-write-lease-release-canary-post282-20260909",
+        "branch": "work/operations/hosted-write-lease-release-canary-post282",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-8444772d154e55df3c48856b",
+      "acquiredAt": "2026-09-09T13:29:39Z",
+      "renewedAt": "2026-09-09T13:29:39Z",
+      "expiresAt": "2026-09-09T13:39:39Z",
+      "ttlSeconds": 600
     }
   ],
-  "revision": "d1149ff1bb7241f4e159c16db2ffe27c9b80cf66",
+  "revision": "bbb21f71db8ffe1f7554b379d6b2da7499aba936",
   "schemaVersion": "CoordinationState 0.1"
 }
