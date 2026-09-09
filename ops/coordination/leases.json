@@ -2,22 +2,22 @@
   "intents": [],
   "leases": [
     {
-      "leaseId": "agent-write-2a5172a80aef1d434fbcaa35:0",
-      "resource": "branch:work/operations/hosted-agent-tool-payload-reference",
+      "leaseId": "agent-write-88a28a757e22a6e20417aa03:0",
+      "resource": "branch:work/operations/expired-lease-release-branch-drift-recovery",
       "mode": "exclusive-write",
       "owner": {
         "role": "manager-gitops",
-        "session": "hosted-agent-tool-payload-ref-v0-1",
-        "branch": "work/operations/hosted-agent-tool-payload-reference",
+        "session": "expired-lease-release-branch-drift-recovery-v0-1",
+        "branch": "work/operations/expired-lease-release-branch-drift-recovery",
         "pr": null
       },
-      "reason": "Agent write lifecycle cycle-instance-f48be2d6a6392074e69c41a2",
-      "acquiredAt": "2026-09-08T21:55:50Z",
-      "renewedAt": "2026-09-08T21:55:50Z",
-      "expiresAt": "2026-09-08T22:55:50Z",
+      "reason": "Agent write lifecycle cycle-instance-359211fa1cb5bf8f29357a0e",
+      "acquiredAt": "2026-09-09T02:29:18Z",
+      "renewedAt": "2026-09-09T02:29:18Z",
+      "expiresAt": "2026-09-09T03:29:18Z",
       "ttlSeconds": 3600
     }
   ],
-  "revision": "cdfc4e3103b740dded3609d7bfa0a61192688744",
+  "revision": "57fb74a096e522fa002f645de8af7048c39979c8",
   "schemaVersion": "CoordinationState 0.1"
 }
