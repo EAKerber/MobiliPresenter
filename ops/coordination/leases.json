@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-88a28a757e22a6e20417aa03:0",
-      "resource": "branch:work/operations/expired-lease-release-branch-drift-recovery",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "expired-lease-release-branch-drift-recovery-v0-1",
-        "branch": "work/operations/expired-lease-release-branch-drift-recovery",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-359211fa1cb5bf8f29357a0e",
-      "acquiredAt": "2026-09-09T02:29:18Z",
-      "renewedAt": "2026-09-09T02:29:18Z",
-      "expiresAt": "2026-09-09T03:29:18Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "57fb74a096e522fa002f645de8af7048c39979c8",
+  "leases": [],
+  "revision": "4dd5bda90b082bab415f08662a1faad7e793c36b",
   "schemaVersion": "CoordinationState 0.1"
 }
