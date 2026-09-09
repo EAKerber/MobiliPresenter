@@ -278,11 +278,27 @@ jobs:
           except (OSError, json.JSONDecodeError):
               raise SystemExit(2)
 
-          cause = {
-              'code': 'HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID',
-              'source': 'hosted-agent-cycle-trace',
-              'phase': 'CLOSE',
-          }
+          compatible_causes = (
+              [
+                  {
+                      'code': 'HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID',
+                      'source': 'hosted-agent-cycle-trace',
+                      'phase': 'CLOSE',
+                  }
+              ],
+              [
+                  {
+                      'code': 'AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH',
+                      'source': 'agent-write-lifecycle-guard',
+                      'phase': 'CLOSE',
+                  },
+                  {
+                      'code': 'AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE',
+                      'source': 'hosted-agent-cycle',
+                      'phase': 'CLOSE',
+                  },
+              ],
+          )
           core = value.get('failureCore') if isinstance(value, dict) else None
           recovery = core.get('recovery') if isinstance(core, dict) else None
           eligible = (
@@ -294,7 +310,7 @@ jobs:
               and core.get('surface') == 'AGENT_CYCLE'
               and core.get('phase') == 'CLOSE'
               and core.get('status') in {'BLOCKED', 'UNKNOWN'}
-              and core.get('causes') == [cause]
+              and core.get('causes') in compatible_causes
               and isinstance(recovery, dict)
               and recovery.get('observationRetry') == 'UNKNOWN'
               and recovery.get('operationReplay') == 'NOT_APPLICABLE'

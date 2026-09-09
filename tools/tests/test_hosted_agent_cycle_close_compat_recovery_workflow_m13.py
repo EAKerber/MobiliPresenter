@@ -15,6 +15,10 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertIn("Qualify observational close compatibility recovery", text)
         self.assertIn("HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID", text)
         self.assertIn("hosted-agent-cycle-trace", text)
+        self.assertIn("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH", text)
+        self.assertIn("agent-write-lifecycle-guard", text)
+        self.assertIn("AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE", text)
+        self.assertIn("hosted-agent-cycle", text)
         self.assertIn("recovery.get('observationRetry') == 'UNKNOWN'", text)
         self.assertIn("recovery.get('operationReplay') == 'NOT_APPLICABLE'", text)
         self.assertIn("core.get('mutationState') == 'NOT_APPLICABLE'", text)
@@ -22,7 +26,7 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertIn("core.get('readOnly') is True", text)
         self.assertIn("core.get('semanticAuthority') is False", text)
         self.assertIn("core.get('authorizesMutation') is False", text)
-        self.assertIn("core.get('causes') == [cause]", text)
+        self.assertIn("core.get('causes') in compatible_causes", text)
 
         # Recovery restores only the current carrier; the begin artifact remains
         # the exact historical cycle identity and is reused unchanged.
@@ -40,7 +44,7 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertIn("steps.close_recovery.outcome != 'success'", text)
         self.assertIn("compatibility-recovery-source.json", text)
 
-    def test_recovery_does_not_broaden_to_other_failure_classes(self) -> None:
+    def test_recovery_accepts_only_two_closed_failure_signatures(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         recovery_region = text.split("Qualify observational close compatibility recovery", 1)[1]
         recovery_region = recovery_region.split("Materialize close termination review shadow", 1)[0]
@@ -48,6 +52,13 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertNotIn("EXECUTION_TRACE_INCOMPLETE", recovery_region)
         self.assertNotIn("HOSTED_AGENT_CLOSE_NOT_PASS", recovery_region)
         self.assertEqual(1, recovery_region.count("HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID"))
+        self.assertEqual(
+            1, recovery_region.count("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
+        )
+        self.assertEqual(1, recovery_region.count("AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE"))
+        self.assertEqual(1, recovery_region.count("core.get('causes') in compatible_causes"))
+        self.assertNotIn("core.get('causes') is not None", recovery_region)
+        self.assertNotIn("if core.get('causes')", recovery_region)
 
 
 if __name__ == "__main__":
