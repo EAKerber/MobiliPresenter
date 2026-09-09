@@ -213,7 +213,11 @@ class HostedAgentToolPayloadRefTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 2)
             self.assertFalse(output_path.exists())
-            self.assertIn("HOSTED_AGENT_TOOL_ARTIFACT_INVALID", completed.stdout)
+            failure = json.loads(completed.stdout)
+            self.assertEqual(failure["schemaVersion"], hosted.FAILURE_SCHEMA)
+            self.assertEqual(failure["status"], "BLOCKED")
+            self.assertFalse(failure["semanticAuthority"])
+            self.assertFalse(failure["authorizesMutation"])
             self.assertNotIn("AttributeError", completed.stderr)
 
 
