@@ -129,10 +129,23 @@ class HostedWriteLeaseBranchReservationRecordTests(unittest.TestCase):
         self.assertEqual(1, len(records))
         self.assertIsNone(records[0]["normalized"]["expectedBranchHead"])
 
-    def test_release_still_requires_concrete_branch_head(self) -> None:
+    def test_release_accepts_null_branch_head(self) -> None:
         current = manifest()
         value = acquire_outer(current)
         value["action"] = "release"
+        value["expectedBindingHash"] = "e" * 64
+        value["ttlSeconds"] = None
+
+        validated = hosted_handle_requests.validate_write_lease(
+            value,
+            repository=REPOSITORY,
+        )
+        self.assertIsNone(validated["expectedBranchHead"])
+
+    def test_renew_still_requires_concrete_branch_head(self) -> None:
+        current = manifest()
+        value = acquire_outer(current)
+        value["action"] = "renew"
         value["expectedBindingHash"] = "e" * 64
         value["ttlSeconds"] = None
 
