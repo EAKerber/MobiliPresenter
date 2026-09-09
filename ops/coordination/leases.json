@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "62deec50c9328322b3652ae461a3e263c307f925",
+  "leases": [
+    {
+      "leaseId": "agent-write-ae36b3dbb818bf33dcae798c:0",
+      "resource": "branch:work/operations/hosted-cycle-migration-release-close-recovery",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "hosted-cycle-migration-release-close-recovery-r2-20260909",
+        "branch": "work/operations/hosted-cycle-migration-release-close-recovery",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-d0214f3d9ef945e541c5bdbb",
+      "acquiredAt": "2026-09-09T21:35:13Z",
+      "renewedAt": "2026-09-09T21:35:13Z",
+      "expiresAt": "2026-09-09T22:35:13Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "5bb141b1f78c7528cd2fb4276fed880d9d120b03",
   "schemaVersion": "CoordinationState 0.1"
 }
