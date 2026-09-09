@@ -199,3 +199,31 @@ def normalize_event(
         + json.dumps(normalized, separators=(",", ":"), ensure_ascii=False)
     )
     return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="hosted-agent-tool-payload-ref")
+    sub = parser.add_subparsers(dest="command_name", required=True)
+
+    normalize = sub.add_parser("normalize-event")
+    normalize.add_argument("--event", required=True)
+    normalize.add_argument("--event-out", required=True)
+
+    args = parser.parse_args(argv)
+    try:
+        event = json.loads(Path(args.event).read_text(encoding="utf-8"))
+        normalized = normalize_event(event)
+        Path(args.event_out).write_text(
+            json.dumps(normalized, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        return 0
+    except Exception as exc:
+        print(f"{_code(exc)}: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
