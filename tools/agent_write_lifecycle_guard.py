@@ -4,7 +4,12 @@ import copy
 import json
 from typing import Any
 
-from tools import agent_write_lifecycle as lifecycle, coordination, hosted_cycle_records
+from tools import (
+    agent_write_lifecycle as lifecycle,
+    coordination,
+    hosted_cycle_records,
+    remote_canonical_execution,
+)
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
@@ -14,6 +19,8 @@ CURRENT_REPOSITORY = hosted_cycle_records.CURRENT_REPOSITORY
 AGENT_TOOL_REQUEST_MARKER = hosted_cycle_records.AGENT_TOOL_REQUEST_MARKER
 AGENT_TOOL_REQUEST_MARKER_V02 = hosted_cycle_records.AGENT_TOOL_REQUEST_MARKER_V02
 WRITE_LEASE_REQUEST_MARKER_V02 = hosted_cycle_records.WRITE_LEASE_REQUEST_MARKER_V02
+REMOTE_RESULT_MARKER = "MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1"
+MIGRATION_RELEASE_INTENT = "agent-write-lease-migration-cleanup"
 STATES = {"NONE", "ACTIVE", "RELEASED", "EXPIRED", "UNKNOWN"}
 
 
@@ -136,6 +143,135 @@ def _unbound_target_leases(
             ):
                 found.append(lease)
     return found
+
+
+def _migration_release_receipt_matches(
+    receipt: dict[str, Any],
+    *,
+    manifest: dict[str, Any],
+    binding: dict[str, Any],
+) -> bool:
+    try:
+        remote_canonical_execution.validate_receipt(receipt)
+    except RuntimeError:
+        return False
+
+    command = receipt.get("command")
+    if not isinstance(command, dict):
+        return False
+    expected_actor = manifest["actor"]
+    expected_owner = _expected_owner(binding["actor"], binding["branch"])
+    resource = f"branch:{binding['branch']}"
+    intent = command.get("declaredIntent")
+    payload = command.get("payload")
+    target = command.get("target")
+    source = receipt.get("source")
+    evidence = receipt.get("evidence")
+    aggregate = receipt.get("aggregateReadback")
+    if (
+        receipt.get("status") != "PASS"
+        or receipt.get("blockers") != []
+        or command.get("kind") != "domain"
+        or command.get("actor") != expected_actor
+        or not isinstance(intent, dict)
+        or set(intent) != {"intent", "sourceSemanticHost", "reason"}
+        or intent.get("intent") != MIGRATION_RELEASE_INTENT
+        or intent.get("sourceSemanticHost") != manifest["source"]["sourceSha"]
+        or not isinstance(intent.get("reason"), str)
+        or not intent["reason"].strip()
+        or target != {
+            "domain": "coordination",
+            "action": "release",
+            "subject": {"kind": "coordination", "id": "leases"},
+        }
+        or not isinstance(payload, dict)
+        or set(payload) != {"owner", "transitionId", "resources", "mine"}
+        or payload.get("owner") != expected_owner
+        or payload.get("resources") != [resource]
+        or payload.get("mine") is not False
+        or payload.get("transitionId") != command.get("executionId")
+        or receipt.get("route") != {
+            "kind": "domain",
+            "domain": "coordination",
+            "action": "release",
+        }
+        or not isinstance(source, dict)
+        or source.get("workflow") != "remote-canonical-execution"
+        or source.get("issueNumber") != manifest["source"]["issueNumber"]
+        or not isinstance(evidence, dict)
+        or evidence.get("kind") != "transition-receipt"
+        or not isinstance(aggregate, dict)
+        or aggregate.get("kind") != "authority-state"
+        or aggregate.get("status") != "PASS"
+    ):
+        return False
+
+    plan = evidence.get("plan")
+    transition_receipt = evidence.get("receipt")
+    if not isinstance(plan, dict) or not isinstance(transition_receipt, dict):
+        return False
+    candidate = plan.get("candidate")
+    plan_intent = plan.get("intent")
+    if (
+        plan.get("domain") != "coordination"
+        or plan.get("action") != "release"
+        or plan.get("subject") != {"kind": "coordination", "id": "leases"}
+        or not isinstance(plan_intent, dict)
+        or plan_intent.get("transitionId") != command.get("executionId")
+        or plan_intent.get("owner") != expected_owner
+        or plan_intent.get("resources") != [resource]
+        or plan_intent.get("mine") is not False
+        or not isinstance(candidate, dict)
+        or not isinstance(candidate.get("leases"), list)
+        or _matching_exact_leases(candidate["leases"], binding=binding)
+        or transition_receipt.get("domain") != "coordination"
+        or transition_receipt.get("action") != "release"
+        or transition_receipt.get("subject") != {"kind": "coordination", "id": "leases"}
+        or transition_receipt.get("verified") is not True
+        or transition_receipt.get("authorityRevision") != aggregate.get("authorityRevision")
+    ):
+        return False
+    return True
+
+
+def _migration_release_proven(
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    *,
+    close_comment_id: int,
+    latest_result_comment_id: int,
+    binding: dict[str, Any],
+) -> bool:
+    begin_comment_id = manifest.get("source", {}).get("commentId")
+    if not isinstance(begin_comment_id, int) or isinstance(begin_comment_id, bool):
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_WINDOW_INVALID")
+    window = _window(comments, begin_comment_id, close_comment_id)
+    after_latest = False
+    for comment in window:
+        comment_id = hosted_cycle_records.comment_id(comment)
+        if comment_id == latest_result_comment_id:
+            after_latest = True
+            continue
+        if not after_latest or not hosted_cycle_records.result_comment_allowed(comment):
+            continue
+        value = _payload(comment.get("body"), REMOTE_RESULT_MARKER)
+        if not isinstance(value, dict):
+            continue
+        command = value.get("command")
+        intent = command.get("declaredIntent") if isinstance(command, dict) else None
+        payload = command.get("payload") if isinstance(command, dict) else None
+        if (
+            not isinstance(intent, dict)
+            or intent.get("intent") != MIGRATION_RELEASE_INTENT
+            or intent.get("sourceSemanticHost") != manifest["source"]["sourceSha"]
+            or not isinstance(payload, dict)
+            or payload.get("owner") != _expected_owner(binding["actor"], binding["branch"])
+            or payload.get("resources") != [f"branch:{binding['branch']}"]
+        ):
+            continue
+        if _migration_release_receipt_matches(value, manifest=manifest, binding=binding):
+            return True
+    return False
 
 
 def prove_active_binding(
@@ -274,7 +410,8 @@ def inspect_cycle(
     matching: list[dict[str, Any]] = []
 
     if results:
-        latest_binding = results[-1][1]["binding"]
+        latest_result_comment_id, latest_result = results[-1]
+        latest_binding = latest_result["binding"]
         matching = _matching_exact_leases(active, binding=latest_binding)
         if latest_binding["state"] == "RELEASED":
             if matching:
@@ -282,6 +419,14 @@ def inspect_cycle(
                 blockers.append("AGENT_WRITE_LIFECYCLE_RELEASE_READBACK_MISMATCH")
             else:
                 state = "RELEASED"
+        elif not matching and _migration_release_proven(
+            comments,
+            manifest,
+            close_comment_id=close_comment_id,
+            latest_result_comment_id=latest_result_comment_id,
+            binding=latest_binding,
+        ):
+            state = "RELEASED"
         elif lifecycle.binding_is_expired(latest_binding, observation.authority_now):
             if matching:
                 state = "UNKNOWN"
