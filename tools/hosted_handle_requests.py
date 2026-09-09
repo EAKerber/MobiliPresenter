@@ -110,7 +110,7 @@ def validate_write_lease(value: Any, *, repository: str) -> dict[str, Any]:
     if not isinstance(authority_head, str) or SHA_RE.fullmatch(authority_head) is None:
         raise HostedHandleRequestError("HOSTED_HANDLE_WRITE_LEASE_HEAD_INVALID")
     branch_head = value.get("expectedBranchHead")
-    if action == "acquire":
+    if action in {"acquire", "release"}:
         if branch_head is not None and (
             not isinstance(branch_head, str) or SHA_RE.fullmatch(branch_head) is None
         ):
