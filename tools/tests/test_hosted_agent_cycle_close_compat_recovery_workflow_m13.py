@@ -18,15 +18,16 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertIn("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH", text)
         self.assertIn("agent-write-lifecycle-guard", text)
         self.assertIn("AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE", text)
+        self.assertIn("AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE", text)
         self.assertIn("hosted-agent-cycle", text)
         self.assertIn("recovery.get('observationRetry') == 'UNKNOWN'", text)
         self.assertIn("recovery.get('operationReplay') == 'NOT_APPLICABLE'", text)
         self.assertIn("core.get('mutationState') == 'NOT_APPLICABLE'", text)
-        self.assertIn("core.get('lossyProjection') is False", text)
+        self.assertIn("core.get('causes'), core.get('lossyProjection')", text)
+        self.assertIn("in compatible_signatures", text)
         self.assertIn("core.get('readOnly') is True", text)
         self.assertIn("core.get('semanticAuthority') is False", text)
         self.assertIn("core.get('authorizesMutation') is False", text)
-        self.assertIn("core.get('causes') in compatible_causes", text)
 
         # Recovery restores only the current carrier; the begin artifact remains
         # the exact historical cycle identity and is reused unchanged.
@@ -44,7 +45,7 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertIn("steps.close_recovery.outcome != 'success'", text)
         self.assertIn("compatibility-recovery-source.json", text)
 
-    def test_recovery_accepts_only_two_closed_failure_signatures(self) -> None:
+    def test_recovery_accepts_only_three_closed_failure_signatures(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         recovery_region = text.split("Qualify observational close compatibility recovery", 1)[1]
         recovery_region = recovery_region.split("Materialize close termination review shadow", 1)[0]
@@ -56,9 +57,16 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
             1, recovery_region.count("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
         )
         self.assertEqual(1, recovery_region.count("AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE"))
-        self.assertEqual(1, recovery_region.count("core.get('causes') in compatible_causes"))
+        self.assertEqual(1, recovery_region.count("AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE"))
+        self.assertEqual(1, recovery_region.count("in compatible_signatures"))
+        self.assertEqual(1, recovery_region.count("core.get('lossyProjection')"))
         self.assertNotIn("core.get('causes') is not None", recovery_region)
         self.assertNotIn("if core.get('causes')", recovery_region)
+
+        expired = recovery_region.split("AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE", 1)[1]
+        self.assertIn("True,", expired.split("),", 1)[0])
+        mismatch = recovery_region.split("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH", 1)[1]
+        self.assertIn("False,", mismatch.split("),", 1)[0])
 
 
 if __name__ == "__main__":

@@ -278,26 +278,42 @@ jobs:
           except (OSError, json.JSONDecodeError):
               raise SystemExit(2)
 
-          compatible_causes = (
-              [
-                  {
-                      'code': 'HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID',
-                      'source': 'hosted-agent-cycle-trace',
-                      'phase': 'CLOSE',
-                  }
-              ],
-              [
-                  {
-                      'code': 'AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH',
-                      'source': 'agent-write-lifecycle-guard',
-                      'phase': 'CLOSE',
-                  },
-                  {
-                      'code': 'AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE',
-                      'source': 'hosted-agent-cycle',
-                      'phase': 'CLOSE',
-                  },
-              ],
+          compatible_signatures = (
+              (
+                  [
+                      {
+                          'code': 'HOSTED_CYCLE_RECORD_LEASE_REQUEST_INVALID',
+                          'source': 'hosted-agent-cycle-trace',
+                          'phase': 'CLOSE',
+                      }
+                  ],
+                  False,
+              ),
+              (
+                  [
+                      {
+                          'code': 'AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH',
+                          'source': 'agent-write-lifecycle-guard',
+                          'phase': 'CLOSE',
+                      },
+                      {
+                          'code': 'AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE',
+                          'source': 'hosted-agent-cycle',
+                          'phase': 'CLOSE',
+                      },
+                  ],
+                  False,
+              ),
+              (
+                  [
+                      {
+                          'code': 'AGENT_WRITE_LIFECYCLE_EXPIRED_AT_CLOSE',
+                          'source': 'hosted-agent-cycle',
+                          'phase': 'CLOSE',
+                      }
+                  ],
+                  True,
+              ),
           )
           core = value.get('failureCore') if isinstance(value, dict) else None
           recovery = core.get('recovery') if isinstance(core, dict) else None
@@ -310,12 +326,13 @@ jobs:
               and core.get('surface') == 'AGENT_CYCLE'
               and core.get('phase') == 'CLOSE'
               and core.get('status') in {'BLOCKED', 'UNKNOWN'}
-              and core.get('causes') in compatible_causes
+              and (
+                  core.get('causes'), core.get('lossyProjection')
+              ) in compatible_signatures
               and isinstance(recovery, dict)
               and recovery.get('observationRetry') == 'UNKNOWN'
               and recovery.get('operationReplay') == 'NOT_APPLICABLE'
               and core.get('mutationState') == 'NOT_APPLICABLE'
-              and core.get('lossyProjection') is False
               and core.get('readOnly') is True
               and core.get('semanticAuthority') is False
               and core.get('authorizesMutation') is False
