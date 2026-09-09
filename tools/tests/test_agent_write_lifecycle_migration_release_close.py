@@ -17,6 +17,7 @@ ACTOR = {
     "sessionId": "migration-close-test-session",
 }
 SOURCE_SHA = "a" * 40
+CYCLE_INSTANCE_ID = "cycle-instance-" + "1" * 24
 
 
 def manifest() -> dict:
@@ -29,14 +30,14 @@ def manifest() -> dict:
         },
         "contextHash": "b" * 64,
         "actor": copy.deepcopy(ACTOR),
-        "cycleInstanceId": "cycle-instance-" + "1" * 24,
+        "cycleInstanceId": CYCLE_INSTANCE_ID,
     }
 
 
 def binding() -> dict:
     return {
         "schemaVersion": "AgentWriteLeaseBinding 0.1",
-        "cycleInstanceId": "cycle-instance-" + "1" * 24,
+        "cycleInstanceId": CYCLE_INSTANCE_ID,
         "begin": {
             "runId": 123,
             "sourceSha": SOURCE_SHA,
@@ -63,6 +64,20 @@ def expected_owner() -> dict:
         "session": ACTOR["sessionId"],
         "branch": BRANCH,
         "pr": None,
+    }
+
+
+def active_lease() -> dict:
+    return {
+        "leaseId": binding()["leaseId"],
+        "resource": f"branch:{BRANCH}",
+        "mode": "exclusive-write",
+        "owner": expected_owner(),
+        "reason": "migration close test",
+        "acquiredAt": "2026-09-09T20:00:00Z",
+        "renewedAt": "2026-09-09T20:00:00Z",
+        "expiresAt": "2026-09-09T23:00:00Z",
+        "ttlSeconds": 3600,
     }
 
 
@@ -313,7 +328,10 @@ class MigrationReleaseWindowTests(unittest.TestCase):
 
 class MigrationReleaseCloseStateTests(unittest.TestCase):
     @patch("tools.agent_write_lifecycle_guard._migration_release_proven", return_value=True)
-    @patch("tools.agent_write_lifecycle_guard.hosted_cycle_records.collect", return_value={})
+    @patch(
+        "tools.agent_write_lifecycle_guard.hosted_cycle_records.collect",
+        return_value={"cycleInstanceId": CYCLE_INSTANCE_ID},
+    )
     def test_absent_exact_lease_with_proven_migration_is_released(self, collect, proven) -> None:
         current = binding()
         with (
@@ -337,16 +355,15 @@ class MigrationReleaseCloseStateTests(unittest.TestCase):
         proven.assert_called_once()
 
     @patch("tools.agent_write_lifecycle_guard._migration_release_proven", return_value=True)
-    @patch("tools.agent_write_lifecycle_guard.hosted_cycle_records.collect", return_value={})
+    @patch(
+        "tools.agent_write_lifecycle_guard.hosted_cycle_records.collect",
+        return_value={"cycleInstanceId": CYCLE_INSTANCE_ID},
+    )
     def test_materialized_exact_lease_cannot_be_overridden_by_migration_receipt(
         self, collect, proven
     ) -> None:
         current = binding()
-        exact = {
-            "leaseId": current["leaseId"],
-            "resource": f"branch:{BRANCH}",
-            "owner": expected_owner(),
-        }
+        exact = active_lease()
         with (
             patch.object(guard, "_bound_results", return_value=[(10, {"binding": current})]),
             patch.object(guard, "_request_count", return_value=1),
