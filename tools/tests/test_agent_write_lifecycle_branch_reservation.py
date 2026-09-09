@@ -41,6 +41,15 @@ def acquire_request(*, expected_branch_head=None) -> dict:
     }
 
 
+def continuation_request(action: str, *, expected_branch_head) -> dict:
+    value = acquire_request(expected_branch_head=expected_branch_head)
+    value["requestId"] = f"request-{action}-branch-reservation"
+    value["action"] = action
+    value["expectedBindingHash"] = "d" * 64
+    value["ttlSeconds"] = None
+    return value
+
+
 def manifest() -> dict:
     return {"cycleInstanceId": CYCLE_INSTANCE_ID}
 
@@ -50,20 +59,28 @@ def authority() -> SimpleNamespace:
     return SimpleNamespace(observe=lambda: observed)
 
 
+def previous_binding() -> dict:
+    return {"bindingHash": "d" * 64}
+
+
+def bound_lease() -> dict:
+    return {"leaseId": "lease-m13-branch-reservation"}
+
+
 class AgentWriteLifecycleBranchReservationTests(unittest.TestCase):
     def test_acquire_request_accepts_explicit_absent_branch_precondition(self) -> None:
         value = acquire_request()
         self.assertIsNone(lifecycle.validate_request(value)["expectedBranchHead"])
 
-    def test_followup_request_still_requires_concrete_branch_head(self) -> None:
-        value = acquire_request()
-        value["action"] = "release"
-        value["expectedBindingHash"] = "d" * 64
-        value["ttlSeconds"] = None
+    def test_release_accepts_null_branch_head_but_renew_requires_concrete_head(self) -> None:
+        release = continuation_request("release", expected_branch_head=None)
+        self.assertIsNone(lifecycle.validate_request(release)["expectedBranchHead"])
+
+        renew = continuation_request("renew", expected_branch_head=None)
         with self.assertRaisesRegex(
             RuntimeError, "AGENT_WRITE_LIFECYCLE_BRANCH_HEAD_INVALID"
         ):
-            lifecycle.validate_request(value)
+            lifecycle.validate_request(renew)
 
     @patch("tools.agent_write_lifecycle.validate_begin_binding")
     @patch("tools.agent_write_lifecycle._prepare_previous_binding", return_value=(None, None))
@@ -130,6 +147,41 @@ class AgentWriteLifecycleBranchReservationTests(unittest.TestCase):
                     transport=object(),
                 )
             authority_cls.assert_not_called()
+
+    @patch("tools.agent_write_lifecycle.validate_begin_binding")
+    @patch(
+        "tools.agent_write_lifecycle._prepare_previous_binding",
+        return_value=(previous_binding(), bound_lease()),
+    )
+    @patch("tools.agent_write_lifecycle.git_observation.observe_branch")
+    @patch("tools.agent_write_lifecycle.git_observation.ref_head")
+    def test_release_does_not_observe_missing_or_advanced_branch(
+        self, ref_head, observe_branch, prepare_previous, validate_begin
+    ) -> None:
+        with patch(
+            "tools.agent_write_lifecycle.GitHubCoordinationAuthority",
+            return_value=authority(),
+        ):
+            for expected_head in (None, "9" * 40):
+                with self.subTest(expected_head=expected_head):
+                    dispatch = lifecycle.prepare_dispatch(
+                        continuation_request(
+                            "release",
+                            expected_branch_head=expected_head,
+                        ),
+                        manifest(),
+                        {},
+                        issue_number=145,
+                        request_comment_id=903,
+                        hosted_run_id=459,
+                        transport=object(),
+                    )
+                    self.assertEqual("release", dispatch["action"])
+                    self.assertEqual(expected_head, dispatch["expectedBranchHead"])
+                    lifecycle.validate_dispatch(dispatch)
+
+        ref_head.assert_not_called()
+        observe_branch.assert_not_called()
 
 
 if __name__ == "__main__":
