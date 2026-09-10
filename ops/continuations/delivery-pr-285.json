@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "delivery-pr-285",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/delivery-boundary-consolidation",
   "prNumber": 285,
   "dependsOn": [],
