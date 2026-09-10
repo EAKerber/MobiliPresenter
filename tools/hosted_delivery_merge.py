@@ -1,15 +1,8 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 import json
-import sys
 from pathlib import Path
 from typing import Any
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from tools import delivery_merge
 
@@ -44,34 +37,30 @@ def parse_event(value: Any) -> dict[str, Any]:
 
 
 def _write(path: str, value: dict[str, Any]) -> None:
-    Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    Path(path).write_text(
+        json.dumps(value, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="hosted-delivery-merge")
-    parser.add_argument("--event", required=True)
-    parser.add_argument("--request-out", required=True)
-    parser.add_argument("--dispatch-out", required=True)
-    parser.add_argument("--result-out", required=True)
-    args = parser.parse_args(argv)
-
+def run_event_file(
+    *,
+    event_path: str,
+    request_out: str,
+    dispatch_out: str,
+    result_out: str,
+) -> int:
     request: dict[str, Any] | None = None
     try:
-        event = json.loads(Path(args.event).read_text(encoding="utf-8"))
+        event = json.loads(Path(event_path).read_text(encoding="utf-8"))
         request = parse_event(event)
-        _write(args.request_out, request)
+        _write(request_out, request)
         dispatch = delivery_merge.prepare(request)
-        _write(args.dispatch_out, dispatch)
+        _write(dispatch_out, dispatch)
         result = delivery_merge.execute(dispatch)
-        _write(args.result_out, result)
-        print(json.dumps(result, ensure_ascii=False))
+        _write(result_out, result)
         return 0
     except Exception as exc:
         result = delivery_merge.failure(exc, request)
-        _write(args.result_out, result)
-        print(json.dumps(result, ensure_ascii=False))
+        _write(result_out, result)
         return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
