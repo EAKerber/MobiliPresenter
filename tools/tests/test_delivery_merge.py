@@ -230,14 +230,16 @@ class DeliveryMergeTests(unittest.TestCase):
         with self.assertRaisesRegex(delivery_merge.DeliveryMergeError, "DELIVERY_MERGE_WORK_BINDING_MISMATCH"):
             delivery_merge.prepare(request(), transport)
 
-    def test_hosted_workflow_is_narrow_and_does_not_mutate_work(self):
-        workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/hosted-delivery-merge.yml").read_text(encoding="utf-8")
+    def test_delivery_reuses_registered_remote_carrier_and_does_not_mutate_work(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/remote-canonical-execution.yml").read_text(encoding="utf-8")
         self.assertIn("MOBILIPRESENTER_DELIVERY_MERGE_REQUEST_V0_1", workflow)
         self.assertIn("pull-requests: write", workflow)
         self.assertIn("actions: read", workflow)
-        self.assertIn("python tools/hosted_delivery_merge.py", workflow)
+        self.assertIn("hosted_delivery_merge.run_event_file", workflow)
         self.assertNotIn("coordination/continuations", workflow)
         self.assertNotIn("continuation_transition", workflow)
+        self.assertFalse((root / ".github/workflows/hosted-delivery-merge.yml").exists())
 
 
 if __name__ == "__main__":
