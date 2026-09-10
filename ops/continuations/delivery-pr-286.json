@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "delivery-pr-286",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/hosted-delivery-merge-v01",
+  "prNumber": 286,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "integrate-pr-286"
+  ],
+  "nextAction": "Integrate PR 286 after Agent Cycle continuity handoff",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
