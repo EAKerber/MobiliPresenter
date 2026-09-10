@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "501224fa7229d65872aed2e9100bf73adf11a169",
+  "leases": [
+    {
+      "leaseId": "agent-write-aebbc992e24024a78a1e54d7:0",
+      "resource": "branch:work/operations/hosted-delivery-merge-v01",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "hosted-delivery-merge-v01-20260909",
+        "branch": "work/operations/hosted-delivery-merge-v01",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-dd82730814e1ebe6387e8ef5",
+      "acquiredAt": "2026-09-10T00:19:29Z",
+      "renewedAt": "2026-09-10T00:19:29Z",
+      "expiresAt": "2026-09-10T00:49:29Z",
+      "ttlSeconds": 1800
+    }
+  ],
+  "revision": "c09bfef44dc8a52083ac6837361a0d01d54464a8",
   "schemaVersion": "CoordinationState 0.1"
 }
