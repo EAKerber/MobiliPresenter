@@ -300,9 +300,9 @@ def _snapshot(request: dict[str, Any], transport: Transport) -> dict[str, Any]:
     if ci["status"] != "green":
         raise DeliveryMergeError(f"DELIVERY_MERGE_CI_{ci['status'].upper()}")
     plan = git_mutation_plan.merge_pr(
-        request["prNumber"],
-        request["expectedHeadSha"],
-        request["expectedBase"],
+        pr_number=request["prNumber"],
+        head_sha=request["expectedHeadSha"],
+        base=request["expectedBase"],
         control_branch=CONTROL_BRANCH,
         merge_method=request["mergeMethod"],
     )
