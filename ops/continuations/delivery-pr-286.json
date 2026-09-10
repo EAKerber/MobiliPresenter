@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "delivery-pr-286",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/hosted-delivery-merge-v01",
   "prNumber": 286,
   "dependsOn": [],
