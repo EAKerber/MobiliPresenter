@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "delivery-pr-287",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/paved-path-refactor-r0-1-ci-reentry",
   "prNumber": 287,
   "dependsOn": [],
