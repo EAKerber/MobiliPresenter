@@ -2,21 +2,22 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r0-2-close-evidence-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r0-2-close-evidence-recovery",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
+  "completed": [
+    "implement-close-evidence-recovery"
+  ],
   "remaining": [
-    "implement-close-evidence-recovery",
     "qualify-close-evidence-recovery",
     "integrate-close-evidence-recovery",
     "verify-r0-2-close-recovery"
   ],
-  "nextAction": "Begin governed Agent Cycle and implement minimal Delivery-to-close evidence recovery",
+  "nextAction": "Open and qualify an exact-head PR for the governed close-evidence recovery candidate",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "732aeb2cea81833373e9848c3a8771109e034c29",
+    "checkpoint": "recovery-candidate-732aeb2"
   },
   "blockers": [],
   "handoffToWorkerId": null
