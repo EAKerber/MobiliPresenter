@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "4b6a9c5abf053d14fb7e59b1cd98bf6d083d8231",
+  "leases": [
+    {
+      "leaseId": "agent-write-47445f2b2c3d6afa64945cd4:0",
+      "resource": "branch:work/operations/paved-path-refactor-r0-2-ci-completeness-governed",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "paved-path-refactor-r0-2-20260911",
+        "branch": "work/operations/paved-path-refactor-r0-2-ci-completeness-governed",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-d6b239f3f8b1653dd6c9ba86",
+      "acquiredAt": "2026-09-11T09:41:53Z",
+      "renewedAt": "2026-09-11T09:41:53Z",
+      "expiresAt": "2026-09-11T10:41:53Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "542694c65c9b8b0e292e7a8aa7dc97f2ed7e8c1e",
   "schemaVersion": "CoordinationState 0.1"
 }
