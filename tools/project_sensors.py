@@ -170,7 +170,6 @@ def observe_continuations_live():
         )
 
 
-
 def _operations_branch(branch: Any) -> bool:
     if not isinstance(branch, str):
         return False
@@ -184,10 +183,71 @@ def _operations_branch(branch: Any) -> bool:
         return identity.get("declaredClass") in {"work", "experiment"}
     return identity.get("grammar") == "legacy"
 
-def _workflow_runs(repository: str, head_sha: str, raw_runs: list[Any]) -> list[dict[str, Any]]:
+
+def _list_pages(endpoint: str) -> tuple[list[Any], bool]:
+    items: list[Any] = []
+    page = 1
+    while True:
+        separator = "&" if "?" in endpoint else "?"
+        ok, payload = agent.run_gh_json(
+            f"{endpoint}{separator}per_page=100&page={page}"
+        )
+        if not ok or not isinstance(payload, list):
+            return items, False
+        items.extend(payload)
+        if len(payload) < 100:
+            return items, True
+        page += 1
+
+
+def _workflow_run_pages(
+    repository: str, head_sha: str
+) -> tuple[list[Any], bool, bool]:
+    raw_runs: list[Any] = []
+    page = 1
+    expected_total: int | None = None
+    complete = True
+    observed = False
+    while True:
+        ok, payload = agent.run_gh_json(
+            f"repos/{repository}/actions/runs?head_sha={head_sha}&per_page=100&page={page}"
+        )
+        if (
+            not ok
+            or not isinstance(payload, dict)
+            or not isinstance(payload.get("workflow_runs"), list)
+        ):
+            return raw_runs, False, observed
+        observed = True
+        page_runs = payload["workflow_runs"]
+        total = payload.get("total_count")
+        if type(total) is int and total >= 0:
+            if expected_total is None:
+                expected_total = total
+            elif total != expected_total:
+                complete = False
+        elif total is not None:
+            complete = False
+        raw_runs.extend(page_runs)
+        if expected_total is not None and len(raw_runs) >= expected_total:
+            if len(raw_runs) != expected_total:
+                complete = False
+            return raw_runs, complete, observed
+        if len(page_runs) < 100:
+            if expected_total is not None and len(raw_runs) != expected_total:
+                complete = False
+            return raw_runs, complete, observed
+        page += 1
+
+
+def _workflow_runs(
+    repository: str, head_sha: str, raw_runs: list[Any]
+) -> tuple[list[dict[str, Any]], bool]:
     runs: list[dict[str, Any]] = []
+    complete = True
     for raw in raw_runs:
         if not isinstance(raw, dict):
+            complete = False
             continue
         jobs_observed = False
         job_count = None
@@ -216,10 +276,8 @@ def _workflow_runs(repository: str, head_sha: str, raw_runs: list[Any]) -> list[
                 )
             )
         except RuntimeError:
-            # Invalid run facts remain visible as incomplete CI rather than being
-            # silently upgraded to a known state.
-            continue
-    return runs
+            complete = False
+    return runs, complete
 
 
 def observe_pull_requests(repository: str, *, live: bool):
@@ -239,15 +297,16 @@ def observe_pull_requests(repository: str, *, live: bool):
             required=False,
             authority=authority,
         )
-    ok, payload = agent.run_gh_json(f"repos/{repository}/pulls?state=open&per_page=100")
-    if not ok or not isinstance(payload, list):
+    payload, inventory_complete = _list_pages(
+        f"repos/{repository}/pulls?state=open"
+    )
+    if not inventory_complete:
         return sensor(
             "UNKNOWN",
             code="REMOTE_PR_INVENTORY_UNAVAILABLE",
             data={
                 "available": False,
-                "reason": "OPEN_PR_READ_FAILED",
-                "detail": payload,
+                "reason": "OPEN_PR_READ_INCOMPLETE",
                 "items": [],
             },
             authority=authority,
@@ -262,24 +321,22 @@ def observe_pull_requests(repository: str, *, live: bool):
         runs: list[dict[str, Any]] = []
         ci = "unknown"
         ci_observed = False
+        ci_complete = False
         if isinstance(head_sha, str):
-            runs_ok, workflow_payload = agent.run_gh_json(
-                f"repos/{repository}/actions/runs?head_sha={head_sha}&per_page=100"
+            raw_runs, pages_complete, ci_observed = _workflow_run_pages(
+                repository, head_sha
             )
-            if (
-                runs_ok
-                and isinstance(workflow_payload, dict)
-                and isinstance(workflow_payload.get("workflow_runs"), list)
-            ):
-                ci_observed = True
-                runs = _workflow_runs(
-                    repository, head_sha, workflow_payload["workflow_runs"]
+            if ci_observed:
+                runs, normalization_complete = _workflow_runs(
+                    repository, head_sha, raw_runs
                 )
+                ci_complete = pages_complete and normalization_complete
                 try:
                     ci = project_ci_observation.classify_runs(
                         runs,
                         head_sha,
                         include_agent_ops=_operations_branch(head.get("ref")),
+                        observation_complete=ci_complete,
                     )
                 except RuntimeError:
                     ci = "unknown"
@@ -292,6 +349,7 @@ def observe_pull_requests(repository: str, *, live: bool):
                 "baseRef": base.get("ref"),
                 "ci": ci,
                 "ciObserved": ci_observed,
+                "ciComplete": ci_complete,
                 "workflows": runs,
             }
         )
