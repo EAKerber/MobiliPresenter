@@ -8,16 +8,16 @@
   "dependsOn": [],
   "completed": [
     "implement-close-evidence-recovery",
-    "qualify-close-evidence-recovery"
+    "qualify-close-evidence-recovery",
+    "integrate-close-evidence-recovery"
   ],
   "remaining": [
-    "integrate-close-evidence-recovery",
     "verify-r0-2-close-recovery"
   ],
-  "nextAction": "Integrate qualified PR 290 with exact-head and exact-base preconditions, then verify the original R0.2 cycle close",
+  "nextAction": "Retry and verify the original R0.2 Agent Cycle close using the now-integrated exact compatibility recovery",
   "lastKnownGood": {
-    "sha": "f0a2cf0abe777353f2df2e028492bf0526794475",
-    "checkpoint": "pr-290-exact-head-ci-green"
+    "sha": "2f4be3756acc53d6f6ff00aa3b2db9730e844bad",
+    "checkpoint": "main-close-recovery-integrated"
   },
   "blockers": [],
   "handoffToWorkerId": null
