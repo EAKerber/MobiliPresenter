@@ -7,16 +7,16 @@
   "prNumber": 289,
   "dependsOn": [],
   "completed": [
-    "materialize-governed-candidate"
+    "materialize-governed-candidate",
+    "validate-governed-candidate"
   ],
   "remaining": [
-    "validate-governed-candidate",
     "integrate-governed-candidate"
   ],
-  "nextAction": "Validate exact-head CI and mergeability for governed PR 289",
+  "nextAction": "Integrate governed PR 289 after final main/head/CI precondition readback",
   "lastKnownGood": {
     "sha": "59e87e3d3e080ae38cfefc9e625624ea98e0c2d4",
-    "checkpoint": "governed-candidate-pr-289"
+    "checkpoint": "pr-289-exact-head-ci-green"
   },
   "blockers": [],
   "handoffToWorkerId": null
