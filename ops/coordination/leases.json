@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "6841017a79974bf04045411500451d2cc51a4a93",
+  "leases": [
+    {
+      "leaseId": "agent-write-411933302f148b651c69d07b:0",
+      "resource": "branch:work/operations/paved-path-refactor-r0-1-ci-reentry",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "paved-path-refactor-r0-1-20260910",
+        "branch": "work/operations/paved-path-refactor-r0-1-ci-reentry",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-628c37a05b233c1ad075d29d",
+      "acquiredAt": "2026-09-11T01:37:16Z",
+      "renewedAt": "2026-09-11T01:37:16Z",
+      "expiresAt": "2026-09-11T02:07:16Z",
+      "ttlSeconds": 1800
+    }
+  ],
+  "revision": "af33a93cae3d67fc0899144a5f5b3351370e5e0a",
   "schemaVersion": "CoordinationState 0.1"
 }
