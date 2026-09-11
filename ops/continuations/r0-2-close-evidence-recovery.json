@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "IN_PROGRESS",
   "branch": "work/operations/r0-2-close-evidence-recovery",
-  "prNumber": null,
+  "prNumber": 290,
   "dependsOn": [],
   "completed": [
     "implement-close-evidence-recovery"
