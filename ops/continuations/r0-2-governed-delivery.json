@@ -8,15 +8,14 @@
   "dependsOn": [],
   "completed": [
     "materialize-governed-candidate",
-    "validate-governed-candidate"
-  ],
-  "remaining": [
+    "validate-governed-candidate",
     "integrate-governed-candidate"
   ],
-  "nextAction": "Integrate governed PR 289 after final main/head/CI precondition readback",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "59e87e3d3e080ae38cfefc9e625624ea98e0c2d4",
-    "checkpoint": "pr-289-exact-head-ci-green"
+    "sha": "8c63e87553542a8e7cd8747555d6296801030799",
+    "checkpoint": "main-r0-2-integrated"
   },
   "blockers": [],
   "handoffToWorkerId": null
