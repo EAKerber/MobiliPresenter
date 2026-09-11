@@ -7,17 +7,17 @@
   "prNumber": 290,
   "dependsOn": [],
   "completed": [
-    "implement-close-evidence-recovery"
+    "implement-close-evidence-recovery",
+    "qualify-close-evidence-recovery"
   ],
   "remaining": [
-    "qualify-close-evidence-recovery",
     "integrate-close-evidence-recovery",
     "verify-r0-2-close-recovery"
   ],
-  "nextAction": "Open and qualify an exact-head PR for the governed close-evidence recovery candidate",
+  "nextAction": "Integrate qualified PR 290 with exact-head and exact-base preconditions, then verify the original R0.2 cycle close",
   "lastKnownGood": {
-    "sha": "732aeb2cea81833373e9848c3a8771109e034c29",
-    "checkpoint": "recovery-candidate-732aeb2"
+    "sha": "f0a2cf0abe777353f2df2e028492bf0526794475",
+    "checkpoint": "pr-290-exact-head-ci-green"
   },
   "blockers": [],
   "handoffToWorkerId": null
