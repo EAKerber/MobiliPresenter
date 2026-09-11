@@ -34,7 +34,7 @@ def __getattr__(name):
     later attribute access resolves against the completed implementation.
     """
     if name == "agent_cycle_close":
-        return importlib.import_module("tools.agent_cycle_close")
+        return importlib.import_module("tools.agent_cycle_close_recovery")
     try:
         return getattr(_commands, name)
     except AttributeError as exc:

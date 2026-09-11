@@ -314,6 +314,21 @@ jobs:
                   ],
                   True,
               ),
+              (
+                  [
+                      {
+                          'code': 'UNATTRIBUTED_DURABLE_DELTA',
+                          'source': 'agent-cycle-close',
+                          'phase': 'CLOSE',
+                      },
+                      {
+                          'code': 'HOSTED_AGENT_CLOSE_NOT_PASS',
+                          'source': 'hosted-agent-cycle',
+                          'phase': 'CLOSE',
+                      },
+                  ],
+                  False,
+              ),
           )
           core = value.get('failureCore') if isinstance(value, dict) else None
           recovery = core.get('recovery') if isinstance(core, dict) else None
