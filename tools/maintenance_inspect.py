@@ -100,14 +100,7 @@ def _machine_findings(machine):
             continue
         status = str(sensor.get("status") or "UNKNOWN").upper()
         if status != "PASS":
-            out.append(
-                finding(
-                    "PAUSE",
-                    sensor.get("code") or "AUTHORITY_NOT_OBSERVED_IN_SCOPE",
-                    f"branch-backed authority {name} was not observed in this inspection scope",
-                    _sensor_focus(name),
-                )
-            )
+            out.append(finding("PAUSE", sensor.get("code") or "AUTHORITY_NOT_OBSERVED_IN_SCOPE", f"branch-backed authority {name} was not observed in this inspection scope", _sensor_focus(name)))
     trust = machine.get("trust") if isinstance(machine.get("trust"), dict) else {}
     status = str(trust.get("status") or "UNKNOWN").upper()
     names = trust.get("failedSensors") if status == "FAIL" else trust.get("unknownSensors")
@@ -115,17 +108,8 @@ def _machine_findings(machine):
     if action:
         for name in names or ["project-machine"]:
             sensor = sensors.get(name) if isinstance(sensors.get(name), dict) else {}
-            code = sensor.get("code") or (
-                "PROJECT_MACHINE_FAILED" if status == "FAIL" else "PROJECT_MACHINE_INCOMPLETE"
-            )
-            out.append(
-                finding(
-                    action,
-                    code,
-                    f"factual sensor {name} status is {status}",
-                    _sensor_focus(str(name)),
-                )
-            )
+            code = sensor.get("code") or ("PROJECT_MACHINE_FAILED" if status == "FAIL" else "PROJECT_MACHINE_INCOMPLETE")
+            out.append(finding(action, code, f"factual sensor {name} status is {status}", _sensor_focus(str(name))))
     coherence = machine.get("coherence") if isinstance(machine.get("coherence"), dict) else {}
     for check in coherence.get("checks") or []:
         if not isinstance(check, dict) or check.get("required") is not True:
@@ -135,19 +119,8 @@ def _machine_findings(machine):
             continue
         action = "RECONCILE" if check_status == "FAIL" else "NEEDS_HUMAN"
         detail = check.get("detail")
-        rendered = (
-            json.dumps(detail, sort_keys=True, ensure_ascii=False)
-            if detail is not None
-            else str(check.get("id"))
-        )
-        out.append(
-            finding(
-                action,
-                check.get("code") or "PROJECT_COHERENCE_UNKNOWN",
-                rendered,
-                _coherence_focus(check),
-            )
-        )
+        rendered = json.dumps(detail, sort_keys=True, ensure_ascii=False) if detail is not None else str(check.get("id"))
+        out.append(finding(action, check.get("code") or "PROJECT_COHERENCE_UNKNOWN", rendered, _coherence_focus(check)))
     return out
 
 
@@ -181,16 +154,7 @@ def _work_selection(machine, work_items):
         target = item.get("handoffToWorkerId")
         if not isinstance(target, str) or not target:
             raise RuntimeError("MAINTENANCE_HANDOFF_TARGET_INVALID")
-        return [
-            finding(
-                "HANDOFF",
-                "WORK_HANDOFF_REQUIRED",
-                f"handoff to {target}: {item.get('nextAction') or 'resume work'}",
-                f"work:{work_id}",
-                work_id=work_id,
-                target_worker_id=target,
-            )
-        ]
+        return [finding("HANDOFF", "WORK_HANDOFF_REQUIRED", f"handoff to {target}: {item.get('nextAction') or 'resume work'}", f"work:{work_id}", work_id=work_id, target_worker_id=target)]
 
     runnable = sorted(str(work_id) for work_id in graph.get("runnable") or [])
     if not runnable:
@@ -218,50 +182,16 @@ def _work_selection(machine, work_items):
         if ci == "green" and observed:
             ready.append((work_id, target, item))
         elif ci == "failed":
-            blocked.append(
-                finding(
-                    "RECONCILE",
-                    "WORK_PR_CI_FAILED",
-                    f"PR #{pr_number} CI is failed",
-                    f"work:{work_id}",
-                    work_id=work_id,
-                    target_worker_id=target,
-                )
-            )
+            blocked.append(finding("RECONCILE", "WORK_PR_CI_FAILED", f"PR #{pr_number} CI is failed", f"work:{work_id}", work_id=work_id, target_worker_id=target))
         elif ci == "pending":
-            blocked.append(
-                finding(
-                    "PAUSE",
-                    "WORK_PR_CI_PENDING",
-                    f"PR #{pr_number} CI is pending",
-                    f"work:{work_id}",
-                    work_id=work_id,
-                    target_worker_id=target,
-                )
-            )
+            blocked.append(finding("PAUSE", "WORK_PR_CI_PENDING", f"PR #{pr_number} CI is pending", f"work:{work_id}", work_id=work_id, target_worker_id=target))
+        elif ci == "reentry_required" and observed:
+            blocked.append(finding("RECONCILE", "WORK_PR_CI_REENTRY_REQUIRED", f"PR #{pr_number} CI requires re-entry", f"work:{work_id}", work_id=work_id, target_worker_id=target))
         else:
-            blocked.append(
-                finding(
-                    "NEEDS_HUMAN",
-                    "WORK_PR_CI_UNKNOWN",
-                    f"PR #{pr_number} CI could not be established",
-                    f"work:{work_id}",
-                    work_id=work_id,
-                    target_worker_id=target,
-                )
-            )
+            blocked.append(finding("NEEDS_HUMAN", "WORK_PR_CI_UNKNOWN", f"PR #{pr_number} CI could not be established", f"work:{work_id}", work_id=work_id, target_worker_id=target))
     if ready:
         work_id, target, item = sorted(ready, key=lambda entry: entry[0])[0]
-        return [
-            finding(
-                "CONTINUE",
-                "WORK_RUNNABLE",
-                item.get("nextAction") or "finish and mark done",
-                f"work:{work_id}",
-                work_id=work_id,
-                target_worker_id=target,
-            )
-        ]
+        return [finding("CONTINUE", "WORK_RUNNABLE", item.get("nextAction") or "finish and mark done", f"work:{work_id}", work_id=work_id, target_worker_id=target)]
     return blocked
 
 
@@ -270,23 +200,11 @@ def _pending_work_pause(work_items, graph):
     for item in work_items:
         work_id = str(item.get("id") or "")
         if item.get("status") == "WAITING":
-            candidates.append(
-                (work_id, "WORK_WAITING", "; ".join(str(v) for v in item.get("blockers") or []))
-            )
+            candidates.append((work_id, "WORK_WAITING", "; ".join(str(v) for v in item.get("blockers") or [])))
     for work_id in graph.get("dependencyBlocked") or []:
         item = _work_item(work_items, work_id)
-        pending = [
-            dep
-            for dep in item.get("dependsOn") or []
-            if dep not in set(graph.get("terminal") or [])
-        ]
-        candidates.append(
-            (
-                str(work_id),
-                "WORK_DEPENDENCY_BLOCKED",
-                f"waiting for dependencies: {', '.join(sorted(str(v) for v in pending))}",
-            )
-        )
+        pending = [dep for dep in item.get("dependsOn") or [] if dep not in set(graph.get("terminal") or [])]
+        candidates.append((str(work_id), "WORK_DEPENDENCY_BLOCKED", f"waiting for dependencies: {', '.join(sorted(str(v) for v in pending))}"))
     if not candidates:
         return None
     work_id, code, detail = sorted(candidates, key=lambda entry: entry[0])[0]
@@ -298,26 +216,11 @@ def _routine_findings(routine_inspection):
     out = []
     status = str(routine_inspection.get("status") or "UNKNOWN").upper()
     if status == "FAIL":
-        out.append(
-            finding(
-                "RECONCILE",
-                "ROUTINE_INSPECTION_FAILED",
-                "one or more required recurring routine evaluations failed",
-                "routines",
-            )
-        )
+        out.append(finding("RECONCILE", "ROUTINE_INSPECTION_FAILED", "one or more required recurring routine evaluations failed", "routines"))
     elif status == "UNKNOWN":
-        out.append(
-            finding(
-                "NEEDS_HUMAN",
-                "ROUTINE_INSPECTION_INCOMPLETE",
-                "one or more required recurring routine evaluations are unknown",
-                "routines",
-            )
-        )
+        out.append(finding("NEEDS_HUMAN", "ROUTINE_INSPECTION_INCOMPLETE", "one or more required recurring routine evaluations are unknown", "routines"))
     elif status != "PASS":
         raise RuntimeError("MAINTENANCE_ROUTINE_STATUS_INVALID")
-
     results = routine_inspection.get("results")
     if not isinstance(results, list):
         raise RuntimeError("MAINTENANCE_ROUTINE_RESULTS_INVALID")
@@ -351,14 +254,7 @@ def decide(machine, routine_inspection):
         if pending is not None:
             findings.append(pending)
     if not findings:
-        findings.append(
-            finding(
-                "CONTINUE",
-                "NEXT_TRANSITION_AVAILABLE",
-                machine["project"]["nextTransition"],
-                "development",
-            )
-        )
+        findings.append(finding("CONTINUE", "NEXT_TRANSITION_AVAILABLE", machine["project"]["nextTransition"], "development"))
     indexed = list(enumerate(findings))
     _, best = max(indexed, key=lambda pair: (ACTION_PRIORITY[pair[1]["action"]], -pair[0]))
     recommendation = {
@@ -405,48 +301,27 @@ def validate_inspection(value):
     if value.get("repository") != project_machine.REPOSITORY:
         raise RuntimeError("MAINTENANCE_REPOSITORY_MISMATCH")
     source_hash = value.get("projectMachineInspectionHash")
-    if (
-        not isinstance(source_hash, str)
-        or len(source_hash) != 64
-        or any(c not in "0123456789abcdef" for c in source_hash)
-    ):
+    if not isinstance(source_hash, str) or len(source_hash) != 64 or any(c not in "0123456789abcdef" for c in source_hash):
         raise RuntimeError("MAINTENANCE_PROJECT_MACHINE_HASH_INVALID")
     routine_hash = value.get("routineInspectionHash")
-    if (
-        not isinstance(routine_hash, str)
-        or len(routine_hash) != 64
-        or any(c not in "0123456789abcdef" for c in routine_hash)
-    ):
+    if not isinstance(routine_hash, str) or len(routine_hash) != 64 or any(c not in "0123456789abcdef" for c in routine_hash):
         raise RuntimeError("MAINTENANCE_ROUTINE_HASH_INVALID")
     if value.get("readOnly") is not True or not isinstance(value.get("findings"), list):
         raise RuntimeError("MAINTENANCE_BOUNDARY_INVALID")
     rec = value.get("recommendation")
     if not isinstance(rec, dict) or set(rec) != RECOMMENDATION_FIELDS or rec.get("action") not in ACTIONS:
         raise RuntimeError("MAINTENANCE_RECOMMENDATION_INVALID")
-    if (
-        rec.get("decisionScope") != "operational-only"
-        or rec.get("semanticAuthority") is not False
-        or rec.get("allowedActions") != list(ACTIONS)
-    ):
+    if rec.get("decisionScope") != "operational-only" or rec.get("semanticAuthority") is not False or rec.get("allowedActions") != list(ACTIONS):
         raise RuntimeError("MAINTENANCE_SEMANTIC_AUTHORITY_INVALID")
-    if rec.get("workId") is not None and (
-        not isinstance(rec.get("workId"), str) or not rec["workId"]
-    ):
+    if rec.get("workId") is not None and (not isinstance(rec.get("workId"), str) or not rec["workId"]):
         raise RuntimeError("MAINTENANCE_WORK_ID_INVALID")
-    if rec.get("targetWorkerId") is not None and (
-        not isinstance(rec.get("targetWorkerId"), str) or not rec["targetWorkerId"]
-    ):
+    if rec.get("targetWorkerId") is not None and (not isinstance(rec.get("targetWorkerId"), str) or not rec["targetWorkerId"]):
         raise RuntimeError("MAINTENANCE_TARGET_WORKER_INVALID")
     supplied = value.get("inspectionHash")
     body = {key: item for key, item in value.items() if key != "inspectionHash"}
     if not isinstance(supplied, str) or supplied != stable_hash(body):
         raise RuntimeError("MAINTENANCE_HASH_MISMATCH")
-    return {
-        "ok": True,
-        "inspectionHash": supplied,
-        "projectMachineInspectionHash": source_hash,
-        "routineInspectionHash": routine_hash,
-    }
+    return {"ok": True, "inspectionHash": supplied, "projectMachineInspectionHash": source_hash, "routineInspectionHash": routine_hash}
 
 
 def validate_derivation(value, machine, routine_inspection):
@@ -457,12 +332,7 @@ def validate_derivation(value, machine, routine_inspection):
         raise RuntimeError("MAINTENANCE_ROUTINE_MISMATCH")
     if value != from_inputs(machine, routine_inspection):
         raise RuntimeError("MAINTENANCE_DERIVATION_MISMATCH")
-    return {
-        "ok": True,
-        "inspectionHash": value["inspectionHash"],
-        "projectMachineInspectionHash": machine["inspectionHash"],
-        "routineInspectionHash": routine_inspection["inspectionHash"],
-    }
+    return {"ok": True, "inspectionHash": value["inspectionHash"], "projectMachineInspectionHash": machine["inspectionHash"], "routineInspectionHash": routine_inspection["inspectionHash"]}
 
 
 def load_json(path):
@@ -510,14 +380,7 @@ def main(argv=None):
         if args.as_json:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:
-            print(
-                "MAINTENANCE INSPECT\n"
-                f"  recommendation: {payload['recommendation']['action']}\n"
-                f"  reason: {payload['recommendation']['reasonCode']}\n"
-                f"  focus: {payload['recommendation']['focus']}\n"
-                f"  source ProjectMachine: {payload['projectMachineInspectionHash']}\n"
-                f"  source RoutineInspection: {payload['routineInspectionHash']}"
-            )
+            print("MAINTENANCE INSPECT\n" f"  recommendation: {payload['recommendation']['action']}\n" f"  reason: {payload['recommendation']['reasonCode']}\n" f"  focus: {payload['recommendation']['focus']}\n" f"  source ProjectMachine: {payload['projectMachineInspectionHash']}\n" f"  source RoutineInspection: {payload['routineInspectionHash']}")
         return 0
     except RuntimeError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
