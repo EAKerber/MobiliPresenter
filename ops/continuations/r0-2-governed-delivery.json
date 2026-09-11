@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r0-2-governed-delivery",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/paved-path-refactor-r0-2-ci-completeness-governed",
   "prNumber": 289,
   "dependsOn": [],
