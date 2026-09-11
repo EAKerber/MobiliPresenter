@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/paved-path-refactor-r0-2-ci-completeness-governed",
-  "prNumber": null,
+  "prNumber": 289,
   "dependsOn": [],
   "completed": [],
   "remaining": [
