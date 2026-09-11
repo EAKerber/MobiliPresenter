@@ -2,18 +2,18 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "delivery-pr-287",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/paved-path-refactor-r0-1-ci-reentry",
   "prNumber": 287,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "integrate-pr-287"
   ],
-  "nextAction": "Integrate PR 287 after Agent Cycle continuity handoff",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "bee92b95734cda2de537afd34b09eb3950c46917",
+    "checkpoint": "PR 287 merged into main with exact head readback"
   },
   "blockers": [],
   "handoffToWorkerId": null
