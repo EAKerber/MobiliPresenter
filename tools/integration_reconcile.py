@@ -110,31 +110,26 @@ def boundary_assessment(head_ref, changed_files):
     }
 
 
-def _selected_runs(runs, head_ref):
-    operations = _branch_domain(head_ref) == "operations"
-    latest = {}
-    for run in runs:
-        if not isinstance(run, dict):
-            continue
-        name = str(run.get("name") or "")
-        if not name or (name == "Agent Ops" and not operations):
-            continue
-        latest.setdefault(name, run)
-    return list(latest.values())
-
-
-def aggregate_ci(runs, head_sha, head_ref=""):
+def aggregate_ci(runs, head_sha, head_ref="", *, observation_complete=True):
     operations = _branch_domain(head_ref) == "operations"
     try:
         status = project_ci_observation.classify_runs(
-            runs, head_sha, include_agent_ops=operations
+            runs,
+            head_sha,
+            include_agent_ops=operations,
+            observation_complete=observation_complete,
+        )
+        selected = project_ci_observation.latest_runs(
+            runs, include_agent_ops=operations
         )
     except RuntimeError:
         status = "unknown"
-    selected = _selected_runs(runs, head_ref)
+        selected = []
+        observation_complete = False
     return {
         "status": status,
         "validatedSha": head_sha,
+        "observationComplete": bool(observation_complete),
         "runs": [
             {key: run.get(key) for key in ("name", "id", "status", "conclusion")}
             for run in selected
@@ -202,6 +197,7 @@ def build_plan(obs):
         obs.get("workflowRuns") or [],
         pr.get("headSha"),
         str(pr.get("headRef") or ""),
+        observation_complete=obs.get("workflowRunsComplete", True) is True,
     )
     body = {
         "schemaVersion": SCHEMA_VERSION,
@@ -281,14 +277,48 @@ class GhObserver:
             "mergeBaseSha": merge_base.get("sha"),
         }
 
-    def _workflow_runs(self, repo: str, head_sha: str) -> list[dict]:
-        payload = self._run(f"repos/{repo}/actions/runs?head_sha={head_sha}&per_page=100")
-        raw_runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
-        if not isinstance(raw_runs, list):
-            raise RuntimeError("WORKFLOW_RUNS_INVALID")
+    def _workflow_run_pages(
+        self, repo: str, head_sha: str
+    ) -> tuple[list[dict], bool]:
+        raw_runs: list[dict] = []
+        page = 1
+        expected_total: int | None = None
+        complete = True
+        while True:
+            try:
+                payload = self._run(
+                    f"repos/{repo}/actions/runs?head_sha={head_sha}&per_page=100&page={page}"
+                )
+            except RuntimeError:
+                return raw_runs, False
+            page_runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
+            if not isinstance(page_runs, list):
+                return raw_runs, False
+            total = payload.get("total_count")
+            if type(total) is int and total >= 0:
+                if expected_total is None:
+                    expected_total = total
+                elif total != expected_total:
+                    complete = False
+            elif total is not None:
+                complete = False
+            raw_runs.extend(page_runs)
+            if expected_total is not None and len(raw_runs) >= expected_total:
+                if len(raw_runs) != expected_total:
+                    complete = False
+                return raw_runs, complete
+            if len(page_runs) < 100:
+                if expected_total is not None and len(raw_runs) != expected_total:
+                    complete = False
+                return raw_runs, complete
+            page += 1
+
+    def _workflow_runs(self, repo: str, head_sha: str) -> tuple[list[dict], bool]:
+        raw_runs, complete = self._workflow_run_pages(repo, head_sha)
         runs = []
         for raw in raw_runs:
             if not isinstance(raw, dict):
+                complete = False
                 continue
             jobs_observed = False
             job_count = None
@@ -320,8 +350,8 @@ class GhObserver:
                     )
                 )
             except RuntimeError:
-                continue
-        return runs
+                complete = False
+        return runs, complete
 
     def observe(self, pr_number, target_branch):
         repo = self.repository
@@ -336,7 +366,7 @@ class GhObserver:
         head_sha = head.get("sha")
         if not all(isinstance(value, str) for value in (target_sha, base_sha, head_sha)):
             raise RuntimeError("PR_IDENTITY_INCOMPLETE")
-        workflows = self._workflow_runs(repo, head_sha)
+        workflows, workflows_complete = self._workflow_runs(repo, head_sha)
         return {
             "repository": repo,
             "pr": {
@@ -365,6 +395,7 @@ class GhObserver:
                 if isinstance(item, dict) and isinstance(item.get("filename"), str)
             ],
             "workflowRuns": workflows,
+            "workflowRunsComplete": workflows_complete,
         }
 
 

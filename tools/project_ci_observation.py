@@ -168,15 +168,26 @@ def _classification_run(raw: Any) -> dict[str, Any]:
     }
 
 
-def _latest_runs(runs: list[dict[str, Any]], *, include_agent_ops: bool) -> list[dict[str, Any]]:
+def _run_order_key(run: dict[str, Any]) -> tuple[int, int]:
+    """Provider-independent ordering for attempts and distinct workflow runs."""
+    attempt = run.get("runAttempt")
+    return (run["id"], attempt if type(attempt) is int else 0)
+
+
+def latest_runs(
+    runs: list[dict[str, Any]], *, include_agent_ops: bool = False
+) -> list[dict[str, Any]]:
+    """Select the newest run per workflow name without trusting provider ordering."""
     latest: dict[str, dict[str, Any]] = {}
     for raw in runs:
         run = _classification_run(raw)
         name = run["name"]
         if name == "Agent Ops" and not include_agent_ops:
             continue
-        latest.setdefault(name, run)
-    return list(latest.values())
+        current = latest.get(name)
+        if current is None or _run_order_key(run) > _run_order_key(current):
+            latest[name] = run
+    return [latest[name] for name in sorted(latest)]
 
 
 def _proven_reentry(run: dict[str, Any], head_sha: str) -> bool:
@@ -197,35 +208,55 @@ def classify_runs(
     head_sha: str,
     *,
     include_agent_ops: bool = False,
+    observation_complete: bool = True,
 ) -> str:
     """Classify latest exact-head runs while preserving known GitHub CI re-entry."""
     head_sha = _sha(head_sha, "PROJECT_CI_PR_HEAD_INVALID")
-    selected = _latest_runs(runs, include_agent_ops=include_agent_ops)
+    if not isinstance(observation_complete, bool):
+        raise ProjectCIObservationError("PROJECT_CI_COMPLETENESS_INVALID")
+    selected = latest_runs(runs, include_agent_ops=include_agent_ops)
     if not selected:
+        return "unknown"
+    if any(
+        run["headSha"] is not None and run["headSha"] != head_sha
+        for run in selected
+    ):
         return "unknown"
     if any(run["status"] != "completed" for run in selected):
         return "pending"
     conclusions = {run["conclusion"] for run in selected}
-    if conclusions <= SUCCESS_CONCLUSIONS:
-        return "green"
     if conclusions & FAILURE_CONCLUSIONS:
         return "failed"
+    if conclusions <= SUCCESS_CONCLUSIONS:
+        return "green" if observation_complete else "unknown"
     action_required = [run for run in selected if run["conclusion"] == "action_required"]
     if action_required:
-        if all(_proven_reentry(run, head_sha) for run in action_required):
+        if observation_complete and all(_proven_reentry(run, head_sha) for run in action_required):
             return "reentry_required"
         return "unknown"
     return "unknown"
 
 
 def reentry_run_ids(
-    runs: list[dict[str, Any]], head_sha: str, *, include_agent_ops: bool = False
+    runs: list[dict[str, Any]],
+    head_sha: str,
+    *,
+    include_agent_ops: bool = False,
+    observation_complete: bool = True,
 ) -> list[int]:
-    if classify_runs(runs, head_sha, include_agent_ops=include_agent_ops) != "reentry_required":
+    if (
+        classify_runs(
+            runs,
+            head_sha,
+            include_agent_ops=include_agent_ops,
+            observation_complete=observation_complete,
+        )
+        != "reentry_required"
+    ):
         return []
     return sorted(
         run["id"]
-        for run in _latest_runs(runs, include_agent_ops=include_agent_ops)
+        for run in latest_runs(runs, include_agent_ops=include_agent_ops)
         if _proven_reentry(run, head_sha)
     )
 
