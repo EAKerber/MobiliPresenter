@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r0-2-governed-delivery",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/paved-path-refactor-r0-2-ci-completeness-governed",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "materialize-governed-candidate",
+    "validate-governed-candidate",
+    "integrate-governed-candidate"
+  ],
+  "nextAction": "Begin current Agent Cycle and materialize R0.2 candidate under active ownership",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
