@@ -40,32 +40,95 @@ class FakeTransport:
         return SimpleNamespace(body=json.dumps(value))
 
 
-def closure(*, blockers=None, changes=None, uncovered=None, status="UNKNOWN"):
-    changes = changes if changes is not None else [{
+def main_change(name):
+    return {
         "kind": "source-head",
-        "name": "control",
+        "name": name,
         "branch": "main",
         "before": BEFORE,
         "after": AFTER,
-    }]
+    }
+
+
+def closure(*, blockers=None, changes=None, uncovered=None, status="UNKNOWN"):
+    changes = changes if changes is not None else [
+        main_change("control"),
+        main_change("inspection"),
+    ]
     return {
         "status": status,
         "receipt": {
             "blockers": blockers if blockers is not None else ["UNATTRIBUTED_DURABLE_DELTA"],
             "delta": {"durableChanges": changes},
             "aggregateReadback": {
-                "uncoveredDurableChanges": uncovered if uncovered is not None else ["source-head:control:0"]
+                "uncoveredDurableChanges": uncovered if uncovered is not None else [
+                    "source-head:control:0",
+                    "source-head:inspection:1",
+                ]
             },
         },
     }
 
 
 class AgentCycleCloseMergeRecoveryTests(unittest.TestCase):
-    def test_exact_main_delta_is_recoverable(self):
+    def test_exact_control_inspection_main_pair_is_recoverable(self):
         self.assertEqual(recovery.recoverable_main_delta(closure()), (BEFORE, AFTER))
+
+    def test_exact_pair_is_order_independent_when_indices_match(self):
+        value = closure(
+            changes=[main_change("inspection"), main_change("control")],
+            uncovered=["source-head:inspection:0", "source-head:control:1"],
+        )
+        self.assertEqual(recovery.recoverable_main_delta(value), (BEFORE, AFTER))
 
     def test_extra_blocker_is_not_recoverable(self):
         value = closure(blockers=["AFTER_CONTEXT_UNKNOWN", "UNATTRIBUTED_DURABLE_DELTA"])
+        self.assertIsNone(recovery.recoverable_main_delta(value))
+
+    def test_extra_durable_change_is_not_recoverable(self):
+        extra = {
+            "kind": "source-head",
+            "name": "coordination",
+            "branch": "coordination/leases",
+            "before": "d" * 40,
+            "after": "e" * 40,
+        }
+        value = closure(changes=[
+            main_change("control"),
+            main_change("inspection"),
+            extra,
+        ])
+        self.assertIsNone(recovery.recoverable_main_delta(value))
+
+    def test_inspection_after_mismatch_is_not_recoverable(self):
+        inspection = main_change("inspection")
+        inspection["after"] = "d" * 40
+        self.assertIsNone(
+            recovery.recoverable_main_delta(
+                closure(changes=[main_change("control"), inspection])
+            )
+        )
+
+    def test_duplicate_control_is_not_recoverable(self):
+        self.assertIsNone(
+            recovery.recoverable_main_delta(
+                closure(changes=[main_change("control"), main_change("control")])
+            )
+        )
+
+    def test_extra_uncovered_change_is_not_recoverable(self):
+        value = closure(uncovered=[
+            "source-head:control:0",
+            "source-head:inspection:1",
+            "source-head:coordination:2",
+        ])
+        self.assertIsNone(recovery.recoverable_main_delta(value))
+
+    def test_uncovered_identity_or_index_mismatch_is_not_recoverable(self):
+        value = closure(uncovered=[
+            "source-head:control:1",
+            "source-head:inspection:0",
+        ])
         self.assertIsNone(recovery.recoverable_main_delta(value))
 
     def test_merge_evidence_requires_exact_parent_main_and_pr(self):
@@ -92,7 +155,6 @@ class AgentCycleCloseMergeRecoveryTests(unittest.TestCase):
                 AFTER,
                 transport=FakeTransport(pulls=[base, dict(base)]),
             )
-
 
     def test_hosted_workflow_admits_exact_unattributed_signature(self):
         workflow = (

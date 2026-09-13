@@ -45,32 +45,52 @@ def recoverable_main_delta(closure: Any) -> tuple[str, str] | None:
     if not isinstance(delta, dict):
         return None
     changes = delta.get("durableChanges")
-    if not isinstance(changes, list) or len(changes) != 1:
+    if not isinstance(changes, list) or len(changes) != 2:
         return None
-    change = changes[0]
-    if not isinstance(change, dict):
+
+    indexed: dict[str, tuple[int, dict[str, Any]]] = {}
+    for index, change in enumerate(changes):
+        if not isinstance(change, dict):
+            return None
+        if (
+            change.get("kind") != "source-head"
+            or change.get("branch") != CONTROL_BRANCH
+            or change.get("name") not in {"control", "inspection"}
+            or change["name"] in indexed
+        ):
+            return None
+        indexed[change["name"]] = (index, change)
+    if set(indexed) != {"control", "inspection"}:
         return None
-    if (
-        change.get("kind") != "source-head"
-        or change.get("name") != "control"
-        or change.get("branch") != CONTROL_BRANCH
-    ):
-        return None
-    before = change.get("before")
-    after = change.get("after")
+
+    control_index, control = indexed["control"]
+    inspection_index, inspection = indexed["inspection"]
+    before = control.get("before")
+    after = control.get("after")
     if (
         not isinstance(before, str)
         or not isinstance(after, str)
         or before == after
         or SHA_RE.fullmatch(before) is None
         or SHA_RE.fullmatch(after) is None
+        or inspection.get("before") != before
+        or inspection.get("after") != after
     ):
         return None
+
     aggregate = receipt.get("aggregateReadback")
     if not isinstance(aggregate, dict):
         return None
     uncovered = aggregate.get("uncoveredDurableChanges")
-    if not isinstance(uncovered, list) or len(uncovered) != 1:
+    expected_uncovered = {
+        f"source-head:control:{control_index}",
+        f"source-head:inspection:{inspection_index}",
+    }
+    if (
+        not isinstance(uncovered, list)
+        or len(uncovered) != 2
+        or set(uncovered) != expected_uncovered
+    ):
         return None
     return before, after
 
