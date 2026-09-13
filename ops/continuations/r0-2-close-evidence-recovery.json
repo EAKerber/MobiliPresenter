@@ -3,7 +3,7 @@
   "id": "r0-2-close-evidence-recovery",
   "workerId": "manager-gitops-chat",
   "status": "IN_PROGRESS",
-  "branch": null,
+  "branch": "work/operations/r0-2-close-evidence-recovery-r2",
   "prNumber": null,
   "dependsOn": [],
   "completed": [
