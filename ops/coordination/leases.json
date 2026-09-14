@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-2806efba7b30f8b058c925c4:0",
-      "resource": "branch:work/operations/r1-1-journey-projection-readonly",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "paved-path-r1-1-journey-projection-reentry-20260914",
-        "branch": "work/operations/r1-1-journey-projection-readonly",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-be34211812399404a749ac1f",
-      "acquiredAt": "2026-09-14T22:03:51Z",
-      "renewedAt": "2026-09-14T22:03:51Z",
-      "expiresAt": "2026-09-14T23:03:51Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "80b813aeaee653856b5f19172a4113d81f5f2310",
+  "leases": [],
+  "revision": "2fcbdb9457196023ad8eb421ac1ccbb12f0f9ebb",
   "schemaVersion": "CoordinationState 0.1"
 }
