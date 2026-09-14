@@ -11,15 +11,14 @@
   "completed": [
     "define-shadow-action-comparison",
     "add-entry-reentry-equivalence-canaries",
-    "qualify-shadow-equivalence"
-  ],
-  "remaining": [
+    "qualify-shadow-equivalence",
     "integrate-r2-entry-reentry"
   ],
-  "nextAction": "Integrate PR #297 through governed Delivery only if main, PR head, lease, and green checks remain unchanged",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "47528ce6691b969271331b2ef09dbc3771c6fdbd",
-    "checkpoint": "PR #297 qualified green on head 47528ce6691b969271331b2ef09dbc3771c6fdbd: Agent Ops 34907463163, Coordination Guard 34907463154, Supervisor Snapshot 34907463209; Agent Ops unit tests, semantic contracts, operational coverage, capability lifecycle guard, doctor, coherence, Project Machine and integration evidence all passed"
+    "sha": "44e5f33fa9056fe13ffbaba264f5dfbf4de75229",
+    "checkpoint": "PR #297 merged via governed Delivery as 44e5f33fa9056fe13ffbaba264f5dfbf4de75229 after green Agent Ops 34907463163, Coordination Guard 34907463154 and Supervisor Snapshot 34907463209; R2 write lease released and coordination readback shows leases=[]"
   },
   "blockers": [],
   "handoffToWorkerId": null
