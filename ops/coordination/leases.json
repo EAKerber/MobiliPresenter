@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-b4e7c949530971a01f58ccc9:0",
-      "resource": "branch:work/operations/r0-3-negative-close-evidence",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "paved-path-r0-3-negative-close-evidence-20260914",
-        "branch": "work/operations/r0-3-negative-close-evidence",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-0967d5726e832bdee8f53d0d",
-      "acquiredAt": "2026-09-14T15:42:06Z",
-      "renewedAt": "2026-09-14T15:42:06Z",
-      "expiresAt": "2026-09-14T16:42:06Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "78ceaeb98c022b65bf09c24cfb595327063755d2",
+  "leases": [],
+  "revision": "580f5bff2f0f1eaaf8acba43c48d2dd308dbdda9",
   "schemaVersion": "CoordinationState 0.1"
 }
