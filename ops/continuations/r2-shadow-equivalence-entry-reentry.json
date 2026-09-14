@@ -2,23 +2,24 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r2-shadow-equivalence-entry-reentry",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r2-shadow-equivalence-entry-reentry",
   "prNumber": null,
   "dependsOn": [
     "r1-1-journey-projection-readonly"
   ],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "define-shadow-action-comparison",
-    "add-entry-reentry-equivalence-canaries",
+    "add-entry-reentry-equivalence-canaries"
+  ],
+  "remaining": [
     "qualify-shadow-equivalence",
     "integrate-r2-entry-reentry"
   ],
-  "nextAction": "Implement read-only shadow comparison for safe entry/re-entry administrative actions only; projected actions must not execute, must preserve UNKNOWN/BLOCKED, and must not add authority/storage/workflow",
+  "nextAction": "Open PR from 47528ce6691b969271331b2ef09dbc3771c6fdbd and qualify with existing Agent Ops/Coordination Guard/Supervisor carriers; do not integrate on divergence or UNKNOWN",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "47528ce6691b969271331b2ef09dbc3771c6fdbd",
+    "checkpoint": "R2 shadow comparison implemented internally with projected actions never executed; canaries cover entry, exact re-entry identity, guard/writer divergence, required UNKNOWN fail-closed, and metrics without new authority/storage/workflow"
   },
   "blockers": [],
   "handoffToWorkerId": null
