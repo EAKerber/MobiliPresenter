@@ -11,15 +11,14 @@
   "completed": [
     "implement-derived-journey-projection",
     "add-status-projection-regressions",
-    "qualify-readonly-projection"
-  ],
-  "remaining": [
+    "qualify-readonly-projection",
     "integrate-r1-1"
   ],
-  "nextAction": "Integrate PR #296 through the governed Delivery merge carrier only if the observed head, target, Work binding, scope and CI remain unchanged",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "d1d21d2394301834e6b102514804a3824b66b376",
-    "checkpoint": "PR #296 head d1d21d2 qualified green: Agent Ops 34903119688, Coordination Guard 34903119630, Supervisor Snapshot 34903119755, Branch Hygiene 34903109313"
+    "sha": "f7cdbbe8ffdd31be60ef94df857561670cf571d4",
+    "checkpoint": "PR #296 merged via governed Delivery as f7cdbbe8ffdd31be60ef94df857561670cf571d4 after green Agent Ops 34903119688, Coordination Guard 34903119630, Supervisor Snapshot 34903119755, Branch Hygiene 34903109313; R1.1 write lease released and coordination readback shows leases=[] at authority 8b932fec37212d8d98d387964bc4da0db8fa4135"
   },
   "blockers": [],
   "handoffToWorkerId": null
