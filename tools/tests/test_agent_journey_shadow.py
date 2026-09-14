@@ -41,6 +41,7 @@ class JourneyShadowEquivalenceTests(unittest.TestCase):
             guard_contract="tools.hosted_agent_cycle",
         ))
         self.assertFalse(projected["executesProjectedAction"])
+        self.assertTrue(projected["comparisonRequired"])
         self.assertTrue(projected["readOnly"])
         self.assertFalse(projected["semanticAuthority"])
         self.assertFalse(projected["authorizesMutation"])
@@ -89,10 +90,14 @@ class JourneyShadowEquivalenceTests(unittest.TestCase):
             "BEGIN_AGENT_CYCLE",
             guard_contract="tools.hosted_cycle_reentry",
         )
+        observed["authorityWriter"] = "unexpected.writer"
         comparison = journey_shadow.compare(projected, observed)
         metrics = journey_shadow.summarize([comparison])
         self.assertEqual(comparison["status"], "DIVERGED")
-        self.assertEqual(comparison["differences"], ["guardContract"])
+        self.assertEqual(
+            comparison["differences"],
+            ["authorityWriter", "guardContract"],
+        )
         self.assertEqual(metrics["gateDisposition"], "BLOCKED")
 
     def test_unknown_reentry_remains_not_comparable_and_never_projects_action(self):
@@ -109,7 +114,9 @@ class JourneyShadowEquivalenceTests(unittest.TestCase):
             projected["reasonCodes"],
         )
         self.assertEqual(comparison["status"], "NOT_COMPARABLE")
+        self.assertTrue(comparison["comparisonRequired"])
         self.assertEqual(metrics["gateDisposition"], "UNKNOWN")
+        self.assertEqual(metrics["requiredNotComparable"], 1)
         self.assertEqual(metrics["projectedActionsExecuted"], 0)
 
     def test_equivalent_canaries_report_pass_without_hiding_uncomparable_cases(self):
@@ -141,8 +148,30 @@ class JourneyShadowEquivalenceTests(unittest.TestCase):
         self.assertEqual(metrics["equivalent"], 2)
         self.assertEqual(metrics["diverged"], 0)
         self.assertEqual(metrics["notComparable"], 1)
+        self.assertEqual(metrics["requiredNotComparable"], 0)
         self.assertEqual(metrics["equivalenceRate"], 1.0)
         self.assertEqual(metrics["projectedActionsExecuted"], 0)
+
+
+    def test_required_unknown_cannot_be_hidden_by_equivalent_canary(self):
+        equivalent = journey_shadow.compare(
+            journey_shadow.project(_status("BEGIN_AGENT_CYCLE")),
+            _manual(
+                "BEGIN_AGENT_CYCLE",
+                guard_contract="tools.hosted_agent_cycle",
+            ),
+        )
+        unknown = journey_shadow.compare(
+            journey_shadow.project(_status(
+                "OBSERVE",
+                blockers=["AGENT_REENTRY_PROVIDER_UNAVAILABLE"],
+            )),
+            None,
+        )
+        metrics = journey_shadow.summarize([equivalent, unknown])
+        self.assertEqual(metrics["equivalent"], 1)
+        self.assertEqual(metrics["requiredNotComparable"], 1)
+        self.assertEqual(metrics["gateDisposition"], "UNKNOWN")
 
 
 if __name__ == "__main__":

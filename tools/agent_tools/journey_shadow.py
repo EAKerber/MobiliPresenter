@@ -76,15 +76,19 @@ def project(status_payload: dict[str, Any]) -> dict[str, Any]:
 
     projected = None
     reasons: list[str] = []
+    comparison_required = False
     if blockers:
+        comparison_required = True
         reasons = ["JOURNEY_BLOCKED", *blockers]
     elif next_action in _BEGIN_ACTIONS:
+        comparison_required = True
         projected = _action(
             "BEGIN_AGENT_CYCLE",
             target_cycle_instance_id=None,
             guard_contract="tools.hosted_agent_cycle",
         )
     elif next_action == "RESUME_EXACT_CYCLE":
+        comparison_required = True
         target_cycle_instance_id = _target_cycle_instance_id(status_payload)
         if target_cycle_instance_id is None:
             reasons = ["TARGET_CYCLE_NOT_OBSERVED"]
@@ -104,6 +108,7 @@ def project(status_payload: dict[str, Any]) -> dict[str, Any]:
         "sourceAction": next_action,
         "projectedAction": projected,
         "executesProjectedAction": False,
+        "comparisonRequired": comparison_required,
         "reasonCodes": sorted(set(reasons)),
         "readOnly": True,
         "semanticAuthority": False,
@@ -129,7 +134,13 @@ def _manual_action(value: Any) -> dict[str, Any] | None:
         )
         or not isinstance(value.get("guardContract"), str)
         or not value["guardContract"]
-        or value.get("authorityWriter") is not None
+        or (
+            value.get("authorityWriter") is not None
+            and (
+                not isinstance(value["authorityWriter"], str)
+                or not value["authorityWriter"]
+            )
+        )
         or value.get("semanticAuthority") is not False
         or value.get("authorizesMutation") is not False
     ):
@@ -174,6 +185,7 @@ def compare(
         "differences": differences,
         "projectionHash": shadow_projection.get("projectionHash"),
         "projectedActionExecuted": False,
+        "comparisonRequired": shadow_projection.get("comparisonRequired") is True,
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -186,19 +198,28 @@ def summarize(comparisons: list[dict[str, Any]]) -> dict[str, Any]:
     if not isinstance(comparisons, list) or not comparisons:
         raise RuntimeError("JOURNEY_SHADOW_COMPARISONS_REQUIRED")
     counts = {"EQUIVALENT": 0, "DIVERGED": 0, "NOT_COMPARABLE": 0}
+    required_not_comparable = 0
     for comparison in comparisons:
         if (
             not isinstance(comparison, dict)
             or comparison.get("schemaVersion") != COMPARISON_SCHEMA
             or comparison.get("status") not in counts
+            or not isinstance(comparison.get("comparisonRequired"), bool)
             or comparison.get("projectedActionExecuted") is not False
         ):
             raise RuntimeError("JOURNEY_SHADOW_COMPARISON_INVALID")
         counts[comparison["status"]] += 1
+        if (
+            comparison["status"] == "NOT_COMPARABLE"
+            and comparison.get("comparisonRequired") is True
+        ):
+            required_not_comparable += 1
     comparable = counts["EQUIVALENT"] + counts["DIVERGED"]
     gate = (
         "BLOCKED"
         if counts["DIVERGED"]
+        else "UNKNOWN"
+        if required_not_comparable
         else "PASS"
         if comparable
         else "UNKNOWN"
@@ -210,6 +231,7 @@ def summarize(comparisons: list[dict[str, Any]]) -> dict[str, Any]:
         "equivalent": counts["EQUIVALENT"],
         "diverged": counts["DIVERGED"],
         "notComparable": counts["NOT_COMPARABLE"],
+        "requiredNotComparable": required_not_comparable,
         "equivalenceRate": counts["EQUIVALENT"] / comparable if comparable else None,
         "gateDisposition": gate,
         "projectedActionsExecuted": 0,
