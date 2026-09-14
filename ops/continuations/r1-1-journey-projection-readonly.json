@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r1-1-journey-projection-readonly",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r0-3-negative-close-evidence"
+  ],
+  "completed": [],
+  "remaining": [
+    "implement-derived-journey-projection",
+    "add-status-projection-regressions",
+    "qualify-readonly-projection",
+    "integrate-r1-1"
+  ],
+  "nextAction": "Implement a stateless read-only JourneyProjection on the existing tools/agent.py status surface without creating new mutable authority",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
