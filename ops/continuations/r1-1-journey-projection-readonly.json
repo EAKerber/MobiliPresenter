@@ -2,23 +2,24 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r1-1-journey-projection-readonly",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r1-1-journey-projection-readonly",
   "prNumber": 296,
   "dependsOn": [
     "r0-3-negative-close-evidence"
   ],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "implement-derived-journey-projection",
     "add-status-projection-regressions",
-    "qualify-readonly-projection",
+    "qualify-readonly-projection"
+  ],
+  "remaining": [
     "integrate-r1-1"
   ],
-  "nextAction": "Implement a stateless read-only JourneyProjection on the existing tools/agent.py status surface without creating new mutable authority",
+  "nextAction": "Integrate PR #296 through the governed Delivery merge carrier only if the observed head, target, Work binding, scope and CI remain unchanged",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "d1d21d2394301834e6b102514804a3824b66b376",
+    "checkpoint": "PR #296 head d1d21d2 qualified green: Agent Ops 34903119688, Coordination Guard 34903119630, Supervisor Snapshot 34903119755, Branch Hygiene 34903109313"
   },
   "blockers": [],
   "handoffToWorkerId": null
