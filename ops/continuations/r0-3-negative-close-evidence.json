@@ -3,8 +3,8 @@
   "id": "r0-3-negative-close-evidence",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
-  "prNumber": null,
+  "branch": "work/operations/r0-3-negative-close-evidence",
+  "prNumber": 295,
   "dependsOn": [],
   "completed": [],
   "remaining": [
