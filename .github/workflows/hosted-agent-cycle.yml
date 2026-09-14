@@ -443,9 +443,22 @@ jobs:
           )
           PY
 
+      - name: Materialize close proof result
+        id: close_proof
+        if: >-
+          steps.close.outcome == 'success' ||
+          steps.close.outcome == 'failure' ||
+          steps.close_recovery.outcome == 'success' ||
+          steps.close_recovery.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          test -d /tmp/agent-cycle-close
+          test -f /tmp/hosted-result.json
+          cp /tmp/hosted-result.json /tmp/agent-cycle-close/result.json
+
       - name: Upload close proof
         id: close_artifact
-        if: steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success'
+        if: steps.close_proof.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -456,8 +469,12 @@ jobs:
 
       - name: Fail close if proof was not preserved
         if: >-
-          (steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success') &&
-          steps.close_artifact.outcome != 'success'
+          (steps.close.outcome == 'success' ||
+           steps.close.outcome == 'failure' ||
+           steps.close_recovery.outcome == 'success' ||
+           steps.close_recovery.outcome == 'failure') &&
+          (steps.close_proof.outcome != 'success' ||
+           steps.close_artifact.outcome != 'success')
         env:
           HOSTED_AGENT_SOURCE_SHA: ${{ steps.close_recovery.outcome == 'success' && github.sha || steps.parse.outputs.begin_source_sha }}
         run: |
