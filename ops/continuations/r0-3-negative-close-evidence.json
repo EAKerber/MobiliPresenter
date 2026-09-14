@@ -2,21 +2,21 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r0-3-negative-close-evidence",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r0-3-negative-close-evidence",
   "prNumber": 295,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "implement-negative-close-evidence-persistence",
     "qualify-negative-close-evidence-persistence",
     "integrate-negative-close-evidence-persistence",
     "verify-negative-close-evidence-persistence"
   ],
-  "nextAction": "Persist existing negative close diagnostics/proof as artifact while preserving UNKNOWN/BLOCKED/WAITING semantics",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "ec0a7ab73dd34cac4770a47dd7cbd78936e49382",
+    "checkpoint": "PR #295 merged; post-merge negative proof run 34868269900 preserved artifact agent-cycle-close-34868269900 (artifact 10357976949) while Require operational result remained failure"
   },
   "blockers": [],
   "handoffToWorkerId": null
