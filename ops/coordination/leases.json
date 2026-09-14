@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-f4c319205ef9abbe75fdd825:0",
-      "resource": "branch:work/operations/r0-2-close-evidence-recovery-r3",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "paved-path-r0-2-close-recovery-3-20260911",
-        "branch": "work/operations/r0-2-close-evidence-recovery-r3",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-40dec95eabc82a53f91297c9",
-      "acquiredAt": "2026-09-13T21:52:02Z",
-      "renewedAt": "2026-09-13T21:52:02Z",
-      "expiresAt": "2026-09-13T22:52:02Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "f97801261422757c3cc303cdced6c3b3c4b569c1",
+  "leases": [],
+  "revision": "960344d789d28a080c6083e87c3bb83a5b6e5cd3",
   "schemaVersion": "CoordinationState 0.1"
 }
