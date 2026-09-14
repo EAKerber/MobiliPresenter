@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r1-1-journey-projection-readonly",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r1-1-journey-projection-readonly",
   "prNumber": 296,
   "dependsOn": [
