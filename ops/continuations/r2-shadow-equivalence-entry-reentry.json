@@ -3,7 +3,7 @@
   "id": "r2-shadow-equivalence-entry-reentry",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
+  "branch": "work/operations/r2-shadow-equivalence-entry-reentry",
   "prNumber": null,
   "dependsOn": [
     "r1-1-journey-projection-readonly"
