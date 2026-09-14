@@ -162,14 +162,14 @@ class AgentCycleCloseMergeRecoveryTests(unittest.TestCase):
             with mock.patch.object(Path, "read_text", return_value=json.dumps({"workRef": {"workId": "r0-2-governed-delivery"}})):
                 self.assertEqual(recovery._work_expectation("context.json", transport=object()), (289, MERGE))
 
-    def test_hosted_close_reuses_agent_facade_recovery_without_new_carrier(self):
+    def test_hosted_compatibility_uses_internal_recovery_carrier_only(self):
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github" / "workflows" / "hosted-agent-cycle.yml").read_text(encoding="utf-8")
         marker = "- name: Run canonical close compatibility recovery"
-        compatibility = workflow.split(marker, 1)[1]
-        self.assertIn("python tools/hosted_agent_cycle.py close", compatibility)
-        facade = (root / "tools" / "agent.py").read_text(encoding="utf-8")
-        self.assertIn('return importlib.import_module("tools.agent_cycle_close_recovery")', facade)
+        initial, compatibility = workflow.split(marker, 1)
+        self.assertIn("python tools/hosted_agent_cycle.py close", initial)
+        self.assertIn("python -m tools.agent_cycle_close_recovery.hosted close", compatibility)
+        self.assertFalse((root / "tools" / "hosted_agent_cycle_close_recovery.py").exists())
 
 
 if __name__ == "__main__":

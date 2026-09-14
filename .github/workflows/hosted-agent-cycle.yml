@@ -377,7 +377,7 @@ jobs:
           mkdir -p /tmp/hosted-evidence /tmp/agent-cycle-close
           cp /tmp/hosted-close-compatibility-failure.json \
             /tmp/agent-cycle-close/compatibility-recovery-source.json
-          python tools/hosted_agent_cycle.py close \
+          python -m tools.agent_cycle_close_recovery.hosted close \
             --command /tmp/hosted-command.json \
             --meta /tmp/hosted-meta.json \
             --begin-dir /tmp/agent-cycle-begin \
