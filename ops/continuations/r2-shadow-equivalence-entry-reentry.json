@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r2-shadow-equivalence-entry-reentry",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r2-shadow-equivalence-entry-reentry",
   "prNumber": 297,
   "dependsOn": [
