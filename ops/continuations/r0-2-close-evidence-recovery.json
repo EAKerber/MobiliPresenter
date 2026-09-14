@@ -9,15 +9,14 @@
   "completed": [
     "implement-close-evidence-recovery",
     "qualify-close-evidence-recovery",
-    "integrate-close-evidence-recovery"
-  ],
-  "remaining": [
+    "integrate-close-evidence-recovery",
     "verify-r0-2-close-recovery"
   ],
-  "nextAction": "Retry and verify the original R0.2 Agent Cycle close using the now-integrated exact compatibility recovery",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "2f4be3756acc53d6f6ff00aa3b2db9730e844bad",
-    "checkpoint": "main-close-recovery-integrated"
+    "sha": "37fde7fde210392e630f5373b9412b0e35594606",
+    "checkpoint": "r0-2-historical-close-pass"
   },
   "blockers": [],
   "handoffToWorkerId": null
