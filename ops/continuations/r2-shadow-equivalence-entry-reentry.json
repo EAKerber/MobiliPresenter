@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "IN_PROGRESS",
   "branch": "work/operations/r2-shadow-equivalence-entry-reentry",
-  "prNumber": null,
+  "prNumber": 297,
   "dependsOn": [
     "r1-1-journey-projection-readonly"
   ],
