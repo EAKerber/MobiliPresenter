@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r2-shadow-equivalence-entry-reentry",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r1-1-journey-projection-readonly"
+  ],
+  "completed": [],
+  "remaining": [
+    "define-shadow-action-comparison",
+    "add-entry-reentry-equivalence-canaries",
+    "qualify-shadow-equivalence",
+    "integrate-r2-entry-reentry"
+  ],
+  "nextAction": "Implement read-only shadow comparison for safe entry/re-entry administrative actions only; projected actions must not execute, must preserve UNKNOWN/BLOCKED, and must not add authority/storage/workflow",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
