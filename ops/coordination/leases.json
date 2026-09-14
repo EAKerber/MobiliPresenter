@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-01cde21b9bd25bf95b566cfb:0",
-      "resource": "branch:work/operations/r2-shadow-equivalence-entry-reentry",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "paved-path-r2-shadow-equivalence-20260914",
-        "branch": "work/operations/r2-shadow-equivalence-entry-reentry",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-dbb03b4e5850f0f7472ce251",
-      "acquiredAt": "2026-09-14T22:57:59Z",
-      "renewedAt": "2026-09-14T22:57:59Z",
-      "expiresAt": "2026-09-14T23:57:59Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "8b932fec37212d8d98d387964bc4da0db8fa4135",
+  "leases": [],
+  "revision": "74a5ed208e3050c2909f905d5551450efd4aa292",
   "schemaVersion": "CoordinationState 0.1"
 }
