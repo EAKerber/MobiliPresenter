@@ -20,7 +20,7 @@ class AgentProjectionTests(unittest.TestCase):
         with mock.patch("tools.agent._state_and_publication",return_value=(state,view,published)),mock.patch("tools.agent.observed_git",return_value={"worktree":False}),mock.patch("builtins.print") as output:
             self.assertEqual(agent.command_status(True),0)
         rendered=output.call_args.args[0];payload=json.loads(rendered)
-        self.assertIn(published["release"],rendered);self.assertIn('"sourceBuildFingerprint"',rendered);self.assertNotIn('"artifactSha256"',rendered);self.assertNotIn('"activeDevelopmentBranch"',rendered);self.assertNotIn('"blockers"',rendered)
+        self.assertIn(published["release"],rendered);self.assertIn('"sourceBuildFingerprint"',rendered);self.assertNotIn('"artifactSha256"',rendered);self.assertNotIn('"activeDevelopmentBranch"',rendered);self.assertNotIn("blockers",payload["project"])
         self.assertEqual(payload["next"],view["development"]["nextTransition"])
         self.assertEqual(payload["roadmapNextTransition"],view["development"]["nextTransition"])
         bootstrap=payload["bootstrap"]
@@ -29,5 +29,26 @@ class AgentProjectionTests(unittest.TestCase):
         self.assertIn("manager-gitops",bootstrap["entryProfiles"])
         self.assertIn("bootstrap-discovery",bootstrap["entryProfiles"]["manager-gitops"])
         self.assertFalse(bootstrap["semanticAuthority"]);self.assertFalse(bootstrap["authorizesMutation"])
+        journey=payload["journeyProjection"]
+        self.assertEqual(journey["schemaVersion"],"JourneyProjection 0.1")
+        self.assertEqual(journey["stage"],"ENTRY")
+        self.assertEqual(journey["nextSafeAction"],"BEGIN_AGENT_CYCLE")
+        self.assertEqual(journey["automaticTransitions"],[])
+        self.assertEqual(journey["blockers"],[])
+        for field in ("ownershipDisposition","authoringDisposition","candidateDisposition","ciDisposition","deliveryDisposition"):
+            self.assertEqual(journey[field],"NOT_OBSERVED")
+        self.assertFalse(journey["semanticDecisionRequired"]);self.assertTrue(journey["readOnly"]);self.assertFalse(journey["semanticAuthority"]);self.assertFalse(journey["authorizesMutation"])
+    def test_journey_projection_preserves_unknown_reentry_without_authorizing(self):
+        state,view,published=self.live_inputs()
+        reentry={"status":"UNKNOWN","workRef":{"workId":"example-work"},"reentryDisposition":"INSUFFICIENT_OBSERVATION","nextSafeAction":"OBSERVE","reasonCodes":["AGENT_REENTRY_PROVIDER_UNAVAILABLE"],"targetCycle":None,"inspection":None,"detail":"list bus comments","readOnly":True,"semanticAuthority":False,"authorizesMutation":False}
+        payload=agent._status_payload(state,view,published,{"available":True,"worktree":False},reentry)
+        journey=payload["journeyProjection"]
+        self.assertEqual(journey["stage"],"REENTRY")
+        self.assertEqual(journey["nextSafeAction"],"OBSERVE")
+        self.assertEqual(journey["blockers"],["AGENT_REENTRY_PROVIDER_UNAVAILABLE"])
+        self.assertEqual(journey["observedFacts"]["reentry"]["status"],"UNKNOWN")
+        self.assertIn("OBSERVE_REENTRY",journey["completedResponsibilities"])
+        self.assertEqual(journey["automaticTransitions"],[])
+        self.assertFalse(journey["semanticDecisionRequired"]);self.assertTrue(journey["readOnly"]);self.assertFalse(journey["semanticAuthority"]);self.assertFalse(journey["authorizesMutation"])
 
 if __name__=="__main__":unittest.main()
