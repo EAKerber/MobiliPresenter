@@ -38,10 +38,18 @@ class HostedAgentCycleCloseCompatibilityRecoveryWorkflowTests(unittest.TestCase)
         self.assertNotIn("agent-write-lease-dispatch", text)
         self.assertNotIn("hosted_cycle_close_compat_recovery.py", text)
 
-        # A recovered close is a first-class successful close for shadow review
-        # and proof upload, while promotion only happens when both attempts fail.
+        # A recovered close is a first-class successful close for shadow review.
+        # R0.3 deliberately preserves proof for either positive or negative
+        # terminal close attempts before the terminal disposition is propagated.
         success = "steps.close.outcome == 'success' || steps.close_recovery.outcome == 'success'"
-        self.assertGreaterEqual(text.count(success), 2)
+        self.assertIn(success, text)
+        self.assertIn("Materialize close proof result", text)
+        self.assertIn("steps.close.outcome == 'failure'", text)
+        self.assertIn("steps.close_recovery.outcome == 'failure'", text)
+        self.assertIn("if: steps.close_proof.outcome == 'success'", text)
+        self.assertIn("steps.close_proof.outcome != 'success'", text)
+        self.assertIn("steps.close_artifact.outcome != 'success'", text)
+        self.assertIn("steps.close.outcome != 'success'", text)
         self.assertIn("steps.close_recovery.outcome != 'success'", text)
         self.assertIn("compatibility-recovery-source.json", text)
 

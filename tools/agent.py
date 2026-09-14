@@ -127,8 +127,85 @@ def _bootstrap_projection(reentry: dict | None = None) -> dict:
     return projection
 
 
+def _journey_projection(
+    view: dict,
+    published: dict,
+    observed: dict,
+    bootstrap: dict,
+    reentry: dict | None = None,
+) -> dict:
+    """Derive a journey view without creating lifecycle authority."""
+    next_safe_action = bootstrap["nextSafeAction"]
+    stage = "ENTRY"
+    if reentry is not None:
+        stage = "QUIESCENT" if next_safe_action == "NONE" else "REENTRY"
+        if next_safe_action == "BEGIN_NEW_CYCLE":
+            stage = "ENTRY"
+
+    blockers: list[str] = []
+    if reentry is not None and (
+        reentry["status"] == "UNKNOWN"
+        or reentry["reentryDisposition"]
+        in {
+            "LEGITIMATE_WAIT",
+            "PRIORITY_OPERATION_REQUIRED",
+            "INSUFFICIENT_OBSERVATION",
+        }
+    ):
+        blockers = copy.deepcopy(reentry["reasonCodes"])
+
+    project = project_summary(view)
+    git_facts = {
+        key: copy.deepcopy(observed.get(key))
+        for key in ("available", "worktree", "branch", "head", "dirty")
+    }
+    reentry_facts = None
+    completed = [
+        "OBSERVE_PROJECT_STATE",
+        "OBSERVE_PUBLICATION",
+        "OBSERVE_GIT",
+    ]
+    if reentry is not None:
+        completed.append("OBSERVE_REENTRY")
+        reentry_facts = {
+            "status": reentry["status"],
+            "workRef": copy.deepcopy(reentry["workRef"]),
+            "disposition": reentry["reentryDisposition"],
+            "reasonCodes": copy.deepcopy(reentry["reasonCodes"]),
+        }
+
+    return {
+        "schemaVersion": "JourneyProjection 0.1",
+        "stage": stage,
+        "observedFacts": {
+            "project": {
+                "phase": project["phase"],
+                "checkpoint": project["checkpoint"],
+                "roadmapNextTransition": view["development"]["nextTransition"],
+            },
+            "publication": {"release": published.get("release")},
+            "git": git_facts,
+            "reentry": reentry_facts,
+        },
+        "completedResponsibilities": completed,
+        "ownershipDisposition": "NOT_OBSERVED",
+        "authoringDisposition": "NOT_OBSERVED",
+        "candidateDisposition": "NOT_OBSERVED",
+        "ciDisposition": "NOT_OBSERVED",
+        "deliveryDisposition": "NOT_OBSERVED",
+        "nextSafeAction": next_safe_action,
+        "automaticTransitions": [],
+        "semanticDecisionRequired": False,
+        "blockers": blockers,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
 def _status_payload(state, view, published, observed, reentry: dict | None = None) -> dict:
     next_transition = view["development"]["nextTransition"]
+    bootstrap = _bootstrap_projection(reentry)
     payload = {
         "project": project_summary(view),
         "projectStateHash": stable_hash(state),
@@ -136,7 +213,10 @@ def _status_payload(state, view, published, observed, reentry: dict | None = Non
         "observedGit": observed,
         "next": next_transition,
         "roadmapNextTransition": next_transition,
-        "bootstrap": _bootstrap_projection(reentry),
+        "bootstrap": bootstrap,
+        "journeyProjection": _journey_projection(
+            view, published, observed, bootstrap, reentry
+        ),
     }
     if reentry is not None:
         payload["reentry"] = copy.deepcopy(reentry)
@@ -179,6 +259,14 @@ def command_status(as_json, work_id: str | None = None):
                 f"  reasons: {reasons}",
             ])
         lines.extend([
+            "",
+            "JOURNEY",
+            f"  stage: {payload['journeyProjection']['stage']}",
+            f"  ownership: {payload['journeyProjection']['ownershipDisposition']}",
+            f"  authoring: {payload['journeyProjection']['authoringDisposition']}",
+            f"  candidate: {payload['journeyProjection']['candidateDisposition']}",
+            f"  ci: {payload['journeyProjection']['ciDisposition']}",
+            f"  delivery: {payload['journeyProjection']['deliveryDisposition']}",
             "",
             "NEXT SAFE ACTION",
             f"  {payload['bootstrap']['nextSafeAction']}",
