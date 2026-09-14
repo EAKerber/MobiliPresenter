@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r1-1-journey-projection-readonly",
-  "prNumber": null,
+  "prNumber": 296,
   "dependsOn": [
     "r0-3-negative-close-evidence"
   ],
