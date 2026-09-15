@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r5-delivery-finalization-composition",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r5-delivery-finalization-composition",
   "prNumber": 300,
   "dependsOn": [
