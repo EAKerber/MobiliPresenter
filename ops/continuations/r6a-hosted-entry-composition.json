@@ -3,7 +3,7 @@
   "id": "r6a-hosted-entry-composition",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
+  "branch": "work/operations/r6a-hosted-entry-composition",
   "prNumber": null,
   "dependsOn": [
     "r5-delivery-finalization-composition"
