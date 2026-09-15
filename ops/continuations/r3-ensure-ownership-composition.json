@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r3-ensure-ownership-composition",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r2-shadow-equivalence-entry-reentry"
+  ],
+  "completed": [],
+  "remaining": [
+    "implement-ensure-ownership-composition",
+    "add-ownership-state-canaries",
+    "qualify-ensure-ownership",
+    "integrate-r3-ensure-ownership"
+  ],
+  "nextAction": "Extend the existing Hosted Agent Write Lease surface with a reentrant ensure action that derives TTL, authority/branch heads and binding internally; reuse ACTIVE valid, renew near expiry, release expired materialized then converge by identical retry, acquire absent, and BLOCK on ambiguity/drift. No new workflow, marker, authority, Journey state or Coordination primitive.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
