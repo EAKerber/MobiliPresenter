@@ -2,23 +2,23 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r3-ensure-ownership-composition",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r3-ensure-ownership-composition",
   "prNumber": 298,
   "dependsOn": [
     "r2-shadow-equivalence-entry-reentry"
   ],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "implement-ensure-ownership-composition",
     "add-ownership-state-canaries",
     "qualify-ensure-ownership",
     "integrate-r3-ensure-ownership"
   ],
-  "nextAction": "Extend the existing Hosted Agent Write Lease surface with a reentrant ensure action that derives TTL, authority/branch heads and binding internally; reuse ACTIVE valid, renew near expiry, release expired materialized then converge by identical retry, acquire absent, and BLOCK on ambiguity/drift. No new workflow, marker, authority, Journey state or Coordination primitive.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "0e7b9433995ec4b80f267dc73a73291ae7efc9df",
+    "checkpoint": "R3 merged via PR #298. ensure_ownership is a client-side reentrant composition only: derives existing Hosted Agent Write Lease V0.2 acquire/release requests from live branch, Coordination and cycle lineage; reuses exact active ownership read-only; blocks released-cycle reacquire; preserves UNKNOWN on authority mismatch. No new workflow, marker, lease primitive, Journey state or authority. PR head 8f2517263c6dff1091fd73c9bc7d2af791784617 qualified green: Agent Ops 34915007521, Coordination Guard 34915007515, Supervisor Snapshot 34915007518. main merged at 0e7b9433995ec4b80f267dc73a73291ae7efc9df."
   },
   "blockers": [],
   "handoffToWorkerId": null
