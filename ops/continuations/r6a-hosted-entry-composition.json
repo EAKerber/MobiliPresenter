@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6a-hosted-entry-composition",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r5-delivery-finalization-composition"
+  ],
+  "completed": [],
+  "remaining": [
+    "characterize-hosted-entry-contract",
+    "implement-hosted-entry-composition",
+    "add-hosted-entry-canaries",
+    "qualify-hosted-entry-composition",
+    "integrate-r6a-hosted-entry-composition"
+  ],
+  "nextAction": "Implement one stateless internal Journey entry composer that takes task-level identity (role, declared intent and Work identity), observes the current Work/runtime context needed by the existing HostedAgentCycleCommand 0.4, derives transport/session/request identity deterministically, optionally submits only the existing Agent Cycle request marker, and returns/observes the existing Hosted Agent Cycle begin result/opaque handle. Do not create a Journey authority/state/session/workflow or expose/promote a new public CLI/API in R6a. Preserve the manual Hosted Agent Cycle primitive and fail closed on ambiguous/missing observations.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
