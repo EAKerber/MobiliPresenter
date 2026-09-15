@@ -43,6 +43,14 @@ observe -> plan -> validate -> apply -> readback
 - Trabalho recuperável deve ser persistido na authority/branch apropriada antes de depender da continuidade de uma conversa ou runtime efêmero.
 - Branch Hygiene é o writer normal de coleta de branches após integração/abandono. Agentes não competem com essa coleta por deleção manual; remoção direta de ref é break-glass/recovery e exige observação + readback explícitos.
 
+## Migração do paved path
+
+- Para qualquer trabalho em R6, R7 ou R8, leia e aplique `docs/architecture/paved-path-migration-hardening.md` antes de nova mutação arquitetural.
+- Cada recorte R6-R8 deve declarar qual conhecimento/API antigo pretende substituir ou demover, qual evidência permite promoção e qual superfície se torna removível, internal-only ou recovery-only.
+- Se um abort/redesign trigger do hardening ocorrer, pare a expansão horizontal e reavalie o recorte; não compense com nova Journey authority, compatibility layer genérica, dual-write/dual-read permanente ou relaxamento de guards.
+- R7 só conta como promoção se mudar o caminho operacional padrão e demover ao menos uma superfície manual/legacy. R8 é milestone obrigatório de deletion/demotion, não cleanup opcional.
+- Novo scaffolding sem retirement target explícito não deve ser promovido.
+
 ## Limites de papel
 
 - Autoridade operacional não concede autoridade semântica sobre produto.
