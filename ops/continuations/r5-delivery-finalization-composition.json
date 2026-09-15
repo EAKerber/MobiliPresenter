@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r5-delivery-finalization-composition",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r4-authoring-composition"
+  ],
+  "completed": [],
+  "remaining": [
+    "implement-delivery-request-composition",
+    "add-finalization-order-projection",
+    "add-delivery-finalization-canaries",
+    "qualify-delivery-finalization-composition",
+    "integrate-r5-delivery-finalization-composition"
+  ],
+  "nextAction": "Compose cycle handle + Work identity into the existing HostedDeliveryMergeRequest 0.1 by deriving current Work authority, PR head/base and main target observations internally; optionally submit the existing delivery marker. Add only a read-only finalization-order projection after delivery: semantic Work completion remains explicit, then existing lease release, then Agent Cycle close. No new workflow, marker, authority, Delivery/Journey state, merge primitive, or atomic mega-finalize transaction.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
