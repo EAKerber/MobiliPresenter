@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6-black-box-paved-path-canary",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r5-delivery-finalization-composition"
+  ],
+  "completed": [],
+  "remaining": [
+    "characterize-black-box-contract",
+    "run-full-journey-canary",
+    "run-black-box-failure-injection",
+    "qualify-r6-promotion-gate"
+  ],
+  "nextAction": "Characterize the current paved path from the perspective of a fresh agent receiving only a normal task: identify any lifecycle/admin inputs still required by the composed R1-R5 path. Then run the full-journey canary without teaching heads, hashes, TTLs or lease choreography. Preserve manual primitives and fail closed; if the canary exposes a concrete composition gap, record it and remediate in a separate governed slice before re-running R6. Do not promote/demote APIs until R7.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
