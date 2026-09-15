@@ -3,7 +3,7 @@
   "id": "r5-delivery-finalization-composition",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
+  "branch": "work/operations/r5-delivery-finalization-composition",
   "prNumber": null,
   "dependsOn": [
     "r4-authoring-composition"
