@@ -12,15 +12,14 @@
     "implement-delivery-request-composition",
     "add-finalization-order-projection",
     "add-delivery-finalization-canaries",
-    "qualify-delivery-finalization-composition"
-  ],
-  "remaining": [
+    "qualify-delivery-finalization-composition",
     "integrate-r5-delivery-finalization-composition"
   ],
-  "nextAction": "Integrate PR #300 after fresh mergeability/head/base readback, then complete R5 Work explicitly, release the exact R5 Agent Write Lease, and close the Agent Cycle last.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "4d067e675b3871449f36bfab1950847278fabd81",
-    "checkpoint": "R5 remains composition-only: handle + Work identity derive the existing HostedDeliveryMergeRequest 0.1 from live Work/PR/main observations; optional submit uses the existing Delivery marker and never merges directly. Finalization is read-only and projects COMPLETE_WORK -> RELEASE_OWNERSHIP -> CLOSE_AGENT_CYCLE with no automatic transitions. PR #300 qualified green on exact head 4d067e675b3871449f36bfab1950847278fabd81: Agent Ops 34995039224, Coordination Guard 34995039083, Supervisor Snapshot 34995039081."
+    "sha": "4d46da44c08dcafbb53c52c0375e14651981a93b",
+    "checkpoint": "R5 integrated: PR #300 merged to main as 4d46da44c08dcafbb53c52c0375e14651981a93b; PR readback reports merged=true with head 4d067e675b3871449f36bfab1950847278fabd81 and main independently reads back the same merge SHA. Finalization order now requires Work DONE, then ownership release, then Agent Cycle close."
   },
   "blockers": [],
   "handoffToWorkerId": null
