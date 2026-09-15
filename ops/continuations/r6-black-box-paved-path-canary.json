@@ -9,17 +9,17 @@
     "r5-delivery-finalization-composition"
   ],
   "completed": [
-    "characterize-black-box-contract"
+    "characterize-black-box-contract",
+    "run-full-journey-canary"
   ],
   "remaining": [
-    "run-full-journey-canary",
     "run-black-box-failure-injection",
     "qualify-r6-promotion-gate"
   ],
-  "nextAction": "Run the full-journey black-box canary from a normal task without supplying heads, hashes, TTLs or lease choreography. Treat task semantics as legitimate inputs, but record handle transport, branch naming, request-id generation, Work identity and explicit finalization handoffs as remaining lifecycle/admin friction. If execution exposes a concrete composition gap, remediate it in a separate governed slice before re-running R6; no API promotion/demotion until R7.",
+  "nextAction": "Remediate the concrete black-box entry/composition gap in a separate governed slice before re-running R6: a fresh agent can observe/project BEGIN_AGENT_CYCLE, but the public facade does not compose/submit Hosted Agent Cycle begin or produce the handle required by R3-R5. Keep remediation stateless and internal/non-promoted until R7; compose existing authorities only. After remediation integrates, re-run the full journey and then the failure injection.",
   "lastKnownGood": {
     "sha": "4d46da44c08dcafbb53c52c0375e14651981a93b",
-    "checkpoint": "R6 characterization: R1-R5 derive Git/CI/Coordination mechanics (authority heads, branch heads, CAS, TTL, lease identity, PR head/base and main target) and preserve fail-closed behavior. A fresh task still requires explicit journey identity/choreography inputs across composition boundaries: cycle handle transport, branch identity, request-id generation, Work identity for delivery, and explicit COMPLETE_WORK -> RELEASE_OWNERSHIP -> CLOSE_AGENT_CYCLE handoffs. These are characterized as black-box friction only; no API promotion/demotion decision is made in R6."
+    "checkpoint": "R6 full-journey canary #1 NEGATIVE (no project mutation): starting from a normal task, agent.py status/JourneyProjection can project BEGIN_AGENT_CYCLE and agent.py begin can build a local AgentCycleContext, but R2 deliberately executes no projected action and there is no composed public/internal journey step that submits the existing hosted begin and returns its opaque handle. Ownership/authoring/delivery require that handle downstream. Proceeding would require teaching the fresh agent issue-bus marker/transport choreography, so the canary stopped fail-closed at entry instead of bypassing the paved path. This is a concrete composition gap; heads, hashes, TTLs and lease choreography were not supplied."
   },
   "blockers": [],
   "handoffToWorkerId": null
