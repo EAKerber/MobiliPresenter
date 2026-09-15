@@ -3,7 +3,7 @@
   "id": "r3-ensure-ownership-composition",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
+  "branch": "work/operations/r3-ensure-ownership-composition",
   "prNumber": null,
   "dependsOn": [
     "r2-shadow-equivalence-entry-reentry"
