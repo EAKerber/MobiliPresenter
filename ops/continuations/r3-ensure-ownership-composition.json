@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r3-ensure-ownership-composition",
-  "prNumber": null,
+  "prNumber": 298,
   "dependsOn": [
     "r2-shadow-equivalence-entry-reentry"
   ],
