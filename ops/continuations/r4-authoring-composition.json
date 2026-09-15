@@ -11,15 +11,14 @@
   "completed": [
     "implement-authoring-request-composition",
     "add-authoring-composition-canaries",
-    "qualify-authoring-composition"
-  ],
-  "remaining": [
+    "qualify-authoring-composition",
     "integrate-r4-authoring-composition"
   ],
-  "nextAction": "Integrate PR #299 after fresh mergeability/head/base readback, then mark integration complete, release the exact R4 Agent Write Lease, and close the Agent Cycle last.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "9e40cdc12e901f3b47e1da5d0b9dd7a09fa1a48f",
-    "checkpoint": "R4 implementation is intentionally thin: handle + branch + concrete changes/message compose the existing HostedAgentToolRequest 0.2 git.files.mutate request; no new state, workflow, marker, authority, mutation primitive, CAS or lease contract. The implementation dogfooded the existing Agent Tool path with terminal PASS, mutationState=APPLIED, receipt + aggregate readback and observed branch head 9e40cdc12e901f3b47e1da5d0b9dd7a09fa1a48f. PR #299 qualified green: Agent Ops 34916852270, Coordination Guard 34916852358, Supervisor Snapshot 34916852210."
+    "sha": "be52d5ee3cc901559ecf0f62404bd2383e3c4352",
+    "checkpoint": "R4 merged via PR #299 at main be52d5ee3cc901559ecf0f62404bd2383e3c4352 after all three PR gates succeeded. Authoring composition remains a thin client over existing Hosted Agent Tool V0.2 git.files.mutate; its own implementation was dogfooded through that path with terminal PASS and exact mutation readback."
   },
   "blockers": [],
   "handoffToWorkerId": null
