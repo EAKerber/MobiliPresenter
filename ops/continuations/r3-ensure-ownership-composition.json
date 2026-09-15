@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r3-ensure-ownership-composition",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r3-ensure-ownership-composition",
   "prNumber": 298,
   "dependsOn": [
