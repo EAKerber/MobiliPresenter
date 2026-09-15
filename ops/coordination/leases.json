@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "08a83bad250530f43d176b850bd46857ab5991bb",
+  "leases": [
+    {
+      "leaseId": "agent-write-eda2de369d5684dcff15edea:0",
+      "resource": "branch:work/operations/r5-delivery-finalization-composition",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "paved-path-r5-delivery-finalization-20260915",
+        "branch": "work/operations/r5-delivery-finalization-composition",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-b9b4ff3378627dd71f07321c",
+      "acquiredAt": "2026-09-15T16:20:27Z",
+      "renewedAt": "2026-09-15T16:20:27Z",
+      "expiresAt": "2026-09-15T17:20:27Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "e738a5638dd1a9e91b63cd3ec70a27056349fed1",
   "schemaVersion": "CoordinationState 0.1"
 }
