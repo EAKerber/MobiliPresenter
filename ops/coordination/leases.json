@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-0a0229883d1a8c0dd2e276c0:0",
-      "resource": "branch:work/operations/r3-ensure-ownership-composition",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "paved-path-r3-ensure-ownership-20260914",
-        "branch": "work/operations/r3-ensure-ownership-composition",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-4c2068237dfb1daa6691d5d0",
-      "acquiredAt": "2026-09-15T00:05:53Z",
-      "renewedAt": "2026-09-15T00:05:53Z",
-      "expiresAt": "2026-09-15T01:05:53Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "e6449f9ff9b1d56029ad221ce57f87e02a2389df",
+  "leases": [],
+  "revision": "d93bc39915bf6d4ca44c38092ba838a632933eac",
   "schemaVersion": "CoordinationState 0.1"
 }
