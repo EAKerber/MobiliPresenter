@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r5-delivery-finalization-composition",
-  "prNumber": null,
+  "prNumber": 300,
   "dependsOn": [
     "r4-authoring-composition"
   ],
