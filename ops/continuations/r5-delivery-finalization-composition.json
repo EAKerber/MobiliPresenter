@@ -2,24 +2,25 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r5-delivery-finalization-composition",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r5-delivery-finalization-composition",
   "prNumber": 300,
   "dependsOn": [
     "r4-authoring-composition"
   ],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "implement-delivery-request-composition",
     "add-finalization-order-projection",
     "add-delivery-finalization-canaries",
-    "qualify-delivery-finalization-composition",
+    "qualify-delivery-finalization-composition"
+  ],
+  "remaining": [
     "integrate-r5-delivery-finalization-composition"
   ],
-  "nextAction": "Compose cycle handle + Work identity into the existing HostedDeliveryMergeRequest 0.1 by deriving current Work authority, PR head/base and main target observations internally; optionally submit the existing delivery marker. Add only a read-only finalization-order projection after delivery: semantic Work completion remains explicit, then existing lease release, then Agent Cycle close. No new workflow, marker, authority, Delivery/Journey state, merge primitive, or atomic mega-finalize transaction.",
+  "nextAction": "Integrate PR #300 after fresh mergeability/head/base readback, then complete R5 Work explicitly, release the exact R5 Agent Write Lease, and close the Agent Cycle last.",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "4d067e675b3871449f36bfab1950847278fabd81",
+    "checkpoint": "R5 remains composition-only: handle + Work identity derive the existing HostedDeliveryMergeRequest 0.1 from live Work/PR/main observations; optional submit uses the existing Delivery marker and never merges directly. Finalization is read-only and projects COMPLETE_WORK -> RELEASE_OWNERSHIP -> CLOSE_AGENT_CYCLE with no automatic transitions. PR #300 qualified green on exact head 4d067e675b3871449f36bfab1950847278fabd81: Agent Ops 34995039224, Coordination Guard 34995039083, Supervisor Snapshot 34995039081."
   },
   "blockers": [],
   "handoffToWorkerId": null
