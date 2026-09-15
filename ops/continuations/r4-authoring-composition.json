@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r4-authoring-composition",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r3-ensure-ownership-composition"
+  ],
+  "completed": [],
+  "remaining": [
+    "implement-authoring-request-composition",
+    "add-authoring-composition-canaries",
+    "qualify-authoring-composition",
+    "integrate-r4-authoring-composition"
+  ],
+  "nextAction": "Compose handle + branch + concrete changes/message into the existing Hosted Agent Tool V0.2 git.files.mutate request, optionally submit it, and preserve all current Agent Tool admission, ownership, CAS, mutation dispatch and readback guarantees. No new workflow, marker, authority, Journey state, mutation primitive or semantic authoring policy.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
