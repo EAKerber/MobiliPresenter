@@ -3,7 +3,7 @@
   "id": "r4-authoring-composition",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
+  "branch": "work/operations/r4-authoring-composition",
   "prNumber": null,
   "dependsOn": [
     "r3-ensure-ownership-composition"
