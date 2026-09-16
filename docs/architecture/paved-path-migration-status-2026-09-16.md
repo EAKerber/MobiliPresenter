@@ -1,19 +1,33 @@
 # Paved-path migration status — 2026-09-16
 
-Status: R6a is integrated; R6 black-box proof is in progress under the enforced migration-hardening contract.
+Status: **R6a and the R6 black-box surface proof are integrated. The live positive + negative traversal is the remaining R6 promotion gate.**
 
 This is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
 ## Current baseline
 
-- `main`: `e41b79b346473dbb1dc24a375c7b82bf368342a9`
+- `main`: `fe17df98ce33f0089cc7d439bf1cfaa506674528`
 - PR #301: migration hardening and retirement gates merged
 - PR #303: hardening made part of permanent agent bootstrap rules
 - PR #304: clean R6a recut plan merged
 - PR #305: post-hardening status checkpoint merged
 - PR #306: clean R6a semantic hosted-entry recut merged
+- PR #307: R6 black-box surface guard and documentation checkpoint merged
 
 The historical `work/operations/r6a-hosted-entry-composition` prototype remains evidence only. The promoted implementation came from the clean recut and did not inherit the prototype branch.
+
+## Migration progression
+
+| Recut | Integrated outcome | Normal-path knowledge reduced | Retirement implication |
+| --- | --- | --- | --- |
+| R1 / PR #296 | read-only `JourneyProjection` | manual multi-authority interpretation of stage/disposition | projection can become the single public semantic read model |
+| R2 / PR #297 | entry/re-entry shadow equivalence | none; measurement only | `journey_shadow` is temporary and must die after sufficient evidence |
+| R3 / PR #298 | `ensure_ownership` composition | manual lease/CAS/binding request construction | manual lease choreography becomes internal/recovery-only after promotion |
+| R4 / PR #299 | authoring composition over Agent Tool | direct Git mutation/CAS/ownership plumbing | direct canonical request construction becomes internal/recovery-only |
+| R5 / PR #300 | Delivery request composition + finalization projection | manual Delivery precondition assembly and finalization-order discovery | manual Delivery request assembly becomes internal/recovery-only |
+| Hardening / PRs #301-#305 | explicit promotion/retirement contract | removes ambiguity about additive scaffolding vs permanent architecture | R7/R8 are mandatory migration phases, not optional cleanup |
+| R6a / PR #306 | semantic hosted-entry composer | raw runtime envelope, command-version choice, caller begin-identity construction | direct Agent Cycle bus entry becomes internal/recovery-only after R6 proof |
+| R6 surface / PR #307 | public surface guard + fail-closed negative entry canary | caller protocol identities are no longer accepted by the paved surfaces | establishes cognitive/API compression precondition for live proof |
 
 ## What R6a now proves
 
@@ -30,29 +44,43 @@ The merged composer:
 
 This makes the old normal-path knowledge of raw `runtimeEnvironment`, explicit command-version selection, caller-side begin identity construction and manual handle decoding eligible for R7 demotion.
 
+## What the R6 surface proof now proves
+
+PR #307 is integrated and qualified on the normal repository gates. It added no production runtime module; it added a guard over the public paved surface and advanced this checkpoint.
+
+The guard asserts that normal-path entry, ownership, authoring, delivery and finalization do not require callers to supply hosted protocol identities such as:
+
+- issue numbers or bus markers;
+- command/schema versions;
+- raw runtime envelopes;
+- authority-head CAS values;
+- lease IDs or binding hashes;
+- result-comment IDs;
+- cycle IDs or context hashes.
+
+The negative entry canary also requires incomplete ToolSurface observation to return `UNKNOWN` before transport writes.
+
+This is meaningful proof of API/cognitive compression, but it is **not** live end-to-end promotion evidence by itself.
+
+## Remaining R6 gate — live traversal
+
+Still required: a black-box positive and negative traversal starting from semantic task/Work intent and passing through:
+
+`entry -> ownership -> authoring -> candidate/CI -> Delivery -> COMPLETE_WORK -> RELEASE_OWNERSHIP -> CLOSE_AGENT_CYCLE`
+
+The traversal must not require caller knowledge of issue #145, markers, protocol versions, authority-head CAS, lease/binding identities, comment-result search mechanics, raw runtime envelopes, or manually predicted cycle/context identities.
+
+Negative cases must remain fail-closed and must prove absence of unintended writes where applicable.
+
+R6 is not complete until this evidence exists. Surface/unit success must not be promoted into an R7 claim.
+
 ## Remaining protocol debt
 
 R6a still contains hosted issue discovery, comment pagination and result correlation. Ownership and other paved composers also retain local hosted-bus mechanics. This is accepted only as bounded migration debt.
 
-The hardening rule remains active: a shared transport seam may be introduced only when the same recut materially reduces at least two duplicate clients. No generic compatibility framework is permitted.
+The hardening rule remains active: a shared transport seam may be introduced only when the same migration window materially reduces at least two duplicate clients. No generic compatibility framework is permitted.
 
-## R6 proof split
-
-R6 is intentionally split into two proof layers rather than another orchestration abstraction.
-
-### R6 surface proof
-
-A normal-path API guard verifies that the paved entry, ownership, authoring, delivery and finalization surfaces do not require callers to supply hosted protocol identities such as issue numbers, markers, schema/command versions, raw runtime environments, authority heads, lease/binding IDs, comment IDs, cycle IDs or context hashes.
-
-The negative entry canary also requires incomplete ToolSurface observation to return UNKNOWN before any transport write.
-
-This proof protects cognitive/API compression. It is necessary but not sufficient for R7 promotion.
-
-### R6 live traversal proof
-
-Still required: a black-box positive and negative traversal starting from semantic task/Work intent and passing through entry, ownership, authoring, candidate/CI, Delivery and safe finalization without manually supplying hosted-protocol choreography.
-
-R6 is not complete until this live evidence exists. Unit/surface success alone must not be promoted to paved-path completion.
+The lifecycle discontinuity discovered during R6a also remains engine/recovery behavior rather than Journey state: after an expired write binding, the proven safe recovery was `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide this by creating a persistent Journey session model.
 
 ## Retirement ledger
 
@@ -64,6 +92,7 @@ R6 is not complete until this live evidence exists. Unit/surface success alone m
 | authoring composition | direct canonical Git mutation/CAS plumbing | make direct request construction internal/recovery-only |
 | delivery composition | manual Delivery precondition/request assembly | make manual Delivery request construction internal/recovery-only |
 | R6a entry composition | issue/marker/version/runtime-envelope/begin identity mechanics | make direct Agent Cycle bus entry internal/recovery-only |
+| duplicated hosted-bus I/O | repeated issue discovery/comment submission/result correlation | consolidate only if at least two clients are materially reduced in the same migration window; otherwise keep recovery-scoped and explicit |
 
 ## Frankenstein abort conditions
 
@@ -75,15 +104,17 @@ Stop and redesign rather than extend the paved layer if any next recut requires:
 - weakening UNKNOWN/BLOCKED or existing safety guards;
 - a generic compatibility framework between paved and legacy models;
 - a new permanent composer without a named old normal-path surface that becomes removable or demotable;
-- continued hosted-protocol duplication without a concrete R7 consolidation/demotion target.
+- continued hosted-protocol duplication without a concrete R7 consolidation/demotion target;
+- two consecutive recuts that add permanent orchestration without making any legacy surface eligible for demotion.
 
 ## Immediate next steps
 
-1. Qualify the R6 surface proof through the normal Agent Ops / Coordination / Snapshot gates.
-2. If green, run the live positive + negative R6 traversal without adding a new façade or workflow solely for the canary.
-3. Record the evidence here and in the PR accounting.
-4. Only after both proof layers succeed, begin R7 promotion.
-5. R7 must change the operational default and demote at least one manual surface in the same migration window.
-6. R8 remains mandatory subtraction: delete `journey_shadow` when justified and remove/private duplicated or superseded normal-path protocol surfaces.
+1. Run the live positive + negative R6 traversal using the existing paved surfaces; do not add a façade/workflow solely for the canary.
+2. Record exact evidence and negative-write assertions in the R6 accounting.
+3. If the traversal exposes a genuine gap, repair it under the hardening contract; do not add Journey state or compatibility layers to force green.
+4. Only after the live R6 evidence succeeds, begin R7 promotion.
+5. R7 must change the operational default and demote at least one manual/legacy surface in the same migration window. A documentation preference alone is not promotion.
+6. During R7, consolidate hosted transport only if the same recut materially reduces at least two duplicated clients; otherwise demote the duplicate paths to recovery scope rather than generalize them.
+7. R8 remains mandatory subtraction: delete `journey_shadow` when justified and remove/private duplicated or superseded normal-path protocol surfaces.
 
-The migration thesis remains: one normal operational model — semantic paved intent over canonical primitives — with hosted protocol mechanics retained only where recovery/debugging actually requires them.
+The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with hosted protocol mechanics retained only where recovery/debugging genuinely requires them.**
