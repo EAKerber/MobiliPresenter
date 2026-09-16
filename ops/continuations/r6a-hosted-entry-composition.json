@@ -2,24 +2,25 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6a-hosted-entry-composition",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6a-hosted-entry-recut",
   "prNumber": 306,
   "dependsOn": [
     "r5-delivery-finalization-composition"
   ],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "characterize-hosted-entry-contract",
     "implement-hosted-entry-composition",
     "add-hosted-entry-canaries",
-    "qualify-hosted-entry-composition",
+    "qualify-hosted-entry-composition"
+  ],
+  "remaining": [
     "integrate-r6a-hosted-entry-composition"
   ],
-  "nextAction": "Implement one stateless internal Journey entry composer that takes task-level identity (role, declared intent and Work identity), observes the current Work/runtime context needed by the existing HostedAgentCycleCommand 0.4, derives transport/session/request identity deterministically, optionally submits only the existing Agent Cycle request marker, and returns/observes the existing Hosted Agent Cycle begin result/opaque handle. Do not create a Journey authority/state/session/workflow or expose/promote a new public CLI/API in R6a. Preserve the manual Hosted Agent Cycle primitive and fail closed on ambiguous/missing observations.",
+  "nextAction": "integrate-r6a-hosted-entry-composition",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "174e954b3bc2b948d285cd64d88cd37973b33026",
+    "checkpoint": "PR #306 clean R6a recut qualified on head 174e954b3bc2b948d285cd64d88cd37973b33026; Agent Ops 35049810651, Coordination Guard 35049810659 and Supervisor Snapshot 35049810733 all success; Work bound to clean recut branch and PR #306; integration deliberately remains pending"
   },
   "blockers": [],
   "handoffToWorkerId": null
