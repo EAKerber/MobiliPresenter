@@ -1,6 +1,8 @@
 # Paved-path migration hardening
 
-Status: migration control gate before continuing R6a.
+Status: **active migration control contract for R6-R8**. Merged in PR #301 and enforced by `AGENTS.md` through PR #303. The current execution checkpoint is `docs/architecture/paved-path-migration-status-2026-09-15.md`; the concrete R6a implementation gate is `docs/architecture/r6a-hosted-entry-recut-plan.md` from PR #304.
+
+This document is no longer pre-implementation advice. Any R6-R8 architectural mutation must satisfy these gates or stop for redesign.
 
 ## Thesis
 
@@ -90,8 +92,8 @@ For every R6-R8 PR, the description/review must state: what is added, what old k
 ## Immediate plan
 
 1. Freeze new Journey modules while R6a is hardened.
-2. Reduce/delegate R6a before adding tests around accidental protocol duplication.
-3. Use R6a to obtain/reuse the handle from semantic inputs and run the R6 black-box canary.
+2. Execute the clean R6a recut from current `main` under `r6a-hosted-entry-recut-plan.md`; do not incrementally promote the historical prototype branch.
+3. Use R6a to obtain/reuse the handle from semantic inputs and run the R6 black-box positive and negative canaries.
 4. Only after R6 evidence, perform R7 promotion; do not add another convenience layer.
 5. Execute R8 as a deletion/demotion milestone, not optional cleanup.
 
