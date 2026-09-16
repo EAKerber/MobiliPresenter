@@ -2,22 +2,23 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6a-hosted-entry-composition",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6a-hosted-entry-recut",
   "prNumber": 306,
   "dependsOn": [
     "r5-delivery-finalization-composition"
   ],
-  "completed": [],
+  "completed": [
+    "expose-hosted-entry-public-facade"
+  ],
   "remaining": [
-    "expose-hosted-entry-public-facade",
     "add-public-entry-canaries",
     "integrate-public-entry-facade"
   ],
-  "nextAction": "expose-hosted-entry-public-facade",
+  "nextAction": "add-public-entry-canaries",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "e41b79b346473dbb1dc24a375c7b82bf368342a9",
+    "checkpoint": "PR #306 merged clean R6a semantic hosted-entry composer; V0.4 only, semantic ToolSurface inputs, no new authority/workflow/marker/protocol"
   },
   "blockers": [],
   "handoffToWorkerId": null
