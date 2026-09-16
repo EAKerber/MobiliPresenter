@@ -1,6 +1,6 @@
 # R6 provider boundary reframe — 2026-09-16
 
-Status: **architectural correction checkpoint for the active `r6-provider-boundary-retirement` Work. Documentation-only; no runtime behavior change and no R6 promotion by itself.**
+Status: **active `r6-provider-boundary-retirement` recut. This checkpoint corrects the provider boundary and persists the inventory needed for implementation; it does not promote R6 by itself.**
 
 ## Decision
 
@@ -41,32 +41,48 @@ The host/provider boundary may be external to repository Python. Provider select
 
 The repository must not silently substitute a local CLI/network provider when the host/provider binding is absent. Missing required provider injection must remain fail-closed (`BLOCKED_EXECUTION_SURFACE` or the owning primitive's equivalent UNKNOWN/BLOCKED disposition).
 
-## Implicit fallback inventory observed on `main`
+## Provider-boundary inventory — completed checkpoint
 
-At this checkpoint, observed examples include:
+The inventory distinguishes **paved semantic/core boundaries**, where provider choice must be injected explicitly, from **named hosted/recovery adapters**, where constructing the GitHub transport is itself the adapter's declared job. The retirement target is silent provider selection by paved code, not a repository-wide ban on the adapter class.
 
-- `tools/agent_tools/journey_entry.py`: `compose_entry(..., transport=None)` falls back to `GhApiTransport()`;
-- `tools/agent_tools/dispatch_host.py`: dispatch/inspection paths fall back to `GhApiTransport()`;
-- `tools/continuation_remote.py`: `GitHubContinuationAuthority(..., transport=None)` defaults to `GhApiTransport()`;
-- `tools/git_observation.py`: `observe_branch` / `observe_file` fall back to `GhApiTransport()`;
-- `tools/remote_canonical_execution.py`: `execute_command(..., transport=None)` falls back to `GhApiTransport()`;
-- `tools/agent_commands/agent_owned_git.py`: agent-owned Git execution falls back to `GhApiTransport()`;
-- `tools/agent_write_lifecycle.py`: lifecycle dispatch preparation falls back to `GhApiTransport()`.
+| Surface | Current observed default | Classification | R6 disposition |
+| --- | --- | --- | --- |
+| `tools/agent_tools/journey_entry.py` | `compose_entry(..., transport=None)` -> `transport or GhApiTransport()` | public paved entry/composition | remove silent fallback; missing live provider must fail closed |
+| `tools/agent_tools/dispatch_host.py` | validation/inspection paths use `transport or GhApiTransport()` | paved dispatch/inspection semantics with hosted callers | require explicit provider at semantic functions; host adapter may pass GitHub transport explicitly |
+| `tools/git_observation.py` | `observe_branch` / `observe_file` use `transport or GhApiTransport()` | shared observation primitive | require explicit provider; no local-provider inference |
+| `tools/continuation_remote.py` | `GitHubContinuationAuthority(..., transport=None)` defaults to `GhApiTransport()` | GitHub authority adapter used by paved composition | make adapter construction explicit at callers; no silent fallback in a provider-neutral call chain |
+| `tools/remote_canonical_execution.py` | `execute_command(..., transport=None)` uses `transport or GhApiTransport()` | named hosted execution adapter | keep GitHub construction only at explicit host/CLI boundary; core execution path should receive transport explicitly |
+| `tools/agent_commands/agent_owned_git.py` | `_transport(None)` returns `GhApiTransport()` | agent-owned Git semantic/writer boundary | retire fallback; missing injected provider blocks before planning/apply |
+| `tools/agent_write_lifecycle.py` | `prepare_dispatch` / `execute_dispatch` use `transport or GhApiTransport()` | lifecycle semantics plus hosted adapter | semantic preparation/execution requires provider injection; hosted carrier supplies it explicitly |
+| `tools/delivery_merge.py` | `prepare` / `execute` use `transport or GhApiTransport()` | Delivery semantics plus hosted adapter | semantic Delivery functions require explicit provider; hosted Delivery carrier supplies adapter explicitly |
 
-These defaults are migration debt. Their existence must not be confused with the canonical provider contract.
+### Classification rule
+
+A function is migration debt when a normal paved caller can omit provider injection and thereby cause repository code to choose a CLI/network implementation implicitly. A function is an allowed adapter when its name/hosting boundary explicitly represents GitHub/host execution and the provider construction is not observable as a choice required from the semantic caller.
+
+Therefore the regression must **not** assert zero textual `GhApiTransport` references. It must assert that paved semantic entrypoints do not instantiate the fallback when provider injection is missing, while explicitly named host/recovery adapters remain allowed until their callers are migrated.
+
+### Concrete retirement order
+
+1. `journey_entry` and dispatch semantic functions: fail closed before provider-backed observation when no provider is injected.
+2. shared `git_observation` and agent-owned Git writer boundary: require explicit transport and propagate a stable execution-surface blocker rather than constructing `GhApiTransport`.
+3. lifecycle and Delivery semantic functions: make transport mandatory in the core path; instantiate GitHub transport only in their explicit hosted carriers.
+4. Remote Canonical: preserve it as a named hosted adapter, but move/default construction to its outer host entry rather than `execute_command`.
+5. Continuation GitHub authority: require explicit transport in constructor once all normal callers/adapters have been migrated.
+6. add tests with a fake provider plus missing-provider tests that prove no fallback construction/mutation.
+
+This sequence must preserve the existing planners, CAS/preconditions, authorities, Work/lease lifecycle, mutation receipts, Delivery gates and independent readback. No provider manager, provider registry, new state machine, workflow or Journey authority is introduced.
 
 ## Active retirement recut
 
-The canonical Work `r6-provider-boundary-retirement` is the current recut for this boundary. Its intended direction is:
+The canonical Work `r6-provider-boundary-retirement` is the current recut for this boundary. Its responsibilities are now interpreted as:
 
-1. inventory implicit CLI/network fallbacks at the normal-path boundaries;
-2. require explicit provider-neutral transport where a live provider is required;
-3. fail closed when provider injection is absent;
-4. retain `GhApiTransport` only for explicitly named legacy/recovery consumers until their last legitimate use is migrated;
-5. add regression coverage proving that normal paved paths do not silently fall back to `gh`, raw DNS/HTTP or local git;
-6. update provider policy and R6 status so the previous in-process-only interpretation is recorded as superseded rather than erased.
-
-This recut must not introduce provider state, a provider manager, authority, workflow, Journey runner, canary-only executor or fallback inference.
+1. `inventory-provider-boundary` — **satisfied by the durable classification above once the writer readback is PASS**;
+2. `retire-implicit-gh-fallbacks` — implement the smallest explicit-injection cut across paved semantic boundaries;
+3. `add-no-fallback-regression` — prove missing-provider fail-closed and fake-provider success without hidden local fallback;
+4. `update-provider-policy-and-r6-status` — mark the former in-process-only interpretation superseded without erasing historical evidence;
+5. qualify and integrate the recut;
+6. only then rerun live positive + negative R6 canaries.
 
 ## R6 proof after boundary retirement
 
@@ -77,6 +93,14 @@ A positive R6 canary must start from semantic task/Work intent and traverse the 
 The caller must not need issue #145, bus markers, protocol/schema versions, runtime envelopes, authority-head CAS values, lease IDs/binding hashes, result-comment correlation, shell `gh`, raw DNS/HTTP, local git transport, or a process-local connector hook.
 
 The path must still prove the existing guards, CAS/preconditions, ownership, canonical writers, CI/Delivery gates, receipts and independent readbacks. The negative canary must preserve UNKNOWN/BLOCKED, prove no unintended mutation, and prove no fallback to local CLI/network transport.
+
+## R7 eligibility
+
+R7 remains **ineligible** until R6 has both live positive and negative PASS evidence after this recut integrates. Once eligible, R7 must change the normal default and demote/remove at least one legacy/manual normal-path surface in the same migration window; documentation-only default claims are insufficient.
+
+## R8 mandatory subtraction
+
+R8 remains mandatory after promotion and must delete or demote measurable scaffolding rather than add compatibility layers. Current named candidates remain `journey_shadow`, duplicate hosted I/O/request construction, CLI-coupled defaults, and superseded manual protocol plumbing. Every retained exception must have an owner and death condition.
 
 ## Decision rule for any future executor seam
 
@@ -94,9 +118,10 @@ This document does not mark R6 complete.
 - `r6-black-box-paved-path-canary` remains WAITING until this recut integrates and the live positive + negative traversal is rerun.
 - `r6b-finalization-composition` remains WAITING until the same execution boundary is proven.
 - R7 remains ineligible until R6 has live promotion evidence.
+- R8 remains a required subtraction phase after promotion.
 
 Historical PRs and audits remain evidence. Where they state that an in-process ChatGPT-connector-to-Python binding is itself the required executor, that interpretation is superseded by this checkpoint.
 
-## Operational note
+## Operational handoff
 
-The provider boundary is an implementation detail of the service, not a cognitive requirement for the normal caller. The target remains one normal operational model: semantic paved intent over canonical primitives, executed through the configured provider surface, with legacy CLI/network mechanics retained only for explicit recovery/debugging where justified.
+This repository document plus PR #315 are the durable continuation surface if the originating chat disappears. The active Work authority remains `r6-provider-boundary-retirement`; use its structured state rather than conversational summaries. Do not reopen the parked R6/R6b Works in parallel.
