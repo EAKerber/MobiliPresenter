@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6-black-box-paved-path-canary",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "WAITING",
   "branch": null,
   "prNumber": null,
   "dependsOn": [
@@ -21,6 +21,8 @@
     "sha": "4d46da44c08dcafbb53c52c0375e14651981a93b",
     "checkpoint": "R6 full-journey canary #1 NEGATIVE (no project mutation): starting from a normal task, agent.py status/JourneyProjection can project BEGIN_AGENT_CYCLE and agent.py begin can build a local AgentCycleContext, but R2 deliberately executes no projected action and there is no composed public/internal journey step that submits the existing hosted begin and returns its opaque handle. Ownership/authoring/delivery require that handle downstream. Proceeding would require teaching the fresh agent issue-bus marker/transport choreography, so the canary stopped fail-closed at entry instead of bypassing the paved path. This is a concrete composition gap; heads, hashes, TTLs and lease choreography were not supplied."
   },
-  "blockers": [],
+  "blockers": [
+    "BLOCKED_EXECUTION_SURFACE"
+  ],
   "handoffToWorkerId": null
 }
