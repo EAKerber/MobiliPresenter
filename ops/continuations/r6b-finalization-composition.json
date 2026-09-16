@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6b-finalization-composition",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "r6a-hosted-entry-composition"
+  ],
+  "completed": [],
+  "remaining": [
+    "characterize-semantic-finalization-gap",
+    "implement-authority-preserving-finalization-actions",
+    "add-finalization-canaries",
+    "qualify-r6b-finalization",
+    "integrate-r6b-finalization"
+  ],
+  "nextAction": "Implement the smallest semantic finalization surface needed by the R6 live traversal: complete Work through the existing Continuation planner/writer, release an active ownership binding through the existing Hosted Agent Write Lease V0.2 lifecycle, and close the Agent Cycle through the existing handle-based close request. Preserve the R5 projected order COMPLETE_WORK -> RELEASE_OWNERSHIP -> CLOSE_AGENT_CYCLE. Do not create an atomic finalize transaction, Journey authority/session/state, workflow, marker, protocol version, or second lifecycle. Each action must independently observe/derive its canonical preconditions, fail closed, and leave the canonical primitive as the sole mutation authority. The old normal-path manual request construction for these three final steps is the explicit R7 demotion target.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
