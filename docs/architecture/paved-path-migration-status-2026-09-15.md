@@ -1,16 +1,19 @@
 # Paved-path migration status — 2026-09-15
 
-Status: consolidated architectural checkpoint after R5, migration hardening, enforcement, and R6a recut planning.
+Status: consolidated architectural checkpoint after R5, migration hardening, enforcement, and qualified R6a clean recut.
 
 This document is a status snapshot, not a mutable authority. Current Work, Coordination, Agent Cycle, CI, Delivery and Project state remain owned by their canonical structured authorities and tooling.
 
 ## Current control baseline
 
-- `main`: `ebf016a0f23585cecb61c0d8edd2fb19d381e977`
-- latest architectural milestone: `Architecture: harden R6a hosted-entry recut plan (#304)`
+- `main` at clean-recut start: `f4c7ae59692c71d988fbadf481a80cce47f36ee1`
+- latest merged architectural checkpoint before the recut: PR #305
 - paved-path migration hardening: merged in PR #301
 - hardening enforcement in permanent agent bootstrap rules: merged in PR #303
 - R6a clean-recut plan: merged in PR #304
+- post-hardening checkpoint: merged in PR #305
+- clean R6a candidate: PR #306, branch `work/operations/r6a-hosted-entry-recut`
+- historical prototype branch `work/operations/r6a-hosted-entry-composition` remains evidence and is not a promotion source.
 - PR #302 was intentionally closed unmerged because its `docs/*` branch violated the Agent Cycle operational branch grammar; the guard correctly failed closed and the same policy change was resubmitted from a canonical `work/operations/...` branch in PR #303.
 
 ## Migration thesis
@@ -50,6 +53,31 @@ The prototype demonstrated useful behavior but combined semantic composition wit
 
 The clean R6a recut is governed by `docs/architecture/r6a-hosted-entry-recut-plan.md`.
 
+### Clean R6a recut checkpoint
+
+PR #306 was created from current `main`, not from the historical prototype. The candidate adds one semantic hosted-entry composer and focused canaries.
+
+The recut deliberately differs from the prototype:
+
+- V0.4 is the only begin contract emitted; there is no V0.3 fallback;
+- the caller supplies observed semantic ToolSurface identifiers plus inventory completeness, not a raw hosted `runtimeEnvironment` object;
+- runtime-environment validity is delegated to `hosted_agent_cycle.validate_runtime_begin_command`, which in turn consumes the existing runtime-provider adapter vocabulary;
+- canonical handle decoding remains owned by `hosted_cycle_handle`;
+- no Journey authority, session, store, lifecycle, workflow, marker or protocol version was introduced;
+- incomplete ToolSurface observation yields `UNKNOWN` before any transport write;
+- an exact pending request is idempotently reused; a same-ID/different-payload conflict fails closed;
+- hosted issue discovery, comment pagination and result correlation remain local duplicated transport debt. They are not promoted as Journey semantics and are a bounded R7 consolidation/demotion target.
+
+The first Agent Ops run for PR #306 failed only in the new R6a fixture because the fixture invented an unregistered ToolSurface (`github.issue.comment.write`). The production composer correctly delegated to the canonical runtime validator, which rejected the invented surface. The fixture was corrected to the existing registered `github-connector-tools` surface; no production guard was weakened.
+
+On head `4251d30e0cf6a4ab6639dedf9542895f59e50f07`, all three qualification carriers completed successfully:
+
+- Agent Ops run `35049709127`: `success`;
+- Coordination Guard run `35049709121`: `success`;
+- Supervisor Snapshot run `35049709110`: `success`.
+
+This is **R6a qualification evidence, not paved-path promotion evidence**. PR #306 must still preserve canonical Work/branch lineage before integration, and R6 remains incomplete until the black-box positive and negative canaries prove the normal path from semantic task/Work intent.
+
 ## Hardening now in force
 
 `docs/architecture/paved-path-migration-hardening.md` is no longer advisory planning. Its R6-R8 rules are referenced by `AGENTS.md` and therefore part of the permanent agent bootstrap contract.
@@ -79,24 +107,31 @@ This is currently treated as an engine/lifecycle boundary, not something to hide
 
 ## Evidence that the migration is still on the intended path
 
-The migration remains structurally healthy because R1-R5 did not create parallel mutable authorities. Journey surfaces derive or compose over existing primitives; canonical Work, Coordination, Agent Cycle, Git mutation, Delivery and Project Machine contracts remain authoritative.
+The migration remains structurally healthy because R1-R5 and the clean R6a recut did not create parallel mutable authorities. Journey surfaces derive or compose over existing primitives; canonical Work, Coordination, Agent Cycle, Git mutation, Delivery and Project Machine contracts remain authoritative.
 
-The main risk is no longer authority duplication. It is protocol duplication: paved composers can accidentally absorb hosted issue-bus mechanics, version selection, marker parsing and result correlation. R6a is the control point for preventing that from becoming permanent architecture.
+The main risk is no longer authority duplication. It is protocol duplication: paved composers can accidentally absorb hosted issue-bus mechanics, version selection, marker parsing and result correlation. The clean R6a recut removed version fallback and raw runtime-envelope knowledge from the caller but intentionally did not invent a generic hosted-transport framework. The remaining bus plumbing has an explicit R7 retirement/consolidation obligation.
 
 ## Promotion path from here
 
 ### R6a — clean hosted-entry recut
 
-Required before promotion:
+Qualification achieved in PR #306:
 
-- start from current `main`, not the historical prototype branch;
-- keep caller inputs semantic;
-- derive runtime proof through existing runtime-provider/Agent runtime contracts;
-- delegate handle and Agent Cycle semantics to canonical owners;
-- do not silently downgrade command versions;
-- cover fresh entry, valid reuse, pending/idempotent retry, incomplete observation, stale/malformed/ambiguous handle, provider failure and unintended-write negatives;
-- if transport is consolidated, reduce at least two duplicated clients in the same recut;
-- leave an explicit R7 retirement ledger.
+- started from current `main`, not the historical prototype branch;
+- caller inputs are semantic ToolSurfaces and task/Work intent;
+- runtime proof delegates to existing runtime-provider/Agent runtime contracts;
+- handle and Agent Cycle validation delegate to canonical owners;
+- no silent command-version downgrade exists;
+- fresh/build-only, valid reuse, pending/idempotent retry, incomplete inventory, conflicting identity and invalid-surface negatives are covered by focused canaries;
+- no new authority/workflow/marker/state was introduced;
+- remaining duplicated transport debt is explicit and assigned to R7 rather than abstracted prematurely.
+
+Still required before integration/promotion:
+
+- reconcile the canonical Work execution binding with the clean recut branch/PR rather than leaving the Work attached only to the historical prototype;
+- keep all integration gates green after this documentation checkpoint;
+- integrate through the governed delivery path;
+- then execute the R6 black-box canaries.
 
 ### R6 — black-box proof
 
@@ -138,4 +173,4 @@ A change that cannot answer question 3 or 4 is not paved-path progress; it is ho
 
 ## Immediate next action
 
-Do not continue patching the historical R6a prototype. Execute the clean R6a recut from current `main` under the hardening and recut-plan gates, then rerun the R6 black-box canaries. Only successful positive + negative evidence permits R7 promotion.
+Preserve the qualified PR #306 candidate, reconcile its clean branch/PR with the canonical R6a Work execution binding, and integrate only through the governed path while gates remain green. After integration, rerun R6 as a black-box positive + negative paved-path canary. Only that evidence permits R7 promotion/demotion.
