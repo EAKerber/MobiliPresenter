@@ -46,8 +46,11 @@ observe -> plan -> validate -> apply -> readback
 ## Migração do paved path
 
 - Para qualquer trabalho em R6, R7 ou R8, leia e aplique `docs/architecture/paved-path-migration-hardening.md` antes de nova mutação arquitetural.
+- Para qualquer decisão de provider/executor em R6-R8, leia também `docs/architecture/paved-path-provider-policy.md`; ela é addendum normativo do hardening.
 - Cada recorte R6-R8 deve declarar qual conhecimento/API antigo pretende substituir ou demover, qual evidência permite promoção e qual superfície se torna removível, internal-only ou recovery-only.
 - Se um abort/redesign trigger do hardening ocorrer, pare a expansão horizontal e reavalie o recorte; não compense com nova Journey authority, compatibility layer genérica, dual-write/dual-read permanente ou relaxamento de guards.
+- ToolSurface/provider observado não equivale a executor disponível. Não provisione shell `gh`, raw DNS/HTTP, local git ou outro fallback só para tornar um canário paved executável quando a provider policy não o admite.
+- Um executor/transport seam novo só é elegível quando vive abaixo de Journey semantics, não cria authority/persistência e, na mesma migration window, reduz ou demove pelo menos dois clientes/protocolos duplicados. Bridge canary-only não é paved-path capability.
 - R7 só conta como promoção se mudar o caminho operacional padrão e demover ao menos uma superfície manual/legacy. R8 é milestone obrigatório de deletion/demotion, não cleanup opcional.
 - Novo scaffolding sem retirement target explícito não deve ser promovido.
 
