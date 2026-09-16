@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6a-hosted-entry-composition",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r6a-hosted-entry-recut",
   "prNumber": 306,
   "dependsOn": [
