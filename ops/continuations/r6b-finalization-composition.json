@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6b-finalization-composition",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "WAITING",
   "branch": "work/operations/r6b-finalization-composition",
   "prNumber": null,
   "dependsOn": [
@@ -21,6 +21,8 @@
     "sha": null,
     "checkpoint": null
   },
-  "blockers": [],
+  "blockers": [
+    "BLOCKED_EXECUTION_SURFACE"
+  ],
   "handoffToWorkerId": null
 }
