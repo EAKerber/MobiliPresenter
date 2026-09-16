@@ -2,24 +2,22 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6a-hosted-entry-composition",
   "workerId": "manager-gitops-chat",
-  "status": "DONE",
-  "branch": "work/operations/r6a-hosted-entry-recut",
-  "prNumber": 306,
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
   "dependsOn": [
     "r5-delivery-finalization-composition"
   ],
-  "completed": [
-    "characterize-hosted-entry-contract",
-    "implement-hosted-entry-composition",
-    "add-hosted-entry-canaries",
-    "qualify-hosted-entry-composition",
-    "integrate-r6a-hosted-entry-composition"
+  "completed": [],
+  "remaining": [
+    "expose-hosted-entry-public-facade",
+    "add-public-entry-canaries",
+    "integrate-public-entry-facade"
   ],
-  "remaining": [],
-  "nextAction": null,
+  "nextAction": "expose-hosted-entry-public-facade",
   "lastKnownGood": {
-    "sha": "e41b79b346473dbb1dc24a375c7b82bf368342a9",
-    "checkpoint": "PR #306 integrated through Hosted Delivery; main=e41b79b346473dbb1dc24a375c7b82bf368342a9 from target f4c7ae59692c71d988fbadf481a80cce47f36ee1; R6a qualification complete, R6 black-box promotion gate remains"
+    "sha": null,
+    "checkpoint": null
   },
   "blockers": [],
   "handoffToWorkerId": null
