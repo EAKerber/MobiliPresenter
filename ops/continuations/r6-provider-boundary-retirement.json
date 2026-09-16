@@ -2,23 +2,24 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6-provider-boundary-retirement",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6-provider-boundary-retirement",
   "prNumber": 315,
   "dependsOn": [],
-  "completed": [],
+  "completed": [
+    "inventory-provider-boundary"
+  ],
   "remaining": [
-    "inventory-provider-boundary",
     "retire-implicit-gh-fallbacks",
     "add-no-fallback-regression",
     "update-provider-policy-and-r6-status",
     "qualify-provider-boundary-retirement",
     "integrate-provider-boundary-retirement"
   ],
-  "nextAction": "Inventory every normal-path implicit GhApiTransport/gh/DNS/reachability fallback; require explicit provider-neutral transport at Journey, Dispatch, Git observation, Continuation, Remote Canonical, agent-owned Git, Agent Write Lifecycle and Delivery boundaries; fail closed with BLOCKED_EXECUTION_SURFACE when provider injection is absent; preserve only explicit legacy/recovery adapters until their last legitimate consumer is migrated; add fake-provider and repo-wide no-fallback tests; update AGENTS and R6 policy/status/audit docs to record the prior discovery interpretation as superseded. Do not add provider state, manager, authority, workflow or fallback inference.",
+  "nextAction": "Retire implicit GitHub transport selection from paved semantic boundaries while preserving explicit hosted/recovery adapters, then add no-fallback regression coverage.",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "001e2f0a86897fce4ec03958bf2a117e5dc52217",
+    "checkpoint": "provider-boundary-inventory-persisted"
   },
   "blockers": [],
   "handoffToWorkerId": null
