@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "571beba015cfb20d475b6498357464153d159582",
+  "leases": [
+    {
+      "leaseId": "agent-write-0a66a46b341d1fb2b90afcb2:0",
+      "resource": "branch:work/operations/r6-provider-boundary-retirement",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "r6-provider-boundary-retirement-20260916",
+        "branch": "work/operations/r6-provider-boundary-retirement",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-438f634bfa90f2273e58b46b",
+      "acquiredAt": "2026-09-16T20:17:31Z",
+      "renewedAt": "2026-09-16T20:17:31Z",
+      "expiresAt": "2026-09-16T21:17:31Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "cc7138f2191ec0ea9aaa17eb696db9172ec0e17f",
   "schemaVersion": "CoordinationState 0.1"
 }
