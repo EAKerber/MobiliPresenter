@@ -1,8 +1,23 @@
 # R6a hosted entry recut plan
 
-Status: **approved hardening plan; implementation recut not yet promoted**. Merged in PR #304 on `main=ebf016a0f23585cecb61c0d8edd2fb19d381e977`. This document is subordinate to `docs/architecture/paved-path-migration-hardening.md` and the R6-R8 rules in `AGENTS.md`.
+Status: **executed and promoted through PR #306; retained as the historical design and retirement contract for R6a.** The clean recut was integrated before the R6 public-surface proof in PR #307. This document remains subordinate to `docs/architecture/paved-path-migration-hardening.md` and the R6-R8 rules in `AGENTS.md`.
 
-Current execution control point: do not continue patching or promote `work/operations/r6a-hosted-entry-composition`. That branch remains historical evidence. The next implementation must be a clean recut from current `main`, and its review must use `docs/architecture/paved-path-migration-status-2026-09-15.md` as the consolidated checkpoint while reobserving live authorities before mutation.
+Current execution control point: do not continue patching or promote `work/operations/r6a-hosted-entry-composition`. That prototype branch remains historical evidence. The promoted implementation came from the clean recut branch `work/operations/r6a-hosted-entry-recut`. Future changes to hosted entry are justified only by live R6 evidence and must satisfy the hardening contract; the current checkpoint is `docs/architecture/paved-path-migration-status-2026-09-16.md`.
+
+## Outcome after PR #306 / PR #307
+
+The clean recut satisfied the core architectural intent of this plan without creating a second lifecycle or authority:
+
+- normal callers provide semantic Work/task intent and ToolSurface observations rather than a raw hosted runtime envelope;
+- the normal path emits the current V0.4 Agent Cycle begin contract only; no convenience downgrade to older schemas was promoted;
+- runtime validation remains owned by the canonical Agent Cycle/runtime contracts;
+- handle decoding/validation remains delegated to canonical handle tooling;
+- incomplete runtime observation remains `UNKNOWN` before transport writes;
+- identical pending/ready requests are reusable/idempotent and conflicting identity remains fail-closed;
+- no Journey authority, session, store, workflow, marker or protocol version was introduced;
+- hosted issue/comment/result correlation remains bounded migration debt with an explicit R7 retirement/consolidation obligation.
+
+PR #307 then added the public-surface guard and negative no-transport canary. Those proofs make the old caller knowledge listed in this plan eligible for R7 demotion, but they do **not** replace the still-required live positive + negative R6 traversal.
 
 ## Purpose
 
@@ -29,9 +44,9 @@ Observed baseline at planning time:
 - the historical branch also contains a hardening-doc commit whose content was integrated independently on `main` through PR #301.
 - hardening enforcement was integrated through PR #303 after PR #302 correctly failed closed on a non-operational `docs/*` branch.
 
-Decision: **the historical R6a branch is evidence, not the promotion branch.** Do not force-rewrite or merge it as-is. The hardened implementation must start from current `main` on a clean recut branch after Work/cycle/lease state is reobserved.
+Planning-time decision: **the historical R6a branch is evidence, not the promotion branch.** That decision was carried out. PR #306 promoted a clean recut from current `main`; the prototype branch was not force-rewritten or merged.
 
-The prototype is useful as a behavioral specimen, but it is not promotion-ready. It currently combines semantic entry composition with too much hosted transport/protocol knowledge and has no qualifying test suite on the branch.
+The prototype remains useful as a behavioral specimen because it shows the failure mode this plan was designed to avoid: semantic entry composition mixed with excessive hosted transport/protocol knowledge and insufficient qualification. It is not a fallback implementation.
 
 ## Inventory of current prototype responsibilities
 
@@ -79,7 +94,7 @@ This duplication is migration debt, not a reason to create a generic compatibili
 
 ## Transport-seam decision gate
 
-A shared hosted transport seam is permitted in the R6a recut only if the same migration window materially reduces at least **two existing duplicated client implementations**.
+A shared hosted transport seam is permitted only if the same migration window materially reduces at least **two existing duplicated client implementations**.
 
 If introduced, that seam must be intentionally boring and I/O-only. Acceptable responsibilities are:
 
@@ -97,18 +112,18 @@ It must **not** own:
 - Work, lease, Delivery, or Journey lifecycle state;
 - generic legacy/new-model translation.
 
-If moving I/O into a shared seam does not delete or materially reduce duplicate I/O code in at least two callers in the same recut, do not add the seam. Keep R6a local and record the remaining transport duplication as an explicit R7 retirement target instead.
+If moving I/O into a shared seam does not delete or materially reduce duplicate I/O code in at least two callers in the same recut, do not add the seam. Keep the duplication explicitly bounded and carry it into the R7 retirement ledger.
 
 ## Required recut shape
 
-The hardened R6a implementation should be decomposable conceptually into four steps without introducing four new subsystems:
+The hardened R6a implementation was designed around four conceptual steps without introducing four new subsystems:
 
 1. **Observe semantic context.** Resolve Work/task identity, actor/session intent, ToolSurfaces/provider context, and any existing canonical handle.
 2. **Ask canonical owners for protocol material.** Runtime environment and begin command/identity semantics come from existing canonical builders/validators, not Journey-authored copies.
-3. **Use existing hosted transport.** Submit the canonical request and observe canonical results. If a narrow shared transport seam is justified by simultaneous deduplication, use it here.
+3. **Use existing hosted transport.** Submit the canonical request and observe canonical results. If a narrow shared transport seam is later justified by simultaneous deduplication, use it below Journey semantics.
 4. **Project a semantic disposition.** Return only what a normal agent needs: valid handle/reuse, request submitted/pending, blocked, unknown, and the next safe action. Never authorize mutation beyond the canonical primitive.
 
-The recut must not add another Journey module merely to split these steps. Prefer functions in the existing canonical owner when a missing reusable operation is genuinely owner-specific.
+Future changes must preserve this decomposition and must not add another Journey module merely to split these steps. Prefer functions in the existing canonical owner when a missing reusable operation is genuinely owner-specific.
 
 ## Runtime-environment rule
 
@@ -120,7 +135,7 @@ Backward command-schema support may remain inside the canonical Agent Cycle host
 
 ## Handle/re-entry rule
 
-Existing handle reuse must flow through `hosted_handle_requests` validation. R6a must not decide that a handle is valid by comparing a locally recreated subset of hashes.
+Existing handle reuse must flow through canonical handle validation. R6a must not decide that a handle is valid by comparing a locally recreated subset of hashes.
 
 The composer may distinguish:
 
@@ -143,7 +158,7 @@ Treat this as candidate retirement/simplification material for R7/R8 after the p
 
 ## Test and canary matrix
 
-R6a cannot be promoted without tests/canaries covering all of the following:
+The following cases remain regression requirements even though the clean recut has been promoted:
 
 | Case | Required result |
 | --- | --- |
@@ -160,25 +175,26 @@ R6a cannot be promoted without tests/canaries covering all of the following:
 
 Every test must assert absence of unintended writes where applicable, not merely the returned status.
 
-## R6a promotion gate
+## R6a promotion gate — historical result
 
-R6a is promotable only when all statements below are true:
+PR #306 satisfied the implementation-side promotion gate:
 
 - caller contract is semantic and contains no raw hosted runtime envelope;
 - no new authority, persistence, workflow, marker, protocol version, or lifecycle state was introduced;
-- handle semantics are delegated to the canonical handle owner;
-- Agent Cycle command/runtime semantics are delegated to the canonical Agent Cycle/runtime owners;
+- handle semantics remain delegated to canonical handle tooling;
+- Agent Cycle command/runtime semantics remain delegated to canonical Agent Cycle/runtime owners;
 - no normal-path fallback silently selects an older protocol version;
-- hosted transport duplication is either materially reduced in at least two existing clients in the same recut or explicitly left as bounded temporary debt with an R7 deletion target;
-- positive and negative tests are green;
-- a black-box R6 canary proves entry without hosted-protocol knowledge;
+- remaining hosted transport duplication is explicitly bounded with an R7 deletion/consolidation target;
+- positive and negative qualification canaries were integrated;
 - the PR description names the legacy/public knowledge that becomes eligible for demotion.
 
-If any item requires a new Journey state/session/authority or a permanent dual-read model, stop and redesign instead of merging.
+PR #307 additionally proves the public surface does not require hosted protocol identities and preserves the negative no-transport behavior.
+
+The remaining gate belongs to R6 as a whole: a live positive + negative traversal must prove the composed path end to end before R7 promotion begins.
 
 ## R7 handoff obligations
 
-R6a promotion must leave a concrete R7 retirement ledger. At minimum R7 must evaluate/demote:
+R6a promotion leaves a concrete R7 retirement ledger. At minimum R7 must evaluate/demote:
 
 - manual Agent Cycle issue-bus entry as a normal documented path;
 - direct manual construction of begin commands by normal agents;
@@ -200,20 +216,18 @@ R8 must produce measurable subtraction. Candidate deletions/demotions include:
 
 A legacy primitive may remain internal when it is still the canonical safety engine. The target is not to delete proven guarantees; the target is to delete duplicate/public choreography around them.
 
-## Execution sequence
+## Execution sequence — current disposition
 
-1. Keep the historical R6a branch unchanged as evidence.
-2. Reobserve current Work, Agent Cycle, lease, `main`, and branch state. Cleanly close/release any stale execution before a recut begins.
-3. Start a clean R6a recut branch from current `main`.
-4. Reuse the existing R6a Work if canonical Continuation semantics permit safe re-entry; otherwise create an explicit successor Work with lineage/dependency. Never silently duplicate the Work.
-5. Establish tests around canonical ownership boundaries before porting the prototype behavior wholesale.
-6. Reduce/delegate command, runtime, handle, and transport responsibilities. Do not copy the 484-line prototype and then patch around it.
-7. If a hosted transport seam is introduced, migrate at least two existing duplicated clients in the same PR/recut and show before/after reduction.
-8. Run unit/regression tests plus the R6 black-box positive and negative canaries.
-9. Promote only after the R6a gate passes; then execute R7 as an actual default-path/demotion change.
-10. Execute R8 as deletion/demotion, not optional cleanup.
+1. Historical R6a prototype branch retained unchanged as evidence — **done**.
+2. Stale lifecycle/lease state reconciled before the clean recut — **done**.
+3. Clean R6a recut branch started from current main — **done**.
+4. R6a implementation qualified and integrated through PR #306 — **done**.
+5. R6 public surface and fail-closed negative guard integrated through PR #307 — **done**.
+6. Run the live positive + negative R6 traversal without adding another façade/workflow — **next**.
+7. If live traversal succeeds, execute R7 as an actual default-path/demotion change.
+8. Execute R8 as deletion/demotion, not optional cleanup.
 
-## Review accounting for every R6a/R7/R8 PR
+## Review accounting for every R7/R8 follow-up
 
 Every relevant PR must state explicitly:
 
@@ -226,19 +240,19 @@ Every relevant PR must state explicitly:
 - exact R7/R8 retirement target;
 - whether public normal-path surface shrinks, is temporarily flat, or grows under an explicit retirement deadline.
 
-## Abort triggers specific to this recut
+## Abort triggers carried forward
 
 Abort and redesign before merge if any of the following occurs:
 
 - Journey needs to own a new session/authority/store to make entry work;
-- the recut requires permanent reading/reconciling of two lifecycle models;
+- the migration requires permanent reading/reconciling of two lifecycle models;
 - `journey_entry` must understand more command versions/exceptions than `hosted_agent_cycle.py`;
 - a new transport helper is added without materially reducing at least two existing duplicate consumers;
 - runtime proof is weakened or silently downgraded for convenience;
 - a negative canary requires suppressing BLOCKED/UNKNOWN to reach green;
-- the recut increases both old and new public normal-path APIs without naming which one will be demoted in R7;
+- the migration increases both old and new public normal-path APIs without naming which one will be demoted in R7;
 - two consecutive migration recuts add orchestration without making a legacy surface eligible for demotion.
 
 ## Definition of done
 
-R6a is done when a black-box agent can start from semantic Work/task intent and obtain or reuse a valid AgentCycleHandle through canonical primitives, without knowing hosted issue-bus mechanics, command versions, raw runtime envelopes, authority-head choreography, or result-comment search mechanics; negative cases remain fail-closed; and the implementation leaves an explicit, credible deletion/demotion path for R7/R8.
+R6a implementation is done. The broader entry migration is promotable to R7 only when a black-box agent can start from semantic Work/task intent and traverse the paved path through canonical primitives without knowing hosted issue-bus mechanics, command versions, raw runtime envelopes, authority-head choreography, lease/binding identities or result-comment search mechanics; negative cases remain fail-closed; and the implementation leaves an explicit, credible deletion/demotion path for R7/R8.
