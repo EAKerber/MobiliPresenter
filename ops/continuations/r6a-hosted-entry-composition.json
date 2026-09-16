@@ -10,15 +10,14 @@
   ],
   "completed": [
     "expose-hosted-entry-public-facade",
-    "add-public-entry-canaries"
-  ],
-  "remaining": [
+    "add-public-entry-canaries",
     "integrate-public-entry-facade"
   ],
-  "nextAction": "integrate-public-entry-facade",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
     "sha": "e41b79b346473dbb1dc24a375c7b82bf368342a9",
-    "checkpoint": "PR #306 qualified semantic hosted-entry canaries: fresh/reuse/pending/incomplete/conflict/invalid-surface cases; Agent Ops, Coordination Guard and Supervisor Snapshot green"
+    "checkpoint": "PR #306 merged as e41b79b346473dbb1dc24a375c7b82bf368342a9; R6a clean recut integrated and qualified; live R6 traversal remains a separate proof gate"
   },
   "blockers": [],
   "handoffToWorkerId": null
