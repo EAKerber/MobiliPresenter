@@ -1,8 +1,8 @@
 # Paved-path migration hardening
 
-Status: **active migration control contract for R6-R8**. Merged in PR #301 and enforced by `AGENTS.md` through PR #303. The current execution checkpoint is `docs/architecture/paved-path-migration-status-2026-09-15.md`; the concrete R6a implementation gate is `docs/architecture/r6a-hosted-entry-recut-plan.md` from PR #304.
+Status: **active migration control contract for R6-R8**. Merged in PR #301 and enforced by `AGENTS.md` through PR #303. R6a was promoted through the clean recut in PR #306 and the R6 public-surface proof was integrated in PR #307. The current execution checkpoint is `docs/architecture/paved-path-migration-status-2026-09-16.md`; the remaining R6 gate is the live positive + negative black-box traversal.
 
-This document is no longer pre-implementation advice. Any R6-R8 architectural mutation must satisfy these gates or stop for redesign.
+This document is not pre-implementation advice. Any R6-R8 architectural mutation must satisfy these gates or stop for redesign.
 
 ## Thesis
 
@@ -41,9 +41,11 @@ If a missing transport seam is proven, consolidation is allowed only when all of
 | delivery/finalization composition | manual Delivery request assembly and post-merge ordering discovery | governed merge + Work/lease/cycle finalization canary succeeds | manual Delivery request assembly becomes internal/recovery-only |
 | R6/R6a entry composition | issue number, markers, HostedAgentCycleCommand versions, begin-result search, runtime envelope mechanics | task/Work intent obtains or reuses a valid AgentCycleHandle without caller protocol knowledge | manual Agent Cycle bus entry becomes internal/recovery-only |
 
-## R6a hardening gate
+## R6a hardening gate — satisfied by clean recut
 
-The current partial `journey_entry.py` must not be promoted merely because it works. Before PR/merge:
+The R6a gate was exercised by the clean recut in PR #306. The historical `work/operations/r6a-hosted-entry-composition` prototype remains evidence only and must not be revived as the promotion path.
+
+The following remain regression requirements for any future change to hosted entry:
 
 - caller input must be semantic (task/Work identity, role/intent, observed ToolSurfaces where platform observation requires them), not a raw hosted runtime envelope;
 - runtime provider semantics must delegate to existing `runtime_provider_adapter` / Agent runtime contracts;
@@ -53,17 +55,23 @@ The current partial `journey_entry.py` must not be promoted merely because it wo
 - tests must cover fresh entry, valid reuse/re-entry, incomplete observation -> UNKNOWN/BLOCKED, stale/invalid handle, and absence of unintended writes;
 - implementation size is not a gate by itself, but every protocol-handling block must have a named existing owner or retirement target. Unowned compatibility code blocks promotion.
 
+PR #307 adds the complementary surface guard: the public paved API must not regress into requiring hosted issue/marker/schema/runtime-envelope/authority-head/lease-binding/comment/cycle/context identities from normal callers.
+
 ## Promotion gates
 
 ### R6 — prove the paved path
 
 A black-box agent starting from semantic Work/task intent must be able to reach entry, ownership, authoring, candidate/CI, Delivery and safe finalization without knowing issue #145, bus markers, protocol versions, authority-head CAS, lease IDs/binding hashes, or result-comment search mechanics. Negative canaries must remain fail-closed.
 
+The public-surface half of this gate is now integrated through PR #307. **R6 is still incomplete until the live positive + negative traversal succeeds.**
+
 R6 is blocked if completing the path requires a new Journey authority/session/store, a second lifecycle, or permanent dual-write/dual-read reconciliation.
 
 ### R7 — promote and demote
 
-Promotion is allowed only after R6 passes both positive and negative canaries. R7 must change the operational default: paved-path surfaces become the documented/default path and at least one legacy/manual surface becomes explicitly internal or recovery-only. Merely adding recommendations or another wrapper does not count as promotion.
+Promotion is allowed only after R6 passes both positive and negative live canaries. R7 must change the operational default: paved-path surfaces become the documented/default path and at least one legacy/manual surface becomes explicitly internal or recovery-only. Merely adding recommendations or another wrapper does not count as promotion.
+
+R7 should also address bounded hosted-bus duplication only when the same migration window materially reduces at least two duplicate clients. A generic transport/compatibility framework is not an acceptable substitute for concrete subtraction.
 
 ### R8 — retire and delete
 
@@ -91,10 +99,11 @@ For every R6-R8 PR, the description/review must state: what is added, what old k
 
 ## Immediate plan
 
-1. Freeze new Journey modules while R6a is hardened.
-2. Execute the clean R6a recut from current `main` under `r6a-hosted-entry-recut-plan.md`; do not incrementally promote the historical prototype branch.
-3. Use R6a to obtain/reuse the handle from semantic inputs and run the R6 black-box positive and negative canaries.
-4. Only after R6 evidence, perform R7 promotion; do not add another convenience layer.
-5. Execute R8 as a deletion/demotion milestone, not optional cleanup.
+1. Keep the historical R6a prototype branch as evidence only; do not resume incremental promotion from it.
+2. Treat PR #306 as the promoted R6a implementation and PR #307 as the completed R6 public-surface proof.
+3. Run the live R6 positive + negative traversal using the existing paved surfaces. Do not add a new façade/workflow solely to make the canary convenient.
+4. If live traversal exposes a real gap, repair it under this contract and preserve UNKNOWN/BLOCKED rather than adding Journey state or compatibility shims.
+5. Only after live R6 evidence succeeds, perform R7 promotion; R7 must change the default path and demote at least one legacy/manual surface in the same migration window.
+6. Execute R8 as a deletion/demotion milestone, not optional cleanup. `journey_shadow` and superseded protocol/request-construction surfaces are explicit subtraction candidates.
 
 The migration remains successful only if the final architecture has one normal operational model: paved semantic intent over canonical primitives, with manual hosted protocol mechanics retained only where recovery/debugging genuinely requires them.
