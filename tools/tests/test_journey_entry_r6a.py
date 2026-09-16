@@ -14,7 +14,7 @@ WORK_ID = "r6a-hosted-entry-composition"
 WORKER_ID = "manager-gitops-chat"
 ROLE = "manager-gitops"
 INTENT = "continue paved-path refactor"
-SURFACES = ["github.repo.read", "github.issue.comment.write"]
+SURFACES = ["github-connector-tools"]
 
 
 class FakeTransport:
