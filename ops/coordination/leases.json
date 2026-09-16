@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-5198f7d9e0a27ab7eb59ab03:0",
-      "resource": "branch:work/operations/r6a-hosted-entry-composition",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "paved-path-r6a-hosted-entry-resume-20260915",
-        "branch": "work/operations/r6a-hosted-entry-composition",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-74b3ca76215cb5b128f5661f",
-      "acquiredAt": "2026-09-15T21:48:02Z",
-      "renewedAt": "2026-09-15T21:48:02Z",
-      "expiresAt": "2026-09-15T22:48:02Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "dad6c6d119a6dfb0803d922f554a832dedebce06",
+  "leases": [],
+  "revision": "c9e52e771fe5d6d5cb53bed63ac75e22a87a90a8",
   "schemaVersion": "CoordinationState 0.1"
 }
