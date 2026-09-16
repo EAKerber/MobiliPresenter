@@ -1,18 +1,19 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R6a and the R6 black-box surface proof are integrated. The live positive + negative traversal is the remaining R6 promotion gate.**
+Status: **R6a and the R6 black-box surface proof are integrated. R6 live promotion remains BLOCKED_EXECUTION_SURFACE until positive + negative traversal can run through the public paved façade without falling back to legacy hosted-bus choreography.**
 
 This is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
 ## Current baseline
 
-- `main`: `fe17df98ce33f0089cc7d439bf1cfaa506674528`
+- `main`: `61cc1defd3cba8f8f4367a5d0cccde668108b271`
 - PR #301: migration hardening and retirement gates merged
 - PR #303: hardening made part of permanent agent bootstrap rules
 - PR #304: clean R6a recut plan merged
 - PR #305: post-hardening status checkpoint merged
 - PR #306: clean R6a semantic hosted-entry recut merged
 - PR #307: R6 black-box surface guard and documentation checkpoint merged
+- PR #308: paved-path status consolidated through the R6 proof boundary
 
 The historical `work/operations/r6a-hosted-entry-composition` prototype remains evidence only. The promoted implementation came from the clean recut and did not inherit the prototype branch.
 
@@ -74,6 +75,23 @@ Negative cases must remain fail-closed and must prove absence of unintended writ
 
 R6 is not complete until this evidence exists. Surface/unit success must not be promoted into an R7 claim.
 
+### Live-executor audit — 2026-09-16
+
+Disposition: **BLOCKED_EXECUTION_SURFACE**. This is neither PASS nor evidence that the paved semantic API is defective.
+
+The current ChatGPT runtime cannot execute the repository checkout directly because outbound GitHub DNS is unavailable in the local container. The GitHub connector can observe and mutate repository resources, but it is not a Python execution environment for `tools/agent.py`.
+
+The existing repository runners were audited rather than extending the architecture to manufacture a canary:
+
+- `Agent Ops` exposes CI/inspection through `workflow_dispatch`, but does not execute a live paved traversal;
+- `Hosted Agent Cycle`, `Hosted Agent Tool`, `Hosted Agent Write Lease`, Remote Canonical Execution and related hosted carriers are driven by the legacy issue-comment bus/markers;
+- using those marker protocols manually as the R6 black-box caller would invalidate the proof, because the caller would again need the exact hosted choreography the paved path exists to hide;
+- the current workflow inventory contains no existing semantic `tools/agent.py` / paved-journey executor that can be invoked from this runtime without crossing back into that legacy protocol surface.
+
+Therefore no canary-only workflow, Journey runner, compatibility façade, or alternate authority will be introduced to force the gate green. The live positive and negative canaries remain pending until a naturally available execution surface can run the public façade with repository/GitHub access. Once such a surface is available, the first action is to execute both canaries as specified above; no R7 work is eligible before that evidence exists.
+
+This block is itself hardening evidence: the migration contract prevented a test-only orchestration layer and prevented legacy bus mechanics from being mislabeled as paved-path proof.
+
 ## Remaining protocol debt
 
 R6a still contains hosted issue discovery, comment pagination and result correlation. Ownership and other paved composers also retain local hosted-bus mechanics. This is accepted only as bounded migration debt.
@@ -109,12 +127,13 @@ Stop and redesign rather than extend the paved layer if any next recut requires:
 
 ## Immediate next steps
 
-1. Run the live positive + negative R6 traversal using the existing paved surfaces; do not add a façade/workflow solely for the canary.
-2. Record exact evidence and negative-write assertions in the R6 accounting.
-3. If the traversal exposes a genuine gap, repair it under the hardening contract; do not add Journey state or compatibility layers to force green.
-4. Only after the live R6 evidence succeeds, begin R7 promotion.
-5. R7 must change the operational default and demote at least one manual/legacy surface in the same migration window. A documentation preference alone is not promotion.
-6. During R7, consolidate hosted transport only if the same recut materially reduces at least two duplicated clients; otherwise demote the duplicate paths to recovery scope rather than generalize them.
-7. R8 remains mandatory subtraction: delete `journey_shadow` when justified and remove/private duplicated or superseded normal-path protocol surfaces.
+1. Keep R7 blocked while `BLOCKED_EXECUTION_SURFACE` remains unresolved; do not add runtime architecture solely to execute the canary.
+2. When a naturally available runtime can invoke the existing public façade with GitHub/repository access, run the live positive + negative R6 traversal first.
+3. Record exact traversal evidence and negative-write assertions here and in the R6 accounting.
+4. If the traversal then exposes a genuine semantic gap, repair it under the hardening contract; do not add Journey state or compatibility layers to force green.
+5. Only after the live R6 evidence succeeds, begin R7 promotion.
+6. R7 must change the operational default and demote at least one manual/legacy surface in the same migration window. A documentation preference alone is not promotion.
+7. During R7, consolidate hosted transport only if the same recut materially reduces at least two duplicated clients; otherwise demote duplicate paths to recovery scope rather than generalize them.
+8. R8 remains mandatory subtraction: delete `journey_shadow` when justified and remove/private duplicated or superseded normal-path protocol surfaces.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with hosted protocol mechanics retained only where recovery/debugging genuinely requires them.**
