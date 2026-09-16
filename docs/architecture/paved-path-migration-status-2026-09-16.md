@@ -1,22 +1,24 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R6a, the R6 public-surface proof, the live-executor audit and the provider-policy hardening are integrated. R6 promotion remains `BLOCKED_EXECUTION_SURFACE` until a genuine provider-backed positive + negative traversal executes through the public paved façade.**
+Status: **R1-R5, the hardening checkpoint, R6a, the public-surface proof, live-executor audit and provider policy are integrated. R6 remains `BLOCKED_EXECUTION_SURFACE` after repository-wide provider-executor discovery found no in-process binding from the configured ChatGPT GitHub ToolSurface to the existing `Transport.request()` seam. R7 remains blocked.**
 
-This is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
+This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
 ## Current baseline
 
-- `main`: `cf79c0a60c952d4b2cd19e759cdc1d161b0851bf`
-- PR #301: migration hardening and retirement gates merged
-- PR #303: hardening made part of permanent agent bootstrap rules
-- PR #304: clean R6a recut plan merged
-- PR #305: post-hardening status checkpoint merged
-- PR #306: clean R6a semantic hosted-entry recut merged
-- PR #307: R6 black-box public-surface guard merged
-- PR #308: paved-path status consolidated through the R6 surface-proof boundary
-- PR #309: live-executor audit persisted `BLOCKED_EXECUTION_SURFACE`
-- PR #310: provider policy clarified that configured GitHub ToolSurfaces, not `gh`/DNS/shell fallbacks, are the normal paved-path provider model
-- open PRs at this checkpoint: none
+- audited architecture baseline before the discovery annex: `main=4211732ae93097966dd74c2e1716270a43100212` after PR #311;
+- PR #301: migration hardening and retirement gates;
+- PR #303: hardening included in permanent agent bootstrap rules;
+- PR #304: clean R6a recut plan;
+- PR #305: post-hardening status checkpoint;
+- PR #306: clean R6a semantic hosted-entry recut;
+- PR #307: R6 public-surface guard and fail-closed negative entry canary;
+- PR #308: R6 migration checkpoint consolidation;
+- PR #309: live-executor audit persisted `BLOCKED_EXECUTION_SURFACE`;
+- PR #310: provider-first execution policy;
+- PR #311: executor seam plus R7/R8 retirement plan;
+- repository-wide executor discovery annex: `docs/architecture/r6-provider-executor-discovery-audit-2026-09-16.md`;
+- open PRs observed immediately before this consolidation: none.
 
 The historical `work/operations/r6a-hosted-entry-composition` prototype remains evidence only. The promoted implementation came from the clean recut and did not inherit the prototype branch.
 
@@ -31,117 +33,120 @@ The historical `work/operations/r6a-hosted-entry-composition` prototype remains 
 | R5 / PR #300 | Delivery request composition + finalization projection | manual Delivery precondition assembly and finalization-order discovery | manual Delivery request assembly becomes internal/recovery-only |
 | Hardening / PRs #301-#305 | explicit promotion/retirement contract | removes ambiguity about additive scaffolding vs permanent architecture | R7/R8 are mandatory migration phases, not optional cleanup |
 | R6a / PR #306 | semantic hosted-entry composer | raw runtime envelope, command-version choice, caller begin-identity construction | direct Agent Cycle bus entry becomes internal/recovery-only after R6 proof |
-| R6 surface / PR #307 | public surface guard + fail-closed negative entry canary | caller protocol identities are no longer accepted by the paved surfaces | establishes cognitive/API compression precondition for live proof |
+| R6 surface / PR #307 | public surface guard + fail-closed negative entry canary | caller protocol identities are no longer accepted by paved surfaces | establishes cognitive/API compression precondition for live proof |
 | R6 executor audit / PR #309 | exact blocked disposition without fabricated executor | prevents legacy bus mechanics or CI carriers from being mislabeled as black-box proof | no R7 promotion until real live traversal |
 | Provider policy / PR #310 | provider/executor distinction made normative | removes `gh`, raw DNS/HTTP and local git as presumed paved-path requirements | CLI-coupled transport remains explicit R7/R8 debt |
+| Executor plan / PR #311 | admissible executor seam and R7/R8 subtraction criteria made explicit | prevents a canary-only bridge from becoming permanent architecture | implementation requires a real platform hook and same-window subtraction |
+| Discovery audit / post-#311 | repository-wide search found no existing provider-backed Python executor | prevents further speculative Journey expansion | block is now explicitly at the runtime/platform execution boundary |
 
-## What R6a and the public-surface proof establish
+## What is already proven
 
-The normal entry caller can provide semantic Work/task intent plus observed ToolSurface inventory and does not need to construct a raw hosted runtime envelope or select an Agent Cycle command version.
+The normal entry caller can provide semantic Work/task intent plus observed ToolSurface inventory without constructing a raw hosted runtime envelope or selecting an Agent Cycle command version.
 
-The merged composer:
+The integrated paved surfaces preserve the existing engine rather than reimplementing it:
 
-- emits only the current V0.4 begin contract;
-- delegates runtime validation to the canonical Agent Cycle runtime validator;
-- delegates handle decoding to `hosted_cycle_handle`;
-- preserves UNKNOWN/BLOCKED fail-closed behavior;
-- reuses exact pending/ready requests idempotently;
-- introduces no Journey authority, session, store, workflow, marker or protocol version.
+- entry delegates to canonical Agent Cycle validation/handle decoding;
+- ownership delegates to Coordination/write-lifecycle primitives;
+- authoring delegates to Agent Tool/Remote Canonical Execution;
+- delivery delegates to governed Delivery;
+- finalization remains a projection of the safe Work -> release -> close order;
+- UNKNOWN/BLOCKED remain fail-closed;
+- no Journey authority, Journey session, Journey store, second lifecycle, new writer, new marker or new workflow was introduced.
 
-The R6 surface guard further proves that normal-path entry, ownership, authoring, delivery and finalization do not require callers to provide issue/marker/schema/runtime-envelope/authority-head/lease-binding/comment/cycle/context identities. Incomplete ToolSurface observation returns `UNKNOWN` before transport writes.
+The R6 public-surface guard also proves that normal callers are no longer required to provide issue/marker/schema/runtime-envelope/authority-head/lease-binding/comment/cycle/context identities. Incomplete ToolSurface observation blocks before unintended transport writes.
 
-This is real API/cognitive compression, but it is **not** live end-to-end promotion evidence.
+This is real cognitive/API compression. It is **not** yet a positive live end-to-end R6 traversal.
 
-## Remaining R6 gate — live traversal
+## Remaining R6 gate — executable provider binding
 
-Still required: a black-box positive and negative traversal starting from semantic task/Work intent and passing through:
+The remaining proof is a positive and negative black-box traversal beginning with semantic task/Work intent and traversing:
 
 `entry -> ownership -> authoring -> candidate/CI -> Delivery -> COMPLETE_WORK -> RELEASE_OWNERSHIP -> CLOSE_AGENT_CYCLE`
 
-The traversal must not require caller knowledge of issue #145, bus markers, protocol versions, authority-head CAS, lease/binding identities, comment-result search mechanics, raw runtime envelopes, or manually predicted cycle/context identities.
+The positive traversal must not require caller knowledge of issue #145, bus markers, protocol versions, authority-head CAS, lease/binding identities, result-comment search, raw runtime envelopes or manually predicted cycle/context identities.
 
-Negative cases must remain fail-closed and must prove absence of unintended writes where applicable.
+The negative traversal must preserve `UNKNOWN`/`BLOCKED`, prove absence of unintended writes and must not silently fall back to shell/CLI/legacy choreography.
 
-R6 is not complete until this evidence exists. Surface/unit success must not be promoted into an R7 claim.
+### Repository-side discovery result
 
-## Executor/provider seam audit — post-PR #310
+The post-#311 discovery inspected the current paved and transport seams plus repository-wide provider/executor terminology. The significant findings are:
 
-Disposition remains **`BLOCKED_EXECUTION_SURFACE`**. The blocker is now characterized more precisely than “local GitHub access is unavailable.”
+1. `tools/runtime_provider_adapter.py` observes ToolSurfaces and produces canonical provider observations; it is read-only and does not invoke provider tools.
+2. `tools/coordination_remote.py` already defines the narrow injectable `Transport.request()` / `ApiResponse` contract.
+3. `tools/agent_tools/journey_entry.py` accepts `transport=` injection, but its repository-local concrete fallback remains `GhApiTransport`.
+4. `tools/agent_tools/dispatch_host.py` also accepts injected transport and otherwise converges on `GhApiTransport`.
+5. `ops/semantics/registry.json` describes provider-boundary concepts such as `GitHubBridge`, `ProviderRequest` and `GitHubToolCallRequest`, but no repository implementation was found that executes the configured ChatGPT GitHub ToolSurface from repository Python.
+6. Searches across the current tree for connector/MCP/API-tool/provider-request/bridge/executor/invocation implementations revealed no second concrete provider-backed `Transport` implementation.
 
-There are two distinct halves of the runtime seam:
+Therefore provider availability and provider observation are proven, but **provider execution inside the repository process is not**.
 
-1. **ToolSurface observation and provider semantics — present.** `tools/agent.py` accepts external ToolSurface observations and `runtime_provider_adapter.observations_from_tool_surfaces()` converts them into canonical provider observations without creating authority.
-2. **Executable provider binding — not proven.** The public paved Python composers need a concrete `Transport.request()` implementation to perform GitHub operations. `journey_entry.compose_entry()` supports dependency injection through `transport=`, but its repository-local default is still `GhApiTransport()`, backed by shell `gh`.
+The detailed evidence is recorded in `docs/architecture/r6-provider-executor-discovery-audit-2026-09-16.md`.
 
-The configured ChatGPT GitHub connector/API ToolSurface can observe and mutate GitHub resources from the hosting platform, but the repository's Python process has no current binding that invokes that platform ToolSurface as a `Transport.request()` implementation. Provider availability therefore does not equal an executable Python transport binding.
+## Current architectural judgment
 
-This distinction matters:
+The migration remains on the intended simplification path, but the repository has reached its legitimate implementation boundary for R6.
 
-- provisioning `gh`, raw DNS/HTTP or local git merely to make R6 executable would violate `paved-path-provider-policy.md`;
-- manually driving the existing hosted issue-comment markers would invalidate the black-box proof because the caller would again know the legacy choreography;
-- `Agent Ops` and the hosted carrier workflows are useful qualification/execution machinery but are not a black-box executor of the public paved façade;
-- adding a canary-only workflow, Journey runner, alternate authority or compatibility façade would manufacture evidence rather than prove the intended path.
+The correct response to the missing executor is **not** to add another Journey module, provider state object, runner, compatibility layer or canary workflow. Such a bridge would turn temporary scaffolding into a second operational architecture and would violate the hardening contract.
 
-No legitimate repository runtime change is currently identified that closes this seam without adding architecture specifically for the canary. Therefore the correct action is to preserve the blocked disposition, not force a PASS.
+A future executable provider seam is admissible only when a concrete runtime/platform hook exists and the recut can prove before implementation that:
 
-A future executor seam is admissible only if it is a genuine runtime/provider capability below Journey semantics, introduces no authority or persistence, preserves canonical primitive contracts and fail-closed behavior, and in the same migration window materially reduces/demotes at least two duplicated hosted/CLI transport clients. A bridge that only makes the R6 canary runnable is not sufficient justification.
+- it lives below Journey semantics;
+- it implements/reuses the existing `Transport` contract;
+- no authority, lifecycle or persistence is added;
+- canonical CAS/ownership/Agent Cycle/Delivery/readback guarantees remain authoritative;
+- at least two existing duplicated or CLI-coupled transport clients are materially reduced, demoted or made recovery-only in the same migration window;
+- the public caller surface does not grow;
+- positive and negative R6 canaries remain live and inspectable.
 
-See `docs/architecture/paved-path-provider-policy.md` and `docs/architecture/r6-executor-seam-retirement-plan.md`.
+If those conditions cannot be filled, remaining blocked is preferable to a false architectural PASS.
 
-## Existing workflow audit
+## Protocol and recovery debt retained deliberately
 
-The repository workflow inventory was rechecked at this checkpoint:
+Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a CLI-coupled concrete transport for explicit legacy/recovery contexts. These are bounded debt, not the desired public model.
 
-- `Agent Ops` can checkout and execute repository Python, tests, semantic checks, Project Machine inspection and handoff evidence, but it does not expose the live semantic paved traversal as an existing service;
-- `Hosted Agent Cycle`, `Hosted Agent Tool`, `Hosted Agent Write Lease`, Remote Canonical Execution and related carriers remain driven by the legacy hosted protocol surface;
-- reusing those markers manually as the R6 caller would test the legacy protocol rather than the public paved façade.
-
-Therefore the prior live-executor conclusion remains valid after PR #310.
-
-## Remaining protocol debt
-
-R6a still contains hosted issue discovery, comment pagination and result correlation. Ownership and other paved composers also retain local hosted-bus mechanics. `GhApiTransport` remains a CLI-coupled concrete transport used by legacy/recovery paths. These are accepted only as bounded migration debt.
-
-The hardening rule remains active: a shared transport seam may be introduced only when the same migration window materially reduces at least two duplicate clients. No generic compatibility framework is permitted.
-
-The lifecycle discontinuity discovered during R6a also remains engine/recovery behavior rather than Journey state: after an expired write binding, the proven safe recovery was `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide this by creating a persistent Journey session model.
+The lifecycle discontinuity discovered during R6a remains engine/recovery behavior: after an expired write binding, the proven safe recovery is `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide it with persistent Journey session state.
 
 ## Retirement ledger
 
 | Paved surface | Old normal-path knowledge eligible for demotion after R6 | R7/R8 obligation |
 | --- | --- | --- |
 | JourneyProjection | manual multi-authority stage interpretation | make projection/default semantic view; demote redundant interpretation helpers |
-| `journey_shadow` | none; measurement scaffolding | delete after stable positive + negative R6 equivalence evidence |
+| `journey_shadow` | none; measurement scaffolding | delete after stable positive + negative R6 evidence |
 | `ensure_ownership` | manual lease request/CAS/binding construction | make manual lease choreography internal/recovery-only |
 | authoring composition | direct canonical Git mutation/CAS plumbing | make direct request construction internal/recovery-only |
 | delivery composition | manual Delivery precondition/request assembly | make manual Delivery request construction internal/recovery-only |
 | R6a entry composition | issue/marker/version/runtime-envelope/begin identity mechanics | make direct Agent Cycle bus entry internal/recovery-only |
 | CLI-coupled defaults | shell `gh` as implicit execution transport | remove from normal path; retain only explicit recovery use where justified |
-| duplicated hosted-bus I/O | repeated issue discovery/comment submission/result correlation | consolidate only if at least two clients are materially reduced in the same migration window; otherwise keep recovery-scoped and explicit |
+| duplicated hosted-bus I/O | repeated issue discovery/comment submission/result correlation | consolidate only when at least two clients are materially reduced in the same window |
 
 ## Frankenstein abort conditions
 
-Stop and redesign rather than extend the paved layer if any next recut requires:
+Stop and redesign rather than extend the paved layer if a future recut requires:
 
 - a new mutable Journey authority/state/session/store;
 - permanent dual-read or dual-write reconciliation;
 - a second lifecycle or merge/mutation primitive;
 - weakening UNKNOWN/BLOCKED or existing safety guards;
 - a generic compatibility framework between paved and legacy models;
-- a new permanent composer without a named old normal-path surface that becomes removable or demotable;
+- a permanent composer without a named old normal-path surface that becomes removable/demotable;
 - an executor/transport bridge whose only consumer is the R6 canary;
-- continued hosted-protocol duplication without a concrete R7 consolidation/demotion target;
-- two consecutive recuts that add permanent orchestration without making any legacy surface eligible for demotion.
+- continued hosted-protocol duplication without a concrete R7 consolidation target;
+- two consecutive recuts that add permanent orchestration without making legacy surface eligible for demotion.
+
+## Governance note from this documentation pass
+
+The discovery annex itself was accidentally created directly on `main` because the connector write omitted the intended branch field. The commit is documentation-only and introduces no runtime behavior, but the bypass is retained as explicit process evidence rather than hidden or rewritten destructively.
+
+No force-reset or compensating direct-main mutation is authorized. This consolidation returns to the normal branch/PR path and should be used as the reviewed checkpoint. The incident reinforces the migration principle that a semantic paved path should make the safe path the easy/default path rather than depend on every caller remembering low-level mutation parameters.
 
 ## Immediate next steps
 
-1. Keep R7 blocked while `BLOCKED_EXECUTION_SURFACE` remains unresolved.
-2. Do not provision `gh`, raw DNS/HTTP, local git, a canary workflow or a Journey executor merely to make R6 pass.
-3. Treat the next technical investigation as runtime/provider seam discovery: look for a naturally available platform hook that can execute the existing public façade while binding the configured GitHub ToolSurface.
-4. If a real shared executor/transport seam becomes available, require it to reduce/demote at least two existing duplicate/CLI clients in the same migration window; otherwise leave the architecture unchanged.
-5. When such a natural execution surface exists, run the positive + negative R6 traversal before any R7 work.
-6. Record exact traversal evidence and negative-write assertions here and in the R6 accounting.
-7. Only after live R6 evidence succeeds, begin R7 promotion. R7 must change the operational default and demote at least one manual/legacy surface in the same migration window.
-8. R8 remains mandatory subtraction: delete `journey_shadow` when justified and remove/private duplicated, CLI-coupled or superseded normal-path protocol surfaces.
+1. Keep R6 at `BLOCKED_EXECUTION_SURFACE` and R7 blocked.
+2. Freeze new Journey/provider/executor modules whose purpose is only to bridge the missing platform capability.
+3. Continue only read-only runtime/platform capability discovery until a concrete executable provider hook can be named.
+4. If such a hook appears, re-evaluate `r6-executor-seam-retirement-plan.md` before writing code and require same-window subtraction of at least two legacy/CLI transport clients.
+5. Run live positive + negative R6 traversal only through that real executor binding.
+6. Begin R7 only after live R6 PASS; R7 must change the operational default and demote at least one legacy/manual surface in the same window.
+7. Execute R8 as mandatory measurable subtraction, including `journey_shadow` retirement when justified and removal/privatization of superseded normal-path protocol surfaces.
 
-The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with hosted protocol mechanics retained only where recovery/debugging genuinely requires them.**
+The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**
