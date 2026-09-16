@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "c9e52e771fe5d6d5cb53bed63ac75e22a87a90a8",
+  "leases": [
+    {
+      "leaseId": "agent-write-a212c9299c925386c7e5567c:0",
+      "resource": "branch:work/operations/r6b-finalization-composition",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "paved-path-r6b-finalization-composition-20260916",
+        "branch": "work/operations/r6b-finalization-composition",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-5a334f87dffe7b3ee534f8e4",
+      "acquiredAt": "2026-09-16T12:29:10Z",
+      "renewedAt": "2026-09-16T12:29:10Z",
+      "expiresAt": "2026-09-16T13:29:10Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "d7a14fd0a215b82c78d27489e6f7851025f9eec0",
   "schemaVersion": "CoordinationState 0.1"
 }
