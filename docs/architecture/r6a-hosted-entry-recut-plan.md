@@ -1,6 +1,8 @@
 # R6a hosted entry recut plan
 
-Status: hardening recut plan. This document is subordinate to `docs/architecture/paved-path-migration-hardening.md` and the R6-R8 rules in `AGENTS.md`.
+Status: **approved hardening plan; implementation recut not yet promoted**. Merged in PR #304 on `main=ebf016a0f23585cecb61c0d8edd2fb19d381e977`. This document is subordinate to `docs/architecture/paved-path-migration-hardening.md` and the R6-R8 rules in `AGENTS.md`.
+
+Current execution control point: do not continue patching or promote `work/operations/r6a-hosted-entry-composition`. That branch remains historical evidence. The next implementation must be a clean recut from current `main`, and its review must use `docs/architecture/paved-path-migration-status-2026-09-15.md` as the consolidated checkpoint while reobserving live authorities before mutation.
 
 ## Purpose
 
@@ -18,12 +20,14 @@ R6a is successful only if it makes that knowledge internal while continuing to d
 
 Observed baseline at planning time:
 
-- `main`: `3a3bccff2e1efedd59abbb0649c34a78b8b191ed`
+- planning `main`: `3a3bccff2e1efedd59abbb0649c34a78b8b191ed`
+- plan integration `main`: `ebf016a0f23585cecb61c0d8edd2fb19d381e977`
 - historical R6a branch: `work/operations/r6a-hosted-entry-composition`
-- historical branch head: `fa36a6903a4410a055ce9dc5d048574aa02708cb`
+- historical branch head at planning time: `fa36a6903a4410a055ce9dc5d048574aa02708cb`
 - prototype implementation commit: `b1ae84f0882f86831233f9f6441cd7f2bebbbff9`
 - prototype file: `tools/agent_tools/journey_entry.py`
-- the historical branch also contains a hardening-doc commit whose content is already integrated independently on `main`.
+- the historical branch also contains a hardening-doc commit whose content was integrated independently on `main` through PR #301.
+- hardening enforcement was integrated through PR #303 after PR #302 correctly failed closed on a non-operational `docs/*` branch.
 
 Decision: **the historical R6a branch is evidence, not the promotion branch.** Do not force-rewrite or merge it as-is. The hardened implementation must start from current `main` on a clean recut branch after Work/cycle/lease state is reobserved.
 
