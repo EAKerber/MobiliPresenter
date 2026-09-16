@@ -9,16 +9,16 @@
     "r5-delivery-finalization-composition"
   ],
   "completed": [
-    "expose-hosted-entry-public-facade"
+    "expose-hosted-entry-public-facade",
+    "add-public-entry-canaries"
   ],
   "remaining": [
-    "add-public-entry-canaries",
     "integrate-public-entry-facade"
   ],
-  "nextAction": "add-public-entry-canaries",
+  "nextAction": "integrate-public-entry-facade",
   "lastKnownGood": {
     "sha": "e41b79b346473dbb1dc24a375c7b82bf368342a9",
-    "checkpoint": "PR #306 merged clean R6a semantic hosted-entry composer; V0.4 only, semantic ToolSurface inputs, no new authority/workflow/marker/protocol"
+    "checkpoint": "PR #306 qualified semantic hosted-entry canaries: fresh/reuse/pending/incomplete/conflict/invalid-surface cases; Agent Ops, Coordination Guard and Supervisor Snapshot green"
   },
   "blockers": [],
   "handoffToWorkerId": null
