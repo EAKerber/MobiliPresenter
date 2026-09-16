@@ -21,7 +21,7 @@ Additive scaffolding is expected during migration. It remains healthy only while
 
 ## Completed recuts
 
-| Rec- ut | State | What is now proven | Retirement significance |
+| Recut | State | What is now proven | Retirement significance |
 | --- | --- | --- | --- |
 | R0 — trust repair | complete | negative close evidence is preserved before terminal propagation; release-before-seal ordering established | restores confidence that later automation cannot hide negative evidence |
 | R1 — JourneyProjection | complete | live, read-only, non-authoritative JourneyProjection is exposed through the existing agent surface | manual multi-authority interpretation becomes eligible for demotion once paved-path promotion is proven |
