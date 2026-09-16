@@ -12,15 +12,14 @@
     "characterize-hosted-entry-contract",
     "implement-hosted-entry-composition",
     "add-hosted-entry-canaries",
-    "qualify-hosted-entry-composition"
-  ],
-  "remaining": [
+    "qualify-hosted-entry-composition",
     "integrate-r6a-hosted-entry-composition"
   ],
-  "nextAction": "integrate-r6a-hosted-entry-composition",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "174e954b3bc2b948d285cd64d88cd37973b33026",
-    "checkpoint": "PR #306 clean R6a recut qualified on head 174e954b3bc2b948d285cd64d88cd37973b33026; Agent Ops 35049810651, Coordination Guard 35049810659 and Supervisor Snapshot 35049810733 all success; Work bound to clean recut branch and PR #306; integration deliberately remains pending"
+    "sha": "e41b79b346473dbb1dc24a375c7b82bf368342a9",
+    "checkpoint": "PR #306 integrated through Hosted Delivery; main=e41b79b346473dbb1dc24a375c7b82bf368342a9 from target f4c7ae59692c71d988fbadf481a80cce47f36ee1; R6a qualification complete, R6 black-box promotion gate remains"
   },
   "blockers": [],
   "handoffToWorkerId": null
