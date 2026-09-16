@@ -7,6 +7,7 @@ This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Deliv
 ## Current baseline
 
 - audited architecture baseline before the discovery annex: `main=4211732ae93097966dd74c2e1716270a43100212` after PR #311;
+- reviewed documentation baseline after PR #312: `main=080e46f05dae6616827cfe1fcf72dd694c825397`;
 - PR #301: migration hardening and retirement gates;
 - PR #303: hardening included in permanent agent bootstrap rules;
 - PR #304: clean R6a recut plan;
@@ -17,8 +18,8 @@ This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Deliv
 - PR #309: live-executor audit persisted `BLOCKED_EXECUTION_SURFACE`;
 - PR #310: provider-first execution policy;
 - PR #311: executor seam plus R7/R8 retirement plan;
-- repository-wide executor discovery annex: `docs/architecture/r6-provider-executor-discovery-audit-2026-09-16.md`;
-- open PRs observed immediately before this consolidation: none.
+- PR #312: provider-executor discovery checkpoint consolidation;
+- repository-wide executor discovery annex: `docs/architecture/r6-provider-executor-discovery-audit-2026-09-16.md`.
 
 The historical `work/operations/r6a-hosted-entry-composition` prototype remains evidence only. The promoted implementation came from the clean recut and did not inherit the prototype branch.
 
@@ -137,11 +138,25 @@ Stop and redesign rather than extend the paved layer if a future recut requires:
 
 The discovery annex itself was accidentally created directly on `main` because the connector write omitted the intended branch field. The commit is documentation-only and introduces no runtime behavior, but the bypass is retained as explicit process evidence rather than hidden or rewritten destructively.
 
-No force-reset or compensating direct-main mutation is authorized. This consolidation returns to the normal branch/PR path and should be used as the reviewed checkpoint. The incident reinforces the migration principle that a semantic paved path should make the safe path the easy/default path rather than depend on every caller remembering low-level mutation parameters.
+No force-reset or compensating direct-main mutation is authorized. The reviewed PR #312 restored the normal branch/PR path and should be used as the documentation baseline. The incident reinforces the migration principle that a semantic paved path should make the safe path the easy/default path rather than depend on every caller remembering low-level mutation parameters.
+
+## Structured authority alignment after executor discovery
+
+The narrative checkpoint and the canonical operational authorities are now aligned on the same disposition:
+
+- `r6a-hosted-entry-composition`: `DONE`, PR #306 integrated, no remaining responsibilities;
+- `r6-black-box-paved-path-canary`: `WAITING`, remaining failure-injection/promotion-gate responsibilities preserved, blocker `BLOCKED_EXECUTION_SURFACE`;
+- `r6b-finalization-composition`: `WAITING`, no implementation promoted, blocker `BLOCKED_EXECUTION_SURFACE`;
+- Continuation authority advanced canonically to `7624ad15994b076257f52d414dce48759138b594` when the original R6 canary was parked;
+- Coordination currently reports `intents=[]` and `leases=[]`; no write ownership is being held while R6 is blocked.
+
+The R6 Work's historical `nextAction` still describes the already-remediated pre-R6a entry gap. That text is retained as historical state because the canonical `wait` transition updates disposition/blockers rather than rewriting the previous action narrative. **Do not interpret that stale `nextAction` as authorization to recreate or reopen R6a.** Current authority is `WAITING` plus `BLOCKED_EXECUTION_SURFACE`; the only valid re-entry trigger is a concrete executable provider/runtime hook or an explicit architectural re-evaluation.
+
+This alignment deliberately parks work rather than manufacturing a completion: R6 still has real remaining canary/promotion responsibilities, but they are ineligible to execute until the missing execution surface exists.
 
 ## Immediate next steps
 
-1. Keep R6 at `BLOCKED_EXECUTION_SURFACE` and R7 blocked.
+1. Keep R6 and R6b at `BLOCKED_EXECUTION_SURFACE`; keep R7 blocked.
 2. Freeze new Journey/provider/executor modules whose purpose is only to bridge the missing platform capability.
 3. Continue only read-only runtime/platform capability discovery until a concrete executable provider hook can be named.
 4. If such a hook appears, re-evaluate `r6-executor-seam-retirement-plan.md` before writing code and require same-window subtraction of at least two legacy/CLI transport clients.
