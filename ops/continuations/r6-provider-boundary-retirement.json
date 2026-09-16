@@ -3,8 +3,8 @@
   "id": "r6-provider-boundary-retirement",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
-  "prNumber": null,
+  "branch": "work/operations/r6-provider-boundary-retirement",
+  "prNumber": 315,
   "dependsOn": [],
   "completed": [],
   "remaining": [
