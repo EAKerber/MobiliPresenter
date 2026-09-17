@@ -242,7 +242,9 @@ def validate_bundle(
     hosted_run_id: int,
     transport: Any | None = None,
 ) -> dict[str, dict[str, Any]]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise DispatchHostError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     if not isinstance(host_sha, str) or not SHA_RE.fullmatch(host_sha):
         raise DispatchHostError("AGENT_TOOL_DISPATCH_HOST_SHA_INVALID")
     hosted_run_id = _positive_int(
@@ -369,7 +371,9 @@ def inspect_protocol(
     run_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise DispatchHostError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     validate_bundle(
         bundle,
         host_sha=host_sha,
@@ -460,7 +464,9 @@ def execute_dispatch(
     attempt_comment_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    base = transport or GhApiTransport()
+    if transport is None:
+        raise DispatchHostError("BLOCKED_EXECUTION_SURFACE")
+    base = transport
     validate_bundle(
         bundle,
         host_sha=host_sha,
@@ -560,12 +566,14 @@ def main(argv: list[str] | None = None) -> int:
     hosted_run_id = _positive_int(
         args.hosted_run_id, "AGENT_TOOL_DISPATCH_HOSTED_RUN_ID_INVALID"
     )
+    carrier = GhApiTransport()
     if args.action == "inspect":
         value = inspect_protocol(
             bundle,
             host_sha=args.host_sha,
             hosted_run_id=hosted_run_id,
             run_id=_positive_int(args.run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID"),
+            transport=carrier,
         )
     else:
         value = execute_dispatch(
@@ -576,6 +584,7 @@ def main(argv: list[str] | None = None) -> int:
             attempt_comment_id=_positive_int(
                 args.attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID"
             ),
+            transport=carrier,
         )
     _write(args.output, value)
     print(json.dumps(value, ensure_ascii=False))
