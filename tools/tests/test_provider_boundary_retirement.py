@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, git_observation
+from tools import agent_authoring, agent_ownership, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 
@@ -58,6 +58,30 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             agent_authoring.submit_authoring_request(request)
+
+    @mock.patch("tools.agent_ownership.hosted_cycle_handle.decode_handle")
+    def test_ownership_requires_explicit_provider_before_observation(
+        self,
+        decode_handle: mock.Mock,
+    ) -> None:
+        decode_handle.return_value = (
+            {},
+            {
+                "runId": 123,
+                "sourceSha": "a" * 40,
+                "contextHash": "b" * 64,
+                "issueNumber": 145,
+            },
+        )
+        with self.assertRaisesRegex(
+            agent_ownership.AgentOwnershipError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_ownership.ensure_ownership(
+                handle={},
+                branch="work/operations/provider-boundary-test",
+                request_id="provider-boundary-test",
+            )
 
 
 if __name__ == "__main__":
