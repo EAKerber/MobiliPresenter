@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_delivery, agent_ownership, git_observation
+from tools import agent_authoring, agent_delivery, agent_ownership, continuation_remote, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 
@@ -114,6 +114,14 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             agent_delivery.submit_delivery_request(request, handle={})
+
+
+    def test_continuation_authority_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            continuation_remote.ContinuationRemoteError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            continuation_remote.GitHubContinuationAuthority()
 
 
 if __name__ == "__main__":
