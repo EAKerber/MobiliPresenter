@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import quote
 
 from tools import coordination
-from tools.coordination_remote import ApiError, GhApiTransport
+from tools.coordination_remote import ApiError
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 GIT_SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -116,12 +116,13 @@ def blob_at(entries: list[dict[str, Any]], path: str) -> str | None:
 
 
 def observe_branch(branch: str, *, transport: Any | None = None) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise GitObservationError("BLOCKED_EXECUTION_SURFACE")
     canonical = canonical_branch(branch)
     return {
         "repository": REPOSITORY,
         "branch": canonical,
-        "branchHead": ref_head(carrier, canonical),
+        "branchHead": ref_head(transport, canonical),
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -134,14 +135,15 @@ def observe_file(
     *,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise GitObservationError("BLOCKED_EXECUTION_SURFACE")
     canonical_branch_value = canonical_branch(branch)
     canonical_path_value = canonical_path(path)
-    head = ref_head(carrier, canonical_branch_value)
+    head = ref_head(transport, canonical_branch_value)
     if not isinstance(head, str):
         raise GitObservationError("GIT_OBSERVATION_BRANCH_UNAVAILABLE")
-    commit = commit_info(carrier, head)
-    entries = tree_entries(carrier, commit["treeSha"])
+    commit = commit_info(transport, head)
+    entries = tree_entries(transport, commit["treeSha"])
     return {
         "repository": REPOSITORY,
         "branch": canonical_branch_value,

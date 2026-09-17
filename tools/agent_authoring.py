@@ -5,7 +5,6 @@ import json
 from typing import Any
 
 from tools import hosted_agent_cycle, hosted_cycle_handle, hosted_handle_requests
-from tools.coordination_remote import GhApiTransport
 
 TOOL_ID = "git.files.mutate"
 
@@ -70,13 +69,14 @@ def submit_authoring_request(
     except RuntimeError as exc:
         raise AgentAuthoringError("AGENT_AUTHORING_REQUEST_INVALID", str(exc)) from exc
 
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise AgentAuthoringError("BLOCKED_EXECUTION_SURFACE")
     body = (
         hosted_handle_requests.TOOL_MARKER_V02
         + "\n"
         + json.dumps(request, separators=(",", ":"), ensure_ascii=False)
     )
-    response = carrier.request(
+    response = transport.request(
         "POST",
         f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{locator['issueNumber']}/comments",
         payload={"body": body},
