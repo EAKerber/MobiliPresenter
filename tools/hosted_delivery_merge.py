@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import delivery_merge
+from tools.coordination_remote import GhApiTransport
 
 REQUEST_MARKER = "MOBILIPRESENTER_DELIVERY_MERGE_REQUEST_V0_1"
 RESULT_MARKER = "MOBILIPRESENTER_DELIVERY_MERGE_RESULT_V0_1"
@@ -55,9 +56,10 @@ def run_event_file(
         event = json.loads(Path(event_path).read_text(encoding="utf-8"))
         request = parse_event(event)
         _write(request_out, request)
-        dispatch = delivery_merge.prepare(request)
+        carrier = GhApiTransport()
+        dispatch = delivery_merge.prepare(request, transport=carrier)
         _write(dispatch_out, dispatch)
-        result = delivery_merge.execute(dispatch)
+        result = delivery_merge.execute(dispatch, transport=carrier)
         _write(result_out, result)
         return 0
     except Exception as exc:
