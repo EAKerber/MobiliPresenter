@@ -1,6 +1,6 @@
 # R6 provider boundary reframe — 2026-09-16
 
-Status: **active `r6-provider-boundary-retirement` recut. This checkpoint corrects the provider boundary and persists the inventory needed for implementation; it does not promote R6 by itself.**
+Status: **active `r6-provider-boundary-retirement` recut. Provider-boundary retirement is implemented on PR #315; exact-head qualification/integration is still pending, and this recut does not promote R6 by itself.**
 
 ## Decision
 
@@ -45,16 +45,26 @@ The repository must not silently substitute a local CLI/network provider when th
 
 The inventory distinguishes **paved semantic/core boundaries**, where provider choice must be injected explicitly, from **named hosted/recovery adapters**, where constructing the GitHub transport is itself the adapter's declared job. The retirement target is silent provider selection by paved code, not a repository-wide ban on the adapter class.
 
-| Surface | Current observed default | Classification | R6 disposition |
+| Surface | State after retirement recut | Classification | R6 disposition |
 | --- | --- | --- | --- |
-| `tools/agent_tools/journey_entry.py` | `compose_entry(..., transport=None)` -> `transport or GhApiTransport()` | public paved entry/composition | remove silent fallback; missing live provider must fail closed |
-| `tools/agent_tools/dispatch_host.py` | validation/inspection paths use `transport or GhApiTransport()` | paved dispatch/inspection semantics with hosted callers | require explicit provider at semantic functions; host adapter may pass GitHub transport explicitly |
-| `tools/git_observation.py` | `observe_branch` / `observe_file` use `transport or GhApiTransport()` | shared observation primitive | require explicit provider; no local-provider inference |
-| `tools/continuation_remote.py` | `GitHubContinuationAuthority(..., transport=None)` defaults to `GhApiTransport()` | GitHub authority adapter used by paved composition | make adapter construction explicit at callers; no silent fallback in a provider-neutral call chain |
-| `tools/remote_canonical_execution.py` | `execute_command(..., transport=None)` uses `transport or GhApiTransport()` | named hosted execution adapter | keep GitHub construction only at explicit host/CLI boundary; core execution path should receive transport explicitly |
-| `tools/agent_commands/agent_owned_git.py` | `_transport(None)` returns `GhApiTransport()` | agent-owned Git semantic/writer boundary | retire fallback; missing injected provider blocks before planning/apply |
-| `tools/agent_write_lifecycle.py` | `prepare_dispatch` / `execute_dispatch` use `transport or GhApiTransport()` | lifecycle semantics plus hosted adapter | semantic preparation/execution requires provider injection; hosted carrier supplies it explicitly |
-| `tools/delivery_merge.py` | `prepare` / `execute` use `transport or GhApiTransport()` | Delivery semantics plus hosted adapter | semantic Delivery functions require explicit provider; hosted Delivery carrier supplies adapter explicitly |
+| `tools/agent_tools/journey_entry.py` | missing provider fails closed; no implicit `GhApiTransport` construction | public paved entry/composition | explicit provider required |
+| `tools/agent_tools/dispatch_host.py` | semantic functions receive provider explicitly; concrete GitHub transport remains at the explicit host boundary | paved dispatch semantics + named host | core injected; host construction allowed |
+| `tools/git_observation.py` | observation requires explicit transport | shared observation primitive | no local-provider inference |
+| `tools/continuation_remote.py` | authority constructor fails closed without transport; `continuation_live.py` selects the GitHub adapter explicitly | GitHub authority adapter + explicit CLI | core injected; CLI construction allowed |
+| `tools/remote_canonical_execution.py` | `execute_command` fails closed without transport; `remote_canonical_issue.py` supplies transport at the outer host/CLI boundary | canonical execution core + named host | no implicit core fallback |
+| `tools/agent_commands/agent_owned_git.py` | missing transport blocks before execution | agent-owned Git semantic/writer boundary | explicit provider required |
+| `tools/agent_write_lifecycle.py` | dispatch preparation fails closed without transport | lifecycle semantics | explicit provider required |
+| `tools/agent_write_lifecycle_host.py` | inspect/execute helpers require transport; `main()` constructs one GitHub carrier and injects it | explicit hosted carrier | host construction allowed |
+| `tools/delivery_merge.py` | prepare/execute fail closed without transport | Delivery semantics | explicit provider required |
+| `tools/hosted_delivery_merge.py` | host constructs and injects the GitHub carrier | explicit hosted carrier | host construction allowed |
+
+### Implementation checkpoint — 2026-09-17
+
+The code checkpoint before this documentation update is `ce4e9aadd99bb4c2fc5ae2dbd5c6ea9c46977f1d`. The retirement recut has removed implicit `GhApiTransport` selection from the inventoried semantic/core boundaries and added focused missing-provider regressions. The provider-boundary regression suite also contains an explicit fake-provider success case so the contract proves both sides: injected provider works, absent provider fails closed.
+
+The only remaining `GhApiTransport` references in the inventoried path are explicit host/CLI construction points: `dispatch_host`, `continuation_live`, `remote_canonical_issue`, `agent_write_lifecycle_host`, and `hosted_delivery_merge`. Textual zero-occurrence is intentionally **not** the acceptance rule.
+
+Qualification of the code checkpoint is currently fail-closed on CI re-entry: the PR-triggered `Supervisor Snapshot`, `Agent Ops`, and `Coordination Guard` runs for the exact implementation head completed as `action_required` with no jobs materialized and no commit statuses. This is not a green test result and not a red test result; it is pre-job re-entry evidence. R0.1 already defines unqualified re-entry as a reconciliation/UNKNOWN condition rather than permission to invent a new workflow or bypass the gate.
 
 ### Classification rule
 
@@ -77,12 +87,13 @@ This sequence must preserve the existing planners, CAS/preconditions, authoritie
 
 The canonical Work `r6-provider-boundary-retirement` is the current recut for this boundary. Its responsibilities are now interpreted as:
 
-1. `inventory-provider-boundary` — **satisfied by the durable classification above once the writer readback is PASS**;
-2. `retire-implicit-gh-fallbacks` — implement the smallest explicit-injection cut across paved semantic boundaries;
-3. `add-no-fallback-regression` — prove missing-provider fail-closed and fake-provider success without hidden local fallback;
-4. `update-provider-policy-and-r6-status` — mark the former in-process-only interpretation superseded without erasing historical evidence;
-5. qualify and integrate the recut;
-6. only then rerun live positive + negative R6 canaries.
+1. `inventory-provider-boundary` — **complete**;
+2. `retire-implicit-gh-fallbacks` — **implemented on PR #315** across the inventoried paved semantic/core boundaries;
+3. `add-no-fallback-regression` — **implemented** with missing-provider fail-closed coverage plus explicit fake-provider success;
+4. `update-provider-policy-and-r6-status` — **implemented by the current documentation cut**, preserving the superseded in-process interpretation as history;
+5. `qualify-provider-boundary-retirement` — **pending exact-head CI re-entry and test execution evidence**;
+6. `integrate-provider-boundary-retirement` — pending qualification;
+7. only after integration rerun the live positive + negative R6 canaries.
 
 ## R6 proof after boundary retirement
 
@@ -124,4 +135,4 @@ Historical PRs and audits remain evidence. Where they state that an in-process C
 
 ## Operational handoff
 
-This repository document plus PR #315 are the durable continuation surface if the originating chat disappears. The active Work authority remains `r6-provider-boundary-retirement`; use its structured state rather than conversational summaries. Do not reopen the parked R6/R6b Works in parallel.
+This repository document plus PR #315 are the durable continuation surface if the originating chat disappears. The active Work authority remains `r6-provider-boundary-retirement`; use its structured state rather than conversational summaries. Do not reopen the parked R6/R6b Works in parallel. The PR history also retains an accidental empty `NOOP` commit followed immediately by its compensating revert; the final tree is clean, but the governance deviation is intentionally preserved as evidence and must be included in integration review rather than hidden by history rewriting.

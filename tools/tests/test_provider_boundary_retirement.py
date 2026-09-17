@@ -6,9 +6,39 @@ from unittest import mock
 from tools import agent_authoring, agent_delivery, agent_ownership, agent_write_lifecycle, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
+from tools.coordination_remote import ApiResponse
 
 
 class ProviderBoundaryRetirementTests(unittest.TestCase):
+    def test_git_observation_uses_injected_provider(self) -> None:
+        class FakeProvider:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, str]] = []
+
+            def request(
+                self,
+                method: str,
+                endpoint: str,
+                *,
+                payload=None,
+                include_headers: bool = False,
+            ) -> ApiResponse:
+                self.calls.append((method, endpoint))
+                return ApiResponse(
+                    status=200,
+                    headers={},
+                    body='{"object":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}',
+                )
+
+        provider = FakeProvider()
+        observed = git_observation.observe_branch(
+            "work/operations/provider-boundary-test",
+            transport=provider,
+        )
+        self.assertEqual(observed["branchHead"], "a" * 40)
+        self.assertEqual(len(provider.calls), 1)
+        self.assertEqual(provider.calls[0][0], "GET")
+
     def test_git_observation_requires_explicit_provider(self) -> None:
         with self.assertRaisesRegex(
             git_observation.GitObservationError,

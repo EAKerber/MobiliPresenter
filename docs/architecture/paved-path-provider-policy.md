@@ -1,6 +1,6 @@
 # Paved-path provider policy
 
-Status: **normative migration addendum for R6-R8**. This document refines the provider/executor interpretation of `paved-path-migration-hardening.md` and the R6 live-executor checkpoint without changing the current `BLOCKED_EXECUTION_SURFACE` disposition.
+Status: **normative migration addendum for R6-R8**. This document refines the provider/executor interpretation of `paved-path-migration-hardening.md`. PR #315 implements the provider-boundary retirement in the R6 recut; that implementation is a prerequisite, not R6 promotion. The live positive + negative R6 traversal remains required.
 
 ## Provider policy
 
@@ -10,13 +10,13 @@ The normal paved path must use the canonical provider-backed GitHub surface repr
 
 If the canonical provider-backed surface cannot be observed or bound, the existing fail-closed disposition applies (`UNKNOWN` / `BLOCKED` as defined by the owning primitive). Do not fall back to shell/CLI transport.
 
-The semantic registry may continue to list `gh-api-cli` while legacy/recovery callers still exist. That is explicit migration debt, not an endorsed normal-path provider. CLI-coupled defaults such as `GhApiTransport` are R7/R8 demotion/removal candidates once black-box evidence proves the provider-backed paved path.
+The semantic registry may continue to list `gh-api-cli` while explicit legacy/recovery adapters still exist. That is migration debt, not an endorsed normal-path provider. As of the PR #315 recut, paved semantic/core boundaries no longer choose `GhApiTransport` implicitly; concrete construction remains only at named host/CLI adapters that explicitly own GitHub transport.
 
 ## Provider is not executor
 
 PR #309 correctly preserved R6 as `BLOCKED_EXECUTION_SURFACE`, but missing raw DNS or `gh` must not be interpreted as the blocker to solve.
 
-The GitHub connector/API already supplies a provider-backed transport surface. What remains unproven is a **black-box executor surface that invokes the public paved façade while binding the real configured ToolSurfaces**. Connector availability proves that GitHub can be observed/mutated through the configured provider; it does not, by itself, prove that the repository's Python façade has been executed live through that provider.
+The GitHub connector/API supplies the provider-backed host surface used during the PR #315 governed mutations, while repository semantic/core functions now require an injected provider and fail closed when it is absent. What remains unproven is the **black-box public paved traversal from semantic intent through the configured host/provider surface and safe finalization**. Successful governed repository mutations prove the host/provider carrier exists; they do not, by themselves, count as the R6 public-façade canary.
 
 Therefore:
 
@@ -51,4 +51,4 @@ This concept is explicitly deferred until the current migration is fully closed.
 
 ## Immediate implication
 
-Continue to preserve `BLOCKED_EXECUTION_SURFACE` until a genuine provider-backed public-façade run exists. The next technical investigation should target the executor seam, not CLI provisioning. R7 remains ineligible until the live R6 evidence exists; R8 remains the mandatory subtraction/demotion phase.
+The provider-boundary retirement should be qualified and integrated without reopening CLI provisioning or inventing an in-process connector bridge. After integration, rerun the genuine provider-backed public-façade positive + negative R6 traversal. Until that live canary exists, R6 remains fail-closed and R7 remains ineligible. R8 remains the mandatory subtraction/demotion phase.
