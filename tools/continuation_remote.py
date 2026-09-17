@@ -12,7 +12,7 @@ from urllib.parse import quote
 from tools import continuation
 from tools import continuation_transition as transition
 from tools import transition_protocol as protocol
-from tools.coordination_remote import ApiError, GhApiTransport
+from tools.coordination_remote import ApiError
 
 DEFAULT_REPOSITORY="EAKerber/MobiliPresenter"
 DEFAULT_BRANCH="coordination/continuations"
@@ -35,7 +35,8 @@ class Observation:
 
 class GitHubContinuationAuthority:
     def __init__(self,transport=None,repository:str=DEFAULT_REPOSITORY,authority_branch:str=DEFAULT_BRANCH,state_dir:str=DEFAULT_DIR,readback_attempts:int=DEFAULT_READBACK_ATTEMPTS,readback_retry_seconds:float=DEFAULT_READBACK_RETRY_SECONDS)->None:
-        self.transport=transport or GhApiTransport(); self.repository=repository; self.authority_branch=authority_branch; self.state_dir=state_dir; self.readback_attempts=readback_attempts; self.readback_retry_seconds=readback_retry_seconds
+        if transport is None:raise ContinuationRemoteError("BLOCKED_EXECUTION_SURFACE")
+        self.transport=transport; self.repository=repository; self.authority_branch=authority_branch; self.state_dir=state_dir; self.readback_attempts=readback_attempts; self.readback_retry_seconds=readback_retry_seconds
 
     @property
     def ref_endpoint(self)->str: return f"repos/{self.repository}/git/ref/heads/{quote(self.authority_branch,safe='')}"
