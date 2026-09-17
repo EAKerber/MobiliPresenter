@@ -168,6 +168,19 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             )
 
 
+    @mock.patch("tools.remote_canonical_execution.validate_command")
+    def test_remote_canonical_execution_requires_explicit_provider(
+        self,
+        validate_command: mock.Mock,
+    ) -> None:
+        validate_command.return_value = {"kind": "domain"}
+        with self.assertRaisesRegex(
+            bridge.RemoteCanonicalExecutionError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            bridge.execute_command({}, source={})
+
+
     @mock.patch("tools.delivery_merge.validate_request")
     def test_delivery_merge_prepare_requires_explicit_provider(
         self,
