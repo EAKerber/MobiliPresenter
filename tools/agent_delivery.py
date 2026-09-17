@@ -14,7 +14,7 @@ from tools import (
 )
 from tools.canonical import stable_hash
 from tools.continuation_remote import ContinuationRemoteError, GitHubContinuationAuthority
-from tools.coordination_remote import ApiError, GhApiTransport
+from tools.coordination_remote import ApiError
 
 FINALIZATION_SCHEMA = "AgentFinalizationProjection 0.1"
 FINALIZATION_ORDER = [
@@ -137,8 +137,10 @@ def build_delivery_request(
 ) -> dict[str, Any]:
     """Compose the existing HostedDeliveryMergeRequest 0.1 from live observations."""
 
-    carrier = transport or GhApiTransport()
     handle_value, _ = _decode_handle(handle)
+    if transport is None:
+        raise AgentDeliveryError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     authority_head, work = _observe_work(work_id, carrier)
     pr = _observe_pr(work["prNumber"], carrier)
     if pr["headRef"] != work["branch"]:
@@ -177,14 +179,15 @@ def submit_delivery_request(
     except RuntimeError as exc:
         raise AgentDeliveryError("AGENT_DELIVERY_REQUEST_INVALID", str(exc)) from exc
     _, locator = _decode_handle(handle)
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise AgentDeliveryError("BLOCKED_EXECUTION_SURFACE")
     body = (
         hosted_delivery_merge.REQUEST_MARKER
         + "\n"
         + json.dumps(request, separators=(",", ":"), ensure_ascii=False)
     )
     payload = _request(
-        carrier,
+        transport,
         "POST",
         f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{locator['issueNumber']}/comments",
         payload={"body": body},

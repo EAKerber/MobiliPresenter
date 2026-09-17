@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_ownership, git_observation
+from tools import agent_authoring, agent_delivery, agent_ownership, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 
@@ -82,6 +82,38 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
                 branch="work/operations/provider-boundary-test",
                 request_id="provider-boundary-test",
             )
+
+    @mock.patch("tools.agent_delivery._decode_handle")
+    def test_delivery_build_requires_explicit_provider_before_observation(
+        self,
+        decode_handle: mock.Mock,
+    ) -> None:
+        decode_handle.return_value = ({"actor": {}}, {})
+        with self.assertRaisesRegex(
+            agent_delivery.AgentDeliveryError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_delivery.build_delivery_request(
+                handle={},
+                work_id="provider-boundary-test",
+                request_id="provider-boundary-test",
+            )
+
+    @mock.patch("tools.agent_delivery._decode_handle")
+    @mock.patch("tools.agent_delivery.delivery_merge.validate_request")
+    def test_delivery_submit_requires_explicit_provider_before_post(
+        self,
+        validate_request: mock.Mock,
+        decode_handle: mock.Mock,
+    ) -> None:
+        request = {}
+        validate_request.return_value = request
+        decode_handle.return_value = ({}, {"issueNumber": 145})
+        with self.assertRaisesRegex(
+            agent_delivery.AgentDeliveryError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_delivery.submit_delivery_request(request, handle={})
 
 
 if __name__ == "__main__":
