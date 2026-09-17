@@ -9,7 +9,7 @@ from typing import Any
 from tools import agent_cycle_identity, coordination, git_observation, hosted_agent_cycle
 from tools import remote_canonical_execution as remote
 from tools.canonical import stable_hash
-from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
+from tools.coordination_remote import GitHubCoordinationAuthority
 
 REQUEST_MARKER = "MOBILIPRESENTER_AGENT_WRITE_LEASE_REQUEST_V0_1"
 DISPATCH_MARKER = "MOBILIPRESENTER_AGENT_WRITE_LEASE_DISPATCH_V0_1"
@@ -382,7 +382,9 @@ def prepare_dispatch(
     transport: Any | None = None,
 ) -> dict[str, Any]:
     validate_begin_binding(request, manifest, context)
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise AgentWriteLifecycleError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     action = request["action"]
 
     expected_branch_head = request["expectedBranchHead"]

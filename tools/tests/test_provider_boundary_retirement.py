@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_delivery, agent_ownership, continuation_remote, delivery_merge, git_observation
+from tools import agent_authoring, agent_delivery, agent_ownership, agent_write_lifecycle, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 
@@ -122,6 +122,50 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             continuation_remote.GitHubContinuationAuthority()
+
+
+    @mock.patch("tools.agent_write_lifecycle.validate_begin_binding")
+    def test_agent_write_lifecycle_requires_explicit_provider(
+        self,
+        validate_begin_binding: mock.Mock,
+    ) -> None:
+        with self.assertRaisesRegex(
+            agent_write_lifecycle.AgentWriteLifecycleError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_write_lifecycle.prepare_dispatch(
+                {},
+                {},
+                {},
+                issue_number=145,
+                request_comment_id=1,
+                hosted_run_id=1,
+            )
+
+    def test_agent_write_lifecycle_host_inspect_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            agent_write_lifecycle_host.AgentWriteLifecycleHostError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_write_lifecycle_host.inspect_protocol(
+                {},
+                host_sha="a" * 40,
+                hosted_run_id=1,
+                run_id=1,
+            )
+
+    def test_agent_write_lifecycle_host_execute_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            agent_write_lifecycle_host.AgentWriteLifecycleHostError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_write_lifecycle_host.execute_dispatch(
+                {},
+                host_sha="a" * 40,
+                hosted_run_id=1,
+                run_id=1,
+                attempt_comment_id=1,
+            )
 
 
     @mock.patch("tools.delivery_merge.validate_request")
