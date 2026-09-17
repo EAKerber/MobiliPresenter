@@ -9,7 +9,7 @@ from urllib.parse import quote
 from tools import continuation, git_mutation_plan, integration_reconcile
 from tools.canonical import stable_hash
 from tools.continuation_remote import GitHubContinuationAuthority
-from tools.coordination_remote import ApiError, ApiResponse, GhApiTransport
+from tools.coordination_remote import ApiError, ApiResponse
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 CONTROL_BRANCH = "main"
@@ -319,7 +319,8 @@ def _snapshot(request: dict[str, Any], transport: Transport) -> dict[str, Any]:
 
 def prepare(request: dict[str, Any], transport: Transport | None = None) -> dict[str, Any]:
     request = validate_request(request)
-    transport = transport or GhApiTransport()
+    if transport is None:
+        raise DeliveryMergeError("BLOCKED_EXECUTION_SURFACE")
     observed = _snapshot(request, transport)
     body = {
         "schemaVersion": DISPATCH_SCHEMA,
@@ -374,7 +375,8 @@ def _same_dispatch(before: dict[str, Any], after: dict[str, Any]) -> None:
 
 def execute(dispatch: dict[str, Any], transport: Transport | None = None) -> dict[str, Any]:
     dispatch = validate_dispatch(dispatch)
-    transport = transport or GhApiTransport()
+    if transport is None:
+        raise DeliveryMergeError("BLOCKED_EXECUTION_SURFACE")
     current = prepare(dispatch.get("request"), transport)
     _same_dispatch(dispatch, current)
     request = current["request"]

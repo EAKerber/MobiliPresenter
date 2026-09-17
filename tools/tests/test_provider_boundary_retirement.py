@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_delivery, agent_ownership, continuation_remote, git_observation
+from tools import agent_authoring, agent_delivery, agent_ownership, continuation_remote, delivery_merge, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 
@@ -122,6 +122,33 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             continuation_remote.GitHubContinuationAuthority()
+
+
+    @mock.patch("tools.delivery_merge.validate_request")
+    def test_delivery_merge_prepare_requires_explicit_provider(
+        self,
+        validate_request: mock.Mock,
+    ) -> None:
+        request = {}
+        validate_request.return_value = request
+        with self.assertRaisesRegex(
+            delivery_merge.DeliveryMergeError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            delivery_merge.prepare(request)
+
+    @mock.patch("tools.delivery_merge.validate_dispatch")
+    def test_delivery_merge_execute_requires_explicit_provider(
+        self,
+        validate_dispatch: mock.Mock,
+    ) -> None:
+        dispatch = {}
+        validate_dispatch.return_value = dispatch
+        with self.assertRaisesRegex(
+            delivery_merge.DeliveryMergeError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            delivery_merge.execute(dispatch)
 
 
 if __name__ == "__main__":
