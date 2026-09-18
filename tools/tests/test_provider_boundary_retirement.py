@@ -3,9 +3,10 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_delivery, agent_ownership, agent_reentry_guidance, agent_write_lifecycle, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
+from tools import agent_authoring, agent_cycle_obligation_inspect, agent_delivery, agent_ownership, agent_reentry_guidance, agent_write_lifecycle, agent_write_lifecycle_guard, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
+from tools.agent_tools import guard_proofs
 from tools.coordination_remote import ApiResponse
 
 
@@ -243,6 +244,44 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             delivery_merge.execute(dispatch)
+
+
+    def test_write_lifecycle_binding_proof_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            agent_write_lifecycle_guard.AgentWriteLifecycleGuardError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_write_lifecycle_guard.prove_active_binding(
+                {},
+                cycle_instance_id="cycle-instance-" + "a" * 24,
+                issue_number=145,
+                before_comment_id=None,
+            )
+
+    def test_write_lifecycle_close_inspection_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            agent_write_lifecycle_guard.AgentWriteLifecycleGuardError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_write_lifecycle_guard.inspect_cycle(
+                [],
+                {},
+                close_comment_id=1,
+            )
+
+    def test_obligation_inspection_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            agent_cycle_obligation_inspect.AgentCycleObligationInspectError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_cycle_obligation_inspect.inspect_inventory({})
+
+    def test_coordination_guard_proof_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            guard_proofs.prove_coordination_lease_owned({})
 
 
 if __name__ == "__main__":
