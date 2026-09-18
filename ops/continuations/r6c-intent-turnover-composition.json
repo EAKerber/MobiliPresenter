@@ -3,8 +3,8 @@
   "id": "r6c-intent-turnover-composition",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": "work/operations/r6c-intent-turnover-composition",
-  "prNumber": null,
+  "branch": "work/operations/r6c-intent-turnover-composition-recut",
+  "prNumber": 317,
   "dependsOn": [],
   "completed": [],
   "remaining": [
