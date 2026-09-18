@@ -17,7 +17,7 @@ from tools.coordination_remote import GitHubCoordinationAuthority
 
 RESULT_SCHEMA = "AgentOwnershipEnsureResult 0.1"
 STATUSES = {"PASS", "PENDING", "BLOCKED", "UNKNOWN"}
-DISPOSITIONS = {"REUSED", "ACQUIRE_REQUESTED", "RELEASE_REQUESTED", "NEW_CYCLE_REQUIRED", "UNKNOWN"}
+DISPOSITIONS = {"REUSED", "ACQUIRE_REQUESTED", "RELEASE_REQUESTED", "NEW_CYCLE_REQUIRED", "NO_OWNERSHIP", "RELEASED", "UNKNOWN"}
 
 
 class AgentOwnershipError(RuntimeError):
@@ -324,4 +324,191 @@ def ensure_ownership(
         binding=binding,
         request_comment_id=comment_id,
         blockers=blockers,
+    )
+
+
+def _lifecycle_snapshot(
+    *,
+    handle: Any,
+    branch: str,
+    transport: Any,
+) -> dict[str, Any]:
+    try:
+        handle_value, locator = hosted_cycle_handle.decode_handle(
+            handle, repository=hosted_agent_cycle.REPOSITORY
+        )
+    except RuntimeError as exc:
+        raise AgentOwnershipError("AGENT_OWNERSHIP_HANDLE_INVALID") from exc
+    branch = git_observation.canonical_branch(branch)
+    if branch == "main":
+        raise AgentOwnershipError("AGENT_OWNERSHIP_BRANCH_FORBIDDEN")
+    actor = copy.deepcopy(handle_value["actor"])
+    begin = {
+        "runId": locator["runId"],
+        "sourceSha": locator["sourceSha"],
+        "contextHash": locator["contextHash"],
+    }
+    authority = GitHubCoordinationAuthority(transport=transport)
+    observation = authority.observe()
+    comments = _comments(transport, locator["issueNumber"])
+    latest = _latest_lifecycle_result(
+        comments,
+        begin=begin,
+        actor=actor,
+        cycle_instance_id=handle_value["cycleInstanceId"],
+        branch=branch,
+    )
+    state = "NONE"
+    binding = None
+    if latest is not None:
+        binding = latest["binding"]
+        if binding["state"] == "RELEASED":
+            state = "RELEASED"
+        elif lifecycle.binding_is_expired(binding, observation.authority_now):
+            materialized = _matching_leases(
+                observation.state["leases"],
+                lease_id=binding["leaseId"],
+                actor=actor,
+                branch=branch,
+            )
+            state = "EXPIRED" if len(materialized) == 1 else "UNKNOWN"
+        else:
+            active = coordination.active_leases(
+                observation.state, observation.authority_now
+            )
+            matching = _matching_leases(
+                active,
+                lease_id=binding["leaseId"],
+                actor=actor,
+                branch=branch,
+            )
+            state = "ACTIVE" if len(matching) == 1 else "UNKNOWN"
+    return {
+        "handle": copy.deepcopy(handle),
+        "actor": actor,
+        "locator": copy.deepcopy(locator),
+        "branch": branch,
+        "observation": observation,
+        "latest": copy.deepcopy(latest),
+        "binding": copy.deepcopy(binding),
+        "state": state,
+    }
+
+
+def observe_write_lifecycle_state(
+    *,
+    handle: Any,
+    branch: str,
+    transport: Any | None = None,
+) -> dict[str, Any]:
+    if transport is None:
+        raise AgentOwnershipError("BLOCKED_EXECUTION_SURFACE")
+    snapshot = _lifecycle_snapshot(
+        handle=handle,
+        branch=branch,
+        transport=transport,
+    )
+    return {
+        "state": snapshot["state"],
+        "branch": snapshot["branch"],
+        "authorityHead": snapshot["observation"].head_sha,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+
+
+def release_ownership(
+    *,
+    handle: Any,
+    branch: str,
+    request_id: str,
+    submit: bool = False,
+    transport: Any | None = None,
+) -> dict[str, Any]:
+    """Release the current cycle's exact binding without selecting a new cycle."""
+    if not isinstance(request_id, str) or not request_id.strip():
+        raise AgentOwnershipError("AGENT_OWNERSHIP_REQUEST_ID_INVALID")
+    if transport is None:
+        raise AgentOwnershipError("BLOCKED_EXECUTION_SURFACE")
+    snapshot = _lifecycle_snapshot(
+        handle=handle,
+        branch=branch,
+        transport=transport,
+    )
+    observed_branch = git_observation.observe_branch(
+        snapshot["branch"], transport=transport
+    )
+    branch_head = observed_branch["branchHead"]
+    state = snapshot["state"]
+    binding = snapshot["binding"]
+
+    if state == "NONE":
+        return _result(
+            status="PASS",
+            disposition="NO_OWNERSHIP",
+            branch=snapshot["branch"],
+            authority_head=snapshot["observation"].head_sha,
+            branch_head=branch_head,
+        )
+    if state == "RELEASED":
+        return _result(
+            status="PASS",
+            disposition="RELEASED",
+            branch=snapshot["branch"],
+            authority_head=snapshot["observation"].head_sha,
+            branch_head=branch_head,
+            binding=binding,
+        )
+    if state == "UNKNOWN" or not isinstance(binding, dict):
+        return _result(
+            status="UNKNOWN",
+            disposition="UNKNOWN",
+            branch=snapshot["branch"],
+            authority_head=snapshot["observation"].head_sha,
+            branch_head=branch_head,
+            binding=binding,
+            blockers=["AGENT_OWNERSHIP_BINDING_AUTHORITY_MISMATCH"],
+        )
+
+    request = _outer_request(
+        request_id=request_id,
+        handle=handle,
+        action="release",
+        branch=snapshot["branch"],
+        authority_head=snapshot["observation"].head_sha,
+        branch_head=None,
+        binding_hash=binding["bindingHash"],
+    )
+    comment_id = None
+    if submit:
+        body = (
+            hosted_handle_requests.WRITE_LEASE_MARKER_V02
+            + "\n"
+            + json.dumps(request, separators=(",", ":"), ensure_ascii=False)
+        )
+        response = _json_response(
+            transport.request(
+                "POST",
+                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{snapshot['locator']['issueNumber']}/comments",
+                payload={"body": body},
+            ),
+            "AGENT_OWNERSHIP_SUBMIT_INVALID",
+        )
+        comment_id = response.get("id") if isinstance(response, dict) else None
+        if (
+            not isinstance(comment_id, int)
+            or isinstance(comment_id, bool)
+            or comment_id <= 0
+        ):
+            raise AgentOwnershipError("AGENT_OWNERSHIP_SUBMIT_INVALID")
+    return _result(
+        status="PENDING",
+        disposition="RELEASE_REQUESTED",
+        branch=snapshot["branch"],
+        authority_head=snapshot["observation"].head_sha,
+        branch_head=branch_head,
+        request=request,
+        binding=binding,
+        request_comment_id=comment_id,
     )
