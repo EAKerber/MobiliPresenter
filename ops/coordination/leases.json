@@ -16,8 +16,24 @@
       "renewedAt": "2026-09-18T22:44:07Z",
       "expiresAt": "2026-09-18T23:44:07Z",
       "ttlSeconds": 3600
+    },
+    {
+      "leaseId": "r6c-recut-lease-acquire-20260918:0",
+      "resource": "branch:work/operations/r6c-intent-turnover-composition-recut",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "r6c-recut-20260918",
+        "branch": "work/operations/r6c-intent-turnover-composition-recut",
+        "pr": null
+      },
+      "reason": "Clean R6c recut on integrated main",
+      "acquiredAt": "2026-09-18T23:15:09Z",
+      "renewedAt": "2026-09-18T23:15:09Z",
+      "expiresAt": "2026-09-19T00:15:09Z",
+      "ttlSeconds": 3600
     }
   ],
-  "revision": "7cc219cd5605dfbb531b3d305a9c5edb03865f61",
+  "revision": "b04712e7b079247459530835841fbb204967ffee",
   "schemaVersion": "CoordinationState 0.1"
 }
