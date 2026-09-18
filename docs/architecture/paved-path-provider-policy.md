@@ -10,7 +10,7 @@ The normal paved path must use the canonical provider-backed GitHub surface repr
 
 If the canonical provider-backed surface cannot be observed or bound, the existing fail-closed disposition applies (`UNKNOWN` / `BLOCKED` as defined by the owning primitive). Do not fall back to shell/CLI transport.
 
-The semantic registry may continue to list `gh-api-cli` while explicit legacy/recovery adapters still exist. That is migration debt, not an endorsed normal-path provider. As of the PR #315 recut, paved semantic/core boundaries no longer choose `GhApiTransport` implicitly; concrete construction remains only at named host/CLI adapters that explicitly own GitHub transport.
+The semantic registry may continue to list `gh-api-cli` while explicit legacy/recovery adapters still exist. That is migration debt, not an endorsed normal-path provider. As of the PR #315 recut, paved semantic/core boundaries no longer choose `GhApiTransport` implicitly; concrete construction remains only at named host/CLI adapters that explicitly own GitHub transport. This includes re-entry observation: `agent_reentry_guidance.observe_live` requires an injected provider, while the outer `tools/agent.py status` CLI selects its concrete CLI carrier explicitly.
 
 ## Provider is not executor
 

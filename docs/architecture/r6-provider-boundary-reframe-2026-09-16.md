@@ -50,6 +50,7 @@ The inventory distinguishes **paved semantic/core boundaries**, where provider c
 | `tools/agent_tools/journey_entry.py` | missing provider fails closed; no implicit `GhApiTransport` construction | public paved entry/composition | explicit provider required |
 | `tools/agent_tools/dispatch_host.py` | semantic functions receive provider explicitly; concrete GitHub transport remains at the explicit host boundary | paved dispatch semantics + named host | core injected; host construction allowed |
 | `tools/git_observation.py` | observation requires explicit transport | shared observation primitive | no local-provider inference |
+| `tools/agent_reentry_guidance.py` | re-entry observation requires explicit transport; `tools/agent.py status` supplies the concrete GitHub carrier at the outer CLI façade | re-entry observation core + explicit CLI host | core injected; CLI construction allowed |
 | `tools/continuation_remote.py` | authority constructor fails closed without transport; `continuation_live.py` selects the GitHub adapter explicitly | GitHub authority adapter + explicit CLI | core injected; CLI construction allowed |
 | `tools/remote_canonical_execution.py` | `execute_command` fails closed without transport; `remote_canonical_issue.py` supplies transport at the outer host/CLI boundary | canonical execution core + named host | no implicit core fallback |
 | `tools/agent_commands/agent_owned_git.py` | missing transport blocks before execution | agent-owned Git semantic/writer boundary | explicit provider required |
@@ -60,9 +61,9 @@ The inventory distinguishes **paved semantic/core boundaries**, where provider c
 
 ### Implementation checkpoint — 2026-09-17
 
-The code checkpoint before this documentation update is `ce4e9aadd99bb4c2fc5ae2dbd5c6ea9c46977f1d`. The retirement recut has removed implicit `GhApiTransport` selection from the inventoried semantic/core boundaries and added focused missing-provider regressions. The provider-boundary regression suite also contains an explicit fake-provider success case so the contract proves both sides: injected provider works, absent provider fails closed.
+The code checkpoint before this documentation update is `55618b8316da6aa7d00fcc173626f078c72a60d7`. The retirement recut has removed implicit `GhApiTransport` selection from the inventoried semantic/core boundaries, including re-entry observation, and added focused missing-provider regressions. Existing fake-provider coverage for re-entry guidance plus the provider-boundary regression suite prove both sides structurally: injected provider works, absent provider fails closed.
 
-The only remaining `GhApiTransport` references in the inventoried path are explicit host/CLI construction points: `dispatch_host`, `continuation_live`, `remote_canonical_issue`, `agent_write_lifecycle_host`, and `hosted_delivery_merge`. Textual zero-occurrence is intentionally **not** the acceptance rule.
+The only remaining `GhApiTransport` references in the inventoried path are explicit host/CLI construction points: `tools/agent.py` for the `status` CLI re-entry observation carrier, `dispatch_host`, `continuation_live`, `remote_canonical_issue`, `agent_write_lifecycle_host`, and `hosted_delivery_merge`. Textual zero-occurrence is intentionally **not** the acceptance rule.
 
 Qualification of the code checkpoint is currently fail-closed on CI re-entry: the PR-triggered `Supervisor Snapshot`, `Agent Ops`, and `Coordination Guard` runs for the exact implementation head completed as `action_required` with no jobs materialized and no commit statuses. This is not a green test result and not a red test result; it is pre-job re-entry evidence. R0.1 already defines unqualified re-entry as a reconciliation/UNKNOWN condition rather than permission to invent a new workflow or bypass the gate.
 

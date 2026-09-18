@@ -106,7 +106,7 @@ If those conditions cannot be filled, remaining blocked is preferable to a false
 
 ## Protocol and recovery debt retained deliberately
 
-Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/recovery boundaries in the inventoried R6 path; semantic/core fallbacks have been retired by PR #315. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
+Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/recovery boundaries in the inventoried R6 path; semantic/core fallbacks have been retired by PR #315. The re-entry observation adapter now also requires provider injection, while `tools/agent.py status` selects its concrete CLI carrier explicitly at the outer CLI façade. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
 
 The lifecycle discontinuity discovered during R6a remains engine/recovery behavior: after an expired write binding, the proven safe recovery is `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide it with persistent Journey session state.
 
