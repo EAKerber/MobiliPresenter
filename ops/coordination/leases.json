@@ -16,24 +16,8 @@
       "renewedAt": "2026-09-18T22:44:07Z",
       "expiresAt": "2026-09-18T23:44:07Z",
       "ttlSeconds": 3600
-    },
-    {
-      "leaseId": "r6c-branch-lease-acquire-20260918:0",
-      "resource": "branch:work/operations/r6c-intent-turnover-composition",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "r6c-bootstrap-20260918",
-        "branch": "work/operations/r6c-intent-turnover-composition",
-        "pr": null
-      },
-      "reason": "Bootstrap R6c stacked implementation branch",
-      "acquiredAt": "2026-09-18T21:46:27Z",
-      "renewedAt": "2026-09-18T21:46:27Z",
-      "expiresAt": "2026-09-18T22:46:27Z",
-      "ttlSeconds": 3600
     }
   ],
-  "revision": "7e3c578178538d62e520fcbbd083211a4984d582",
+  "revision": "7cc219cd5605dfbb531b3d305a9c5edb03865f61",
   "schemaVersion": "CoordinationState 0.1"
 }
