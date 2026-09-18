@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R1-R5, hardening, R6a and the public-surface proof are integrated. The former in-process-only executor interpretation is superseded. PR #315 now implements provider-boundary retirement by requiring explicit provider injection in paved semantic/core functions while keeping concrete GitHub transport construction at named host/CLI adapters. Provider-boundary qualification/integration and the live positive + negative R6 canary remain pending; R7 remains blocked.**
+Status: **R1-R5, hardening, R6a and the public-surface proof are integrated. The former in-process-only executor interpretation is superseded. PR #315 now implements provider-boundary retirement by requiring explicit provider injection in paved semantic/core/guard functions while keeping concrete GitHub transport construction at explicit host/CLI/live-sensor adapters. Provider-boundary exact-head qualification/integration and the live positive + negative R6 canary remain pending; R7 remains blocked.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
@@ -88,7 +88,7 @@ The detailed evidence is recorded in `docs/architecture/r6-provider-executor-dis
 
 ## Current architectural judgment
 
-The migration remains on the intended simplification path. PR #315 demonstrates the smaller boundary: semantic/core code does not select a concrete provider, while explicit host/CLI adapters may do so at the hosting edge. The remaining R6 question is no longer whether repository Python can invoke the ChatGPT connector in-process; it is whether the public paved façade can complete the required live positive + negative traversal through the configured host/provider service.
+The migration remains on the intended simplification path. PR #315 demonstrates the smaller boundary: semantic/core/guard code does not select a concrete provider, while explicit host/CLI/live-sensor adapters may do so at their environment edge. The remaining R6 question is no longer whether repository Python can invoke the ChatGPT connector in-process; it is whether the public paved façade can complete the required live positive + negative traversal through the configured host/provider service.
 
 The correct response to any remaining live-canary gap is **not** to add another Journey module, provider state object, runner, compatibility layer or canary workflow. Such a bridge would turn temporary scaffolding into a second operational architecture and would violate the hardening contract.
 
@@ -106,7 +106,7 @@ If those conditions cannot be filled, remaining blocked is preferable to a false
 
 ## Protocol and recovery debt retained deliberately
 
-Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/recovery boundaries in the inventoried R6 path; semantic/core fallbacks have been retired by PR #315. The re-entry observation adapter now also requires provider injection, while `tools/agent.py status` selects its concrete CLI carrier explicitly at the outer CLI façade. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
+Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/live-sensor/recovery boundaries in the inventoried R6 path; semantic/core/guard fallbacks have been retired by PR #315. Re-entry, lifecycle close inspection, obligation inspection and Coordination guard proof now require provider injection; their outer host/CLI callers supply the carrier explicitly. `project_sensors.observe_coordination(live=True)` is retained as an explicitly classified live-environment sensor adapter. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
 
 The lifecycle discontinuity discovered during R6a remains engine/recovery behavior: after an expired write binding, the proven safe recovery is `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide it with persistent Journey session state.
 
@@ -155,6 +155,10 @@ The durable operational state is intentionally narrower than this narrative:
 - R7 remains ineligible until R6 has live promotion evidence.
 
 Transient leases/cycle handles are operational coordination, not architectural state; consult Coordination/Agent Cycle authorities live rather than this document. The provider-boundary Work must be advanced only through its canonical continuation writer after exact-head evidence is observed.
+
+## R6Q qualification checkpoint — 2026-09-18
+
+R6Q reconciled the expired prior ownership without bypassing Coordination: the exact historical lease was released through `remote-canonical-execution` with PASS/readback, the old Agent Cycle closed PASS, and a fresh Work-bound Agent Cycle acquired new ownership before further branch mutation. The residual semantic/guard provider defaults identified during independent review were then moved to explicit host injection or fail-closed provider requirements. This is lifecycle and structural evidence only; it does **not** convert CI re-entry into PASS.
 
 ## Immediate next steps
 

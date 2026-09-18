@@ -43,7 +43,7 @@ The repository must not silently substitute a local CLI/network provider when th
 
 ## Provider-boundary inventory — completed checkpoint
 
-The inventory distinguishes **paved semantic/core boundaries**, where provider choice must be injected explicitly, from **named hosted/recovery adapters**, where constructing the GitHub transport is itself the adapter's declared job. The retirement target is silent provider selection by paved code, not a repository-wide ban on the adapter class.
+The inventory distinguishes **paved semantic/core boundaries**, where provider choice must be injected explicitly, from **explicit host/CLI/live-sensor adapters**, where constructing the GitHub transport is itself the adapter's declared job. The retirement target is silent provider selection by paved code, not a repository-wide ban on the adapter class.
 
 | Surface | State after retirement recut | Classification | R6 disposition |
 | --- | --- | --- | --- |
@@ -51,6 +51,10 @@ The inventory distinguishes **paved semantic/core boundaries**, where provider c
 | `tools/agent_tools/dispatch_host.py` | semantic functions receive provider explicitly; concrete GitHub transport remains at the explicit host boundary | paved dispatch semantics + named host | core injected; host construction allowed |
 | `tools/git_observation.py` | observation requires explicit transport | shared observation primitive | no local-provider inference |
 | `tools/agent_reentry_guidance.py` | re-entry observation requires explicit transport; `tools/agent.py status` supplies the concrete GitHub carrier at the outer CLI façade | re-entry observation core + explicit CLI host | core injected; CLI construction allowed |
+| `tools/agent_write_lifecycle_guard.py` | active-binding and close inspection require explicit transport; `hosted_agent_cycle` injects the concrete carrier at close | lifecycle guard core + explicit hosted carrier | core injected; host construction allowed |
+| `tools/agent_cycle_obligation_inspect.py` | obligation inspection requires explicit transport; `hosted_agent_cycle` injects the carrier for disposition shadow inspection | obligation inspection core + explicit hosted carrier | core injected; host construction allowed |
+| `tools/agent_tools/guard_proofs.py` | Coordination ownership proof requires explicit transport; dispatch-host callers already inject their carrier | semantic guard proof | explicit provider required |
+| `tools/project_sensors.py` | live Coordination sensing constructs the concrete carrier inside the live sensor | live-environment sensor adapter | bounded sensor adapter; not a paved semantic fallback |
 | `tools/continuation_remote.py` | authority constructor fails closed without transport; `continuation_live.py` selects the GitHub adapter explicitly | GitHub authority adapter + explicit CLI | core injected; CLI construction allowed |
 | `tools/remote_canonical_execution.py` | `execute_command` fails closed without transport; `remote_canonical_issue.py` supplies transport at the outer host/CLI boundary | canonical execution core + named host | no implicit core fallback |
 | `tools/agent_commands/agent_owned_git.py` | missing transport blocks before execution | agent-owned Git semantic/writer boundary | explicit provider required |
@@ -61,9 +65,9 @@ The inventory distinguishes **paved semantic/core boundaries**, where provider c
 
 ### Implementation checkpoint — 2026-09-17
 
-The code checkpoint before this documentation update is `55618b8316da6aa7d00fcc173626f078c72a60d7`. The retirement recut has removed implicit `GhApiTransport` selection from the inventoried semantic/core boundaries, including re-entry observation, and added focused missing-provider regressions. Existing fake-provider coverage for re-entry guidance plus the provider-boundary regression suite prove both sides structurally: injected provider works, absent provider fails closed.
+The functional code checkpoint before this documentation update is `4a7a825cafed3851bfc4dd3220f7564b38535aa9`. The retirement recut has removed implicit `GhApiTransport` selection from the inventoried semantic/core and guard boundaries, including re-entry, lifecycle close inspection, obligation inspection and Coordination ownership proof. The explicit Hosted Agent Cycle carrier is now injected at the outer host boundary. Focused missing-provider regressions are committed; execution of those regressions on the exact PR head is still a qualification requirement, so this structural result is not CI PASS evidence.
 
-The only remaining `GhApiTransport` references in the inventoried path are explicit host/CLI construction points: `tools/agent.py` for the `status` CLI re-entry observation carrier, `dispatch_host`, `continuation_live`, `remote_canonical_issue`, `agent_write_lifecycle_host`, and `hosted_delivery_merge`. Textual zero-occurrence is intentionally **not** the acceptance rule.
+Remaining `GhApiTransport` construction is intentionally limited to explicit environment adapters, including outer CLI/host carriers (`tools/agent.py status`, dispatch/lifecycle hosts, `continuation_live`, `remote_canonical_issue`, hosted Delivery/Agent Cycle) and explicitly classified live/recovery sensors such as `project_sensors.observe_coordination(live=True)`. Textual zero-occurrence is intentionally **not** the acceptance rule.
 
 Qualification of the code checkpoint is currently fail-closed on CI re-entry: the PR-triggered `Supervisor Snapshot`, `Agent Ops`, and `Coordination Guard` runs for the exact implementation head completed as `action_required` with no jobs materialized and no commit statuses. This is not a green test result and not a red test result; it is pre-job re-entry evidence. R0.1 already defines unqualified re-entry as a reconciliation/UNKNOWN condition rather than permission to invent a new workflow or bypass the gate.
 
