@@ -106,7 +106,7 @@ If those conditions cannot be filled, remaining blocked is preferable to a false
 
 ## Protocol and recovery debt retained deliberately
 
-Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/live-sensor/recovery boundaries in the inventoried R6 path; semantic/core/guard fallbacks have been retired by PR #315. Re-entry, lifecycle close inspection, obligation inspection and Coordination guard proof now require provider injection; their outer host/CLI callers supply the carrier explicitly. `project_sensors.observe_coordination(live=True)` is retained as an explicitly classified live-environment sensor adapter. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
+Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/live-sensor/recovery boundaries in the inventoried R6 path; semantic/core/guard fallbacks have been retired by PR #315. Re-entry, lifecycle close inspection, obligation inspection and Coordination guard proof now require provider injection; their outer host/CLI callers supply the carrier explicitly. `project_sensors.observe_coordination(live=True)` and `project_sensors.observe_continuations_live()` are retained as explicitly classified live-environment sensor adapters. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
 
 The lifecycle discontinuity discovered during R6a remains engine/recovery behavior: after an expired write binding, the proven safe recovery is `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide it with persistent Journey session state.
 
@@ -158,13 +158,15 @@ Transient leases/cycle handles are operational coordination, not architectural s
 
 ## R6Q qualification checkpoint — 2026-09-18
 
-R6Q reconciled the expired prior ownership without bypassing Coordination: the exact historical lease was released through `remote-canonical-execution` with PASS/readback, the old Agent Cycle closed PASS, and a fresh Work-bound Agent Cycle acquired new ownership before further branch mutation. The residual semantic/guard provider defaults identified during independent review were then moved to explicit host injection or fail-closed provider requirements. This is lifecycle and structural evidence only; it does **not** convert CI re-entry into PASS.
+R6Q reconciled the expired prior ownership without bypassing Coordination: the exact historical lease was released through `remote-canonical-execution` with PASS/readback, the old Agent Cycle closed PASS, and a fresh Work-bound Agent Cycle acquired new ownership before further branch mutation. The residual semantic/guard provider defaults identified during independent review were then moved to explicit host injection or fail-closed provider requirements.
+
+A stacked R6c qualification run subsequently exposed one missed environment edge: `project_sensors.observe_continuations_live()` still constructed `GitHubContinuationAuthority()` without an explicit provider, so live Project Machine observation became `UNKNOWN / WORK_AUTHORITY_UNAVAILABLE` after the #315 fallback retirement. The fix injects `GhApiTransport` explicitly at that live-sensor boundary, matching the already-classified Coordination sensor edge. On functional head `ff463e7a695aacc5ad3e349ab290b28395204a7f`, Coordination Guard, Agent Ops and Supervisor Snapshot all materialized real jobs and completed PASS; source and readback Project Machine observation both completed successfully. This is exact functional evidence for the provider-boundary recut, while the final documentation head must retain equivalent exact-head CI before integration.
 
 ## Immediate next steps
 
-1. Qualify PR #315 on its exact head. The current pre-documentation implementation head produced PR-triggered runs with `action_required` and **zero jobs**, so it is CI re-entry rather than a test failure; do not normalize that state to PASS.
-2. Use the existing R0.1 reconciliation semantics for re-entry. Do not add a no-op commit, new workflow, CLI fallback, or compatibility bridge merely to trigger CI.
-3. Once the provider-boundary head has real test/guard evidence, integrate PR #315 through governed Delivery and complete the provider-boundary Work.
+1. Qualify the final PR #315 documentation head and require the same real-job PASS evidence already observed on functional head `ff463e7a695aacc5ad3e349ab290b28395204a7f`.
+2. Integrate PR #315 through governed Delivery only after final exact-head CI remains green, then complete the provider-boundary Work.
+3. Preserve the earlier `action_required` / zero-job runs as historical CI re-entry evidence; they are neither PASS nor test failure.
 4. Reopen the parked R6 black-box canary only after integration and run the positive + negative public-façade traversal through the configured host/provider path.
 5. Begin R7 only after live R6 PASS; R7 must change the operational default and demote at least one legacy/manual surface.
 6. Execute R8 as mandatory measurable subtraction, including `journey_shadow` retirement when justified and removal/privatization of superseded normal-path protocol surfaces.
