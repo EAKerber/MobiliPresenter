@@ -19,7 +19,7 @@ from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 TOOLBOX_COMMANDS = {
-    "begin", "close", "close-review", "reflection-eligibility", "operational-quiescence", "status", "doctor", "verify", "checkpoint", "handoff",
+    "begin", "continue", "close", "close-review", "reflection-eligibility", "operational-quiescence", "status", "doctor", "verify", "checkpoint", "handoff",
     "git prune-plan", "git mutation-plan",
 }
 _RUNTIME_TOOL_SURFACE = "--runtime-tool-surface"
@@ -355,6 +355,87 @@ def _status_arguments(argv: list[str]) -> tuple[bool, str | None]:
     return as_json, work_id
 
 
+def _continue_arguments(argv: list[str]) -> tuple[bool, str, str | None, bool]:
+    as_json = False
+    work_id = None
+    target_intent = None
+    apply = False
+    index = 2
+    while index < len(argv):
+        token = argv[index]
+        if token == "--json":
+            as_json = True
+            index += 1
+            continue
+        if token == "--apply":
+            apply = True
+            index += 1
+            continue
+        if token in {"--work-id", "--intent"}:
+            if index + 1 >= len(argv):
+                raise RuntimeError(f"ARGUMENT_VALUE_REQUIRED:{token}")
+            value = argv[index + 1]
+            if token == "--work-id":
+                work_id = value
+            else:
+                target_intent = value
+            index += 2
+            continue
+        if token.startswith("--work-id="):
+            work_id = token.split("=", 1)[1]
+            index += 1
+            continue
+        if token.startswith("--intent="):
+            target_intent = token.split("=", 1)[1]
+            index += 1
+            continue
+        raise RuntimeError(f"UNEXPECTED_CONTINUE_ARGUMENT:{token}")
+    if not isinstance(work_id, str) or not work_id:
+        raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--work-id")
+    if target_intent == "":
+        raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--intent")
+    return as_json, work_id, target_intent, apply
+
+
+def command_continue(
+    argv: list[str],
+    *,
+    provider_observations: dict,
+    tool_surfaces: list[str],
+    inventory_complete: bool,
+) -> int:
+    as_json, work_id, target_intent, apply = _continue_arguments(argv)
+    turnover_host = importlib.import_module("tools.agent_cycle_turnover_host")
+    from tools.coordination_remote import GhApiTransport
+
+    machine = _commands._machine_for_begin("live", None)
+    runtime = runtime_capabilities.build_inspection(provider_observations)
+    payload = turnover_host.continue_work(
+        work_id=work_id,
+        machine=machine,
+        runtime_inspection=runtime,
+        tool_surfaces=sorted(set(tool_surfaces)),
+        inventory_complete=inventory_complete,
+        target_intent=target_intent,
+        submit=apply,
+        transport=GhApiTransport(),
+    )
+    projection = payload["projection"]
+    if as_json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(
+            "AGENT CONTINUE\n"
+            f"  work: {work_id}\n"
+            f"  action: {projection['action']}\n"
+            f"  target-intent: {projection['targetIntent'] or '-'}\n"
+            f"  submitted: {str(payload['submitted']).lower()}"
+        )
+        if projection["reasonCodes"]:
+            print(f"  reasons: {', '.join(projection['reasonCodes'])}")
+    return ERROR_EXIT if projection["action"] == "BLOCKED" else 0
+
+
 def _extract_runtime_tool_surfaces(
     argv: list[str],
 ) -> tuple[list[str], list[str], bool, bool]:
@@ -395,7 +476,7 @@ def _runtime_surface_base(
     inventory_complete: bool,
 ) -> dict:
     command = argv[1] if len(argv) > 1 else None
-    if command not in {"begin", "doctor"}:
+    if command not in {"begin", "continue", "doctor"}:
         raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRE_BEGIN_OR_DOCTOR")
     derived = runtime_provider_adapter.observations_from_tool_surfaces(
         surfaces,
@@ -421,12 +502,21 @@ def _run_with_runtime_tool_surfaces(argv: list[str]) -> int:
         if len(clean) >= 2 and clean[1] == "status":
             as_json, work_id = _status_arguments(clean)
             return command_status(as_json, work_id=work_id)
+        if len(clean) >= 2 and clean[1] == "continue":
+            raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRED_FOR_CONTINUE")
         return _commands.main()
     base = _runtime_surface_base(
         clean,
         surfaces,
         inventory_complete=inventory_complete,
     )
+    if len(clean) >= 2 and clean[1] == "continue":
+        return command_continue(
+            clean,
+            provider_observations=base,
+            tool_surfaces=surfaces,
+            inventory_complete=inventory_complete,
+        )
     original_argv = sys.argv
     original_local_observations = runtime_capabilities.local_provider_observations
     try:
