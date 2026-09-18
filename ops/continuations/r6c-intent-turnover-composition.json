@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6c-intent-turnover-composition",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6c-intent-turnover-composition",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "characterize-intent-turnover-contract",
+    "implement-stateless-turnover-composer",
+    "add-interruption-and-negative-regressions",
+    "expose-semantic-continue-facade",
+    "qualify-intent-turnover",
+    "integrate-intent-turnover"
+  ],
+  "nextAction": "Create a stacked implementation branch from PR #315 exact head; implement a stateless/reentrant Agent Cycle intent-turnover composer. Do not integrate R6c before #315 integrates.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
