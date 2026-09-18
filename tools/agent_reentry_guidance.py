@@ -6,10 +6,11 @@ transport-only Hosted Agent Cycle bus.
 """
 from __future__ import annotations
 
+import copy
 import json
 from typing import Any
 
-from tools import continuation_remote, hosted_agent_cycle, hosted_cycle_reentry
+from tools import continuation_remote, hosted_agent_cycle, hosted_cycle_handle, hosted_cycle_reentry
 from tools.coordination_remote import ApiError
 
 PER_PAGE = 100
@@ -129,3 +130,131 @@ def observe_live(
         raise AgentReentryGuidanceError(
             "AGENT_REENTRY_INSPECTION_INVALID", str(exc).split(":", 1)[0]
         ) from exc
+
+
+def _begin_for_work(
+    comments: list[dict[str, Any]],
+    *,
+    work_id: str,
+    issue_number: int,
+    preferred_comment_id: int | None = None,
+) -> dict[str, Any] | None:
+    matches: list[tuple[int, dict[str, Any]]] = []
+    for comment in comments:
+        cid = comment.get("id") if isinstance(comment, dict) else None
+        if not isinstance(cid, int) or isinstance(cid, bool) or cid <= 0:
+            continue
+        if preferred_comment_id is not None and cid != preferred_comment_id:
+            continue
+        user = comment.get("user")
+        association = comment.get("author_association")
+        if association is None and isinstance(user, dict) and user.get("login") == "EAKerber":
+            association = "OWNER"
+        event = {
+            "issue": {
+                "number": issue_number,
+                "title": hosted_agent_cycle.BUS_TITLE,
+                "pull_request": None,
+            },
+            "comment": {
+                "id": cid,
+                "body": comment.get("body"),
+                "author_association": association,
+            },
+            "repository": {"full_name": hosted_agent_cycle.REPOSITORY},
+        }
+        try:
+            command, _ = hosted_agent_cycle.parse_event(event)
+        except RuntimeError:
+            continue
+        if (
+            command.get("action") == "begin"
+            and command.get("workRef") == {"workId": work_id}
+        ):
+            matches.append((cid, command))
+    if not matches:
+        return None
+    matches.sort(key=lambda item: item[0])
+    return copy.deepcopy(matches[-1][1])
+
+
+def observe_turnover_context(
+    work_id: str,
+    *,
+    repository: str = hosted_agent_cycle.REPOSITORY,
+    transport: Any | None = None,
+) -> dict[str, Any]:
+    """Observe the minimum host context needed for stateless intent turnover.
+
+    This is a host adapter, not a new authority. It exposes the canonical
+    re-entry projection plus the current/most-recent Work-bound begin intent and
+    actor so a caller can recompute readiness without putting semantic state in
+    the AgentCycleHandle.
+    """
+    if transport is None:
+        raise AgentReentryGuidanceError("BLOCKED_EXECUTION_SURFACE")
+    reentry = observe_live(work_id, repository=repository, transport=transport)
+    try:
+        observed = continuation_remote.GitHubContinuationAuthority(
+            transport=transport,
+            repository=repository,
+        ).observe()
+    except continuation_remote.ContinuationRemoteError as exc:
+        raise AgentReentryGuidanceError(
+            "AGENT_REENTRY_WORK_AUTHORITY_UNKNOWN", exc.code
+        ) from exc
+    work = observed.items.get(work_id)
+    if not isinstance(work, dict):
+        raise AgentReentryGuidanceError("AGENT_REENTRY_WORK_NOT_FOUND", work_id)
+
+    issue_number = _bus_issue_number(transport, repository)
+    comments = _paged_list(
+        transport,
+        f"repos/{repository}/issues/{issue_number}/comments",
+        "read hosted-cycle bus comments",
+    )
+    preferred = None
+    target = reentry.get("targetCycle")
+    handle = None
+    if isinstance(target, dict):
+        handle = copy.deepcopy(target.get("handle"))
+        if handle is not None:
+            try:
+                _, locator = hosted_cycle_handle.decode_handle(
+                    handle, repository=repository
+                )
+            except RuntimeError as exc:
+                raise AgentReentryGuidanceError(
+                    "AGENT_REENTRY_HANDLE_INVALID"
+                ) from exc
+            preferred = locator["beginCommentId"]
+
+    begin = _begin_for_work(
+        comments,
+        work_id=work_id,
+        issue_number=issue_number,
+        preferred_comment_id=preferred,
+    )
+    if begin is None and preferred is not None:
+        raise AgentReentryGuidanceError("AGENT_REENTRY_BEGIN_REQUEST_NOT_FOUND")
+    if begin is None:
+        begin = _begin_for_work(
+            comments,
+            work_id=work_id,
+            issue_number=issue_number,
+        )
+
+    actor = copy.deepcopy(begin.get("actor")) if isinstance(begin, dict) else None
+    current_intent = (
+        begin.get("declaredIntent") if isinstance(begin, dict) else None
+    )
+    return {
+        "work": copy.deepcopy(work),
+        "reentry": copy.deepcopy(reentry),
+        "handle": handle,
+        "actor": actor,
+        "currentIntent": current_intent,
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
