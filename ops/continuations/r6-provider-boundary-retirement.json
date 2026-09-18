@@ -10,16 +10,15 @@
     "inventory-provider-boundary",
     "retire-implicit-gh-fallbacks",
     "add-no-fallback-regression",
-    "update-provider-policy-and-r6-status"
-  ],
-  "remaining": [
+    "update-provider-policy-and-r6-status",
     "qualify-provider-boundary-retirement",
     "integrate-provider-boundary-retirement"
   ],
-  "nextAction": "Re-enter PR #315 exact-head CI through the canonical ci.workflow.rerun execution surface; qualify and integrate only after real jobs and tests materialize.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "c31a7d16d23683151ff90154edcca727239e9513",
-    "checkpoint": "provider-boundary-retirement-implementation-frozen"
+    "sha": "8097e56ebc8495dcf0c2ba3659941c626fe87efe",
+    "checkpoint": "PR #315 exact-head 716efeb passed Agent Ops, Coordination Guard and Supervisor Snapshot; merged to main 8097e56"
   },
   "blockers": [],
   "handoffToWorkerId": null
