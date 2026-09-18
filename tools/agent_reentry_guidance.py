@@ -10,7 +10,7 @@ import json
 from typing import Any
 
 from tools import continuation_remote, hosted_agent_cycle, hosted_cycle_reentry
-from tools.coordination_remote import ApiError, GhApiTransport
+from tools.coordination_remote import ApiError
 
 PER_PAGE = 100
 
@@ -96,7 +96,8 @@ def observe_live(
     except RuntimeError as exc:
         raise AgentReentryGuidanceError("AGENT_REENTRY_WORK_REF_INVALID") from exc
 
-    transport = transport or GhApiTransport()
+    if transport is None:
+        raise AgentReentryGuidanceError("BLOCKED_EXECUTION_SURFACE")
     try:
         observed = continuation_remote.GitHubContinuationAuthority(
             transport=transport,

@@ -228,8 +228,13 @@ def command_status(as_json, work_id: str | None = None):
     reentry = None
     if work_id is not None:
         reentry_module = importlib.import_module("tools.agent_reentry_guidance")
+        from tools.coordination_remote import GhApiTransport
+
         try:
-            inspection = reentry_module.observe_live(work_id)
+            inspection = reentry_module.observe_live(
+                work_id,
+                transport=GhApiTransport(),
+            )
             reentry = _reentry_success(work_id, inspection)
         except reentry_module.AgentReentryGuidanceError as exc:
             reentry = _reentry_unknown(work_id, exc)

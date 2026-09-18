@@ -28,7 +28,6 @@ from tools import transition_protocol
 from tools.canonical import stable_hash
 from tools.coordination_remote import (
     ApiError,
-    GhApiTransport,
     GitHubCoordinationAuthority,
 )
 
@@ -1130,7 +1129,9 @@ def execute_command(
     transport: Any | None = None,
 ) -> dict[str, Any]:
     command = validate_command(command)
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise RemoteCanonicalExecutionError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     try:
         if command["kind"] == "domain":
             plan, evidence, aggregate = _execute_domain(command, carrier)

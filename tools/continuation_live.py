@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 from tools import continuation,continuation_transition as transition,work_graph
 from tools.continuation_remote import ContinuationRemoteError,GitHubContinuationAuthority
+from tools.coordination_remote import GhApiTransport
 ERROR_EXIT=2
 
 def flags(p):p.add_argument('--json',action='store_true',dest='as_json');p.add_argument('--apply',action='store_true');p.add_argument('--expected-plan')
@@ -44,7 +45,7 @@ def summary(v):
     x=continuation.operational_view(v);return {'id':x['id'],'workerId':x['workerId'],'status':x['status'],'nextAction':x['nextAction'],'stateHash':continuation.state_hash(v),'schemaVersion':v['schemaVersion']}
 def output(v,j):print(json.dumps(v,indent=2 if j else None,ensure_ascii=False))
 def main(argv=None):
-    args=parser().parse_args(argv);a=GitHubContinuationAuthority()
+    args=parser().parse_args(argv);a=GitHubContinuationAuthority(transport=GhApiTransport())
     try:
         if args.command in {'list','verify','show'}:
             o=a.observe()

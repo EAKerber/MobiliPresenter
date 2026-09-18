@@ -392,7 +392,9 @@ def inspect_protocol(
     run_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise AgentWriteLifecycleHostError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     _validate_bundle(
         bundle,
         host_sha=host_sha,
@@ -543,7 +545,9 @@ def execute_dispatch(
     attempt_comment_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    base = transport or GhApiTransport()
+    if transport is None:
+        raise AgentWriteLifecycleHostError("BLOCKED_EXECUTION_SURFACE")
+    base = transport
     _validate_bundle(
         bundle,
         host_sha=host_sha,
@@ -688,12 +692,14 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     bundle = load_bundle(args.artifact_dir)
+    carrier = GhApiTransport()
     if args.action == "inspect":
         value = inspect_protocol(
             bundle,
             host_sha=args.host_sha,
             hosted_run_id=args.hosted_run_id,
             run_id=args.run_id,
+            transport=carrier,
         )
     else:
         value = execute_dispatch(
@@ -702,6 +708,7 @@ def main(argv: list[str] | None = None) -> int:
             hosted_run_id=args.hosted_run_id,
             run_id=args.run_id,
             attempt_comment_id=args.attempt_comment_id,
+            transport=carrier,
         )
     _write(args.output, value)
     print(json.dumps(value, ensure_ascii=False))

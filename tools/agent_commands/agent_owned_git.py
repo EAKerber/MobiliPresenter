@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from tools import agent_write_ownership
 from tools import remote_canonical_execution as bridge
-from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
+from tools.coordination_remote import GitHubCoordinationAuthority
 
 PROOF_SCHEMA = agent_write_ownership.PROOF_SCHEMA
 POLICY_ID = agent_write_ownership.POLICY_ID
@@ -78,9 +78,10 @@ def execute_agent_owned_git(
         raise bridge.RemoteCanonicalExecutionError(
             "REMOTE_AGENT_WRITE_ROUTE_UNSUPPORTED"
         )
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise bridge.RemoteCanonicalExecutionError("BLOCKED_EXECUTION_SURFACE")
     guarded = LeaseEnforcingTransport(
-        carrier,
+        transport,
         command,
         authority_factory=authority_factory,
     )

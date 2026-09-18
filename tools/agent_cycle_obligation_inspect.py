@@ -11,7 +11,6 @@ from tools import (
     work_graph,
 )
 from tools.continuation_remote import ContinuationRemoteError, GitHubContinuationAuthority
-from tools.coordination_remote import GhApiTransport
 
 WORK_UNAVAILABLE = "AGENT_CYCLE_DISPOSITION_WORK_AUTHORITY_UNAVAILABLE"
 GIT_UNAVAILABLE = "AGENT_CYCLE_DISPOSITION_GIT_REF_UNAVAILABLE"
@@ -190,8 +189,10 @@ def inspect_inventory(
     lifecycle_report: dict[str, Any] | None = None,
     transport: Any | None = None,
 ) -> dict[str, Any]:
+    if transport is None:
+        raise AgentCycleObligationInspectError("BLOCKED_EXECUTION_SURFACE")
     inventory = obligations.validate_inventory(inventory)
-    carrier = transport or GhApiTransport()
+    carrier = transport
     work_head, work_items, active_bindings = _work_snapshot(inventory, carrier)
 
     dispositions: list[dict[str, Any]] = []

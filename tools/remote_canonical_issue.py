@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 
 from tools.agent_commands.agent_owned_git import execute_agent_owned_git
 from tools.canonical import stable_hash
+from tools.coordination_remote import GhApiTransport
 from tools.remote_canonical_execution import (
     RemoteCanonicalExecutionError,
     command_hash,
@@ -248,7 +249,11 @@ def main(argv: list[str] | None = None) -> int:
         raw_command, issue, comment = _parse_event_transport(event)
         command = authorize_role_route(validate_command(raw_command))
         event_meta = _event_meta(issue, comment)
-        receipt = execute_command(command, source=build_source(event_meta))
+        receipt = execute_command(
+            command,
+            source=build_source(event_meta),
+            transport=GhApiTransport(),
+        )
         _write(args.output, receipt)
         print(json.dumps(receipt, ensure_ascii=False))
         return 0

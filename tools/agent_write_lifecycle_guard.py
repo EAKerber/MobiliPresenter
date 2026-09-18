@@ -11,7 +11,7 @@ from tools import (
     remote_canonical_execution,
 )
 from tools.canonical import stable_hash
-from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
+from tools.coordination_remote import GitHubCoordinationAuthority
 
 REPORT_SCHEMA = "AgentWriteLeaseCloseReport 0.1"
 PROOF_SCHEMA = "AgentWriteLifecycleGuardProof 0.1"
@@ -282,7 +282,9 @@ def prove_active_binding(
     before_comment_id: int | None,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise AgentWriteLifecycleGuardError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     comments = _before(_comments(carrier, issue_number), before_comment_id)
 
     candidates: list[tuple[int, dict[str, Any]]] = []
@@ -387,7 +389,9 @@ def inspect_cycle(
     close_comment_id: int,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        raise AgentWriteLifecycleGuardError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
     try:
         view = hosted_cycle_records.collect(
             comments, manifest, close_comment_id=close_comment_id

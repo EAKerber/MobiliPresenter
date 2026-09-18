@@ -40,6 +40,7 @@ from tools import remote_canonical_execution
 from tools import runtime_provider_adapter
 from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
+from tools.coordination_remote import GhApiTransport
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
@@ -802,6 +803,7 @@ def _observe_write_lifecycle_close(
     if not isinstance(close_comment_id, int) or isinstance(close_comment_id, bool) or close_comment_id <= 0:
         raise HostedAgentCycleError("HOSTED_AGENT_WRITE_LIFECYCLE_CLOSE_COMMENT_INVALID")
 
+    carrier = GhApiTransport()
     last_report: dict[str, Any] | None = None
     for attempt in range(hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS):
         comments = trace_collect.fetch_issue_comments(REPOSITORY, issue_number)
@@ -810,6 +812,7 @@ def _observe_write_lifecycle_close(
                 comments,
                 manifest,
                 close_comment_id=close_comment_id,
+                transport=carrier,
             )
         except agent_write_lifecycle_guard.AgentWriteLifecycleGuardError as exc:
             core = _failure_core(
@@ -871,9 +874,11 @@ def _materialize_disposition_shadow(
     try:
         inventory = _load_json(inventory_path)
         agent_cycle_obligations.validate_inventory(inventory)
+        carrier = GhApiTransport()
         value = agent_cycle_obligation_inspect.inspect_inventory(
             inventory,
             lifecycle_report=lifecycle_report,
+            transport=carrier,
         )
         agent_cycle_obligations.validate_disposition_set(value, inventory)
         _write_json(disposition_path, value)

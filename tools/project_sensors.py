@@ -138,8 +138,9 @@ def observe_continuations_local():
 def observe_continuations_live():
     try:
         from tools.continuation_remote import GitHubContinuationAuthority
+        from tools.coordination_remote import GhApiTransport
 
-        authority = GitHubContinuationAuthority()
+        authority = GitHubContinuationAuthority(transport=GhApiTransport())
         observed = authority.observe()
         items = [
             continuation_item(value)

@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R1-R5, the hardening checkpoint, R6a, the public-surface proof, live-executor audit and provider policy are integrated. R6 remains `BLOCKED_EXECUTION_SURFACE` after repository-wide provider-executor discovery found no in-process binding from the configured ChatGPT GitHub ToolSurface to the existing `Transport.request()` seam. R7 remains blocked.**
+Status: **R1-R5, hardening, R6a and the public-surface proof are integrated. The former in-process-only executor interpretation is superseded. PR #315 now implements provider-boundary retirement by requiring explicit provider injection in paved semantic/core/guard functions while keeping concrete GitHub transport construction at explicit host/CLI/live-sensor adapters. Provider-boundary exact-head qualification/integration and the live positive + negative R6 canary remain pending; R7 remains blocked.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
@@ -38,7 +38,8 @@ The historical `work/operations/r6a-hosted-entry-composition` prototype remains 
 | R6 executor audit / PR #309 | exact blocked disposition without fabricated executor | prevents legacy bus mechanics or CI carriers from being mislabeled as black-box proof | no R7 promotion until real live traversal |
 | Provider policy / PR #310 | provider/executor distinction made normative | removes `gh`, raw DNS/HTTP and local git as presumed paved-path requirements | CLI-coupled transport remains explicit R7/R8 debt |
 | Executor plan / PR #311 | admissible executor seam and R7/R8 subtraction criteria made explicit | prevents a canary-only bridge from becoming permanent architecture | implementation requires a real platform hook and same-window subtraction |
-| Discovery audit / post-#311 | repository-wide search found no existing provider-backed Python executor | prevents further speculative Journey expansion | block is now explicitly at the runtime/platform execution boundary |
+| Discovery audit / post-#311 | repository-wide search found no in-process ChatGPT-connector binding | prevented speculative Journey expansion | historical observation retained; in-process binding is no longer an R6 requirement |
+| Provider-boundary retirement / PR #315 | semantic/core paths require injected providers; named hosts select concrete GitHub transport explicitly | removes silent CLI/provider choice from the normal semantic path | qualify/integrate this recut, then rerun live R6 canaries |
 
 ## What is already proven
 
@@ -58,7 +59,7 @@ The R6 public-surface guard also proves that normal callers are no longer requir
 
 This is real cognitive/API compression. It is **not** yet a positive live end-to-end R6 traversal.
 
-## Remaining R6 gate — executable provider binding
+## Remaining R6 gate — live host/provider traversal
 
 The remaining proof is a positive and negative black-box traversal beginning with semantic task/Work intent and traversing:
 
@@ -68,7 +69,9 @@ The positive traversal must not require caller knowledge of issue #145, bus mark
 
 The negative traversal must preserve `UNKNOWN`/`BLOCKED`, prove absence of unintended writes and must not silently fall back to shell/CLI/legacy choreography.
 
-### Repository-side discovery result
+### Historical repository-side discovery result
+
+The post-#311 discovery remains valid as an observation of repository process boundaries, but PR #315 supersedes the conclusion that an in-process ChatGPT-connector-to-`Transport.request()` binding is itself required. The hosting control plane may provide the configured ToolSurface outside repository Python; repository semantic/core code now expresses that boundary by requiring explicit provider injection instead of silently choosing a local CLI transport.
 
 The post-#311 discovery inspected the current paved and transport seams plus repository-wide provider/executor terminology. The significant findings are:
 
@@ -85,9 +88,9 @@ The detailed evidence is recorded in `docs/architecture/r6-provider-executor-dis
 
 ## Current architectural judgment
 
-The migration remains on the intended simplification path, but the repository has reached its legitimate implementation boundary for R6.
+The migration remains on the intended simplification path. PR #315 demonstrates the smaller boundary: semantic/core/guard code does not select a concrete provider, while explicit host/CLI/live-sensor adapters may do so at their environment edge. The remaining R6 question is no longer whether repository Python can invoke the ChatGPT connector in-process; it is whether the public paved façade can complete the required live positive + negative traversal through the configured host/provider service.
 
-The correct response to the missing executor is **not** to add another Journey module, provider state object, runner, compatibility layer or canary workflow. Such a bridge would turn temporary scaffolding into a second operational architecture and would violate the hardening contract.
+The correct response to any remaining live-canary gap is **not** to add another Journey module, provider state object, runner, compatibility layer or canary workflow. Such a bridge would turn temporary scaffolding into a second operational architecture and would violate the hardening contract.
 
 A future executable provider seam is admissible only when a concrete runtime/platform hook exists and the recut can prove before implementation that:
 
@@ -103,7 +106,7 @@ If those conditions cannot be filled, remaining blocked is preferable to a false
 
 ## Protocol and recovery debt retained deliberately
 
-Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a CLI-coupled concrete transport for explicit legacy/recovery contexts. These are bounded debt, not the desired public model.
+Hosted issue discovery, comment pagination and result correlation still exist in migration-era clients. `GhApiTransport` remains a concrete transport only at explicit host/CLI/live-sensor/recovery boundaries in the inventoried R6 path; semantic/core/guard fallbacks have been retired by PR #315. Re-entry, lifecycle close inspection, obligation inspection and Coordination guard proof now require provider injection; their outer host/CLI callers supply the carrier explicitly. `project_sensors.observe_coordination(live=True)` and `project_sensors.observe_continuations_live()` are retained as explicitly classified live-environment sensor adapters. The remaining hosted-protocol duplication is bounded debt, not the desired public model.
 
 The lifecycle discontinuity discovered during R6a remains engine/recovery behavior: after an expired write binding, the proven safe recovery is `release expired binding -> close old cycle -> begin new cycle for the same Work -> acquire new ownership`. Do not hide it with persistent Journey session state.
 
@@ -140,28 +143,32 @@ The discovery annex itself was accidentally created directly on `main` because t
 
 No force-reset or compensating direct-main mutation is authorized. The reviewed PR #312 restored the normal branch/PR path and should be used as the documentation baseline. The incident reinforces the migration principle that a semantic paved path should make the safe path the easy/default path rather than depend on every caller remembering low-level mutation parameters.
 
-## Structured authority alignment after executor discovery
+PR #315 contains a second, smaller governance incident: an erroneous test call created an empty `NOOP` file/commit without a valid lease, followed immediately by a compensating revert that restored the tree. The two commits remain in history intentionally. Integration review must treat this as process evidence, not erase it through destructive history rewriting; the final tree contains no `NOOP` artifact.
 
-The narrative checkpoint and the canonical operational authorities are now aligned on the same disposition:
+## Structured authority alignment after provider-boundary recut
 
-- `r6a-hosted-entry-composition`: `DONE`, PR #306 integrated, no remaining responsibilities;
-- `r6-black-box-paved-path-canary`: `WAITING`, remaining failure-injection/promotion-gate responsibilities preserved, blocker `BLOCKED_EXECUTION_SURFACE`;
-- `r6b-finalization-composition`: `WAITING`, no implementation promoted, blocker `BLOCKED_EXECUTION_SURFACE`;
-- Continuation authority advanced canonically to `7624ad15994b076257f52d414dce48759138b594` when the original R6 canary was parked;
-- Coordination currently reports `intents=[]` and `leases=[]`; no write ownership is being held while R6 is blocked.
+The durable operational state is intentionally narrower than this narrative:
 
-The R6 Work's historical `nextAction` still describes the already-remediated pre-R6a entry gap. That text is retained as historical state because the canonical `wait` transition updates disposition/blockers rather than rewriting the previous action narrative. **Do not interpret that stale `nextAction` as authorization to recreate or reopen R6a.** Current authority is `WAITING` plus `BLOCKED_EXECUTION_SURFACE`; the only valid re-entry trigger is a concrete executable provider/runtime hook or an explicit architectural re-evaluation.
+- `r6-provider-boundary-retirement`: **IN_PROGRESS**, PR #315; inventory and implementation are materially complete, while qualification/integration remain.
+- `r6-black-box-paved-path-canary`: **WAITING** until the provider-boundary recut integrates; its positive + negative live proof remains mandatory.
+- `r6b-finalization-composition`: **WAITING** on the same live execution proof.
+- R7 remains ineligible until R6 has live promotion evidence.
 
-This alignment deliberately parks work rather than manufacturing a completion: R6 still has real remaining canary/promotion responsibilities, but they are ineligible to execute until the missing execution surface exists.
+Transient leases/cycle handles are operational coordination, not architectural state; consult Coordination/Agent Cycle authorities live rather than this document. The provider-boundary Work must be advanced only through its canonical continuation writer after exact-head evidence is observed.
+
+## R6Q qualification checkpoint — 2026-09-18
+
+R6Q reconciled the expired prior ownership without bypassing Coordination: the exact historical lease was released through `remote-canonical-execution` with PASS/readback, the old Agent Cycle closed PASS, and a fresh Work-bound Agent Cycle acquired new ownership before further branch mutation. The residual semantic/guard provider defaults identified during independent review were then moved to explicit host injection or fail-closed provider requirements.
+
+A stacked R6c qualification run subsequently exposed one missed environment edge: `project_sensors.observe_continuations_live()` still constructed `GitHubContinuationAuthority()` without an explicit provider, so live Project Machine observation became `UNKNOWN / WORK_AUTHORITY_UNAVAILABLE` after the #315 fallback retirement. The fix injects `GhApiTransport` explicitly at that live-sensor boundary, matching the already-classified Coordination sensor edge. On functional head `ff463e7a695aacc5ad3e349ab290b28395204a7f`, Coordination Guard, Agent Ops and Supervisor Snapshot all materialized real jobs and completed PASS; source and readback Project Machine observation both completed successfully. This is exact functional evidence for the provider-boundary recut, while the final documentation head must retain equivalent exact-head CI before integration.
 
 ## Immediate next steps
 
-1. Keep R6 and R6b at `BLOCKED_EXECUTION_SURFACE`; keep R7 blocked.
-2. Freeze new Journey/provider/executor modules whose purpose is only to bridge the missing platform capability.
-3. Continue only read-only runtime/platform capability discovery until a concrete executable provider hook can be named.
-4. If such a hook appears, re-evaluate `r6-executor-seam-retirement-plan.md` before writing code and require same-window subtraction of at least two legacy/CLI transport clients.
-5. Run live positive + negative R6 traversal only through that real executor binding.
-6. Begin R7 only after live R6 PASS; R7 must change the operational default and demote at least one legacy/manual surface in the same window.
-7. Execute R8 as mandatory measurable subtraction, including `journey_shadow` retirement when justified and removal/privatization of superseded normal-path protocol surfaces.
+1. Qualify the final PR #315 documentation head and require the same real-job PASS evidence already observed on functional head `ff463e7a695aacc5ad3e349ab290b28395204a7f`.
+2. Integrate PR #315 through governed Delivery only after final exact-head CI remains green, then complete the provider-boundary Work.
+3. Preserve the earlier `action_required` / zero-job runs as historical CI re-entry evidence; they are neither PASS nor test failure.
+4. Reopen the parked R6 black-box canary only after integration and run the positive + negative public-façade traversal through the configured host/provider path.
+5. Begin R7 only after live R6 PASS; R7 must change the operational default and demote at least one legacy/manual surface.
+6. Execute R8 as mandatory measurable subtraction, including `journey_shadow` retirement when justified and removal/privatization of superseded normal-path protocol surfaces.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**

@@ -10,7 +10,7 @@ from tools import git_observation
 from tools import remote_canonical_execution as remote
 from tools.agent_tools import contracts
 from tools.canonical import stable_hash
-from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
+from tools.coordination_remote import GitHubCoordinationAuthority
 
 GIT_CAS_SCHEMA = "GitCasGuardProof 0.1"
 PROOF_SET_SCHEMA = "AgentToolGuardProofSet 0.1"
@@ -258,8 +258,10 @@ def prove_coordination_lease_owned(
     transport: Any | None = None,
     authority_factory: Callable[[Any], Any] | None = None,
 ) -> dict[str, Any]:
+    if transport is None:
+        raise RuntimeError("BLOCKED_EXECUTION_SURFACE")
     command = _command_from_plan(plan)
-    carrier = transport or GhApiTransport()
+    carrier = transport
     authority = (
         authority_factory(carrier)
         if authority_factory is not None

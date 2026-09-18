@@ -13,7 +13,6 @@ from tools import (
     hosted_cycle_handle,
 )
 from tools.canonical import stable_hash
-from tools.coordination_remote import GhApiTransport
 
 RESULT_SCHEMA = "JourneyEntryComposition 0.2"
 BEGIN_RESULT_SCHEMA = hosted_cycle_artifact.BEGIN_RESULT_SCHEMA
@@ -291,7 +290,13 @@ def compose_entry(
             request={}, request_comment_id=None, result_comment_id=None,
             handle=None, blockers=["TOOL_SURFACE_INVENTORY_INCOMPLETE"], submitted=False,
         )
-    carrier = transport or GhApiTransport()
+    if transport is None:
+        return _result(
+            status="UNKNOWN", disposition="BUILD_ONLY", work_id=work_id,
+            request={}, request_comment_id=None, result_comment_id=None,
+            handle=None, blockers=["BLOCKED_EXECUTION_SURFACE"], submitted=False,
+        )
+    carrier = transport
     work = _work(work_id, carrier)
     command = build_begin_request(
         role=role,

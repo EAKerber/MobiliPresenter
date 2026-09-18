@@ -13,7 +13,7 @@ from tools import (
     hosted_handle_requests,
 )
 from tools.canonical import stable_hash
-from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
+from tools.coordination_remote import GitHubCoordinationAuthority
 
 RESULT_SCHEMA = "AgentOwnershipEnsureResult 0.1"
 STATUSES = {"PASS", "PENDING", "BLOCKED", "UNKNOWN"}
@@ -192,7 +192,6 @@ def ensure_ownership(
     submit: bool = False,
     transport: Any | None = None,
 ) -> dict[str, Any]:
-    carrier = transport or GhApiTransport()
     try:
         handle_value, locator = hosted_cycle_handle.decode_handle(
             handle, repository=hosted_agent_cycle.REPOSITORY
@@ -205,6 +204,9 @@ def ensure_ownership(
         raise AgentOwnershipError("AGENT_OWNERSHIP_BRANCH_FORBIDDEN")
     if not isinstance(request_id, str) or not request_id.strip():
         raise AgentOwnershipError("AGENT_OWNERSHIP_REQUEST_ID_INVALID")
+    if transport is None:
+        raise AgentOwnershipError("BLOCKED_EXECUTION_SURFACE")
+    carrier = transport
 
     begin = {
         "runId": locator["runId"],
