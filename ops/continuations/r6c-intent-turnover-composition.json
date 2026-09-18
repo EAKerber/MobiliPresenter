@@ -2,23 +2,24 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6c-intent-turnover-composition",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6c-intent-turnover-composition-recut",
   "prNumber": 317,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "characterize-intent-turnover-contract",
     "implement-stateless-turnover-composer",
     "add-interruption-and-negative-regressions",
-    "expose-semantic-continue-facade",
+    "expose-semantic-continue-facade"
+  ],
+  "remaining": [
     "qualify-intent-turnover",
     "integrate-intent-turnover"
   ],
-  "nextAction": "Create a stacked implementation branch from PR #315 exact head; implement a stateless/reentrant Agent Cycle intent-turnover composer. Do not integrate R6c before #315 integrates.",
+  "nextAction": "Qualify PR #317 on exact head; require real-job PASS for Agent Ops, Coordination Guard and Supervisor Snapshot before integration.",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "16ab09d99d59ed2bc89acd0bb967807a4f346602",
+    "checkpoint": "r6c-clean-recut-implementation-complete"
   },
   "blockers": [],
   "handoffToWorkerId": null
