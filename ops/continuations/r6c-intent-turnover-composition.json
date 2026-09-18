@@ -10,16 +10,15 @@
     "characterize-intent-turnover-contract",
     "implement-stateless-turnover-composer",
     "add-interruption-and-negative-regressions",
-    "expose-semantic-continue-facade"
-  ],
-  "remaining": [
+    "expose-semantic-continue-facade",
     "qualify-intent-turnover",
     "integrate-intent-turnover"
   ],
-  "nextAction": "Qualify PR #317 on exact head; require real-job PASS for Agent Ops, Coordination Guard and Supervisor Snapshot before integration.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "16ab09d99d59ed2bc89acd0bb967807a4f346602",
-    "checkpoint": "r6c-clean-recut-implementation-complete"
+    "sha": "e3c836c094a91f8afaf35c0b4f1610674cd48b13",
+    "checkpoint": "PR #317 exact-head 16ab09d passed Agent Ops, Coordination Guard and Supervisor Snapshot; merged to main e3c836c"
   },
   "blockers": [],
   "handoffToWorkerId": null
