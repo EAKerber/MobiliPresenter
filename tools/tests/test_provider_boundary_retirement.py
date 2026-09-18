@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_delivery, agent_ownership, agent_write_lifecycle, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
+from tools import agent_authoring, agent_delivery, agent_ownership, agent_reentry_guidance, agent_write_lifecycle, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 from tools.coordination_remote import ApiResponse
@@ -45,6 +45,13 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             git_observation.observe_branch("work/operations/provider-boundary-test")
+
+    def test_reentry_guidance_requires_explicit_provider(self) -> None:
+        with self.assertRaisesRegex(
+            agent_reentry_guidance.AgentReentryGuidanceError,
+            "BLOCKED_EXECUTION_SURFACE",
+        ):
+            agent_reentry_guidance.observe_live("r6-provider-boundary-retirement")
 
     def test_agent_owned_git_requires_explicit_provider_before_execution(self) -> None:
         command = {
