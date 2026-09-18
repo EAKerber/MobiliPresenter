@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tools import agent_authoring, agent_cycle_obligation_inspect, agent_delivery, agent_ownership, agent_reentry_guidance, agent_write_lifecycle, agent_write_lifecycle_guard, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation
+from tools import agent_authoring, agent_cycle_obligation_inspect, agent_delivery, agent_ownership, agent_reentry_guidance, agent_write_lifecycle, agent_write_lifecycle_guard, agent_write_lifecycle_host, continuation_remote, delivery_merge, git_observation, project_sensors
 from tools import remote_canonical_execution as bridge
 from tools.agent_commands import agent_owned_git
 from tools.agent_tools import guard_proofs
@@ -282,6 +282,34 @@ class ProviderBoundaryRetirementTests(unittest.TestCase):
             "BLOCKED_EXECUTION_SURFACE",
         ):
             guard_proofs.prove_coordination_lease_owned({})
+
+
+    @mock.patch("tools.continuation_remote.GitHubContinuationAuthority")
+    @mock.patch("tools.coordination_remote.GhApiTransport")
+    def test_continuation_live_sensor_selects_transport_at_environment_edge(
+        self,
+        transport_cls: mock.Mock,
+        authority_cls: mock.Mock,
+    ) -> None:
+        carrier = object()
+        transport_cls.return_value = carrier
+        authority = authority_cls.return_value
+        authority.authority_branch = "coordination/continuations"
+        observed = mock.Mock()
+        observed.head_sha = "a" * 40
+        observed.items = {}
+        authority.observe.return_value = observed
+
+        result = project_sensors.observe_continuations_live()
+
+        transport_cls.assert_called_once_with()
+        authority_cls.assert_called_once_with(transport=carrier)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(
+            result["data"]["authorityHead"],
+            "a" * 40,
+        )
+
 
 
 if __name__ == "__main__":
