@@ -1097,6 +1097,163 @@ def _emit_output(path: str, key: str, value: str) -> None:
         handle.write(f"{key}={value}\n")
 
 
+
+def _transport_json(response: Any, code: str) -> Any:
+    try:
+        return json.loads(response.body)
+    except (AttributeError, json.JSONDecodeError) as exc:
+        raise HostedAgentCycleError(code) from exc
+
+
+def _transport_comments(
+    transport: Any, issue_number: int
+) -> list[dict[str, Any]]:
+    comments: list[dict[str, Any]] = []
+    for page in range(1, 101):
+        value = _transport_json(
+            transport.request(
+                "GET",
+                f"repos/{REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
+            ),
+            "HOSTED_AGENT_COMMENTS_INVALID",
+        )
+        if not isinstance(value, list):
+            raise HostedAgentCycleError("HOSTED_AGENT_COMMENTS_INVALID")
+        comments.extend(item for item in value if isinstance(item, dict))
+        if len(value) < 100:
+            return comments
+    raise HostedAgentCycleError("HOSTED_AGENT_COMMENTS_UNBOUNDED")
+
+
+def close_evidence_comment_ids(
+    handle: Any,
+    *,
+    transport: Any | None = None,
+) -> list[int]:
+    """Collect validated PASS receipts attributable to the exact cycle actor."""
+    if transport is None:
+        raise HostedAgentCycleError("BLOCKED_EXECUTION_SURFACE")
+    try:
+        handle_value, locator = hosted_cycle_handle.decode_handle(
+            handle, repository=REPOSITORY
+        )
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_INVALID") from exc
+    found: list[int] = []
+    for comment in _transport_comments(transport, locator["issueNumber"]):
+        cid = comment.get("id") if isinstance(comment, dict) else None
+        if (
+            not isinstance(cid, int)
+            or isinstance(cid, bool)
+            or cid <= locator["beginCommentId"]
+        ):
+            continue
+        user = comment.get("user")
+        if not isinstance(user, dict) or user.get("login") != "github-actions[bot]":
+            continue
+        payload = trace_collect._json_after_marker(
+            comment.get("body"), trace_collect.REMOTE_RESULT_MARKER
+        )
+        if not isinstance(payload, dict) or payload.get("status") != "PASS":
+            continue
+        command = payload.get("command")
+        if (
+            not isinstance(command, dict)
+            or command.get("actor") != handle_value["actor"]
+        ):
+            continue
+        try:
+            remote_canonical_execution.validate_receipt(payload)
+        except RuntimeError:
+            continue
+        found.append(cid)
+    return sorted(set(found))
+
+
+def compose_handle_close(
+    *,
+    handle: Any,
+    request_id: str,
+    evidence_comment_ids: list[int] | None = None,
+    submit: bool = False,
+    transport: Any | None = None,
+) -> dict[str, Any]:
+    """Compose/reuse one handle-first Hosted Agent Cycle close request."""
+    if transport is None:
+        raise HostedAgentCycleError("BLOCKED_EXECUTION_SURFACE")
+    try:
+        _, locator = hosted_cycle_handle.decode_handle(
+            handle, repository=REPOSITORY
+        )
+    except RuntimeError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_INVALID") from exc
+    evidence = (
+        close_evidence_comment_ids(handle, transport=transport)
+        if evidence_comment_ids is None
+        else list(evidence_comment_ids)
+    )
+    command = {
+        "schemaVersion": COMMAND_SCHEMA_V02,
+        "requestId": request_id,
+        "action": "close",
+        "handle": copy.deepcopy(handle),
+        "evidenceCommentIds": evidence,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    validate_handle_close_command(command)
+    comments = _transport_comments(transport, locator["issueNumber"])
+    existing = None
+    for comment in comments:
+        body = comment.get("body") if isinstance(comment, dict) else None
+        prefix = REQUEST_MARKER_V02 + "\n"
+        if not isinstance(body, str) or not body.startswith(prefix):
+            continue
+        try:
+            candidate = json.loads(body[len(prefix):].strip())
+        except json.JSONDecodeError:
+            continue
+        if candidate == command:
+            cid = comment.get("id")
+            if isinstance(cid, int) and not isinstance(cid, bool) and cid > 0:
+                existing = cid
+                break
+
+    submitted = False
+    comment_id = existing
+    if comment_id is None and submit:
+        response = _transport_json(
+            transport.request(
+                "POST",
+                f"repos/{REPOSITORY}/issues/{locator['issueNumber']}/comments",
+                payload={
+                    "body": REQUEST_MARKER_V02
+                    + "\n"
+                    + json.dumps(command, separators=(",", ":"), ensure_ascii=False)
+                },
+            ),
+            "HOSTED_AGENT_CLOSE_SUBMIT_INVALID",
+        )
+        comment_id = response.get("id") if isinstance(response, dict) else None
+        if (
+            not isinstance(comment_id, int)
+            or isinstance(comment_id, bool)
+            or comment_id <= 0
+        ):
+            raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_SUBMIT_INVALID")
+        submitted = True
+
+    core = {
+        "schemaVersion": "HostedAgentCycleCloseComposition 0.1",
+        "request": command,
+        "requestCommentId": comment_id,
+        "submitted": submitted,
+        "readOnly": not submitted,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "resultHash": stable_hash(core)}
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="hosted-agent-cycle")
     sub = parser.add_subparsers(dest="command_name", required=True)
