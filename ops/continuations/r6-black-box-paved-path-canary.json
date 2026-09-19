@@ -10,16 +10,16 @@
   ],
   "completed": [
     "characterize-black-box-contract",
-    "run-full-journey-canary"
+    "run-full-journey-canary",
+    "run-black-box-failure-injection"
   ],
   "remaining": [
-    "run-black-box-failure-injection",
     "qualify-r6-promotion-gate"
   ],
-  "nextAction": "Remediate the concrete black-box entry/composition gap in a separate governed slice before re-running R6: a fresh agent can observe/project BEGIN_AGENT_CYCLE, but the public facade does not compose/submit Hosted Agent Cycle begin or produce the handle required by R3-R5. Keep remediation stateless and internal/non-promoted until R7; compose existing authorities only. After remediation integrates, re-run the full journey and then the failure injection.",
+  "nextAction": "Turn over from inspect-and-plan to governed-mutation, acquire ownership of the live canary branch, author the durable R6 evidence checkpoint through git.files.mutate, qualify CI, deliver through governed Delivery, then finalize Work -> ownership -> Agent Cycle.",
   "lastKnownGood": {
-    "sha": "4d46da44c08dcafbb53c52c0375e14651981a93b",
-    "checkpoint": "R6 full-journey canary #1 NEGATIVE (no project mutation): starting from a normal task, agent.py status/JourneyProjection can project BEGIN_AGENT_CYCLE and agent.py begin can build a local AgentCycleContext, but R2 deliberately executes no projected action and there is no composed public/internal journey step that submits the existing hosted begin and returns its opaque handle. Ownership/authoring/delivery require that handle downstream. Proceeding would require teaching the fresh agent issue-bus marker/transport choreography, so the canary stopped fail-closed at entry instead of bypassing the paved path. This is a concrete composition gap; heads, hashes, TTLs and lease choreography were not supplied."
+    "sha": "9e1ad21c1226de09e5965077c6e17082e013a28a",
+    "checkpoint": "R6 negative live canary PASS: Hosted Agent Tool request comment 5738515739 targeting forbidden main was BLOCKED with AGENT_TOOL_TARGET_BRANCH_FORBIDDEN at result 5738517166; independent readback kept main at 9e1ad21 and sentinel path absent."
   },
   "blockers": [],
   "handoffToWorkerId": null
