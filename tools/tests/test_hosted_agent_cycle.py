@@ -179,6 +179,36 @@ class HostedAgentCycleTests(unittest.TestCase):
         self.assertEqual("BEGIN", core["phase"])
         validate_context.assert_called()
 
+    def test_work_ref_observation_fails_closed_without_provider(self):
+        with self.assertRaisesRegex(RuntimeError, "BLOCKED_EXECUTION_SURFACE"):
+            hosted._observe_work_ref(
+                {"workId": "r6e-hosted-begin-provider-injection"}
+            )
+
+    @patch(
+        "tools.hosted_agent_cycle.continuation_remote.GitHubContinuationAuthority"
+    )
+    def test_work_ref_observation_uses_injected_provider(self, authority_cls):
+        work_id = "r6e-hosted-begin-provider-injection"
+        provider = object()
+        authority = authority_cls.return_value
+        authority.observe.return_value = type(
+            "ObservedContinuationAuthority",
+            (),
+            {"items": {work_id: {}}},
+        )()
+
+        observed = hosted._observe_work_ref(
+            {"workId": work_id},
+            transport=provider,
+        )
+
+        self.assertEqual(observed, {"workId": work_id})
+        authority_cls.assert_called_once_with(
+            transport=provider,
+            repository=hosted.REPOSITORY,
+        )
+
     def test_legacy_begin_manifest_remains_valid_without_trace_requirement(self):
         source = {
             "workflow": "hosted-agent-cycle",
