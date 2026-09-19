@@ -27,6 +27,14 @@ Therefore:
 
 This addendum supersedes any interpretation of the R6 live-executor audit that treats availability of `gh`, raw DNS, or local git transport as a promotion requirement. It does **not** weaken the required live evidence or change the current blocked disposition.
 
+## Host action handoff
+
+R6c and CI re-entry independently reached the same boundary: repository semantics can derive the exact next operation while the configured host/provider remains outside the Python process.
+
+R6d formalizes that boundary as a read-only, hash-bound `ProviderHostActionPlan`. It is not an in-process connector bridge and does not execute anything. It carries one exact provider operation, its preconditions, and required readback to the configured `github-connector-tools` host surface.
+
+This handoff is admissible only while it remains narrower than an executor framework: no queue, retry loop, provider selection, durable state, orchestration graph or alternate authority. Provider-feature absence remains BLOCKED/UNKNOWN and must not trigger a CLI/raw-HTTP fallback.
+
 ## Golden target for agent experience
 
 The target experience is the same class of behavior already seen in low-friction paths such as branch hygiene and other provider-backed operations that happen invisibly: the agent asks for the semantic service and receives it without needing to understand how the service is routed internally.
