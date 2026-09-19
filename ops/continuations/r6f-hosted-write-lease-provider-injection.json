@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6f-hosted-write-lease-provider-injection",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r6f-hosted-write-lease-provider-injection",
   "prNumber": null,
   "dependsOn": [],
