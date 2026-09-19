@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r6l-close-recovery-provider-diagnostics",
-  "prNumber": null,
+  "prNumber": 326,
   "dependsOn": [],
   "completed": [],
   "remaining": [
