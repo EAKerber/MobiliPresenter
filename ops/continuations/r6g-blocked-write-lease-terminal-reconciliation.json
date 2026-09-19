@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r6g-blocked-write-lease-terminal-reconciliation",
-  "prNumber": null,
+  "prNumber": 321,
   "dependsOn": [],
   "completed": [],
   "remaining": [
