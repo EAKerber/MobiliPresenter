@@ -65,6 +65,27 @@ def _payload(body: Any, marker: str) -> Any | None:
         return None
 
 
+def _find_write_lease_request(
+    comments: list[dict[str, Any]],
+    request: dict[str, Any],
+) -> int | None:
+    matches: list[int] = []
+    for comment in comments:
+        payload = _payload(
+            comment.get("body") if isinstance(comment, dict) else None,
+            hosted_handle_requests.WRITE_LEASE_MARKER_V02,
+        )
+        if payload != request:
+            continue
+        comment_id = comment.get("id")
+        if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
+            raise AgentOwnershipError("AGENT_OWNERSHIP_REQUEST_COMMENT_INVALID")
+        matches.append(comment_id)
+    if len(matches) > 1:
+        raise AgentOwnershipError("AGENT_OWNERSHIP_REQUEST_DUPLICATE")
+    return matches[0] if matches else None
+
+
 def _latest_lifecycle_result(
     comments: list[dict[str, Any]],
     *,
@@ -295,8 +316,12 @@ def ensure_ownership(
                 disposition = "UNKNOWN"
                 blockers = ["AGENT_OWNERSHIP_BINDING_AUTHORITY_MISMATCH"]
 
-    comment_id: int | None = None
-    if request is not None and submit:
+    comment_id: int | None = (
+        _find_write_lease_request(comments, request)
+        if request is not None
+        else None
+    )
+    if request is not None and comment_id is None and submit:
         body = (
             hosted_handle_requests.WRITE_LEASE_MARKER_V02
             + "\n"
@@ -392,6 +417,7 @@ def _lifecycle_snapshot(
         "latest": copy.deepcopy(latest),
         "binding": copy.deepcopy(binding),
         "state": state,
+        "comments": copy.deepcopy(comments),
     }
 
 
@@ -480,8 +506,8 @@ def release_ownership(
         branch_head=None,
         binding_hash=binding["bindingHash"],
     )
-    comment_id = None
-    if submit:
+    comment_id = _find_write_lease_request(snapshot["comments"], request)
+    if comment_id is None and submit:
         body = (
             hosted_handle_requests.WRITE_LEASE_MARKER_V02
             + "\n"
