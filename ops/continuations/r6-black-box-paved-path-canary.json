@@ -3,7 +3,7 @@
   "id": "r6-black-box-paved-path-canary",
   "workerId": "manager-gitops-chat",
   "status": "IN_PROGRESS",
-  "branch": null,
+  "branch": "work/operations/r6-black-box-live-canary",
   "prNumber": null,
   "dependsOn": [
     "r5-delivery-finalization-composition"
