@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6l-close-recovery-provider-diagnostics",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r6l-close-recovery-provider-diagnostics",
   "prNumber": 326,
   "dependsOn": [],
