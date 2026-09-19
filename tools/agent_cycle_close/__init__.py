@@ -19,7 +19,9 @@ EVIDENCE_KINDS = {
     "transition-receipt",
     "git-mutation-bundle-readback",
     "git-mutation-plan-readback",
+    "agent-cycle-noninterference-readback",
 }
+NONINTERFERENCE_SCHEMA = "AgentCycleNonInterferenceReadback 0.1"
 RECEIPT_STATUSES = {"PASS", "UNKNOWN", "BLOCKED"}
 
 
@@ -166,10 +168,176 @@ def _validate_git_plan_readback(plan: dict[str, Any], observed: Any) -> dict[str
     return observed
 
 
+
+def _source_head_change(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"kind", "name", "branch", "before", "after"}:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_CHANGE_INVALID")
+    if value.get("kind") != "source-head":
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_CHANGE_INVALID")
+    for key in ("name", "branch", "before", "after"):
+        if not isinstance(value.get(key), str) or not value[key]:
+            raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_CHANGE_INVALID")
+    return deepcopy(value)
+
+
+def _verify_noninterference_evidence(item: dict[str, Any]) -> dict[str, Any]:
+    fields = {
+        "kind", "schemaVersion", "cycleId", "workId", "workBranch",
+        "workPrNumber", "workStateHash", "coveredChanges",
+        "continuationReadback", "controlReadback", "readOnly",
+        "semanticAuthority", "authorizesMutation", "evidenceHash",
+    }
+    if set(item) != fields or item.get("schemaVersion") != NONINTERFERENCE_SCHEMA:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    if (
+        item.get("kind") != "agent-cycle-noninterference-readback"
+        or not isinstance(item.get("cycleId"), str)
+        or not isinstance(item.get("workId"), str)
+        or not isinstance(item.get("workBranch"), str)
+        or item.get("workBranch") == "main"
+        or not isinstance(item.get("workStateHash"), str)
+        or len(item["workStateHash"]) != 64
+        or item.get("readOnly") is not True
+        or item.get("semanticAuthority") is not False
+        or item.get("authorizesMutation") is not False
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    work_pr = item.get("workPrNumber")
+    if work_pr is not None and (
+        not isinstance(work_pr, int) or isinstance(work_pr, bool) or work_pr <= 0
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+
+    covered = item.get("coveredChanges")
+    if not isinstance(covered, list) or len(covered) != 3:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    changes = [_source_head_change(change) for change in covered]
+    by_name = {change["name"]: change for change in changes}
+    if len(by_name) != 3 or set(by_name) != {"continuation", "control", "inspection"}:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    continuation = by_name["continuation"]
+    control = by_name["control"]
+    inspection = by_name["inspection"]
+    if (
+        continuation["branch"] != "coordination/continuations"
+        or control["branch"] != "main"
+        or inspection["branch"] != "main"
+        or control["before"] != inspection["before"]
+        or control["after"] != inspection["after"]
+        or control["before"] == control["after"]
+        or continuation["before"] == continuation["after"]
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+
+    continuation_readback = item.get("continuationReadback")
+    if not isinstance(continuation_readback, dict) or set(continuation_readback) != {
+        "branch", "before", "after", "workPath", "changedPaths"
+    }:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    changed_paths = continuation_readback.get("changedPaths")
+    expected_work_path = f"ops/continuations/{item['workId']}.json"
+    if (
+        continuation_readback.get("branch") != continuation["branch"]
+        or continuation_readback.get("before") != continuation["before"]
+        or continuation_readback.get("after") != continuation["after"]
+        or continuation_readback.get("workPath") != expected_work_path
+        or not isinstance(changed_paths, list)
+        or any(not isinstance(path, str) or not path for path in changed_paths)
+        or changed_paths != sorted(set(changed_paths))
+        or expected_work_path in changed_paths
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+
+    control_readback = item.get("controlReadback")
+    if not isinstance(control_readback, dict) or set(control_readback) != {
+        "branch", "before", "after", "mergedPullRequests"
+    }:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    pulls = control_readback.get("mergedPullRequests")
+    if (
+        control_readback.get("branch") != "main"
+        or control_readback.get("before") != control["before"]
+        or control_readback.get("after") != control["after"]
+        or not isinstance(pulls, list)
+        or not pulls
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+    for pull in pulls:
+        if not isinstance(pull, dict) or set(pull) != {
+            "commitSha", "prNumber", "headBranch", "baseSha"
+        }:
+            raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+        if (
+            not isinstance(pull.get("commitSha"), str)
+            or not isinstance(pull.get("baseSha"), str)
+            or not isinstance(pull.get("headBranch"), str)
+            or not pull["headBranch"]
+            or pull["headBranch"] == item["workBranch"]
+            or not isinstance(pull.get("prNumber"), int)
+            or isinstance(pull.get("prNumber"), bool)
+            or pull["prNumber"] <= 0
+            or (work_pr is not None and pull["prNumber"] == work_pr)
+        ):
+            raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+
+    body = {key: deepcopy(value) for key, value in item.items() if key != "evidenceHash"}
+    if item.get("evidenceHash") != stable_hash(body):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_HASH_MISMATCH")
+    return deepcopy(item)
+
+
+def _context_work_item(context: Any, work_id: str) -> dict[str, Any]:
+    if not isinstance(context, dict):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_CONTEXT_INVALID")
+    machine = context.get("projectMachine")
+    sensors = machine.get("sensors") if isinstance(machine, dict) else None
+    continuation_sensor = sensors.get("continuations") if isinstance(sensors, dict) else None
+    data = continuation_sensor.get("data") if isinstance(continuation_sensor, dict) else None
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_WORK_UNAVAILABLE")
+    matches = [item for item in items if isinstance(item, dict) and item.get("id") == work_id]
+    if len(matches) != 1:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_WORK_UNAVAILABLE")
+    return deepcopy(matches[0])
+
+
+def _validate_noninterference_binding(
+    evidence: dict[str, Any],
+    before: dict[str, Any],
+    after: dict[str, Any],
+) -> None:
+    if evidence.get("kind") != "agent-cycle-noninterference-readback":
+        return
+    before_ref = before.get("workRef")
+    after_ref = after.get("workRef")
+    work_id = evidence["workId"]
+    if (
+        not isinstance(before_ref, dict)
+        or before_ref.get("workId") != work_id
+        or after_ref != before_ref
+        or evidence.get("cycleId") != before.get("cycleId")
+        or after.get("cycleId") != before.get("cycleId")
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_BINDING_MISMATCH")
+    before_work = _context_work_item(before, work_id)
+    after_work = _context_work_item(after, work_id)
+    if before_work != after_work:
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_WORK_CHANGED")
+    if (
+        before_work.get("branch") != evidence.get("workBranch")
+        or before_work.get("prNumber") != evidence.get("workPrNumber")
+        or stable_hash(before_work) != evidence.get("workStateHash")
+    ):
+        raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_BINDING_MISMATCH")
+
+
 def verify_evidence(item: Any) -> dict[str, Any]:
     if not isinstance(item, dict) or item.get("kind") not in EVIDENCE_KINDS:
         raise RuntimeError("AGENT_CYCLE_CLOSE_EVIDENCE_INVALID")
     kind = item["kind"]
+    if kind == "agent-cycle-noninterference-readback":
+        return _verify_noninterference_evidence(item)
     if kind == "transition-receipt":
         if set(item) != {"kind", "plan", "receipt"}:
             raise RuntimeError("AGENT_CYCLE_CLOSE_EVIDENCE_FIELDS_INVALID")
@@ -219,6 +387,8 @@ def _authority_contains_branch(authority: Any, branch: str | None) -> bool:
 
 
 def _evidence_covers(change: dict[str, Any], evidence: dict[str, Any]) -> bool:
+    if evidence.get("kind") == "agent-cycle-noninterference-readback":
+        return any(change == item for item in evidence["coveredChanges"])
     if change["kind"] == "project-state":
         return evidence.get("kind") == "transition-receipt" and evidence.get("domain") == "project-state"
     branch = change.get("branch")
@@ -256,6 +426,8 @@ def build_receipt(
     verified.sort(key=lambda item: item["evidenceHash"])
     if len({item["evidenceHash"] for item in verified}) != len(verified):
         raise RuntimeError("AGENT_CYCLE_CLOSE_EVIDENCE_DUPLICATE")
+    for item in verified:
+        _validate_noninterference_binding(item, before, after)
 
     uncovered: list[str] = []
     covered: list[str] = []

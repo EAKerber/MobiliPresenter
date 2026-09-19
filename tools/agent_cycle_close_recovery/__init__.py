@@ -11,9 +11,11 @@ from tools import agent_cycle_close as _canonical
 from tools import git_mutation_plan
 from tools import continuation_remote
 from tools.coordination_remote import ApiError, CoordinationRemoteError, GhApiTransport
+from tools.canonical import stable_hash
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 CONTROL_BRANCH = "main"
+CONTINUATION_BRANCH = "coordination/continuations"
 SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
 CHANGE_REF_RE = re.compile(r"^source-head:([a-z][a-z0-9-]*):(0|[1-9][0-9]*)$")
 MAX_FIRST_PARENT_DEPTH = 128
@@ -46,6 +48,308 @@ def _change_id(change: Any, index: int) -> str | None:
     if not isinstance(kind, str) or not isinstance(name, str):
         return None
     return f"{kind}:{name}:{index}"
+
+
+
+def _context_work_item(context: Any, work_id: str) -> dict[str, Any]:
+    if not isinstance(context, dict):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_CONTEXT_INVALID")
+    machine = context.get("projectMachine")
+    sensors = machine.get("sensors") if isinstance(machine, dict) else None
+    continuation_sensor = sensors.get("continuations") if isinstance(sensors, dict) else None
+    data = continuation_sensor.get("data") if isinstance(continuation_sensor, dict) else None
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_WORK_UNAVAILABLE")
+    matches = [item for item in items if isinstance(item, dict) and item.get("id") == work_id]
+    if len(matches) != 1:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_WORK_UNAVAILABLE")
+    return matches[0]
+
+
+def _current_branch_head(branch: str, *, transport: Any) -> str:
+    value = _get_json(
+        transport,
+        f"repos/{REPOSITORY}/git/ref/heads/{branch}",
+        "AGENT_CYCLE_CLOSE_NONINTERFERENCE_REF_UNAVAILABLE",
+    )
+    sha = (value.get("object") or {}).get("sha") if isinstance(value, dict) else None
+    if not isinstance(sha, str) or SHA_RE.fullmatch(sha) is None:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_REF_INVALID")
+    return sha
+
+
+def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
+    if not isinstance(closure, dict) or closure.get("status") != "UNKNOWN":
+        return None
+    receipt = closure.get("receipt")
+    if not isinstance(receipt, dict) or receipt.get("blockers") != ["UNATTRIBUTED_DURABLE_DELTA"]:
+        return None
+    delta = receipt.get("delta")
+    aggregate = receipt.get("aggregateReadback")
+    if not isinstance(delta, dict) or not isinstance(aggregate, dict):
+        return None
+    changes = delta.get("durableChanges")
+    covered = aggregate.get("coveredDurableChanges")
+    uncovered = aggregate.get("uncoveredDurableChanges")
+    if (
+        not isinstance(changes, list)
+        or not isinstance(covered, list)
+        or not isinstance(uncovered, list)
+        or len(uncovered) != 3
+        or any(not isinstance(item, str) for item in [*covered, *uncovered])
+        or len(set(covered)) != len(covered)
+        or len(set(uncovered)) != len(uncovered)
+        or set(covered) & set(uncovered)
+    ):
+        return None
+
+    all_ids: list[str] = []
+    indexed: dict[str, dict[str, Any]] = {}
+    selected: list[dict[str, Any]] = []
+    for index, change in enumerate(changes):
+        change_id = _change_id(change, index)
+        if change_id is None:
+            return None
+        all_ids.append(change_id)
+        if change_id not in uncovered:
+            continue
+        name = change.get("name") if isinstance(change, dict) else None
+        if (
+            not isinstance(change, dict)
+            or change.get("kind") != "source-head"
+            or not isinstance(name, str)
+            or not name
+            or name in indexed
+        ):
+            return None
+        indexed[name] = change
+        selected.append(change)
+    if set(covered) | set(uncovered) != set(all_ids):
+        return None
+    if set(indexed) != {"continuation", "control", "inspection"}:
+        return None
+
+    continuation = indexed["continuation"]
+    control = indexed["control"]
+    inspection = indexed["inspection"]
+    if (
+        continuation.get("branch") != CONTINUATION_BRANCH
+        or control.get("branch") != CONTROL_BRANCH
+        or inspection.get("branch") != CONTROL_BRANCH
+        or control.get("before") != inspection.get("before")
+        or control.get("after") != inspection.get("after")
+    ):
+        return None
+    for change in (continuation, control, inspection):
+        if (
+            not isinstance(change.get("before"), str)
+            or not isinstance(change.get("after"), str)
+            or change["before"] == change["after"]
+            or SHA_RE.fullmatch(change["before"]) is None
+            or SHA_RE.fullmatch(change["after"]) is None
+        ):
+            return None
+    return selected
+
+
+def _continuation_noninterference(
+    before_sha: str,
+    after_sha: str,
+    *,
+    work_id: str,
+    transport: Any,
+) -> dict[str, Any]:
+    if _current_branch_head(CONTINUATION_BRANCH, transport=transport) != after_sha:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_CONTINUATION_HEAD_MISMATCH")
+    comparison = _get_json(
+        transport,
+        f"repos/{REPOSITORY}/compare/{before_sha}...{after_sha}",
+        "AGENT_CYCLE_CLOSE_NONINTERFERENCE_CONTINUATION_COMPARE_UNAVAILABLE",
+    )
+    merge_base = comparison.get("merge_base_commit") if isinstance(comparison, dict) else None
+    files = comparison.get("files") if isinstance(comparison, dict) else None
+    commits = comparison.get("commits") if isinstance(comparison, dict) else None
+    ahead_by = comparison.get("ahead_by") if isinstance(comparison, dict) else None
+    if (
+        not isinstance(comparison, dict)
+        or comparison.get("status") != "ahead"
+        or not isinstance(merge_base, dict)
+        or merge_base.get("sha") != before_sha
+        or not isinstance(ahead_by, int)
+        or isinstance(ahead_by, bool)
+        or ahead_by <= 0
+        or not isinstance(commits, list)
+        or len(commits) != ahead_by
+        or not isinstance(files, list)
+    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_CONTINUATION_COMPARE_INVALID")
+    paths: list[str] = []
+    for item in files:
+        filename = item.get("filename") if isinstance(item, dict) else None
+        if not isinstance(filename, str) or not filename:
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_CONTINUATION_COMPARE_INVALID")
+        paths.append(filename)
+    paths = sorted(set(paths))
+    work_path = f"ops/continuations/{work_id}.json"
+    if work_path in paths:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_WORK_TOUCHED")
+    return {
+        "branch": CONTINUATION_BRANCH,
+        "before": before_sha,
+        "after": after_sha,
+        "workPath": work_path,
+        "changedPaths": paths,
+    }
+
+
+def _unrelated_main_pr_chain(
+    before_sha: str,
+    after_sha: str,
+    *,
+    work_branch: str,
+    work_pr_number: int | None,
+    transport: Any,
+) -> list[dict[str, Any]]:
+    if _current_branch_head(CONTROL_BRANCH, transport=transport) != after_sha:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_MAIN_HEAD_MISMATCH")
+    cursor = after_sha
+    newest_first: list[dict[str, Any]] = []
+    for _ in range(MAX_FIRST_PARENT_DEPTH):
+        commit = _get_json(
+            transport,
+            f"repos/{REPOSITORY}/git/commits/{cursor}",
+            "AGENT_CYCLE_CLOSE_NONINTERFERENCE_COMMIT_UNAVAILABLE",
+        )
+        parents = commit.get("parents") if isinstance(commit, dict) else None
+        if not isinstance(parents, list) or len(parents) != 1 or not isinstance(parents[0], dict):
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_NONLINEAR_HISTORY")
+        parent = parents[0].get("sha")
+        if not isinstance(parent, str) or SHA_RE.fullmatch(parent) is None:
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_PARENT_INVALID")
+
+        pulls = _get_json(
+            transport,
+            f"repos/{REPOSITORY}/commits/{cursor}/pulls",
+            "AGENT_CYCLE_CLOSE_NONINTERFERENCE_PR_UNAVAILABLE",
+        )
+        if not isinstance(pulls, list):
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_PR_INVALID")
+        candidates: list[dict[str, Any]] = []
+        for item in pulls:
+            if not isinstance(item, dict):
+                continue
+            base = item.get("base")
+            head = item.get("head")
+            if not isinstance(base, dict) or not isinstance(head, dict):
+                continue
+            if (
+                item.get("state") == "closed"
+                and isinstance(item.get("merged_at"), str)
+                and item.get("merge_commit_sha") == cursor
+                and base.get("ref") == CONTROL_BRANCH
+                and base.get("sha") == parent
+                and isinstance(head.get("ref"), str)
+                and head["ref"]
+                and isinstance(item.get("number"), int)
+                and not isinstance(item.get("number"), bool)
+                and item["number"] > 0
+            ):
+                candidates.append(item)
+        if len(candidates) != 1:
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_PR_AMBIGUOUS")
+        pull = candidates[0]
+        if pull["head"]["ref"] == work_branch or (
+            work_pr_number is not None and pull["number"] == work_pr_number
+        ):
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_BOUND_WORK_MERGE")
+        newest_first.append({
+            "commitSha": cursor,
+            "prNumber": pull["number"],
+            "headBranch": pull["head"]["ref"],
+            "baseSha": parent,
+        })
+        if parent == before_sha:
+            return list(reversed(newest_first))
+        cursor = parent
+    raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_ANCESTRY_MISMATCH")
+
+
+def noninterference_evidence(
+    closure: dict[str, Any],
+    *,
+    context_path: str,
+    transport: Any | None = None,
+) -> dict[str, Any] | None:
+    changes = _ambient_uncovered_changes(closure)
+    if changes is None:
+        return None
+    carrier = transport or GhApiTransport()
+    try:
+        before = json.loads(Path(context_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_CONTEXT_UNAVAILABLE") from exc
+    after = closure.get("afterContext")
+    before_ref = before.get("workRef") if isinstance(before, dict) else None
+    after_ref = after.get("workRef") if isinstance(after, dict) else None
+    work_id = before_ref.get("workId") if isinstance(before_ref, dict) else None
+    if not isinstance(work_id, str) or not work_id or after_ref != before_ref:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_WORK_REF_REQUIRED")
+    before_work = _context_work_item(before, work_id)
+    after_work = _context_work_item(after, work_id)
+    if before_work != after_work:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_WORK_CHANGED")
+    work_branch = before_work.get("branch")
+    work_pr = before_work.get("prNumber")
+    if (
+        not isinstance(work_branch, str)
+        or not work_branch
+        or work_branch == CONTROL_BRANCH
+        or (work_pr is not None and (
+            not isinstance(work_pr, int) or isinstance(work_pr, bool) or work_pr <= 0
+        ))
+    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_WORK_BINDING_INVALID")
+
+    by_name = {change["name"]: change for change in changes}
+    continuation = by_name["continuation"]
+    control = by_name["control"]
+    continuation_readback = _continuation_noninterference(
+        continuation["before"],
+        continuation["after"],
+        work_id=work_id,
+        transport=carrier,
+    )
+    main_pulls = _unrelated_main_pr_chain(
+        control["before"],
+        control["after"],
+        work_branch=work_branch,
+        work_pr_number=work_pr,
+        transport=carrier,
+    )
+    body = {
+        "kind": "agent-cycle-noninterference-readback",
+        "schemaVersion": _canonical.NONINTERFERENCE_SCHEMA,
+        "cycleId": closure.get("cycleId"),
+        "workId": work_id,
+        "workBranch": work_branch,
+        "workPrNumber": work_pr,
+        "workStateHash": stable_hash(before_work),
+        "coveredChanges": changes,
+        "continuationReadback": continuation_readback,
+        "controlReadback": {
+            "branch": CONTROL_BRANCH,
+            "before": control["before"],
+            "after": control["after"],
+            "mergedPullRequests": main_pulls,
+        },
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    evidence = {**body, "evidenceHash": stable_hash(body)}
+    _canonical.verify_evidence(evidence)
+    return evidence
 
 
 def recoverable_main_delta(closure: Any) -> tuple[str, str] | None:
@@ -278,17 +582,24 @@ def recovery_evidence(
     context_path: str,
     transport: Any | None = None,
 ) -> dict[str, Any] | None:
-    delta = recoverable_main_delta(closure)
-    if delta is None:
-        return None
     carrier = transport or GhApiTransport()
+    delta = recoverable_main_delta(closure)
+    if delta is not None:
+        try:
+            expected_pr, expected_merge = _work_expectation(context_path, transport=carrier)
+            return merge_readback_evidence(
+                *delta,
+                transport=carrier,
+                expected_pr_number=expected_pr,
+                expected_merge_sha=expected_merge,
+            )
+        except RuntimeError:
+            pass
     try:
-        expected_pr, expected_merge = _work_expectation(context_path, transport=carrier)
-        return merge_readback_evidence(
-            *delta,
+        return noninterference_evidence(
+            closure,
+            context_path=context_path,
             transport=carrier,
-            expected_pr_number=expected_pr,
-            expected_merge_sha=expected_merge,
         )
     except RuntimeError:
         return None
