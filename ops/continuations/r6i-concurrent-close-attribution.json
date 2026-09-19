@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6i-concurrent-close-attribution",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/r6i-concurrent-close-attribution",
   "prNumber": 323,
   "dependsOn": [],
