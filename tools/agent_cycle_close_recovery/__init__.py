@@ -695,6 +695,7 @@ def recovery_evidence(
     *,
     context_path: str,
     transport: Any | None = None,
+    raise_on_error: bool = False,
 ) -> dict[str, Any] | None:
     carrier = transport or GhApiTransport()
     delta = recoverable_main_delta(closure)
@@ -716,6 +717,8 @@ def recovery_evidence(
             transport=carrier,
         )
     except RuntimeError:
+        if raise_on_error:
+            raise
         return None
 
 
@@ -729,8 +732,14 @@ def recover_closure(
     evidence_paths: list[str],
     transport: Any | None = None,
     recovery_evidence_path: str | None = None,
+    raise_on_recovery_error: bool = False,
 ) -> dict[str, Any]:
-    evidence = recovery_evidence(closure, context_path=context_path, transport=transport)
+    evidence = recovery_evidence(
+        closure,
+        context_path=context_path,
+        transport=transport,
+        raise_on_error=raise_on_recovery_error,
+    )
     if evidence is None:
         return closure
 
