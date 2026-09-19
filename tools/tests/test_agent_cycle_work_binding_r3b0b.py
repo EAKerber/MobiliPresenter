@@ -114,17 +114,27 @@ class AgentCycleWorkBindingR3B0bTests(unittest.TestCase):
         authority = authority_cls.return_value
         authority.observe.return_value = SimpleNamespace(items={WORK_ID: {"id": WORK_ID}})
 
+        provider = object()
         self.assertEqual(
             {"workId": WORK_ID},
-            hosted._observe_work_ref({"workId": WORK_ID}),
+            hosted._observe_work_ref(
+                {"workId": WORK_ID},
+                transport=provider,
+            ),
         )
-        authority_cls.assert_called_once_with(repository=hosted.REPOSITORY)
+        authority_cls.assert_called_once_with(
+            transport=provider,
+            repository=hosted.REPOSITORY,
+        )
         authority.observe.assert_called_once_with()
 
         authority.reset_mock()
         authority.observe.return_value = SimpleNamespace(items={})
         with self.assertRaisesRegex(RuntimeError, "HOSTED_AGENT_WORK_NOT_FOUND"):
-            hosted._observe_work_ref({"workId": WORK_ID})
+            hosted._observe_work_ref(
+                {"workId": WORK_ID},
+                transport=provider,
+            )
 
     @patch("tools.hosted_agent_cycle.continuation_remote.GitHubContinuationAuthority")
     def test_hosted_work_observation_fails_closed_when_authority_is_unknown(self, authority_cls):
@@ -132,7 +142,10 @@ class AgentCycleWorkBindingR3B0bTests(unittest.TestCase):
             "CONTINUATION_REMOTE_UNAVAILABLE", "test"
         )
         with self.assertRaisesRegex(RuntimeError, "HOSTED_AGENT_WORK_AUTHORITY_UNKNOWN"):
-            hosted._observe_work_ref({"workId": WORK_ID})
+            hosted._observe_work_ref(
+                {"workId": WORK_ID},
+                transport=object(),
+            )
 
     @patch("tools.hosted_agent_cycle._observe_work_ref")
     @patch("tools.hosted_agent_cycle._run_agent")
@@ -151,11 +164,13 @@ class AgentCycleWorkBindingR3B0bTests(unittest.TestCase):
             from pathlib import Path
 
             with tempfile.TemporaryDirectory() as tmp:
+                provider = object()
                 result = hosted.begin_from_envelope(
                     _work_begin({"workId": WORK_ID}),
                     {"issueNumber": 145, "commentId": 9901},
                     context_path=f"{tmp}/context.json",
                     manifest_path=f"{tmp}/manifest.json",
+                    transport=provider,
                 )
                 materialized = json.loads(Path(f"{tmp}/context.json").read_text())
                 manifest = json.loads(Path(f"{tmp}/manifest.json").read_text())
@@ -166,7 +181,10 @@ class AgentCycleWorkBindingR3B0bTests(unittest.TestCase):
         self.assertEqual(materialized["contextHash"], handle["context"]["contextHash"])
         self.assertEqual(materialized["schemaVersion"], handle["context"]["schemaVersion"])
         self.assertEqual(hosted.transport_command_hash(_work_begin({"workId": WORK_ID})), result["commandHash"])
-        observe_work.assert_called_once_with({"workId": WORK_ID})
+        observe_work.assert_called_once_with(
+            {"workId": WORK_ID},
+            transport=provider,
+        )
 
 
 if __name__ == "__main__":
