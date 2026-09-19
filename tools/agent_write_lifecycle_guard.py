@@ -86,6 +86,30 @@ def _bound_results(
     ]
 
 
+def _bound_requests(
+    view: dict[str, Any], manifest: dict[str, Any] | None = None
+) -> list[tuple[int, dict[str, Any]]]:
+    del manifest
+    return [
+        (item["commentId"], item["normalized"])
+        for item in hosted_cycle_records.records_of(
+            view, "write-lease-request", binding=hosted_cycle_records.STRONG
+        )
+    ]
+
+
+def _bound_failures(
+    view: dict[str, Any], manifest: dict[str, Any] | None = None
+) -> list[tuple[int, dict[str, Any]]]:
+    del manifest
+    return [
+        (item["commentId"], item["normalized"])
+        for item in hosted_cycle_records.records_of(
+            view, "write-lease-failure", binding=hosted_cycle_records.STRONG
+        )
+    ]
+
+
 def _request_count(view: dict[str, Any], manifest: dict[str, Any] | None = None) -> int:
     del manifest
     return len(hosted_cycle_records.records_of(
@@ -401,8 +425,42 @@ def inspect_cycle(
             raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_WINDOW_INVALID") from exc
         raise AgentWriteLifecycleGuardError(exc.code) from exc
     results = _bound_results(view, manifest)
-    request_count = _request_count(view, manifest)
+    requests = _bound_requests(view, manifest)
+    failures = _bound_failures(view, manifest)
+
+    request_by_hash = {
+        lifecycle.request_hash(request): request
+        for _, request in requests
+    }
+    terminal_by_hash: dict[str, tuple[int, str, dict[str, Any]]] = {}
+    for comment_id, result in results:
+        terminal_by_hash[result["requestHash"]] = (
+            comment_id,
+            "PASS",
+            result,
+        )
+    for comment_id, failure in failures:
+        current = terminal_by_hash.get(failure["requestHash"])
+        if current is None or comment_id > current[0]:
+            terminal_by_hash[failure["requestHash"]] = (
+                comment_id,
+                failure["status"],
+                failure,
+            )
+
+    unresolved_request_hashes = sorted(
+        set(request_by_hash) - set(terminal_by_hash)
+    )
+    unknown_failure_hashes = sorted(
+        request_hash
+        for request_hash, terminal in terminal_by_hash.items()
+        if request_hash in request_by_hash and terminal[1] == "UNKNOWN"
+    )
+
     target_branches = _bound_agent_tool_branches(view, manifest)
+    target_branches.update(
+        request["branch"] for request in request_by_hash.values()
+    )
 
     authority = GitHubCoordinationAuthority(transport=carrier)
     observation = authority.observe()
@@ -413,7 +471,13 @@ def inspect_cycle(
     latest_binding: dict[str, Any] | None = None
     matching: list[dict[str, Any]] = []
 
-    if results:
+    if unresolved_request_hashes:
+        state = "UNKNOWN"
+        blockers.append("AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL")
+    elif unknown_failure_hashes:
+        state = "UNKNOWN"
+        blockers.append("AGENT_WRITE_LIFECYCLE_UNKNOWN_FAILURE_AT_CLOSE")
+    elif results:
         latest_result_comment_id, latest_result = results[-1]
         latest_binding = latest_result["binding"]
         matching = _matching_exact_leases(active, binding=latest_binding)
@@ -443,10 +507,6 @@ def inspect_cycle(
         else:
             state = "UNKNOWN"
             blockers.append("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
-    elif request_count:
-        state = "UNKNOWN"
-        blockers.append("AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL")
-
     bound_lease_id = latest_binding["leaseId"] if latest_binding is not None else None
     unbound = _unbound_target_leases(
         active,
