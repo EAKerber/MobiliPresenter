@@ -27,6 +27,7 @@ class FakeTransport:
         main_head_branch="work/operations/r6h-blocked-close-compatibility-recovery",
         main_pr_number=322,
         main_has_pr=True,
+        main_second_parent=None,
     ):
         self.continuation_paths = continuation_paths or [
             "ops/continuations/r6h-blocked-close-compatibility-recovery.json"
@@ -34,6 +35,7 @@ class FakeTransport:
         self.main_head_branch = main_head_branch
         self.main_pr_number = main_pr_number
         self.main_has_pr = main_has_pr
+        self.main_second_parent = main_second_parent
 
     def request(self, method, endpoint):
         self.assert_get(method)
@@ -50,7 +52,10 @@ class FakeTransport:
                 "files": [{"filename": path} for path in self.continuation_paths],
             })
         if endpoint.endswith(f"git/commits/{MAIN_AFTER}"):
-            return self.response({"sha": MAIN_AFTER, "parents": [{"sha": MAIN_BEFORE}]})
+            parents = [{"sha": MAIN_BEFORE}]
+            if self.main_second_parent is not None:
+                parents.append({"sha": self.main_second_parent})
+            return self.response({"sha": MAIN_AFTER, "parents": parents})
         if endpoint.endswith(f"commits/{MAIN_AFTER}/pulls"):
             if not self.main_has_pr:
                 return self.response([])
@@ -172,6 +177,15 @@ class ConcurrentCloseAttributionTests(unittest.TestCase):
             "work/operations/r6h-blocked-close-compatibility-recovery",
         )
         self.assertEqual(agent_cycle_close.verify_evidence(evidence), evidence)
+
+    def test_two_parent_merge_commit_follows_first_parent(self):
+        evidence = self.evidence(
+            transport=FakeTransport(main_second_parent="6" * 40)
+        )
+        pulls = evidence["controlReadback"]["mergedPullRequests"]
+        self.assertEqual(len(pulls), 1)
+        self.assertEqual(pulls[0]["commitSha"], MAIN_AFTER)
+        self.assertEqual(pulls[0]["baseSha"], MAIN_BEFORE)
 
     def test_bound_work_file_touch_fails_closed(self):
         transport = FakeTransport(
