@@ -2,22 +2,22 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6i-concurrent-close-attribution",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6i-concurrent-close-attribution",
   "prNumber": 323,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "characterize-concurrent-close-drift",
     "implement-noninterference-readback-evidence",
     "add-fail-closed-regressions",
     "qualify-and-integrate-r6i",
     "retry-r6-live-close"
   ],
-  "nextAction": "Add the smallest read-only non-interference evidence composition to Agent Cycle close recovery. Admit only exact shared-authority source-head drift proven not to touch the bound Work: bound Work identical before/after; continuation authority change does not modify that Work file; main advancement is a linear chain of merged PRs unrelated to the bound Work branch/PR. Any ambiguity remains UNKNOWN. Reuse canonical close/recovery and add no authority, state machine, lease, or replay.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "3e6adc6403b6712c57dbd6f31c8b39a042609eb9",
+    "checkpoint": "PR #323 exact-head 24428b7 passed Agent Ops, Coordination Guard and Supervisor Snapshot; merged to main 3e6adc6. Post-merge live close retry is handled separately so Work reconciliation does not depend on that historical cycle outcome."
   },
   "blockers": [],
   "handoffToWorkerId": null
