@@ -198,10 +198,17 @@ class ConcurrentCloseAttributionTests(unittest.TestCase):
 
     def test_evidence_hash_and_exact_change_binding_are_enforced(self):
         evidence = self.evidence()
-        tampered = copy.deepcopy(evidence)
-        tampered["coveredChanges"][0]["after"] = "9" * 40
+        bad_hash = copy.deepcopy(evidence)
+        bad_hash["evidenceHash"] = "0" * 64
         with self.assertRaisesRegex(RuntimeError, "HASH_MISMATCH"):
-            agent_cycle_close.verify_evidence(tampered)
+            agent_cycle_close.verify_evidence(bad_hash)
+
+        inconsistent = copy.deepcopy(evidence)
+        inconsistent["coveredChanges"][0]["after"] = "9" * 40
+        body = {key: value for key, value in inconsistent.items() if key != "evidenceHash"}
+        inconsistent["evidenceHash"] = stable_hash(body)
+        with self.assertRaisesRegex(RuntimeError, "EVIDENCE_INVALID"):
+            agent_cycle_close.verify_evidence(inconsistent)
 
     def test_context_binding_rejects_changed_work_even_with_valid_evidence(self):
         evidence = self.evidence()
