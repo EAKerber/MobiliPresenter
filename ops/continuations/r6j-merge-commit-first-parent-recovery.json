@@ -2,22 +2,22 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6j-merge-commit-first-parent-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6j-merge-commit-first-parent-recovery",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "characterize-real-merge-parent-shape",
     "fix-first-parent-pr-chain",
     "add-real-merge-commit-regressions",
     "qualify-and-integrate-r6j",
     "retry-r6-live-close"
   ],
-  "nextAction": "Update the read-only R6i non-interference main-chain proof so a genuine GitHub merge commit may have multiple parents while traversal follows only the first parent and still proves exactly one merged PR. Preserve direct-main ambiguity and bound-Work merge fail-closed behavior; add regression for a two-parent merge commit, qualify, integrate, then retry the historical R6 canary close.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "cf9919e2850303a0505992cfff149cb58d35ba81",
+    "checkpoint": "PR #324 exact-head 1b07704 passed Agent Ops, Coordination Guard and Supervisor Snapshot; merged to main cf9919e. Post-merge historical R6 close retried as r6-live-governed-close-post-r6j-20260919 and remained UNKNOWN because coordination/leases also drifted non-interferingly."
   },
   "blockers": [],
   "handoffToWorkerId": null
