@@ -2,22 +2,22 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "r6h-blocked-close-compatibility-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/r6h-blocked-close-compatibility-recovery",
   "prNumber": 322,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "characterize-historical-close-signature",
     "admit-exact-observational-recovery-signature",
     "preserve-no-replay-and-unknown-fail-closed",
     "add-recovery-regressions",
     "qualify-and-integrate-r6h"
   ],
-  "nextAction": "Extend the existing hosted-cycle observational close compatibility recovery with the exact pre-R6g failure signature AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL + AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE. Recovery must reobserve using current carrier only, never replay write-lease operation, and remain restricted to exact non-lossy close failure signature. Add regressions, qualify exact-head CI, integrate, then retry the existing R6 canary close.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "2236ae3b09743b78c586e78730a9798d85c984e6",
+    "checkpoint": "PR #322 exact-head 449f3cc passed Agent Ops, Coordination Guard and Supervisor Snapshot; merged to main 2236ae3"
   },
   "blockers": [],
   "handoffToWorkerId": null
