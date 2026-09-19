@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-798f9291519a8f6d36db766d:0",
-      "resource": "branch:work/operations/r6l-close-recovery-provider-diagnostics",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "r6l-close-recovery-provider-diagnostics-20260919",
-        "branch": "work/operations/r6l-close-recovery-provider-diagnostics",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-bf2ef6070564d906f41d4310",
-      "acquiredAt": "2026-09-19T22:23:13Z",
-      "renewedAt": "2026-09-19T22:23:13Z",
-      "expiresAt": "2026-09-19T23:23:13Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "064816e2db78a9fe477704b258f5af5617094945",
+  "leases": [],
+  "revision": "7645b27b78f3a1acadab97ffc4e3b906e58c887b",
   "schemaVersion": "CoordinationState 0.1"
 }
