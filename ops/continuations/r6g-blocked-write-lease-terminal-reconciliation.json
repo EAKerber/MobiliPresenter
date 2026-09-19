@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6g-blocked-write-lease-terminal-reconciliation",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6g-blocked-write-lease-terminal-reconciliation",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "characterize-blocked-lease-close-gap",
+    "reconcile-blocked-failure-as-terminal",
+    "preserve-unknown-fail-closed",
+    "add-close-regressions",
+    "qualify-and-integrate-r6g"
+  ],
+  "nextAction": "Teach the write-lifecycle close guard to reconcile each strongly-bound lease request against success/failure terminals: BLOCKED failures are terminal non-mutations, UNKNOWN failures remain UNKNOWN, unresolved requests remain blocked. Add regressions, qualify exact-head CI, integrate, then close/rebegin the R6 canary cycle.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
