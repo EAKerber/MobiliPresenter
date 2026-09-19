@@ -222,7 +222,11 @@ def _unrelated_main_pr_chain(
             "AGENT_CYCLE_CLOSE_NONINTERFERENCE_COMMIT_UNAVAILABLE",
         )
         parents = commit.get("parents") if isinstance(commit, dict) else None
-        if not isinstance(parents, list) or len(parents) != 1 or not isinstance(parents[0], dict):
+        if (
+            not isinstance(parents, list)
+            or not parents
+            or not isinstance(parents[0], dict)
+        ):
             raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_NONLINEAR_HISTORY")
         parent = parents[0].get("sha")
         if not isinstance(parent, str) or SHA_RE.fullmatch(parent) is None:
