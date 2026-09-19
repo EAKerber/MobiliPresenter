@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "IN_PROGRESS",
   "branch": "work/operations/r6e-hosted-begin-provider-injection",
-  "prNumber": null,
+  "prNumber": 319,
   "dependsOn": [],
   "completed": [
     "characterize-hosted-begin-provider-gap",
