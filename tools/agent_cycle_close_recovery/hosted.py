@@ -9,6 +9,7 @@ from tools import agent_cycle_close
 from tools import agent_cycle_close_recovery
 from tools import agent_failure
 from tools import hosted_agent_cycle as hosted
+from tools.coordination_remote import GhApiTransport
 
 EXACT_CAUSES = [
     {"code": "UNATTRIBUTED_DURABLE_DELTA", "source": "agent-cycle-close", "phase": "CLOSE"},
@@ -148,6 +149,7 @@ def close_with_compatibility_recovery(
         evidence_root = Path(evidence_dir)
         evidence_paths = sorted(str(path) for path in evidence_root.glob("evidence-*.json"))
         recovery_path = evidence_root / "evidence-recovery-merge.json"
+        carrier = GhApiTransport()
         recovered = agent_cycle_close_recovery.recover_closure(
             closure,
             context_path=context_path,
@@ -155,7 +157,9 @@ def close_with_compatibility_recovery(
             observations_path=None,
             runtime_providers=None,
             evidence_paths=evidence_paths,
+            transport=carrier,
             recovery_evidence_path=str(recovery_path),
+            raise_on_recovery_error=True,
         )
         if recovered.get("status") != "PASS" or not recovery_path.is_file():
             raise original
@@ -168,7 +172,16 @@ def close_with_compatibility_recovery(
         return _hosted_close_result(command=outer, meta=meta, manifest=manifest, closure=recovered)
     except hosted.HostedAgentCycleError:
         raise
-    except Exception:
+    except Exception as exc:
+        diagnostic = {
+            "schemaVersion": "AgentCycleCloseRecoveryDiagnostic 0.1",
+            "status": "BLOCKED",
+            "code": str(exc).split(":", 1)[0] or exc.__class__.__name__,
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        _write(close_root / "recovery-diagnostic.json", diagnostic)
         raise original
 
 
