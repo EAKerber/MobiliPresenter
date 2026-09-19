@@ -549,16 +549,21 @@ def _context_failure_core(context: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _observe_work_ref(work_ref: Any) -> dict[str, str] | None:
+def _observe_work_ref(
+    work_ref: Any, *, transport: Any | None = None
+) -> dict[str, str] | None:
     try:
         normalized = agent_cycle.validate_work_ref(work_ref)
     except RuntimeError as exc:
         raise HostedAgentCycleError("HOSTED_AGENT_WORK_REF_INVALID") from exc
     if normalized is None:
         return None
+    if transport is None:
+        raise HostedAgentCycleError("BLOCKED_EXECUTION_SURFACE")
     try:
         observed = continuation_remote.GitHubContinuationAuthority(
-            repository=REPOSITORY
+            transport=transport,
+            repository=REPOSITORY,
         ).observe()
     except continuation_remote.ContinuationRemoteError as exc:
         raise HostedAgentCycleError("HOSTED_AGENT_WORK_AUTHORITY_UNKNOWN", exc.code) from exc
@@ -568,13 +573,18 @@ def _observe_work_ref(work_ref: Any) -> dict[str, str] | None:
 
 
 def begin_from_envelope(
-    command: dict[str, Any], meta: dict[str, int], *, context_path: str, manifest_path: str
+    command: dict[str, Any],
+    meta: dict[str, int],
+    *,
+    context_path: str,
+    manifest_path: str,
+    transport: Any | None = None,
 ) -> dict[str, Any]:
     command = validate_transport_command(command)
     if command["action"] != "begin":
         raise HostedAgentCycleError("HOSTED_AGENT_BEGIN_ACTION_REQUIRED")
     work_ref = (
-        _observe_work_ref(command["workRef"])
+        _observe_work_ref(command["workRef"], transport=transport)
         if command["schemaVersion"] in {COMMAND_SCHEMA_V03, COMMAND_SCHEMA_V04}
         else None
     )
@@ -1311,7 +1321,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.command_name == "begin":
             meta = _load_json(args.meta)
             result = begin_from_envelope(
-                command_value, meta, context_path=args.context, manifest_path=args.manifest
+                command_value,
+                meta,
+                context_path=args.context,
+                manifest_path=args.manifest,
+                transport=GhApiTransport(),
             )
         elif args.command_name == "close":
             meta = _load_json(args.meta)
