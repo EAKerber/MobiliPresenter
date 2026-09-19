@@ -90,6 +90,8 @@ def _bound_requests(
     view: dict[str, Any], manifest: dict[str, Any] | None = None
 ) -> list[tuple[int, dict[str, Any]]]:
     del manifest
+    if not isinstance(view.get("records"), list):
+        return []
     return [
         (item["commentId"], item["normalized"])
         for item in hosted_cycle_records.records_of(
@@ -102,6 +104,8 @@ def _bound_failures(
     view: dict[str, Any], manifest: dict[str, Any] | None = None
 ) -> list[tuple[int, dict[str, Any]]]:
     del manifest
+    if not isinstance(view.get("records"), list):
+        return []
     return [
         (item["commentId"], item["normalized"])
         for item in hosted_cycle_records.records_of(
@@ -434,7 +438,10 @@ def inspect_cycle(
     }
     terminal_by_hash: dict[str, tuple[int, str, dict[str, Any]]] = {}
     for comment_id, result in results:
-        terminal_by_hash[result["requestHash"]] = (
+        request_hash = result.get("requestHash")
+        if not isinstance(request_hash, str):
+            continue
+        terminal_by_hash[request_hash] = (
             comment_id,
             "PASS",
             result,
