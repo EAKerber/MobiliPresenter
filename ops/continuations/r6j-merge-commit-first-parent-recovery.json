@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6j-merge-commit-first-parent-recovery",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6j-merge-commit-first-parent-recovery",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "characterize-real-merge-parent-shape",
+    "fix-first-parent-pr-chain",
+    "add-real-merge-commit-regressions",
+    "qualify-and-integrate-r6j",
+    "retry-r6-live-close"
+  ],
+  "nextAction": "Update the read-only R6i non-interference main-chain proof so a genuine GitHub merge commit may have multiple parents while traversal follows only the first parent and still proves exactly one merged PR. Preserve direct-main ambiguity and bound-Work merge fail-closed behavior; add regression for a two-parent merge commit, qualify, integrate, then retry the historical R6 canary close.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
