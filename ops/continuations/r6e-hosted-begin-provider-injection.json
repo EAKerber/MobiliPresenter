@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6e-hosted-begin-provider-injection",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6e-hosted-begin-provider-injection",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "characterize-hosted-begin-provider-gap",
+    "inject-provider-at-hosted-begin-boundary",
+    "add-work-observation-regression",
+    "qualify-hosted-begin-provider-fix",
+    "integrate-hosted-begin-provider-fix"
+  ],
+  "nextAction": "Patch Hosted Agent Cycle begin so Work-bound V0.3/V0.4 requests observe Continuation through an explicit provider supplied by the outer host adapter. Do not reintroduce an implicit core fallback or create a provider manager/layer. Add regression proving injected provider succeeds and missing provider fails closed, qualify exact-head CI, integrate, then return to r6-black-box-paved-path-canary.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
