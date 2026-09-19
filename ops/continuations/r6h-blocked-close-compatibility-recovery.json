@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r6h-blocked-close-compatibility-recovery",
-  "prNumber": null,
+  "prNumber": 322,
   "dependsOn": [],
   "completed": [],
   "remaining": [
