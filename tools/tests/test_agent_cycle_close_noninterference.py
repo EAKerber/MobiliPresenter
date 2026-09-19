@@ -1,3 +1,4 @@
+import base64
 import copy
 import json
 import tempfile
@@ -14,6 +15,8 @@ MAIN_BEFORE = "1" * 40
 MAIN_AFTER = "2" * 40
 CONT_BEFORE = "3" * 40
 CONT_AFTER = "4" * 40
+COORD_BEFORE = "7" * 40
+COORD_AFTER = "8" * 40
 CYCLE_ID = "cycle-" + "a" * 20
 WORK_ID = "r6-black-box-paved-path-canary"
 WORK_BRANCH = "work/operations/r6-black-box-live-canary"
@@ -28,6 +31,7 @@ class FakeTransport:
         main_pr_number=322,
         main_has_pr=True,
         main_second_parent=None,
+        coordination_touches_work=False,
     ):
         self.continuation_paths = continuation_paths or [
             "ops/continuations/r6h-blocked-close-compatibility-recovery.json"
@@ -36,6 +40,7 @@ class FakeTransport:
         self.main_pr_number = main_pr_number
         self.main_has_pr = main_has_pr
         self.main_second_parent = main_second_parent
+        self.coordination_touches_work = coordination_touches_work
 
     def request(self, method, endpoint):
         self.assert_get(method)
@@ -43,6 +48,8 @@ class FakeTransport:
             return self.response({"object": {"sha": MAIN_AFTER}})
         if endpoint.endswith("git/ref/heads/coordination/continuations"):
             return self.response({"object": {"sha": CONT_AFTER}})
+        if endpoint.endswith("git/ref/heads/coordination/leases"):
+            return self.response({"object": {"sha": COORD_AFTER}})
         if endpoint.endswith(f"compare/{CONT_BEFORE}...{CONT_AFTER}"):
             return self.response({
                 "status": "ahead",
@@ -51,6 +58,22 @@ class FakeTransport:
                 "commits": [{"sha": CONT_AFTER}],
                 "files": [{"filename": path} for path in self.continuation_paths],
             })
+        if endpoint.endswith(f"compare/{COORD_BEFORE}...{COORD_AFTER}"):
+            return self.response({
+                "status": "ahead",
+                "ahead_by": 1,
+                "merge_base_commit": {"sha": COORD_BEFORE},
+                "commits": [{"sha": COORD_AFTER}],
+                "files": [{"filename": "ops/coordination/leases.json"}],
+            })
+        if f"contents/ops/coordination/leases.json?ref=" in endpoint:
+            ref = endpoint.rsplit("=", 1)[-1]
+            leases = []
+            if self.coordination_touches_work and ref == COORD_AFTER:
+                leases = [{"resource": f"branch:{WORK_BRANCH}", "owner": {"branch": WORK_BRANCH}}]
+            payload = {"intents": [], "leases": leases, "revision": ref, "schemaVersion": "CoordinationState 0.1"}
+            encoded = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
+            return self.response({"encoding": "base64", "content": encoded})
         if endpoint.endswith(f"git/commits/{MAIN_AFTER}"):
             parents = [{"sha": MAIN_BEFORE}]
             if self.main_second_parent is not None:
@@ -112,7 +135,7 @@ def context(work_value=None):
     }
 
 
-def closure(after_context=None):
+def closure(after_context=None, *, include_coordination=False):
     changes = [
         {
             "kind": "source-head",
@@ -136,6 +159,14 @@ def closure(after_context=None):
             "after": MAIN_AFTER,
         },
     ]
+    if include_coordination:
+        changes.insert(2, {
+            "kind": "source-head",
+            "name": "coordination",
+            "branch": "coordination/leases",
+            "before": COORD_BEFORE,
+            "after": COORD_AFTER,
+        })
     return {
         "cycleId": CYCLE_ID,
         "status": "UNKNOWN",
@@ -145,23 +176,30 @@ def closure(after_context=None):
             "delta": {"durableChanges": changes},
             "aggregateReadback": {
                 "coveredDurableChanges": [],
-                "uncoveredDurableChanges": [
-                    "source-head:continuation:0",
-                    "source-head:control:1",
-                    "source-head:inspection:2",
-                ],
+                "uncoveredDurableChanges": (
+                    [
+                        "source-head:continuation:0",
+                        "source-head:control:1",
+                        "source-head:coordination:2",
+                        "source-head:inspection:3",
+                    ] if include_coordination else [
+                        "source-head:continuation:0",
+                        "source-head:control:1",
+                        "source-head:inspection:2",
+                    ]
+                ),
             },
         },
     }
 
 
 class ConcurrentCloseAttributionTests(unittest.TestCase):
-    def evidence(self, *, transport=None, after_context=None):
+    def evidence(self, *, transport=None, after_context=None, include_coordination=False):
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "context.json"
             path.write_text(json.dumps(context()), encoding="utf-8")
             return agent_cycle_close_recovery.noninterference_evidence(
-                closure(after_context),
+                closure(after_context, include_coordination=include_coordination),
                 context_path=str(path),
                 transport=transport or FakeTransport(),
             )
@@ -186,6 +224,23 @@ class ConcurrentCloseAttributionTests(unittest.TestCase):
         self.assertEqual(len(pulls), 1)
         self.assertEqual(pulls[0]["commitSha"], MAIN_AFTER)
         self.assertEqual(pulls[0]["baseSha"], MAIN_BEFORE)
+
+    def test_proves_coordination_drift_when_bound_work_never_appears(self):
+        evidence = self.evidence(include_coordination=True)
+        self.assertEqual(len(evidence["coveredChanges"]), 4)
+        self.assertEqual(evidence["coordinationReadback"]["branch"], "coordination/leases")
+        self.assertEqual(
+            len({state["bindingHash"] for state in evidence["coordinationReadback"]["states"]}),
+            1,
+        )
+        self.assertEqual(agent_cycle_close.verify_evidence(evidence), evidence)
+
+    def test_coordination_bound_work_touch_fails_closed(self):
+        with self.assertRaisesRegex(RuntimeError, "BOUND_WORK_COORDINATION_TOUCHED"):
+            self.evidence(
+                transport=FakeTransport(coordination_touches_work=True),
+                include_coordination=True,
+            )
 
     def test_bound_work_file_touch_fails_closed(self):
         transport = FakeTransport(
