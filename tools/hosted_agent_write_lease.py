@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from tools import agent_write_lifecycle as lifecycle
 from tools import hosted_agent_cycle, hosted_cycle_handle
+from tools.coordination_remote import GhApiTransport
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = hosted_agent_cycle.BUS_TITLE
@@ -253,7 +254,13 @@ def main(argv: list[str] | None = None) -> int:
             _write(Path(args.request).with_name("agent-write-lease-outer-request.json"), outer)
             request = derive_handle_request(outer, manifest, context)
             _write(args.request, request)
-        dispatch = prepare(request, manifest, context, meta=meta)
+        dispatch = prepare(
+            request,
+            manifest,
+            context,
+            meta=meta,
+            transport=GhApiTransport(),
+        )
         _write(args.dispatch, dispatch)
         print(json.dumps(dispatch, ensure_ascii=False))
         return 0
