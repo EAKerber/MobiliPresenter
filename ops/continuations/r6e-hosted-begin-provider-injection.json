@@ -9,16 +9,16 @@
   "completed": [
     "characterize-hosted-begin-provider-gap",
     "inject-provider-at-hosted-begin-boundary",
-    "add-work-observation-regression"
+    "add-work-observation-regression",
+    "qualify-hosted-begin-provider-fix"
   ],
   "remaining": [
-    "qualify-hosted-begin-provider-fix",
     "integrate-hosted-begin-provider-fix"
   ],
-  "nextAction": "Open and exact-head qualify the R6e PR. Merge only if Agent Ops, Coordination Guard and Supervisor Snapshot pass, then re-run the same Work-bound V0.4 R6 black-box begin through github-connector-tools.",
+  "nextAction": "Squash-merge PR #319 at exact head 81118fe014b8170ee882a199110d541bdf604a96, read back main, then mark integration complete and rerun the Work-bound R6 black-box V0.4 begin.",
   "lastKnownGood": {
-    "sha": "a6ade3c221c863013ae3a18d9d2cdbb1a05db0d3",
-    "checkpoint": "Live R6 canary exposed HOSTED_AGENT_WORK_AUTHORITY_UNKNOWN on Work-bound V0.4 begin. Root cause confirmed: hosted_agent_cycle._observe_work_ref constructed GitHubContinuationAuthority without provider after provider-boundary retirement. R6e now requires explicit provider for Work observation, forwards transport through begin_from_envelope, constructs GhApiTransport only at the explicit outer host, and adds missing-provider/injected-provider regressions."
+    "sha": "81118fe014b8170ee882a199110d541bdf604a96",
+    "checkpoint": "PR #319 exact head 81118fe passed Agent Ops run 35414033040, Coordination Guard run 35414033068 and Supervisor Snapshot run 35414033027."
   },
   "blockers": [],
   "handoffToWorkerId": null
