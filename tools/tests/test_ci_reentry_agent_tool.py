@@ -160,6 +160,13 @@ class CiReentryAgentToolTests(unittest.TestCase):
         self.assertEqual(concrete["requiredExecutionPermission"], "actions:write")
         self.assertIsNone(concrete["executionProvider"])
         self.assertTrue(all(item["method"] == "POST" for item in concrete["requests"]))
+        self.assertEqual(len(concrete["hostActions"]), 3)
+        self.assertTrue(
+            all(item["operation"] == "workflow-run.rerun" for item in concrete["hostActions"])
+        )
+        self.assertTrue(
+            all(item["toolSurface"] == "github-connector-tools" for item in concrete["hostActions"])
+        )
         self.assertFalse(concrete["authorizesMutation"])
 
     def test_head_drift_fails_closed(self):

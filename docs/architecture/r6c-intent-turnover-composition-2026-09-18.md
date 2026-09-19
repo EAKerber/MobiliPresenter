@@ -1,6 +1,6 @@
 # R6c — Agent Cycle intent-turnover composition
 
-Status: **implementation slice in progress**.
+Status: **integrated via PR #317. R6d follows up only on provider-host execution handoff; R6c semantics remain unchanged.**
 
 ## Problem discovered by R6Q
 
@@ -31,6 +31,8 @@ It derives exactly one next primitive:
 - `BLOCKED` / `NO_TURNOVER` otherwise.
 
 Execution is deliberately one-primitive-at-a-time through injected existing adapters. After any submission, authorities must be re-observed before another step. This makes interruption between release, close and begin an ordinary re-entry case rather than a new durable state machine.
+
+PR #317 proved this semantic composition and integrated it. R6d does not change the turnover state model; it formalizes the handoff from an already-derived primitive to the configured host/provider surface so Work-mode execution does not depend on the explicit CLI carrier.
 
 ## Boundary
 

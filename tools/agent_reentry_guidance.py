@@ -254,6 +254,7 @@ def observe_turnover_context(
         "handle": handle,
         "actor": actor,
         "currentIntent": current_intent,
+        "busIssueNumber": issue_number,
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,

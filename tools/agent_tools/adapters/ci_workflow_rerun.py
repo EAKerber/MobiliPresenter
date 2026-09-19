@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from tools import project_ci_observation
+from tools import project_ci_observation, provider_host_action
 from tools.semantics.branches import parse_branch_name
 
 REPOSITORY = "EAKerber/MobiliPresenter"
@@ -101,9 +101,27 @@ def build_concrete(
 ) -> dict[str, Any]:
     value = _input(request)
     observed = _bind_observation(value, context)
+    repository = context.get("repository") or REPOSITORY
+    run_attempts = {
+        item.get("id"): item.get("runAttempt")
+        for item in observed.get("workflows") or []
+        if isinstance(item, dict)
+    }
+    host_actions = [
+        provider_host_action.workflow_rerun(
+            repository=repository,
+            run_id=run_id,
+            head_sha=value["headSha"],
+            run_attempt=_positive_int(
+                run_attempts.get(run_id),
+                "AGENT_TOOL_CI_REENTRY_RUN_ATTEMPT_INVALID",
+            ),
+        )
+        for run_id in value["runIds"]
+    ]
     return {
         "kind": "github-workflow-rerun-plan",
-        "repository": context.get("repository") or REPOSITORY,
+        "repository": repository,
         "prNumber": value["prNumber"],
         "headRef": observed.get("headRef"),
         "headSha": value["headSha"],
@@ -115,6 +133,7 @@ def build_concrete(
             }
             for run_id in value["runIds"]
         ],
+        "hostActions": host_actions,
         "executionStatus": "PLAN_ONLY",
         "requiredExecutionPermission": "actions:write",
         "executionProvider": None,
