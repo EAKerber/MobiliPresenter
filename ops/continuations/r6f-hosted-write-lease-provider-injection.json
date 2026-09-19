@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6f-hosted-write-lease-provider-injection",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6f-hosted-write-lease-provider-injection",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "characterize-hosted-write-lease-provider-gap",
+    "inject-provider-at-hosted-write-lease-prepare-boundary",
+    "add-hosted-write-lease-provider-regression",
+    "qualify-hosted-write-lease-provider-fix",
+    "integrate-hosted-write-lease-provider-fix"
+  ],
+  "nextAction": "Patch the explicit Hosted Agent Write Lease CLI host so prepare receives GhApiTransport at the outer host boundary. Keep agent_write_lifecycle provider-explicit and fail-closed; add regression proving CLI injection, qualify exact-head CI, integrate, then resume r6-black-box-paved-path-canary ownership acquisition.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
