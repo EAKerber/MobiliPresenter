@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6l-close-recovery-provider-diagnostics",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6l-close-recovery-provider-diagnostics",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "characterize-hosted-recovery-evidence-gap",
+    "inject-explicit-recovery-provider",
+    "preserve-recovery-error-diagnostic",
+    "add-fail-closed-regressions",
+    "qualify-and-integrate-r6l",
+    "retry-r6-live-close"
+  ],
+  "nextAction": "Patch only the hosted close-recovery seam: inject the concrete carrier at the explicit host boundary, allow strict recovery-error propagation internally for diagnostics while preserving external fail-closed close semantics, add regressions, qualify exact-head CI, integrate, then retry the historical R6 canary close. Do not widen non-interference, add authority/state/lifecycle, or replay operations.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
