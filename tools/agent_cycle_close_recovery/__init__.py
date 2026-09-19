@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import re
 import tempfile
@@ -16,6 +17,8 @@ from tools.canonical import stable_hash
 REPOSITORY = "EAKerber/MobiliPresenter"
 CONTROL_BRANCH = "main"
 CONTINUATION_BRANCH = "coordination/continuations"
+COORDINATION_BRANCH = "coordination/leases"
+COORDINATION_PATH = "ops/coordination/leases.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
 CHANGE_REF_RE = re.compile(r"^source-head:([a-z][a-z0-9-]*):(0|[1-9][0-9]*)$")
 MAX_FIRST_PARENT_DEPTH = 128
@@ -96,7 +99,7 @@ def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
         not isinstance(changes, list)
         or not isinstance(covered, list)
         or not isinstance(uncovered, list)
-        or len(uncovered) != 3
+        or len(uncovered) not in {3, 4}
         or any(not isinstance(item, str) for item in [*covered, *uncovered])
         or len(set(covered)) != len(covered)
         or len(set(uncovered)) != len(uncovered)
@@ -127,21 +130,26 @@ def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
         selected.append(change)
     if set(covered) | set(uncovered) != set(all_ids):
         return None
-    if set(indexed) != {"continuation", "control", "inspection"}:
+    expected = {"continuation", "control", "inspection"}
+    if "coordination" in indexed:
+        expected.add("coordination")
+    if set(indexed) != expected:
         return None
 
     continuation = indexed["continuation"]
     control = indexed["control"]
     inspection = indexed["inspection"]
+    coordination = indexed.get("coordination")
     if (
         continuation.get("branch") != CONTINUATION_BRANCH
         or control.get("branch") != CONTROL_BRANCH
         or inspection.get("branch") != CONTROL_BRANCH
+        or (coordination is not None and coordination.get("branch") != COORDINATION_BRANCH)
         or control.get("before") != inspection.get("before")
         or control.get("after") != inspection.get("after")
     ):
         return None
-    for change in (continuation, control, inspection):
+    for change in selected:
         if (
             not isinstance(change.get("before"), str)
             or not isinstance(change.get("after"), str)
@@ -151,7 +159,6 @@ def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
         ):
             return None
     return selected
-
 
 def _continuation_noninterference(
     before_sha: str,
@@ -200,6 +207,99 @@ def _continuation_noninterference(
         "after": after_sha,
         "workPath": work_path,
         "changedPaths": paths,
+    }
+
+
+def _coordination_binding_projection(state: Any, *, work_branch: str) -> dict[str, Any]:
+    if not isinstance(state, dict):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_STATE_INVALID")
+    projection: dict[str, list[Any]] = {}
+    for key in ("intents", "leases"):
+        records = state.get(key)
+        if not isinstance(records, list):
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_STATE_INVALID")
+        matched = []
+        for record in records:
+            if not isinstance(record, dict):
+                raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_STATE_INVALID")
+            if work_branch in json.dumps(record, sort_keys=True, separators=(",", ":")):
+                matched.append(record)
+        projection[key] = matched
+    return projection
+
+
+def _coordination_state_at(sha: str, *, transport: Any) -> dict[str, Any]:
+    payload = _get_json(
+        transport,
+        f"repos/{REPOSITORY}/contents/{COORDINATION_PATH}?ref={sha}",
+        "AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_CONTENT_UNAVAILABLE",
+    )
+    if (
+        not isinstance(payload, dict)
+        or payload.get("encoding") != "base64"
+        or not isinstance(payload.get("content"), str)
+    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_CONTENT_INVALID")
+    try:
+        raw = base64.b64decode(payload["content"]).decode("utf-8")
+        value = json.loads(raw)
+    except Exception as exc:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_CONTENT_INVALID") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_CONTENT_INVALID")
+    return value
+
+
+def _coordination_noninterference(
+    before_sha: str,
+    after_sha: str,
+    *,
+    work_branch: str,
+    transport: Any,
+) -> dict[str, Any]:
+    if _current_branch_head(COORDINATION_BRANCH, transport=transport) != after_sha:
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_HEAD_MISMATCH")
+    comparison = _get_json(
+        transport,
+        f"repos/{REPOSITORY}/compare/{before_sha}...{after_sha}",
+        "AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_COMPARE_UNAVAILABLE",
+    )
+    merge_base = comparison.get("merge_base_commit") if isinstance(comparison, dict) else None
+    commits = comparison.get("commits") if isinstance(comparison, dict) else None
+    ahead_by = comparison.get("ahead_by") if isinstance(comparison, dict) else None
+    if (
+        not isinstance(comparison, dict)
+        or comparison.get("status") != "ahead"
+        or not isinstance(merge_base, dict)
+        or merge_base.get("sha") != before_sha
+        or not isinstance(ahead_by, int)
+        or isinstance(ahead_by, bool)
+        or ahead_by <= 0
+        or not isinstance(commits, list)
+        or len(commits) != ahead_by
+    ):
+        raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_COMPARE_INVALID")
+    shas = [before_sha]
+    for commit in commits:
+        sha = commit.get("sha") if isinstance(commit, dict) else None
+        if not isinstance(sha, str) or SHA_RE.fullmatch(sha) is None:
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_COORDINATION_COMPARE_INVALID")
+        shas.append(sha)
+    states = []
+    for sha in shas:
+        projection = _coordination_binding_projection(
+            _coordination_state_at(sha, transport=transport),
+            work_branch=work_branch,
+        )
+        if projection != {"intents": [], "leases": []}:
+            raise RuntimeError("AGENT_CYCLE_CLOSE_NONINTERFERENCE_BOUND_WORK_COORDINATION_TOUCHED")
+        states.append({"sha": sha, "bindingHash": stable_hash(projection)})
+    return {
+        "branch": COORDINATION_BRANCH,
+        "before": before_sha,
+        "after": after_sha,
+        "workBranch": work_branch,
+        "states": states,
     }
 
 
@@ -318,12 +418,21 @@ def noninterference_evidence(
     by_name = {change["name"]: change for change in changes}
     continuation = by_name["continuation"]
     control = by_name["control"]
+    coordination = by_name.get("coordination")
     continuation_readback = _continuation_noninterference(
         continuation["before"],
         continuation["after"],
         work_id=work_id,
         transport=carrier,
     )
+    coordination_readback = None
+    if coordination is not None:
+        coordination_readback = _coordination_noninterference(
+            coordination["before"],
+            coordination["after"],
+            work_branch=work_branch,
+            transport=carrier,
+        )
     main_pulls = _unrelated_main_pr_chain(
         control["before"],
         control["after"],
@@ -341,6 +450,7 @@ def noninterference_evidence(
         "workStateHash": stable_hash(before_work),
         "coveredChanges": changes,
         "continuationReadback": continuation_readback,
+        "coordinationReadback": coordination_readback,
         "controlReadback": {
             "branch": CONTROL_BRANCH,
             "before": control["before"],
