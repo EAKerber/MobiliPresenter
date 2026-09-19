@@ -106,6 +106,7 @@ def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
 
     all_ids: list[str] = []
     indexed: dict[str, dict[str, Any]] = {}
+    selected: list[dict[str, Any]] = []
     for index, change in enumerate(changes):
         change_id = _change_id(change, index)
         if change_id is None:
@@ -113,13 +114,17 @@ def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
         all_ids.append(change_id)
         if change_id not in uncovered:
             continue
+        name = change.get("name") if isinstance(change, dict) else None
         if (
             not isinstance(change, dict)
             or change.get("kind") != "source-head"
-            or change.get("name") in indexed
+            or not isinstance(name, str)
+            or not name
+            or name in indexed
         ):
             return None
-        indexed[change["name"]] = change
+        indexed[name] = change
+        selected.append(change)
     if set(covered) | set(uncovered) != set(all_ids):
         return None
     if set(indexed) != {"continuation", "control", "inspection"}:
@@ -145,10 +150,7 @@ def _ambient_uncovered_changes(closure: Any) -> list[dict[str, Any]] | None:
             or SHA_RE.fullmatch(change["after"]) is None
         ):
             return None
-    return [
-        change for change in changes
-        if _change_id(change, changes.index(change)) in uncovered
-    ]
+    return selected
 
 
 def _continuation_noninterference(
@@ -170,7 +172,8 @@ def _continuation_noninterference(
     commits = comparison.get("commits") if isinstance(comparison, dict) else None
     ahead_by = comparison.get("ahead_by") if isinstance(comparison, dict) else None
     if (
-        comparison.get("status") != "ahead"
+        not isinstance(comparison, dict)
+        or comparison.get("status") != "ahead"
         or not isinstance(merge_base, dict)
         or merge_base.get("sha") != before_sha
         or not isinstance(ahead_by, int)
