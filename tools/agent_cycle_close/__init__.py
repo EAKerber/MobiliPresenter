@@ -21,7 +21,8 @@ EVIDENCE_KINDS = {
     "git-mutation-plan-readback",
     "agent-cycle-noninterference-readback",
 }
-NONINTERFERENCE_SCHEMA = "AgentCycleNonInterferenceReadback 0.1"
+NONINTERFERENCE_SCHEMA = "AgentCycleNonInterferenceReadback 0.2"
+LEGACY_NONINTERFERENCE_SCHEMA = "AgentCycleNonInterferenceReadback 0.1"
 RECEIPT_STATUSES = {"PASS", "UNKNOWN", "BLOCKED"}
 
 
@@ -181,13 +182,15 @@ def _source_head_change(value: Any) -> dict[str, Any]:
 
 
 def _verify_noninterference_evidence(item: dict[str, Any]) -> dict[str, Any]:
-    fields = {
+    schema = item.get("schemaVersion")
+    base_fields = {
         "kind", "schemaVersion", "cycleId", "workId", "workBranch",
         "workPrNumber", "workStateHash", "coveredChanges",
         "continuationReadback", "controlReadback", "readOnly",
         "semanticAuthority", "authorizesMutation", "evidenceHash",
     }
-    if set(item) != fields or item.get("schemaVersion") != NONINTERFERENCE_SCHEMA:
+    fields = base_fields if schema == LEGACY_NONINTERFERENCE_SCHEMA else base_fields | {"coordinationReadback"}
+    if set(item) != fields or schema not in {LEGACY_NONINTERFERENCE_SCHEMA, NONINTERFERENCE_SCHEMA}:
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
     if (
         item.get("kind") != "agent-cycle-noninterference-readback"
@@ -209,19 +212,25 @@ def _verify_noninterference_evidence(item: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
 
     covered = item.get("coveredChanges")
-    if not isinstance(covered, list) or len(covered) != 3:
+    if not isinstance(covered, list):
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
     changes = [_source_head_change(change) for change in covered]
     by_name = {change["name"]: change for change in changes}
-    if len(by_name) != 3 or set(by_name) != {"continuation", "control", "inspection"}:
+    expected = {"continuation", "control", "inspection"}
+    coordination_readback = None if schema == LEGACY_NONINTERFERENCE_SCHEMA else item.get("coordinationReadback")
+    if coordination_readback is not None:
+        expected.add("coordination")
+    if len(by_name) != len(changes) or set(by_name) != expected or len(changes) != len(expected):
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
     continuation = by_name["continuation"]
     control = by_name["control"]
     inspection = by_name["inspection"]
+    coordination = by_name.get("coordination")
     if (
         continuation["branch"] != "coordination/continuations"
         or control["branch"] != "main"
         or inspection["branch"] != "main"
+        or (coordination is not None and coordination["branch"] != "coordination/leases")
         or control["before"] != inspection["before"]
         or control["after"] != inspection["after"]
         or control["before"] == control["after"]
@@ -247,6 +256,37 @@ def _verify_noninterference_evidence(item: dict[str, Any]) -> dict[str, Any]:
         or expected_work_path in changed_paths
     ):
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+
+    if schema == NONINTERFERENCE_SCHEMA:
+        if coordination is None:
+            if coordination_readback is not None:
+                raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+        else:
+            if not isinstance(coordination_readback, dict) or set(coordination_readback) != {
+                "branch", "before", "after", "workBranch", "states"
+            }:
+                raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
+            states = coordination_readback.get("states")
+            if (
+                coordination_readback.get("branch") != coordination["branch"]
+                or coordination_readback.get("before") != coordination["before"]
+                or coordination_readback.get("after") != coordination["after"]
+                or coordination_readback.get("workBranch") != item["workBranch"]
+                or not isinstance(states, list)
+                or len(states) < 2
+                or any(
+                    not isinstance(state, dict)
+                    or set(state) != {"sha", "bindingHash"}
+                    or not isinstance(state.get("sha"), str)
+                    or not isinstance(state.get("bindingHash"), str)
+                    or len(state["bindingHash"]) != 64
+                    for state in states
+                )
+                or states[0]["sha"] != coordination["before"]
+                or states[-1]["sha"] != coordination["after"]
+                or len({state["bindingHash"] for state in states}) != 1
+            ):
+                raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_INVALID")
 
     control_readback = item.get("controlReadback")
     if not isinstance(control_readback, dict) or set(control_readback) != {
@@ -284,7 +324,6 @@ def _verify_noninterference_evidence(item: dict[str, Any]) -> dict[str, Any]:
     if item.get("evidenceHash") != stable_hash(body):
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_EVIDENCE_HASH_MISMATCH")
     return deepcopy(item)
-
 
 def _context_work_item(context: Any, work_id: str) -> dict[str, Any]:
     if not isinstance(context, dict):
