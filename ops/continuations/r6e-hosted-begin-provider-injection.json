@@ -10,15 +10,14 @@
     "characterize-hosted-begin-provider-gap",
     "inject-provider-at-hosted-begin-boundary",
     "add-work-observation-regression",
-    "qualify-hosted-begin-provider-fix"
-  ],
-  "remaining": [
+    "qualify-hosted-begin-provider-fix",
     "integrate-hosted-begin-provider-fix"
   ],
-  "nextAction": "Squash-merge PR #319 at exact head 81118fe014b8170ee882a199110d541bdf604a96, read back main, then mark integration complete and rerun the Work-bound R6 black-box V0.4 begin.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": "81118fe014b8170ee882a199110d541bdf604a96",
-    "checkpoint": "PR #319 exact head 81118fe passed Agent Ops run 35414033040, Coordination Guard run 35414033068 and Supervisor Snapshot run 35414033027."
+    "sha": "9e1ad21c1226de09e5965077c6e17082e013a28a",
+    "checkpoint": "PR #319 exact-head qualified and squash-merged to main 9e1ad21; integration read back."
   },
   "blockers": [],
   "handoffToWorkerId": null
