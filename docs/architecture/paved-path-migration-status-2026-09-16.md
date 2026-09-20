@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R6 is live-proven and integrated through the fresh positive + negative black-box canary in PR #328. R7 is now eligible. The current R7 recut promotes the existing semantic Work-bound entry composition as the operational default and demotes direct `begin` choreography to diagnostic/recovery use; R8 remains the mandatory subtraction milestone.**
+Status: **R6 is live-proven through PR #328 and R7 is promoted through PR #329. R8 is active as measurable subtraction; its first slice retires the R2 `journey_shadow` measurement scaffolding with no runtime replacement.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
@@ -115,7 +115,7 @@ The lifecycle discontinuity discovered during R6a remains engine/recovery behavi
 | Paved surface | Old normal-path knowledge eligible for demotion after R6 | R7/R8 obligation |
 | --- | --- | --- |
 | JourneyProjection | manual multi-authority stage interpretation | make projection/default semantic view; demote redundant interpretation helpers |
-| `journey_shadow` | none; measurement scaffolding | delete after stable positive + negative R6 evidence |
+| `journey_shadow` | none; measurement scaffolding | **retired in R8** after R6 live proof + R7 promotion; no replacement |
 | `ensure_ownership` | manual lease request/CAS/binding construction | make manual lease choreography internal/recovery-only |
 | authoring composition | direct canonical Git mutation/CAS plumbing | make direct request construction internal/recovery-only |
 | delivery composition | manual Delivery precondition/request assembly | make manual Delivery request construction internal/recovery-only |
@@ -164,11 +164,10 @@ A stacked R6c qualification run subsequently exposed one missed environment edge
 
 ## Immediate next steps
 
-1. Qualify the final PR #315 documentation head and require the same real-job PASS evidence already observed on functional head `ff463e7a695aacc5ad3e349ab290b28395204a7f`.
-2. Integrate PR #315 through governed Delivery only after final exact-head CI remains green, then complete the provider-boundary Work.
-3. Preserve the earlier `action_required` / zero-job runs as historical CI re-entry evidence; they are neither PASS nor test failure.
-4. Reopen the parked R6 black-box canary only after integration and run the positive + negative public-façade traversal through the configured host/provider path.
-5. Begin R7 only after live R6 PASS; R7 must change the operational default and demote at least one legacy/manual surface.
-6. Execute R8 as mandatory measurable subtraction, including `journey_shadow` retirement when justified and removal/privatization of superseded normal-path protocol surfaces.
+1. Qualify and integrate the R8 `journey_shadow` retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
+2. Inventory remaining direct-entry callers and demote/delete only callers that no longer serve explicit recovery/test purposes.
+3. Inventory duplicated hosted-bus I/O and CLI-coupled defaults; consolidate only where at least two concrete clients are actually reduced.
+4. Keep R8 subtractive: no replacement Journey layer, compatibility framework, alternate authority or new lifecycle.
+5. Close the migration cycle only after the remaining normal-path/public surfaces are demonstrably smaller than the pre-R7 baseline.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**
