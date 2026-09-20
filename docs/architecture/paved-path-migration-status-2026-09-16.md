@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R1-R5, hardening, R6a and the public-surface proof are integrated. The former in-process-only executor interpretation is superseded. PR #315 now implements provider-boundary retirement by requiring explicit provider injection in paved semantic/core/guard functions while keeping concrete GitHub transport construction at explicit host/CLI/live-sensor adapters. Provider-boundary exact-head qualification/integration and the live positive + negative R6 canary remain pending; R7 remains blocked.**
+Status: **R6 is live-proven and integrated through the fresh positive + negative black-box canary in PR #328. R7 is now eligible. The current R7 recut promotes the existing semantic Work-bound entry composition as the operational default and demotes direct `begin` choreography to diagnostic/recovery use; R8 remains the mandatory subtraction milestone.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
