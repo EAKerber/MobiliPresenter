@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools import agent_cycle_identity, hosted_agent_cycle, hosted_cycle_handle
+from tools.coordination_remote import GhApiTransport
 from tools.agent_tools import admission, contracts, mutation_dispatch, resolver
 from tools.canonical import stable_hash
 
@@ -392,7 +393,14 @@ def main(argv: list[str] | None = None) -> int:
                 _write(Path(args.request).with_name("agent-tool-outer-request.json"), outer)
                 request = derive_handle_request(outer, manifest, context)
                 _write(args.request, request)
-            outcome = prepare_request(request, manifest, context, meta=meta)
+            carrier = GhApiTransport()
+            outcome = prepare_request(
+                request,
+                manifest,
+                context,
+                meta=meta,
+                transport=carrier,
+            )
             _write(args.plan, outcome["plan"])
             if outcome["kind"] == "dispatch":
                 _write(args.proof_set, outcome["proofSet"])
