@@ -19,7 +19,7 @@ from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 TOOLBOX_COMMANDS = {
-    "enter", "begin", "continue", "close", "close-review", "reflection-eligibility", "operational-quiescence", "status", "doctor", "verify", "checkpoint", "handoff",
+    "continue", "close", "close-review", "reflection-eligibility", "operational-quiescence", "status", "doctor", "verify", "checkpoint", "handoff",
     "git prune-plan", "git mutation-plan",
 }
 _RUNTIME_TOOL_SURFACE = "--runtime-tool-surface"
@@ -99,10 +99,13 @@ def _bootstrap_projection(reentry: dict | None = None) -> dict:
         for role, entries in policy["entryProfiles"].items()
     }
     projection = {
-        "nextSafeAction": "BEGIN_AGENT_CYCLE",
-        "commandTemplate": (
-            "python3 tools/agent.py begin --role <role> --intent <intent> --json"
-        ),
+        "nextSafeAction": "OBSERVE_WORK",
+        "commandTemplate": "python3 tools/agent.py status --work-id <work-id> --json",
+        "pavedEntry": None,
+        "legacyDirectBegin": {
+            "surface": "agent.py begin",
+            "disposition": "RECOVERY_ONLY",
+        },
         "roleContractPattern": "docs/kickstarts/roles/<role>.md",
         "entryProfiles": entry_profiles,
         "readOnly": True,
@@ -112,12 +115,18 @@ def _bootstrap_projection(reentry: dict | None = None) -> dict:
     if reentry is None:
         return projection
     action = reentry["nextSafeAction"]
+    work_id = reentry["workRef"]["workId"]
     projection.update({
         "nextSafeAction": action,
-        "commandTemplate": (
-            f"python3 tools/agent.py enter --work-id {reentry['workRef']['workId']} "
-            "--role <role> --intent <intent> --runtime-tool-surface <surface> "
-            "--runtime-tool-surfaces-complete --apply --json"
+        "commandTemplate": None,
+        "pavedEntry": (
+            {
+                "surface": "journey-entry",
+                "implementation": "tools.agent_tools.journey_entry.compose_entry",
+                "executionBoundary": "host-provider",
+                "toolSurface": "github-connector-tools",
+                "workId": work_id,
+            }
             if action == "BEGIN_NEW_CYCLE"
             else None
         ),
@@ -357,92 +366,6 @@ def _status_arguments(argv: list[str]) -> tuple[bool, str | None]:
     return as_json, work_id
 
 
-def _enter_arguments(argv: list[str]) -> tuple[bool, str, str, str, bool]:
-    as_json = False
-    work_id = None
-    role = None
-    declared_intent = None
-    apply = False
-    index = 2
-    while index < len(argv):
-        token = argv[index]
-        if token == "--json":
-            as_json = True
-            index += 1
-            continue
-        if token == "--apply":
-            apply = True
-            index += 1
-            continue
-        if token in {"--work-id", "--role", "--intent"}:
-            if index + 1 >= len(argv):
-                raise RuntimeError(f"ARGUMENT_VALUE_REQUIRED:{token}")
-            value = argv[index + 1]
-            if token == "--work-id":
-                work_id = value
-            elif token == "--role":
-                role = value
-            else:
-                declared_intent = value
-            index += 2
-            continue
-        for name in ("--work-id", "--role", "--intent"):
-            prefix = f"{name}="
-            if token.startswith(prefix):
-                value = token[len(prefix):]
-                if name == "--work-id":
-                    work_id = value
-                elif name == "--role":
-                    role = value
-                else:
-                    declared_intent = value
-                break
-        else:
-            raise RuntimeError(f"UNEXPECTED_ENTER_ARGUMENT:{token}")
-        index += 1
-    if not isinstance(work_id, str) or not work_id:
-        raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--work-id")
-    if not isinstance(role, str) or not role:
-        raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--role")
-    if not isinstance(declared_intent, str) or not declared_intent:
-        raise RuntimeError("ARGUMENT_VALUE_REQUIRED:--intent")
-    return as_json, work_id, role, declared_intent, apply
-
-
-def command_enter(
-    argv: list[str],
-    *,
-    tool_surfaces: list[str],
-    inventory_complete: bool,
-) -> int:
-    as_json, work_id, role, declared_intent, apply = _enter_arguments(argv)
-    journey_entry = importlib.import_module("tools.agent_tools.journey_entry")
-    from tools.coordination_remote import GhApiTransport
-
-    payload = journey_entry.compose_entry(
-        role=role,
-        declared_intent=declared_intent,
-        work_id=work_id,
-        tool_surfaces=sorted(set(tool_surfaces)),
-        inventory_complete=inventory_complete,
-        submit=apply,
-        transport=GhApiTransport(),
-    )
-    if as_json:
-        print(json.dumps(payload, indent=2, ensure_ascii=False))
-    else:
-        print(
-            "AGENT ENTER\n"
-            f"  work: {work_id}\n"
-            f"  status: {payload['status']}\n"
-            f"  disposition: {payload['disposition']}\n"
-            f"  submitted: {str(payload['submitted']).lower()}"
-        )
-        if payload.get("blockers"):
-            print(f"  blockers: {', '.join(payload['blockers'])}")
-    return ERROR_EXIT if payload["status"] in {"BLOCKED", "UNKNOWN"} else 0
-
-
 def _continue_arguments(argv: list[str]) -> tuple[bool, str, str | None, bool]:
     as_json = False
     work_id = None
@@ -564,8 +487,8 @@ def _runtime_surface_base(
     inventory_complete: bool,
 ) -> dict:
     command = argv[1] if len(argv) > 1 else None
-    if command not in {"enter", "begin", "continue", "doctor"}:
-        raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRE_ENTER_BEGIN_CONTINUE_OR_DOCTOR")
+    if command not in {"begin", "continue", "doctor"}:
+        raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRE_BEGIN_OR_DOCTOR")
     derived = runtime_provider_adapter.observations_from_tool_surfaces(
         surfaces,
         inventory_complete=inventory_complete,
@@ -590,8 +513,6 @@ def _run_with_runtime_tool_surfaces(argv: list[str]) -> int:
         if len(clean) >= 2 and clean[1] == "status":
             as_json, work_id = _status_arguments(clean)
             return command_status(as_json, work_id=work_id)
-        if len(clean) >= 2 and clean[1] == "enter":
-            raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRED_FOR_ENTER")
         if len(clean) >= 2 and clean[1] == "continue":
             raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRED_FOR_CONTINUE")
         return _commands.main()
@@ -600,12 +521,6 @@ def _run_with_runtime_tool_surfaces(argv: list[str]) -> int:
         surfaces,
         inventory_complete=inventory_complete,
     )
-    if len(clean) >= 2 and clean[1] == "enter":
-        return command_enter(
-            clean,
-            tool_surfaces=surfaces,
-            inventory_complete=inventory_complete,
-        )
     if len(clean) >= 2 and clean[1] == "continue":
         return command_continue(
             clean,
