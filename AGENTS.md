@@ -73,6 +73,8 @@ Comece pelo estado/tooling corrente, não pela reconstrução do histórico:
 python3 tools/agent.py status
 ```
 
+Para trabalho normal vinculado a um Work, observe a reentrada com `python3 tools/agent.py status --work-id <work-id> --json` e siga a entrada semântica projetada. Quando um novo Agent Cycle for necessário, o default paved é `python3 tools/agent.py enter ...`; `begin` direto fica restrito a diagnóstico, testes e recovery explícito, não ao fluxo Work-bound normal.
+
 Use `python3 tools/agent.py doctor` quando a capacidade do ambiente importar. `doctor` diferencia executables/providers locais de capabilities lógicas; uma capability `UNKNOWN` pode exigir observação explícita de provider externo por `tools/runtime_capabilities.py`. Contratos semânticos transversais vivem em `ops/semantics/registry.json`.
 
 Contratos específicos de papel vivem diretamente em `docs/kickstarts/roles/<role>.md`. O Git preserva sua evolução histórica; não mantenha pointers `*-current.md` ou cópias versionadas como fontes operacionais paralelas. Estado, capabilities, tools e procedimento corrente continuam sendo descobertos pelas authorities e tooling canônicos, não copiados para o contrato da role.
