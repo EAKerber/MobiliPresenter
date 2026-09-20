@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/r6m-hosted-agent-tool-provider-injection",
-  "prNumber": null,
+  "prNumber": 327,
   "dependsOn": [
     "r6-black-box-paved-path-canary"
   ],
