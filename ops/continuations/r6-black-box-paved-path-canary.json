@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "IN_PROGRESS",
   "branch": "work/operations/r6-black-box-live-canary",
-  "prNumber": null,
+  "prNumber": 328,
   "dependsOn": [
     "r5-delivery-finalization-composition"
   ],
