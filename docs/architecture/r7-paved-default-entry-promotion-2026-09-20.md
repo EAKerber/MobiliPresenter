@@ -4,60 +4,60 @@ Status: **candidate**.
 
 ## Purpose
 
-R6 proved the provider-backed paved path with a fresh positive + negative live canary and governed Delivery. R7 therefore stops treating the semantic entry composition as optional migration scaffolding and makes it the normal Work-bound entry surface.
+R6 is live-proven through the fresh positive + negative black-box canary and governed Delivery in PR #328. R7 now changes the default operational model instead of adding another execution wrapper.
 
-This recut does not add a new lifecycle, authority, state machine, provider bridge or protocol. It exposes the already-integrated `tools.agent_tools.journey_entry.compose_entry` through the stable `tools/agent.py` facade as `enter`.
+The already-integrated semantic entry composition becomes the advertised Work-bound entry surface. Direct Agent Cycle `begin` remains implemented for diagnostics, tests and explicit recovery, but is removed from the stable public toolbox surface.
 
 ## Default-path change
 
-For normal Work-bound execution the sequence becomes:
+The public bootstrap projection now behaves as follows:
 
 ```text
-agent.py status --work-id <work-id>
-        |
-        v
-BEGIN_NEW_CYCLE
-        |
-        v
-agent.py enter --work-id <work-id> --role <role> --intent <intent> ...
-        |
-        v
-existing JourneyEntryComposition -> canonical Hosted Agent Cycle
+no Work selected
+  -> OBSERVE_WORK
+  -> status --work-id <work-id>
+
+Work requires a new cycle
+  -> bootstrap.pavedEntry
+     surface: journey-entry
+     implementation: tools.agent_tools.journey_entry.compose_entry
+     executionBoundary: host-provider
+     toolSurface: github-connector-tools
 ```
 
-`status --work-id` now projects `enter` for `BEGIN_NEW_CYCLE`. The manager-gitops role contract and permanent agent rules identify this as the normal path.
+The projection intentionally does not emit a shell/CLI execution command for hosted entry. R6d already established that direct CLI apply uses `GhApiTransport` and is a bounded CLI/recovery adapter, not the normal provider-backed path.
 
 ## Demotion in the same migration window
 
-Direct `agent.py begin` remains available only for diagnostic, tests and explicit recovery use. It is no longer the documented/default entry for Work-bound normal operation.
+`agent.py begin` is removed from `TOOLBOX_COMMANDS`, the stable public façade inventory. The underlying command remains reachable for diagnostic/test/recovery cases so R7 does not destroy break-glass capability.
 
-That demotes the old normal-path knowledge of:
+The manager-gitops role contract and permanent agent guidance no longer present direct `begin` as normal Work-bound entry.
 
-- manually choosing direct Agent Cycle begin;
-- treating the local context builder as equivalent to hosted Work-bound entry;
-- reconstructing hosted entry mechanics outside `JourneyEntryComposition`.
-
-R8 may further privatize or delete direct-entry surfaces once recovery consumers are inventoried.
+This demotes the old normal-path knowledge of manually choosing Agent Cycle begin and treating a local/CLI begin as equivalent to provider-backed hosted entry.
 
 ## Safety and authority
 
-`enter` delegates to `JourneyEntryComposition 0.2`. It does not implement begin itself.
+No new command, lifecycle, authority, state machine, provider selector, executor bridge or compatibility layer is introduced.
 
-The existing composer remains responsible for Work observation, canonical begin request construction, idempotent reuse, provider-backed submission, handle validation and fail-closed outcomes. Runtime ToolSurface inventory is still required; absence remains blocked/unknown rather than falling back to shell/CLI transport.
+The normal entry implementation remains `JourneyEntryComposition 0.2`, which delegates to canonical Work, Hosted Agent Cycle and handle contracts. The configured host/provider remains `github-connector-tools`; shell `gh`, raw HTTP and local git are not promoted.
+
+`bootstrap.pavedEntry` is a read-only projection. It authorizes no mutation and does not become an authority.
 
 ## Promotion evidence
 
 R7 requires:
 
-1. regressions proving the bootstrap projection selects `enter`, not direct `begin`, for Work-bound `BEGIN_NEW_CYCLE`;
-2. a regression proving the facade delegates to the existing Journey entry composer;
-3. exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS;
-4. branch/PR integration with no new authority or lifecycle.
+1. R6 live proof already integrated in PR #328;
+2. regression that direct `begin` is no longer advertised in the stable toolbox;
+3. regression that Work-bound `BEGIN_NEW_CYCLE` projects the existing semantic host/provider entry;
+4. exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS;
+5. integration through the normal branch/PR path.
 
 ## Migration accounting
 
-- added public normal-path surface: `agent.py enter`;
-- promoted existing implementation: `journey_entry.compose_entry`;
-- demoted old normal-path surface: direct `agent.py begin`;
-- net semantic model: one Work-bound entry model over the existing Agent Cycle primitive;
-- R8 subtraction target: delete/privatize obsolete direct-entry and migration-shadow surfaces after recovery-use inventory.
+- new permanent orchestration modules: **0**;
+- new mutation surfaces: **0**;
+- promoted existing semantic surface: `journey-entry`;
+- demoted public normal-path surface: direct `agent.py begin`;
+- provider default: unchanged, `github-connector-tools`;
+- R8 subtraction target: inventory and remove/privatize obsolete direct-entry callers plus temporary migration shadows such as `journey_shadow`.
