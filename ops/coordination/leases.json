@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "f0ea6c217c3d2b1d28898342e3b1ec5dbd1ebc16",
+  "leases": [
+    {
+      "leaseId": "agent-write-c75b4bcb9cb585b50e892948:0",
+      "resource": "branch:work/operations/r6-black-box-live-canary",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "r6-fresh-after-r6m-20260920",
+        "branch": "work/operations/r6-black-box-live-canary",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-6a554dccb69acab459323e1a",
+      "acquiredAt": "2026-09-20T22:41:44Z",
+      "renewedAt": "2026-09-20T22:41:44Z",
+      "expiresAt": "2026-09-20T23:41:44Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "d5943fb7b7f31e877721e01bf23f3715e463e598",
   "schemaVersion": "CoordinationState 0.1"
 }
