@@ -22,13 +22,19 @@ Artifacts, briefs, snapshots, receipts, handoffs, Agent Bus e conversa são evid
 
 ## Bootstrap
 
-Comece pela entrada canônica do Agent Cycle quando disponível:
+Comece pelo Work e pela projeção semântica de reentrada:
 
 ```bash
-python3 tools/agent.py begin --role manager-gitops --intent <intent> --machine-scope <scope> --json
+python3 tools/agent.py status --work-id <work-id> --json
 ```
 
-O contexto emitido determina capabilities, Agent Tools, guards, observations e obrigações de fechamento correntes. Não reconstrua manualmente uma sequência equivalente nem copie uma lista de ferramentas para este contrato.
+Quando a projeção exigir um novo Agent Cycle, use o paved entry que compõe a entrada hospedada a partir do Work e do inventário de ToolSurfaces observado:
+
+```bash
+python3 tools/agent.py enter --work-id <work-id> --role manager-gitops --intent <intent> --runtime-tool-surface github-connector-tools --runtime-tool-surfaces-complete --apply --json
+```
+
+`begin` direto permanece ferramenta de diagnóstico, testes e recovery explícito; não é mais a entrada normal para trabalho Work-bound. O handle/contexto resultante continua sendo produzido e validado pelos contratos canônicos de Agent Cycle. Não reconstrua manualmente uma sequência equivalente nem copie uma lista de ferramentas para este contrato.
 
 Quando o ambiente não consegue observar uma authority necessária, use somente providers/fallbacks reconhecidos pelas contracts correntes. Provider alternativo não pode enfraquecer authority, scope, CAS, plan ou readback.
 
