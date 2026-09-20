@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "r6m-hosted-agent-tool-provider-injection",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/r6m-hosted-agent-tool-provider-injection",
+  "prNumber": null,
+  "dependsOn": [
+    "r6-black-box-paved-path-canary"
+  ],
+  "completed": [],
+  "remaining": [
+    "characterize-hosted-agent-tool-provider-gap",
+    "inject-explicit-provider-at-hosted-agent-tool-boundary",
+    "add-provider-injection-regressions",
+    "qualify-and-integrate-r6m",
+    "retry-r6-fresh-canary"
+  ],
+  "nextAction": "Patch only the named Hosted Agent Tool host boundary so its execute path constructs the concrete GitHub carrier and injects it into prepare_request; keep semantic/core functions provider-explicit/fail-closed, preserve the separate dispatch host contract, add regressions proving explicit host injection and no hidden semantic fallback, qualify exact-head CI, integrate, then retry the fresh R6 black-box canary from current main. Do not add a Journey executor, generic provider bridge, new authority/state/lifecycle, or CLI/raw-HTTP fallback.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
