@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "agent-write-7a1afd462c43db9b018eedae:0",
-      "resource": "branch:work/operations/r6m-hosted-agent-tool-provider-injection",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "r6m-hosted-agent-tool-provider-injection-20260920",
-        "branch": "work/operations/r6m-hosted-agent-tool-provider-injection",
-        "pr": null
-      },
-      "reason": "Agent write lifecycle cycle-instance-40377094504728f2e5e9616b",
-      "acquiredAt": "2026-09-20T20:32:26Z",
-      "renewedAt": "2026-09-20T20:32:26Z",
-      "expiresAt": "2026-09-20T21:32:26Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "1b4b88dc6145f4b1cf410a4332733bda69571490",
+  "leases": [],
+  "revision": "f0ea6c217c3d2b1d28898342e3b1ec5dbd1ebc16",
   "schemaVersion": "CoordinationState 0.1"
 }
