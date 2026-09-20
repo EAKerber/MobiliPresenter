@@ -40,7 +40,7 @@ A canary-only executor, Journey runner or bridge is explicitly disallowed.
 | Scaffolding / paved surface | Superseded normal-path knowledge | Promotion evidence | Retirement / demotion target |
 | --- | --- | --- | --- |
 | JourneyProjection | manually interpreting Project/Work/Git/re-entry authorities to know where the agent is | projection agrees with observed outcomes and never creates false PASS | keep projection only if it remains the single public read model; remove redundant manual interpretation helpers |
-| `journey_shadow` | none; it is measurement scaffolding | R6 black-box canaries show stable agreement including negative cases | delete after promotion confidence is established |
+| `journey_shadow` | none; it is measurement scaffolding | R6 black-box positive + negative canaries and R7 default-path promotion | **retired in R8; no runtime replacement** |
 | `ensure_ownership` | manual acquire/release/re-entry request construction and CAS discovery | repeated valid reuse/acquire/release/expired cases, zero false ownership | manual lease choreography becomes internal/recovery-only |
 | authoring composition | manual GitMutationPlan/CAS/lease plumbing for normal edits | black-box authoring succeeds through existing Agent Tool with complete readback | direct canonical mutation construction becomes internal/recovery-only |
 | delivery/finalization composition | manual Delivery request assembly and post-merge ordering discovery | governed merge + Work/lease/cycle finalization canary succeeds | manual Delivery request assembly becomes internal/recovery-only |
@@ -98,7 +98,7 @@ R7 should also address bounded hosted-bus/CLI duplication only when the same mig
 
 ### R8 — retire and delete
 
-R8 must produce measurable subtraction. Required targets include deleting shadow instrumentation once no longer needed, removing duplicated hosted-bus plumbing where consolidation has replaced it, and deleting or privatizing legacy entry/request-construction/CLI-coupled paths that no normal-path caller needs.
+R8 must produce measurable subtraction. The first concrete subtraction retires `tools/agent_tools/journey_shadow.py` and its dedicated regression module after R6 live proof and R7 promotion; no replacement runtime surface is introduced. Further targets include removing duplicated hosted-bus plumbing where consolidation has replaced it, and deleting or privatizing legacy entry/request-construction/CLI-coupled paths that no normal-path caller needs.
 
 If R8 cannot identify code/API surface that can be removed or demoted because the new layer depends permanently on both models, the migration thesis is considered unproven and must be re-evaluated rather than extended with more compatibility code.
 
