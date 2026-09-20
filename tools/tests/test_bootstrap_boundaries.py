@@ -34,12 +34,15 @@ class BootstrapBoundaryTests(unittest.TestCase):
                         f"{contract.name} must define role semantics, not copy mutable ProjectState direction",
                     )
 
-    def test_manager_bootstrap_uses_agent_cycle_without_copying_runtime_versions(self):
+    def test_manager_bootstrap_uses_semantic_work_entry_without_copying_runtime_versions(self):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         manager = (ROLE_DIR / "manager-gitops.md").read_text(encoding="utf-8")
         self.assertTrue((ROOT / "tools" / "agent_cycle.py").is_file())
         self.assertTrue((ROOT / "tools" / "semantics" / "brief.py").is_file())
-        self.assertIn("python3 tools/agent.py begin", manager)
+        self.assertIn("status --work-id <work-id>", manager)
+        self.assertIn("bootstrap.pavedEntry", manager)
+        self.assertIn("journey-entry", manager)
+        self.assertIn("diagnóstico, testes e recovery explícito", manager)
         self.assertIn("docs/kickstarts/roles/<role>.md", agents)
         for copied_runtime_contract in (
             "AgentCycleContext 0.1",
@@ -57,8 +60,9 @@ class BootstrapBoundaryTests(unittest.TestCase):
             (ROOT / state["published"]["artifactManifest"]).read_text(encoding="utf-8")
         )
         self.assertIn("python3 tools/agent.py status", readme)
-        self.assertIn("python3 tools/agent.py begin --role <role> --intent <intent> --json", readme)
-        self.assertIn("readiness.nextSafeAction", readme)
+        self.assertIn("python3 tools/agent.py status --work-id <work-id> --json", readme)
+        self.assertIn("bootstrap.pavedEntry", readme)
+        self.assertIn("journey-entry", readme)
         self.assertIn("docs/kickstarts/roles/<role>.md", readme)
         self.assertNotIn("docs/kickstarts/roles/*-current.md", readme)
         for mutable in (
