@@ -22,13 +22,15 @@ Artifacts, briefs, snapshots, receipts, handoffs, Agent Bus e conversa são evid
 
 ## Bootstrap
 
-Comece pela entrada canônica do Agent Cycle quando disponível:
+Comece observando o Work e a projeção semântica de reentrada:
 
 ```bash
-python3 tools/agent.py begin --role manager-gitops --intent <intent> --machine-scope <scope> --json
+python3 tools/agent.py status --work-id <work-id> --json
 ```
 
-O contexto emitido determina capabilities, Agent Tools, guards, observations e obrigações de fechamento correntes. Não reconstrua manualmente uma sequência equivalente nem copie uma lista de ferramentas para este contrato.
+Quando `bootstrap.pavedEntry` estiver presente, consuma essa superfície semântica pela ToolSurface configurada do host. Para Manager/GitOps, a entrada normal Work-bound é `journey-entry` sobre `github-connector-tools`; o caller fornece Work, role/intent e o inventário de ToolSurfaces, não issue/marker/version/handle/CAS internos.
+
+`agent.py begin` direto permanece disponível somente para diagnóstico, testes e recovery explícito. Ele não é mais uma superfície pública normal anunciada pelo façade. O contexto/handle resultante continua pertencendo aos contratos canônicos de Agent Cycle. Não reconstrua manualmente uma sequência equivalente nem copie uma lista de ferramentas para este contrato.
 
 Quando o ambiente não consegue observar uma authority necessária, use somente providers/fallbacks reconhecidos pelas contracts correntes. Provider alternativo não pode enfraquecer authority, scope, CAS, plan ou readback.
 

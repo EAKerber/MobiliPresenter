@@ -19,7 +19,7 @@ from tools.canonical import stable_hash
 
 ERROR_EXIT = 2
 TOOLBOX_COMMANDS = {
-    "begin", "continue", "close", "close-review", "reflection-eligibility", "operational-quiescence", "status", "doctor", "verify", "checkpoint", "handoff",
+    "continue", "close", "close-review", "reflection-eligibility", "operational-quiescence", "status", "doctor", "verify", "checkpoint", "handoff",
     "git prune-plan", "git mutation-plan",
 }
 _RUNTIME_TOOL_SURFACE = "--runtime-tool-surface"
@@ -99,10 +99,13 @@ def _bootstrap_projection(reentry: dict | None = None) -> dict:
         for role, entries in policy["entryProfiles"].items()
     }
     projection = {
-        "nextSafeAction": "BEGIN_AGENT_CYCLE",
-        "commandTemplate": (
-            "python3 tools/agent.py begin --role <role> --intent <intent> --json"
-        ),
+        "nextSafeAction": "OBSERVE_WORK",
+        "commandTemplate": "python3 tools/agent.py status --work-id <work-id> --json",
+        "pavedEntry": None,
+        "legacyDirectBegin": {
+            "surface": "agent.py begin",
+            "disposition": "RECOVERY_ONLY",
+        },
         "roleContractPattern": "docs/kickstarts/roles/<role>.md",
         "entryProfiles": entry_profiles,
         "readOnly": True,
@@ -112,10 +115,18 @@ def _bootstrap_projection(reentry: dict | None = None) -> dict:
     if reentry is None:
         return projection
     action = reentry["nextSafeAction"]
+    work_id = reentry["workRef"]["workId"]
     projection.update({
         "nextSafeAction": action,
-        "commandTemplate": (
-            "python3 tools/agent.py begin --role <role> --intent <intent> --json"
+        "commandTemplate": None,
+        "pavedEntry": (
+            {
+                "surface": "journey-entry",
+                "implementation": "tools.agent_tools.journey_entry.compose_entry",
+                "executionBoundary": "host-provider",
+                "toolSurface": "github-connector-tools",
+                "workId": work_id,
+            }
             if action == "BEGIN_NEW_CYCLE"
             else None
         ),

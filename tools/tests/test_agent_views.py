@@ -24,7 +24,10 @@ class AgentProjectionTests(unittest.TestCase):
         self.assertEqual(payload["next"],view["development"]["nextTransition"])
         self.assertEqual(payload["roadmapNextTransition"],view["development"]["nextTransition"])
         bootstrap=payload["bootstrap"]
-        self.assertEqual(bootstrap["nextSafeAction"],"BEGIN_AGENT_CYCLE")
+        self.assertEqual(bootstrap["nextSafeAction"],"OBSERVE_WORK")
+        self.assertEqual(bootstrap["commandTemplate"],"python3 tools/agent.py status --work-id <work-id> --json")
+        self.assertIsNone(bootstrap["pavedEntry"])
+        self.assertEqual(bootstrap["legacyDirectBegin"]["disposition"],"RECOVERY_ONLY")
         self.assertEqual(bootstrap["roleContractPattern"],"docs/kickstarts/roles/<role>.md")
         self.assertIn("manager-gitops",bootstrap["entryProfiles"])
         self.assertIn("bootstrap-discovery",bootstrap["entryProfiles"]["manager-gitops"])
@@ -32,7 +35,7 @@ class AgentProjectionTests(unittest.TestCase):
         journey=payload["journeyProjection"]
         self.assertEqual(journey["schemaVersion"],"JourneyProjection 0.1")
         self.assertEqual(journey["stage"],"ENTRY")
-        self.assertEqual(journey["nextSafeAction"],"BEGIN_AGENT_CYCLE")
+        self.assertEqual(journey["nextSafeAction"],"OBSERVE_WORK")
         self.assertEqual(journey["automaticTransitions"],[])
         self.assertEqual(journey["blockers"],[])
         for field in ("ownershipDisposition","authoringDisposition","candidateDisposition","ciDisposition","deliveryDisposition"):

@@ -20,13 +20,9 @@ python3 tools/agent.py status --work-id <work-id> --json
 
 Esse modo observa a Work authority e o histórico completo do Hosted Agent Cycle bus, reutiliza a classificação canônica de re-entry e pode orientar `BEGIN_NEW_CYCLE`, `RESUME_EXACT_CYCLE`, `WAIT`, `HONOR_HANDOFF`, `RECONCILE_FAILURE`, `OBSERVE` ou `NONE`. Falha/incompletude do provider resulta em `OBSERVE`; nunca é promovida a `PASS`.
 
-Se a orientação permitir um novo ciclo, abra-o com um dos pares apresentados:
+Quando a orientação exigir um novo ciclo, consuma `bootstrap.pavedEntry`. A entrada normal Work-bound é `journey-entry` pela ToolSurface configurada do host (`github-connector-tools`), mantendo issue/marker/version/handle/CAS fora da superfície cognitiva do caller.
 
-```bash
-python3 tools/agent.py begin --role <role> --intent <intent> --json
-```
-
-O `begin` materializa um `AgentCycleContext` read-only e inclui `readiness.nextSafeAction`. Essa orientação é derivada: ela pode indicar seleção de intenção/ferramenta, resolução de provider, planejamento ou resolução de autorização, mas nunca autoriza mutação por si só.
+`agent.py begin` direto continua disponível para diagnóstico, testes e recovery explícito, mas não é mais o caminho operacional normal anunciado pelo bootstrap. `bootstrap.pavedEntry` é somente uma projeção read-only: ela não concede authority nem autoriza mutação.
 
 Authorities e contratos de entrada:
 
