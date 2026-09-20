@@ -1,6 +1,6 @@
 # R7 — promote semantic Work entry as the operational default
 
-Status: **candidate**.
+Status: **integrated via PR #329**.
 
 ## Purpose
 
@@ -60,4 +60,4 @@ R7 requires:
 - promoted existing semantic surface: `journey-entry`;
 - demoted public normal-path surface: direct `agent.py begin`;
 - provider default: unchanged, `github-connector-tools`;
-- R8 subtraction target: inventory and remove/privatize obsolete direct-entry callers plus temporary migration shadows such as `journey_shadow`.
+- R8 subtraction target: the temporary `journey_shadow` measurement scaffolding is retired in the first R8 slice; remaining work is inventory-driven removal/privatization of obsolete direct-entry callers and other duplicated legacy surfaces.
