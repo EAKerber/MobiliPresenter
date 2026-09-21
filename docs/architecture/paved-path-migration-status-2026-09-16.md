@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R6 is live-proven through PR #328 and R7 is promoted through PR #329. R8 is active as measurable subtraction: `journey_shadow`, direct public `agent.py begin`, and duplicated hosted issue-bus I/O have been retired/demoted through PR #332; the current candidate removes the R6h/R6l historical second-close compatibility path without replacing it.**
+Status: **R6 is live-proven, R7 promoted the semantic Work-bound paved path, and R8 is complete through PR #334: migration-only shadows, direct public begin, duplicated hosted bus plumbing, historical second-close compatibility, and automatic close-recovery generation have been retired without adding replacement authority or lifecycle.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
@@ -164,10 +164,10 @@ A stacked R6c qualification run subsequently exposed one missed environment edge
 
 ## Immediate next steps
 
-1. Qualify and integrate the R8 close-recovery-generator retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
-2. Preserve R6g BLOCKED-terminal reconciliation and canonical AgentCycleNonInterferenceReadback verification as safety behavior; generation/retry orchestration is the retirement target, not evidence validation.
-3. After integration, run an R8 closeout inventory of remaining CLI/provider coupling and migration-only productive paths; open another runtime recut only when independent deletion/demotion is proven.
-4. Measure remaining agent operational friction separately from architecture debt so ToolSurface limitations are not encoded as repository compatibility layers.
-5. Close R8 when every remaining runtime layer has a unique justified responsibility and no migration-only productive path remains.
+1. Treat R8 as closed unless new evidence shows a remaining migration-only productive path.
+2. Preserve R6g BLOCKED-terminal reconciliation and canonical AgentCycleNonInterferenceReadback verification as safety primitives; their historical generators/retry orchestration are retired.
+3. Run the post-R8 operational ergonomics discovery recorded in `r8-closeout-operational-friction-baseline-2026-09-21.md`.
+4. Distinguish repository architecture debt from ToolSurface friction before adding runtime modules or tools.
+5. Admit a new tool only when repeated execution-edge evidence shows that it can hide administrative choreography while preserving CAS, authority and readback guarantees.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**
