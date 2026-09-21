@@ -93,7 +93,7 @@ class FakeTransport:
 
 class AgentToolDispatchHostTests(unittest.TestCase):
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
-    @patch("tools.agent_tools.dispatch_host._comments")
+    @patch("tools.agent_tools.dispatch_host.hosted_issue_bus.list_comments")
     @patch("tools.agent_tools.dispatch_host._observe_branch_head", return_value=EXPECTED_HEAD)
     @patch("tools.agent_tools.dispatch_host.mutation_dispatch.build_execution_result")
     @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs")
@@ -122,7 +122,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
         build_result.assert_called_once()
 
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
-    @patch("tools.agent_tools.dispatch_host._comments")
+    @patch("tools.agent_tools.dispatch_host.hosted_issue_bus.list_comments")
     @patch("tools.agent_tools.dispatch_host._observe_branch_head", return_value=EXPECTED_HEAD)
     @patch("tools.agent_tools.dispatch_host.mutation_dispatch.build_execution_result")
     @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs")
@@ -154,7 +154,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
         build_result.assert_called_once()
 
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
-    @patch("tools.agent_tools.dispatch_host._comments")
+    @patch("tools.agent_tools.dispatch_host.hosted_issue_bus.list_comments")
     @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs")
     def test_existing_terminal_short_circuits_without_reproof_or_new_attempt(
         self, collect, comments, validate_bundle
@@ -209,7 +209,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
             )
 
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
-    @patch("tools.agent_tools.dispatch_host._comment")
+    @patch("tools.agent_tools.dispatch_host.hosted_issue_bus.get_comment")
     @patch("tools.agent_tools.dispatch_host.validate_attempt")
     @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs")
     @patch("tools.agent_tools.dispatch_host._observe_branch_head", return_value=EXPECTED_HEAD)
@@ -242,7 +242,7 @@ class AgentToolDispatchHostTests(unittest.TestCase):
         self.assertEqual(kwargs["blockers"], ["LEASE_STALE"])
 
     @patch("tools.agent_tools.dispatch_host.validate_bundle")
-    @patch("tools.agent_tools.dispatch_host._comment")
+    @patch("tools.agent_tools.dispatch_host.hosted_issue_bus.get_comment")
     @patch("tools.agent_tools.dispatch_host.validate_attempt")
     @patch("tools.agent_tools.dispatch_host.admission.collect_guard_proofs", return_value={"proofSetHash": "f" * 64})
     @patch("tools.agent_tools.dispatch_host.admission.assert_execution_admitted")
