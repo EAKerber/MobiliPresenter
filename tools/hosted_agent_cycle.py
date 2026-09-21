@@ -36,6 +36,7 @@ from tools import agent_write_lifecycle_guard
 from tools import continuation_remote
 from tools import hosted_agent_cycle_trace
 from tools import hosted_cycle_handle
+from tools import hosted_issue_bus
 from tools import remote_canonical_execution
 from tools import runtime_provider_adapter
 from tools.agent_tools import trace_collect
@@ -280,24 +281,23 @@ def transport_command_hash(command: dict[str, Any]) -> str:
 
 
 def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
-    if not isinstance(value, dict):
-        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_INVALID")
-    issue = value.get("issue")
-    comment = value.get("comment")
-    repository = value.get("repository")
-    if not isinstance(issue, dict) or not isinstance(comment, dict) or not isinstance(repository, dict):
-        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_INVALID")
-    if issue.get("pull_request") is not None:
-        raise HostedAgentCycleError("HOSTED_AGENT_PR_COMMENT_FORBIDDEN")
-    if issue.get("title") != BUS_TITLE:
-        raise HostedAgentCycleError("HOSTED_AGENT_BUS_MISMATCH")
-    if comment.get("author_association") != "OWNER":
-        raise HostedAgentCycleError("HOSTED_AGENT_ACTOR_FORBIDDEN")
-    if repository.get("full_name") != REPOSITORY:
-        raise HostedAgentCycleError("HOSTED_AGENT_REPOSITORY_MISMATCH")
-    body = comment.get("body")
-    if not isinstance(body, str):
-        raise HostedAgentCycleError("HOSTED_AGENT_MARKER_INVALID")
+    try:
+        envelope = hosted_issue_bus.validate_event_envelope(
+            value,
+            repository=REPOSITORY,
+            bus_title=BUS_TITLE,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = {
+            "HOSTED_ISSUE_BUS_EVENT_INVALID": "HOSTED_AGENT_EVENT_INVALID",
+            "HOSTED_ISSUE_BUS_PR_FORBIDDEN": "HOSTED_AGENT_PR_COMMENT_FORBIDDEN",
+            "HOSTED_ISSUE_BUS_TITLE_MISMATCH": "HOSTED_AGENT_BUS_MISMATCH",
+            "HOSTED_ISSUE_BUS_ACTOR_FORBIDDEN": "HOSTED_AGENT_ACTOR_FORBIDDEN",
+            "HOSTED_ISSUE_BUS_REPOSITORY_MISMATCH": "HOSTED_AGENT_REPOSITORY_MISMATCH",
+            "HOSTED_ISSUE_BUS_BODY_INVALID": "HOSTED_AGENT_MARKER_INVALID",
+        }.get(exc.code, "HOSTED_AGENT_EVENT_INVALID")
+        raise HostedAgentCycleError(code) from exc
+    body = envelope["body"]
     markers = {
         REQUEST_MARKER: COMMAND_SCHEMA,
         REQUEST_MARKER_V02: COMMAND_SCHEMA_V02,
@@ -314,14 +314,11 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
     command = validate_transport_command(command)
     if command["schemaVersion"] != markers[marker]:
         raise HostedAgentCycleError("HOSTED_AGENT_MARKER_SCHEMA_MISMATCH")
-    issue_number = issue.get("number")
-    comment_id = comment.get("id")
-    if (
-        not isinstance(issue_number, int) or isinstance(issue_number, bool) or issue_number <= 0
-        or not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0
-    ):
-        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_IDENTITY_INVALID")
-    return command, {"issueNumber": issue_number, "commentId": comment_id}
+    try:
+        meta = hosted_issue_bus.event_identity(envelope)
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise HostedAgentCycleError("HOSTED_AGENT_EVENT_IDENTITY_INVALID") from exc
+    return command, meta
 
 
 def _source(meta: dict[str, int]) -> dict[str, Any]:
@@ -652,27 +649,31 @@ def begin_from_envelope(
     return {**core, "resultHash": stable_hash(core)}
 
 
-def _gh_comment(comment_id: int) -> dict[str, Any]:
-    proc = subprocess.run(
-        ["gh", "api", f"repos/{REPOSITORY}/issues/comments/{comment_id}"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_UNAVAILABLE", str(comment_id))
+def _remote_result_payload(
+    comment_id: int,
+    *,
+    transport: Any,
+) -> dict[str, Any]:
     try:
-        value = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
-        raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_INVALID", str(comment_id)) from exc
-    if not isinstance(value, dict) or value.get("user", {}).get("login") != "github-actions[bot]":
+        comment = hosted_issue_bus.get_comment(
+            transport,
+            repository=REPOSITORY,
+            comment_id=comment_id,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = (
+            "HOSTED_AGENT_EVIDENCE_UNAVAILABLE"
+            if exc.code in {
+                "BLOCKED_EXECUTION_SURFACE",
+                "HOSTED_ISSUE_BUS_TRANSPORT_UNAVAILABLE",
+            }
+            else "HOSTED_AGENT_EVIDENCE_INVALID"
+        )
+        raise HostedAgentCycleError(code, str(comment_id)) from exc
+    user = comment.get("user")
+    if not isinstance(user, dict) or user.get("login") != "github-actions[bot]":
         raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_ACTOR_INVALID", str(comment_id))
-    return value
-
-
-def _remote_result_payload(comment_id: int) -> dict[str, Any]:
-    body = _gh_comment(comment_id).get("body")
+    body = comment.get("body")
     marker = "MOBILIPRESENTER_REMOTE_CANONICAL_RESULT_V0_1\n"
     if not isinstance(body, str) or not body.startswith(marker):
         raise HostedAgentCycleError("HOSTED_AGENT_EVIDENCE_MARKER_INVALID", str(comment_id))
@@ -804,7 +805,11 @@ def _write_lifecycle_failure_core(
 
 
 def _observe_write_lifecycle_close(
-    manifest: dict[str, Any], meta: dict[str, int], *, output_path: str
+    manifest: dict[str, Any],
+    meta: dict[str, int],
+    *,
+    output_path: str,
+    transport: Any,
 ) -> dict[str, Any] | None:
     if not _manifest_requires_write_lifecycle(manifest):
         return None
@@ -813,16 +818,19 @@ def _observe_write_lifecycle_close(
     if not isinstance(close_comment_id, int) or isinstance(close_comment_id, bool) or close_comment_id <= 0:
         raise HostedAgentCycleError("HOSTED_AGENT_WRITE_LIFECYCLE_CLOSE_COMMENT_INVALID")
 
-    carrier = GhApiTransport()
     last_report: dict[str, Any] | None = None
     for attempt in range(hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS):
-        comments = trace_collect.fetch_issue_comments(REPOSITORY, issue_number)
+        comments = trace_collect.fetch_issue_comments(
+            REPOSITORY,
+            issue_number,
+            transport=transport,
+        )
         try:
             report = agent_write_lifecycle_guard.inspect_cycle(
                 comments,
                 manifest,
                 close_comment_id=close_comment_id,
-                transport=carrier,
+                transport=transport,
             )
         except agent_write_lifecycle_guard.AgentWriteLifecycleGuardError as exc:
             core = _failure_core(
@@ -874,7 +882,10 @@ def _shadow_error(path: Path, code: str) -> None:
 
 
 def _materialize_disposition_shadow(
-    *, output_path: str, lifecycle_report: dict[str, Any] | None
+    *,
+    output_path: str,
+    lifecycle_report: dict[str, Any] | None,
+    transport: Any,
 ) -> None:
     root = Path(output_path).parent
     inventory_path = root / "agent-cycle-obligation-inventory.json"
@@ -884,11 +895,10 @@ def _materialize_disposition_shadow(
     try:
         inventory = _load_json(inventory_path)
         agent_cycle_obligations.validate_inventory(inventory)
-        carrier = GhApiTransport()
         value = agent_cycle_obligation_inspect.inspect_inventory(
             inventory,
             lifecycle_report=lifecycle_report,
-            transport=carrier,
+            transport=transport,
         )
         agent_cycle_obligations.validate_disposition_set(value, inventory)
         _write_json(disposition_path, value)
@@ -936,10 +946,13 @@ def close_from_envelope(
     begin_dir: str,
     output_path: str,
     evidence_dir: str,
+    transport: Any | None = None,
 ) -> dict[str, Any]:
     outer = validate_transport_command(command)
     if outer["action"] != "close":
         raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_ACTION_REQUIRED")
+    if transport is None:
+        raise HostedAgentCycleError("BLOCKED_EXECUTION_SURFACE")
     begin_root = Path(begin_dir)
     context_path = begin_root / "context.json"
     manifest_path = begin_root / "manifest.json"
@@ -962,6 +975,11 @@ def close_from_envelope(
                 manifest,
                 context,
                 repository=REPOSITORY,
+                fetch_comments=lambda repository, issue_number: hosted_issue_bus.list_comments(
+                    transport,
+                    repository=repository,
+                    issue_number=issue_number,
+                ),
                 resource_output_path=str(close_root / "agent-cycle-touched-resources.json"),
                 obligation_output_path=str(close_root / "agent-cycle-obligation-inventory.json"),
             )
@@ -988,11 +1006,15 @@ def close_from_envelope(
         _write_json(trace_path, trace_value)
 
     lifecycle_report = _observe_write_lifecycle_close(
-        manifest, meta, output_path=output_path
+        manifest,
+        meta,
+        output_path=output_path,
+        transport=transport,
     )
     _materialize_disposition_shadow(
         output_path=output_path,
         lifecycle_report=lifecycle_report,
+        transport=transport,
     )
     _require_clean_write_lifecycle_report(lifecycle_report)
 
@@ -1000,7 +1022,9 @@ def close_from_envelope(
     evidence_root.mkdir(parents=True, exist_ok=True)
     evidence_paths: list[str] = []
     for index, comment_id in enumerate(effective_command["evidenceCommentIds"]):
-        normalized = normalize_remote_evidence(_remote_result_payload(comment_id))
+        normalized = normalize_remote_evidence(
+            _remote_result_payload(comment_id, transport=transport)
+        )
         path = evidence_root / f"evidence-{index:03d}.json"
         _write_json(path, normalized)
         evidence_paths.append(str(path))
@@ -1115,26 +1139,6 @@ def _transport_json(response: Any, code: str) -> Any:
         raise HostedAgentCycleError(code) from exc
 
 
-def _transport_comments(
-    transport: Any, issue_number: int
-) -> list[dict[str, Any]]:
-    comments: list[dict[str, Any]] = []
-    for page in range(1, 101):
-        value = _transport_json(
-            transport.request(
-                "GET",
-                f"repos/{REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
-            "HOSTED_AGENT_COMMENTS_INVALID",
-        )
-        if not isinstance(value, list):
-            raise HostedAgentCycleError("HOSTED_AGENT_COMMENTS_INVALID")
-        comments.extend(item for item in value if isinstance(item, dict))
-        if len(value) < 100:
-            return comments
-    raise HostedAgentCycleError("HOSTED_AGENT_COMMENTS_UNBOUNDED")
-
-
 def close_evidence_comment_ids(
     handle: Any,
     *,
@@ -1150,7 +1154,11 @@ def close_evidence_comment_ids(
     except RuntimeError as exc:
         raise HostedAgentCycleError("HOSTED_AGENT_CYCLE_HANDLE_INVALID") from exc
     found: list[int] = []
-    for comment in _transport_comments(transport, locator["issueNumber"]):
+    for comment in hosted_issue_bus.list_comments(
+        transport,
+        repository=REPOSITORY,
+        issue_number=locator["issueNumber"],
+    ):
         cid = comment.get("id") if isinstance(comment, dict) else None
         if (
             not isinstance(cid, int)
@@ -1212,7 +1220,11 @@ def compose_handle_close(
         "authorizesMutation": False,
     }
     validate_handle_close_command(command)
-    comments = _transport_comments(transport, locator["issueNumber"])
+    comments = hosted_issue_bus.list_comments(
+        transport,
+        repository=REPOSITORY,
+        issue_number=locator["issueNumber"],
+    )
     existing = None
     for comment in comments:
         body = comment.get("body") if isinstance(comment, dict) else None
@@ -1335,6 +1347,7 @@ def main(argv: list[str] | None = None) -> int:
                 begin_dir=args.begin_dir,
                 output_path=args.closure,
                 evidence_dir=args.evidence_dir,
+                transport=GhApiTransport(),
             )
         else:
             exc = HostedAgentCycleError(args.error)
