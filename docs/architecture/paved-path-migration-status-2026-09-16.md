@@ -166,8 +166,8 @@ A stacked R6c qualification run subsequently exposed one missed environment edge
 
 1. Treat R8 as closed unless new evidence shows a remaining migration-only productive path.
 2. Preserve R6g BLOCKED-terminal reconciliation and canonical AgentCycleNonInterferenceReadback verification as safety primitives; their historical generators/retry orchestration are retired.
-3. Run the post-R8 operational ergonomics discovery recorded in `r8-closeout-operational-friction-baseline-2026-09-21.md`.
-4. Distinguish repository architecture debt from ToolSurface friction before adding runtime modules or tools.
-5. Admit a new tool only when repeated execution-edge evidence shows that it can hide administrative choreography while preserving CAS, authority and readback guarantees.
+3. The post-R8 ergonomics discovery now finds a repeated execution-edge gap: multi-path branch mutation already has canonical plan/bundle/readback semantics, but the connected ToolSurface exposes the required Git-data primitives separately.
+4. Do not add another repository mutation engine. Prefer a thin GitHub ToolSurface/host binding over the existing governed `mutate-files` path when such a binding can return canonical proof.
+5. Keep PR creation, CI observation and merge as separate lifecycle stages for now; measure them independently after branch-content mutation ergonomics improve.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**
