@@ -42,7 +42,7 @@ class BootstrapBoundaryTests(unittest.TestCase):
         self.assertIn("status --work-id <work-id>", manager)
         self.assertIn("bootstrap.pavedEntry", manager)
         self.assertIn("journey-entry", manager)
-        self.assertNotIn("agent.py begin", manager)
+        self.assertIn("foi retirado em R8", manager)
         self.assertIn("Hosted Agent Cycle", manager)
         self.assertIn("docs/kickstarts/roles/<role>.md", agents)
         for copied_runtime_contract in (
