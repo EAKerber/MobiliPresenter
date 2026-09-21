@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
-import subprocess
 from typing import Any
 
-from tools import agent_cycle_identity, hosted_cycle_records, remote_canonical_execution
+from tools import agent_cycle_identity, hosted_cycle_records, hosted_issue_bus, remote_canonical_execution
 from tools.agent_tools import contracts, mutation_dispatch, trace
 from tools.canonical import stable_hash
 
@@ -319,29 +318,30 @@ def agent_tool_mutation_evidence_comment_ids(
     return sorted(found.values())
 
 
-def fetch_issue_comments(repository: str, issue_number: int) -> list[dict[str, Any]]:
-    proc = subprocess.run(
-        [
-            "gh", "api", "--paginate", "--slurp",
-            f"repos/{repository}/issues/{issue_number}/comments?per_page=100",
-        ],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise AgentTraceCollectionError("AGENT_TRACE_COMMENTS_UNAVAILABLE")
+def fetch_issue_comments(
+    repository: str,
+    issue_number: int,
+    *,
+    transport: Any | None = None,
+) -> list[dict[str, Any]]:
+    if transport is None:
+        raise AgentTraceCollectionError("BLOCKED_EXECUTION_SURFACE")
     try:
-        value = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
-        raise AgentTraceCollectionError("AGENT_TRACE_COMMENTS_INVALID") from exc
-    pages = value if isinstance(value, list) else []
-    comments: list[dict[str, Any]] = []
-    for page in pages:
-        if isinstance(page, list):
-            comments.extend(item for item in page if isinstance(item, dict))
-        elif isinstance(page, dict):
-            comments.append(page)
-    if not comments and pages and all(isinstance(item, dict) for item in pages):
-        comments = list(pages)
-    return comments
+        return hosted_issue_bus.list_comments(
+            transport,
+            repository=repository,
+            issue_number=issue_number,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        if exc.code == "BLOCKED_EXECUTION_SURFACE":
+            code = exc.code
+        elif exc.code in {
+            "HOSTED_ISSUE_BUS_COMMENTS_INVALID",
+            "HOSTED_ISSUE_BUS_ISSUE_ID_INVALID",
+        }:
+            code = "AGENT_TRACE_COMMENTS_INVALID"
+        elif exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED":
+            code = "AGENT_TRACE_COMMENTS_UNBOUNDED"
+        else:
+            code = "AGENT_TRACE_COMMENTS_UNAVAILABLE"
+        raise AgentTraceCollectionError(code) from exc
