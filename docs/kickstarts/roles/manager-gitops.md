@@ -30,7 +30,7 @@ python3 tools/agent.py status --work-id <work-id> --json
 
 Quando `bootstrap.pavedEntry` estiver presente, consuma essa superfície semântica pela ToolSurface configurada do host. Para Manager/GitOps, a entrada normal Work-bound é `journey-entry` sobre `github-connector-tools`; o caller fornece Work, role/intent e o inventário de ToolSurfaces, não issue/marker/version/handle/CAS internos.
 
-`agent.py begin` direto permanece disponível somente para diagnóstico, testes e recovery explícito. Ele não é mais uma superfície pública normal anunciada pelo façade. O contexto/handle resultante continua pertencendo aos contratos canônicos de Agent Cycle. Não reconstrua manualmente uma sequência equivalente nem copie uma lista de ferramentas para este contrato.
+O comando público `agent.py begin` foi retirado em R8. Diagnóstico e recovery continuam disponíveis somente pelos carriers/contratos internos de Hosted Agent Cycle; isso não reabre uma segunda superfície normal de entrada. O contexto/handle resultante continua pertencendo aos contratos canônicos de Agent Cycle. Não reconstrua manualmente uma sequência equivalente nem copie uma lista de ferramentas para este contrato.
 
 Quando o ambiente não consegue observar uma authority necessária, use somente providers/fallbacks reconhecidos pelas contracts correntes. Provider alternativo não pode enfraquecer authority, scope, CAS, plan ou readback.
 
