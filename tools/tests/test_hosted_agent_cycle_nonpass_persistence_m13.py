@@ -101,6 +101,7 @@ class HostedAgentCycleNonPassPersistenceM13Tests(unittest.TestCase):
                     begin_dir=str(begin_dir(root, context)),
                     output_path=str(output),
                     evidence_dir=str(root / "evidence"),
+                    transport=object(),
                 )
             persisted = json.loads(output.read_text(encoding="utf-8"))
 
@@ -144,6 +145,7 @@ class HostedAgentCycleNonPassPersistenceM13Tests(unittest.TestCase):
                     begin_dir=str(begin_dir(root, context)),
                     output_path=str(output),
                     evidence_dir=str(root / "evidence"),
+                    transport=object(),
                 )
             self.assertFalse(output.exists())
 
@@ -189,6 +191,7 @@ class HostedAgentCycleNonPassPersistenceM13Tests(unittest.TestCase):
                 begin_dir=str(begin_dir(root, context)),
                 output_path=str(output),
                 evidence_dir=str(root / "evidence"),
+                transport=object(),
             )
             persisted = json.loads(output.read_text(encoding="utf-8"))
 
