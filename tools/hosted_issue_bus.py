@@ -37,37 +37,6 @@ def _request_json(
         raise HostedIssueBusError("HOSTED_ISSUE_BUS_TRANSPORT_UNAVAILABLE") from exc
 
 
-def validate_event_envelope(value: Any, *, repository: str, bus_title: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_EVENT_INVALID")
-    issue, comment, observed = value.get("issue"), value.get("comment"), value.get("repository")
-    if not all(isinstance(item, dict) for item in (issue, comment, observed)):
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_EVENT_INVALID")
-    if issue.get("pull_request") is not None:
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_PR_COMMENT_FORBIDDEN")
-    if issue.get("title") != bus_title:
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_BUS_MISMATCH")
-    if comment.get("author_association") != "OWNER":
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_ACTOR_FORBIDDEN")
-    if observed.get("full_name") != repository:
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_REPOSITORY_MISMATCH")
-    body = comment.get("body")
-    if not isinstance(body, str):
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_BODY_INVALID")
-    return {"issue": issue, "comment": comment, "repository": observed, "body": body}
-
-
-def event_identity(envelope: dict[str, Any]) -> dict[str, int]:
-    try:
-        issue, comment = envelope["issue"], envelope["comment"]
-    except (KeyError, TypeError) as exc:
-        raise HostedIssueBusError("HOSTED_ISSUE_BUS_IDENTITY_INVALID") from exc
-    return {
-        "issueNumber": _positive(issue.get("number"), "HOSTED_ISSUE_BUS_IDENTITY_INVALID"),
-        "commentId": _positive(comment.get("id"), "HOSTED_ISSUE_BUS_IDENTITY_INVALID"),
-    }
-
-
 def get_comment(transport: Any, *, repository: str, comment_id: int) -> dict[str, Any]:
     comment_id = _positive(comment_id, "HOSTED_ISSUE_BUS_COMMENT_ID_INVALID")
     value = _request_json(
