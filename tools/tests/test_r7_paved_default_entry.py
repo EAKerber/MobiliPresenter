@@ -68,7 +68,7 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("bootstrap.pavedEntry", content)
         self.assertIn("journey-entry", content)
-        self.assertNotIn("agent.py begin", content)
+        self.assertIn("foi retirado em R8", content)
         self.assertIn("Hosted Agent Cycle", content)
 
 
