@@ -158,7 +158,7 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
             prepare_binding.assert_not_called()
 
     @patch("tools.agent_write_lifecycle_host._validate_bundle")
-    @patch("tools.agent_write_lifecycle_host._comments")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.list_comments")
     def test_prior_attempt_without_terminal_is_unknown_and_not_replayed(self, comments, validate_bundle):
         value = bundle()
         comments.return_value = [
@@ -179,7 +179,7 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
         )
 
     @patch("tools.agent_write_lifecycle_host._validate_bundle")
-    @patch("tools.agent_write_lifecycle_host._comments")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.list_comments")
     def test_same_request_hash_prior_attempt_fences_even_when_dispatch_changed(self, comments, validate_bundle):
         value = bundle()
         prior_dispatch = copy.deepcopy(value["dispatch"])
@@ -200,7 +200,7 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
         self.assertEqual("UNKNOWN", result["terminal"]["status"])
 
     @patch("tools.agent_write_lifecycle_host._validate_bundle")
-    @patch("tools.agent_write_lifecycle_host._comments")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.list_comments")
     def test_existing_terminal_short_circuits_without_new_attempt(self, comments, validate_bundle):
         value = bundle()
         terminal = {
@@ -222,7 +222,7 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
         self.assertEqual("TERMINAL_EXISTS", result["state"])
         self.assertEqual(terminal, result["terminal"])
 
-    @patch("tools.agent_write_lifecycle_host._comment")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.get_comment")
     @patch("tools.agent_write_lifecycle_host.hosted_agent_write_lease.derive_handle_request")
     def test_v02_outer_request_readback_must_derive_exact_inner_request(self, derive, comment):
         request = acquire_request()
@@ -300,7 +300,7 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
         )
 
     @patch("tools.agent_write_lifecycle_host._validate_bundle")
-    @patch("tools.agent_write_lifecycle_host._comment")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.get_comment")
     @patch("tools.agent_write_lifecycle.validate_attempt")
     def test_failure_after_mutable_call_is_unknown(self, validate_attempt, comment, validate_bundle):
         value = bundle()
