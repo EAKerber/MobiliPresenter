@@ -321,7 +321,7 @@ def prepare_close_stabilized(
     context: dict[str, Any],
     *,
     repository: str,
-    fetch_comments: Callable[[str, int], list[dict[str, Any]]] | None = None,
+    fetch_comments: Callable[[str, int], list[dict[str, Any]]],
     sleep: Callable[[float], None] | None = None,
     attempts: int = TRACE_STABILIZATION_ATTEMPTS,
     delay_seconds: float = TRACE_STABILIZATION_DELAY_SECONDS,
@@ -337,7 +337,7 @@ def prepare_close_stabilized(
         or delay_seconds < 0
     ):
         raise HostedAgentCycleTraceError("HOSTED_AGENT_TRACE_STABILIZATION_INVALID")
-    fetcher = trace_collect.fetch_issue_comments if fetch_comments is None else fetch_comments
+    fetcher = fetch_comments
     sleeper = time.sleep if sleep is None else sleep
     issue_number = manifest["source"]["issueNumber"]
     last_trace: dict[str, Any] | None = None

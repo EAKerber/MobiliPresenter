@@ -226,7 +226,7 @@ class DerivedMutationPredecessorFenceR4CTests(unittest.TestCase):
 
     @patch("tools.agent_write_lifecycle_host.lifecycle.build_attempt")
     @patch("tools.agent_write_lifecycle_host._mutation_predecessor_fence")
-    @patch("tools.agent_write_lifecycle_host._comments")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.list_comments")
     @patch("tools.agent_write_lifecycle_host._validate_bundle")
     def test_inspect_protocol_returns_waiting_before_attempt_marker(
         self,

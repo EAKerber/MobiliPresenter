@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R6 is live-proven through PR #328 and R7 is promoted through PR #329. R8 is active as measurable subtraction: `journey_shadow` is retired, and the next slice removes direct `agent.py begin` from the stable public façade without replacing the canonical Hosted Agent Cycle recovery carrier.**
+Status: **R6 is live-proven through PR #328 and R7 is promoted through PR #329. R8 is active as measurable subtraction: `journey_shadow` and direct public `agent.py begin` are retired; the current candidate consolidates duplicated hosted issue-bus I/O below protocol semantics with a negative production-LOC balance and no new public surface.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
@@ -164,10 +164,10 @@ A stacked R6c qualification run subsequently exposed one missed environment edge
 
 ## Immediate next steps
 
-1. Qualify and integrate the R8 direct-`begin` retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
-2. Inventory duplicated hosted-bus I/O and CLI-coupled defaults; consolidate only where at least two concrete clients are actually reduced.
-3. Keep lower-level Hosted Agent Cycle entry only where recovery/debugging genuinely requires it; do not re-advertise it through bootstrap.
-4. Keep R8 subtractive: no replacement Journey layer, compatibility framework, alternate authority or new lifecycle.
-5. Close the migration cycle only after the remaining normal-path/public surfaces are demonstrably smaller than the pre-R7 baseline.
+1. Qualify and integrate the R8 hosted issue-bus I/O retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
+2. Re-inventory remaining CLI-coupled defaults and R6g-R6l recovery-only scaffolding; open another slice only when deletion/demotion is independently measurable.
+3. Keep lower-level Hosted Agent Cycle recovery where it remains genuinely required; do not re-advertise retired protocol mechanics through bootstrap.
+4. Keep R8 subtractive: no replacement Journey layer, compatibility framework, alternate authority, provider manager or new lifecycle.
+5. Close the migration cycle when the remaining layers each have a unique justified responsibility and the normal/public surface is demonstrably smaller than the pre-R7 baseline.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**

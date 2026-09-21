@@ -17,6 +17,7 @@ from tools import agent_failure
 from tools import agent_write_lifecycle_guard
 from tools import hosted_agent_cycle
 from tools import hosted_agent_cycle_trace
+from tools import hosted_issue_bus
 from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
 
@@ -212,7 +213,12 @@ def _failure_codes(failure: dict[str, Any]) -> set[str]:
     return {item["code"] for item in failure["failureCore"]["causes"]}
 
 
-def _trace_waiting_for(meta: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
+def _trace_waiting_for(
+    meta: dict[str, Any],
+    manifest: dict[str, Any],
+    *,
+    transport: Any | None,
+) -> list[str]:
     close_comment_id = meta.get("commentId")
     if (
         not isinstance(close_comment_id, int)
@@ -220,10 +226,13 @@ def _trace_waiting_for(meta: dict[str, Any], manifest: dict[str, Any]) -> list[s
         or close_comment_id <= 0
     ):
         return []
+    if transport is None:
+        return []
     try:
-        comments = trace_collect.fetch_issue_comments(
-            hosted_agent_cycle.REPOSITORY,
-            manifest["source"]["issueNumber"],
+        comments = hosted_issue_bus.list_comments(
+            transport,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=manifest["source"]["issueNumber"],
         )
         trace = trace_collect.build_trace(
             comments,
@@ -271,6 +280,7 @@ def classify_waiting(
     meta: dict[str, Any],
     manifest: dict[str, Any],
     output_path: str,
+    transport: Any | None = None,
 ) -> list[str]:
     try:
         codes = _failure_codes(failure)
@@ -279,7 +289,7 @@ def classify_waiting(
     if not codes:
         return []
     if codes.issubset(TRACE_WAITABLE_CAUSES) and codes & TRACE_WAITABLE_CAUSES:
-        return _trace_waiting_for(meta, manifest)
+        return _trace_waiting_for(meta, manifest, transport=transport)
     if codes.issubset(REMOTE_RECEIPT_WAITABLE_CAUSES):
         return ["REMOTE_CANONICAL_RESULT"]
     if codes.issubset(LIFECYCLE_WAITABLE_CAUSES):
@@ -326,6 +336,7 @@ def promote_close_result(
     begin_dir: str,
     closure_path: str,
     result_path: str,
+    transport: Any | None = None,
 ) -> bool:
     """Rewrite one waitable Hosted close failure as WAITING; otherwise no-op."""
     failure = _json(result_path)
@@ -341,6 +352,7 @@ def promote_close_result(
         meta=meta,
         manifest=manifest,
         output_path=closure_path,
+        transport=transport,
     )
     if not waiting_for:
         _emit_close_delta_diagnostic(closure_path)

@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from tools import agent_cycle_identity, coordination, git_observation, hosted_agent_cycle
+from tools import agent_cycle_identity, coordination, git_observation, hosted_agent_cycle, hosted_issue_bus
 from tools import remote_canonical_execution as remote
 from tools.canonical import stable_hash
 from tools.coordination_remote import GitHubCoordinationAuthority
@@ -175,13 +175,6 @@ def _owner(request: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _json_response(response: Any, code: str) -> Any:
-    try:
-        return json.loads(response.body)
-    except (AttributeError, json.JSONDecodeError) as exc:
-        raise AgentWriteLifecycleError(code) from exc
-
-
 def _payload(body: Any, marker: str) -> Any | None:
     prefix = marker + "\n"
     if not isinstance(body, str) or not body.startswith(prefix):
@@ -200,22 +193,16 @@ def _comments_before(
     issue_number: int,
     request_comment_id: int,
 ) -> list[dict[str, Any]]:
-    comments: list[dict[str, Any]] = []
-    for page in range(1, 101):
-        value = _json_response(
-            transport.request(
-                "GET",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
-            "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID",
+    try:
+        comments = hosted_issue_bus.list_comments(
+            transport,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=issue_number,
         )
-        if not isinstance(value, list):
-            raise AgentWriteLifecycleError("AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID")
-        comments.extend(item for item in value if isinstance(item, dict))
-        if any(item.get("id") == request_comment_id for item in value if isinstance(item, dict)):
-            break
-        if len(value) < 100:
-            break
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise AgentWriteLifecycleError(
+            "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID"
+        ) from exc
     for index, item in enumerate(comments):
         if item.get("id") == request_comment_id:
             return comments[:index]

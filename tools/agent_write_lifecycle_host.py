@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import agent_write_lifecycle as lifecycle
-from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, hosted_cycle_records, remote_canonical_issue
+from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, hosted_cycle_records, hosted_issue_bus, remote_canonical_issue
 from tools.agent_tools import contracts, policy as tool_policy
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
@@ -75,50 +75,6 @@ def load_bundle(root: str | Path) -> dict[str, dict[str, Any]]:
     return result
 
 
-def _json_response(response: Any, code: str) -> Any:
-    try:
-        return json.loads(response.body)
-    except (AttributeError, json.JSONDecodeError) as exc:
-        raise AgentWriteLifecycleHostError(code) from exc
-
-
-def _comment(transport: Any, comment_id: int) -> dict[str, Any]:
-    value = _json_response(
-        transport.request(
-            "GET",
-            f"repos/{hosted_agent_cycle.REPOSITORY}/issues/comments/{comment_id}",
-        ),
-        "AGENT_WRITE_LIFECYCLE_COMMENT_INVALID",
-    )
-    if not isinstance(value, dict):
-        raise AgentWriteLifecycleHostError(
-            "AGENT_WRITE_LIFECYCLE_COMMENT_INVALID"
-        )
-    return value
-
-
-def _comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    for page in range(1, 101):
-        value = _json_response(
-            transport.request(
-                "GET",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
-            "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID",
-        )
-        if not isinstance(value, list):
-            raise AgentWriteLifecycleHostError(
-                "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID"
-            )
-        result.extend(item for item in value if isinstance(item, dict))
-        if len(value) < 100:
-            return result
-    raise AgentWriteLifecycleHostError(
-        "AGENT_WRITE_LIFECYCLE_COMMENTS_UNBOUNDED"
-    )
-
-
 def _payload(body: Any, marker: str) -> Any | None:
     prefix = marker + "\n"
     if not isinstance(body, str) or not body.startswith(prefix):
@@ -141,7 +97,16 @@ def _validate_request_readback(
     transport: Any,
     outer_request: dict[str, Any] | None,
 ) -> None:
-    comment = _comment(transport, dispatch["source"]["requestCommentId"])
+    try:
+        comment = hosted_issue_bus.get_comment(
+            transport,
+            repository=hosted_agent_cycle.REPOSITORY,
+            comment_id=dispatch["source"]["requestCommentId"],
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_COMMENT_INVALID"
+        ) from exc
     if comment.get("author_association") != "OWNER":
         raise AgentWriteLifecycleHostError(
             "AGENT_WRITE_LIFECYCLE_REQUEST_ACTOR_FORBIDDEN"
@@ -404,10 +369,19 @@ def inspect_protocol(
     dispatch = bundle["dispatch"]
     terminals: list[dict[str, Any]] = []
     attempts: list[dict[str, Any]] = []
-    comments = _comments(
-        carrier,
-        dispatch["source"]["issueNumber"],
-    )
+    try:
+        comments = hosted_issue_bus.list_comments(
+            carrier,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=dispatch["source"]["issueNumber"],
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = (
+            "AGENT_WRITE_LIFECYCLE_COMMENTS_UNBOUNDED"
+            if exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED"
+            else "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID"
+        )
+        raise AgentWriteLifecycleHostError(code) from exc
 
     for comment in comments:
         user = comment.get("user")
@@ -556,7 +530,16 @@ def execute_dispatch(
     )
     dispatch = bundle["dispatch"]
 
-    attempt_comment = _comment(base, attempt_comment_id)
+    try:
+        attempt_comment = hosted_issue_bus.get_comment(
+            base,
+            repository=hosted_agent_cycle.REPOSITORY,
+            comment_id=attempt_comment_id,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise AgentWriteLifecycleHostError(
+            "AGENT_WRITE_LIFECYCLE_COMMENT_INVALID"
+        ) from exc
     user = attempt_comment.get("user")
     attempt = _payload(
         attempt_comment.get("body"),

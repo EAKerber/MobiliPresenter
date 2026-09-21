@@ -11,6 +11,7 @@ from tools import (
     hosted_agent_cycle,
     hosted_cycle_handle,
     hosted_handle_requests,
+    hosted_issue_bus,
 )
 from tools.canonical import stable_hash
 from tools.coordination_remote import GitHubCoordinationAuthority
@@ -27,31 +28,6 @@ class AgentOwnershipError(RuntimeError):
         super().__init__(f"{code}:{detail}" if detail else code)
 
 
-def _json_response(response: Any, code: str) -> Any:
-    try:
-        return json.loads(response.body)
-    except (AttributeError, json.JSONDecodeError) as exc:
-        raise AgentOwnershipError(code) from exc
-
-
-def _comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
-    comments: list[dict[str, Any]] = []
-    for page in range(1, 101):
-        value = _json_response(
-            transport.request(
-                "GET",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
-            "AGENT_OWNERSHIP_COMMENTS_INVALID",
-        )
-        if not isinstance(value, list):
-            raise AgentOwnershipError("AGENT_OWNERSHIP_COMMENTS_INVALID")
-        comments.extend(item for item in value if isinstance(item, dict))
-        if len(value) < 100:
-            return comments
-    raise AgentOwnershipError("AGENT_OWNERSHIP_COMMENTS_UNBOUNDED")
-
-
 def _payload(body: Any, marker: str) -> Any | None:
     prefix = marker + "\n"
     if not isinstance(body, str) or not body.startswith(prefix):
@@ -63,6 +39,22 @@ def _payload(body: Any, marker: str) -> Any | None:
         return json.loads(raw)
     except json.JSONDecodeError:
         return None
+
+
+def _issue_comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
+    try:
+        return hosted_issue_bus.list_comments(
+            transport,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=issue_number,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = (
+            "AGENT_OWNERSHIP_COMMENTS_UNBOUNDED"
+            if exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED"
+            else "AGENT_OWNERSHIP_COMMENTS_INVALID"
+        )
+        raise AgentOwnershipError(code) from exc
 
 
 def _find_write_lease_request(
@@ -242,7 +234,7 @@ def ensure_ownership(
     branch_head = observed_branch["branchHead"]
     authority = GitHubCoordinationAuthority(transport=carrier)
     observation = authority.observe()
-    comments = _comments(carrier, issue_number)
+    comments = _issue_comments(carrier, issue_number)
     latest = _latest_lifecycle_result(
         comments,
         begin=begin,
@@ -327,17 +319,15 @@ def ensure_ownership(
             + "\n"
             + json.dumps(request, separators=(",", ":"), ensure_ascii=False)
         )
-        response = _json_response(
-            carrier.request(
-                "POST",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments",
-                payload={"body": body},
-            ),
-            "AGENT_OWNERSHIP_SUBMIT_INVALID",
-        )
-        comment_id = response.get("id") if isinstance(response, dict) else None
-        if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
-            raise AgentOwnershipError("AGENT_OWNERSHIP_SUBMIT_INVALID")
+        try:
+            comment_id = hosted_issue_bus.post_comment(
+                carrier,
+                repository=hosted_agent_cycle.REPOSITORY,
+                issue_number=issue_number,
+                body=body,
+            )
+        except hosted_issue_bus.HostedIssueBusError as exc:
+            raise AgentOwnershipError("AGENT_OWNERSHIP_SUBMIT_INVALID") from exc
 
     return _result(
         status=status,
@@ -375,7 +365,8 @@ def _lifecycle_snapshot(
     }
     authority = GitHubCoordinationAuthority(transport=transport)
     observation = authority.observe()
-    comments = _comments(transport, locator["issueNumber"])
+    issue_number = locator["issueNumber"]
+    comments = _issue_comments(transport, issue_number)
     latest = _latest_lifecycle_result(
         comments,
         begin=begin,
@@ -513,21 +504,15 @@ def release_ownership(
             + "\n"
             + json.dumps(request, separators=(",", ":"), ensure_ascii=False)
         )
-        response = _json_response(
-            transport.request(
-                "POST",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{snapshot['locator']['issueNumber']}/comments",
-                payload={"body": body},
-            ),
-            "AGENT_OWNERSHIP_SUBMIT_INVALID",
-        )
-        comment_id = response.get("id") if isinstance(response, dict) else None
-        if (
-            not isinstance(comment_id, int)
-            or isinstance(comment_id, bool)
-            or comment_id <= 0
-        ):
-            raise AgentOwnershipError("AGENT_OWNERSHIP_SUBMIT_INVALID")
+        try:
+            comment_id = hosted_issue_bus.post_comment(
+                transport,
+                repository=hosted_agent_cycle.REPOSITORY,
+                issue_number=snapshot["locator"]["issueNumber"],
+                body=body,
+            )
+        except hosted_issue_bus.HostedIssueBusError as exc:
+            raise AgentOwnershipError("AGENT_OWNERSHIP_SUBMIT_INVALID") from exc
     return _result(
         status="PENDING",
         disposition="RELEASE_REQUESTED",

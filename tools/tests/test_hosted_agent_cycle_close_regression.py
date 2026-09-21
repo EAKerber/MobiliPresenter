@@ -105,6 +105,7 @@ class HostedAgentCycleCloseRegressionTests(unittest.TestCase):
                 begin_dir=str(begin_dir),
                 output_path=str(output),
                 evidence_dir=str(Path(tmp) / "evidence"),
+                transport=object(),
             )
 
         validate_binding.assert_called_once()
@@ -151,6 +152,7 @@ class HostedAgentCycleCloseRegressionTests(unittest.TestCase):
                     begin_dir=str(begin_dir),
                     output_path=str(Path(tmp) / "closure.json"),
                     evidence_dir=str(Path(tmp) / "evidence"),
+                    transport=object(),
                 )
 
         core = raised.exception.failure_core
