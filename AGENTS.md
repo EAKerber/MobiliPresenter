@@ -73,7 +73,7 @@ Comece pelo estado/tooling corrente, não pela reconstrução do histórico:
 python3 tools/agent.py status
 ```
 
-No fluxo normal vinculado a Work, observe `status --work-id <work-id>` e siga `bootstrap.pavedEntry` pela ToolSurface configurada do host. A entrada paved é a composição semântica `journey-entry`; `agent.py begin` direto fica restrito a diagnóstico, testes e recovery explícito e não integra mais a superfície pública normal anunciada pelo façade.
+No fluxo normal vinculado a Work, observe `status --work-id <work-id>` e siga `bootstrap.pavedEntry` pela ToolSurface configurada do host. A entrada paved é a composição semântica `journey-entry`. O comando público `agent.py begin` foi retirado em R8; recovery de Agent Cycle permanece nos carriers/contratos internos de Hosted Agent Cycle e não é anunciado pelo façade normal.
 
 Use `python3 tools/agent.py doctor` quando a capacidade do ambiente importar. `doctor` diferencia executables/providers locais de capabilities lógicas; uma capability `UNKNOWN` pode exigir observação explícita de provider externo por `tools/runtime_capabilities.py`. Contratos semânticos transversais vivem em `ops/semantics/registry.json`.
 
