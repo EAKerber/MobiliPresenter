@@ -11,6 +11,7 @@ from tools import (
     hosted_agent_cycle,
     hosted_cycle_handle,
     hosted_delivery_merge,
+    hosted_issue_bus,
 )
 from tools.canonical import stable_hash
 from tools.continuation_remote import ContinuationRemoteError, GitHubContinuationAuthority
@@ -186,16 +187,15 @@ def submit_delivery_request(
         + "\n"
         + json.dumps(request, separators=(",", ":"), ensure_ascii=False)
     )
-    payload = _request(
-        transport,
-        "POST",
-        f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{locator['issueNumber']}/comments",
-        payload={"body": body},
-    )
-    comment_id = payload.get("id") if isinstance(payload, dict) else None
-    if type(comment_id) is not int or comment_id <= 0:
-        raise AgentDeliveryError("AGENT_DELIVERY_SUBMIT_INVALID")
-    return comment_id
+    try:
+        return hosted_issue_bus.post_comment(
+            transport,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=locator["issueNumber"],
+            body=body,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise AgentDeliveryError("AGENT_DELIVERY_SUBMIT_INVALID") from exc
 
 
 def compose_delivery(
