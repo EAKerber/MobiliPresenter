@@ -35,7 +35,7 @@ SCHEMA_PATH = project_state.CURRENT_SCHEMA_PATH
 ERROR_EXIT = 2
 UNKNOWN_EXIT = 1
 TOOLBOX_COMMANDS = {
-    "begin", "status", "doctor", "verify", "checkpoint", "handoff",
+    "status", "doctor", "verify", "checkpoint", "handoff",
     "git prune-plan", "git mutation-plan",
 }
 
@@ -585,7 +585,7 @@ def main():
     )
     parser.add_argument(
         "command",
-        choices=("begin", "status", "doctor", "verify", "checkpoint", "handoff", "git"),
+        choices=("status", "doctor", "verify", "checkpoint", "handoff", "git"),
     )
     parser.add_argument("subcommand", nargs="?")
     parser.add_argument("--json", action="store_true", dest="as_json")
@@ -620,10 +620,6 @@ def main():
     parser.add_argument("--observations")
     args = parser.parse_args()
     try:
-        if args.command == "begin":
-            if args.subcommand is not None:
-                raise RuntimeError(f"UNEXPECTED_SUBCOMMAND:{args.subcommand}")
-            return command_begin(args.as_json, args)
         if args.command == "status":
             return command_status(args.as_json)
         if args.command == "doctor":
