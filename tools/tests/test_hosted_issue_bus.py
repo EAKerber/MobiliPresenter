@@ -43,8 +43,8 @@ class HostedIssueBusTests(unittest.TestCase):
 
     def test_event_envelope_fails_closed_on_shared_boundary_errors(self):
         cases = [
-            ("pull_request", "PR_FORBIDDEN"),
-            ("title", "TITLE_MISMATCH"),
+            ("pull_request", "PR_COMMENT_FORBIDDEN"),
+            ("title", "BUS_MISMATCH"),
             ("association", "ACTOR_FORBIDDEN"),
             ("repository", "REPOSITORY_MISMATCH"),
             ("body", "BODY_INVALID"),
@@ -106,6 +106,40 @@ class HostedIssueBusTests(unittest.TestCase):
         self.assertEqual(2, len(transport.calls))
         self.assertTrue(transport.calls[0][1].endswith("per_page=100&page=1"))
         self.assertTrue(transport.calls[1][1].endswith("per_page=100&page=2"))
+
+    def test_issue_discovery_and_comment_submission_are_provider_backed(self):
+        transport = FakeTransport([
+            [{"number": 145, "title": "MobiliPresenter Remote Canonical Execution Bus"}],
+            {"id": 9002},
+        ])
+        issue_number = bus.find_open_issue(
+            transport,
+            repository="EAKerber/MobiliPresenter",
+            title="MobiliPresenter Remote Canonical Execution Bus",
+        )
+        comment_id = bus.post_comment(
+            transport,
+            repository="EAKerber/MobiliPresenter",
+            issue_number=issue_number,
+            body="request",
+        )
+        self.assertEqual(145, issue_number)
+        self.assertEqual(9002, comment_id)
+        self.assertEqual("GET", transport.calls[0][0])
+        self.assertEqual("POST", transport.calls[1][0])
+
+    def test_issue_discovery_fails_closed_when_missing_or_ambiguous(self):
+        for responses, code in [
+            ([[]], "HOSTED_ISSUE_BUS_MISSING"),
+            ([[{"number": 1, "title": "bus"}, {"number": 2, "title": "bus"}]], "HOSTED_ISSUE_BUS_AMBIGUOUS"),
+        ]:
+            with self.subTest(code=code):
+                with self.assertRaisesRegex(RuntimeError, code):
+                    bus.find_open_issue(
+                        FakeTransport(responses),
+                        repository="EAKerber/MobiliPresenter",
+                        title="bus",
+                    )
 
     def test_missing_provider_blocks_without_fallback(self):
         with self.assertRaisesRegex(RuntimeError, "BLOCKED_EXECUTION_SURFACE"):
