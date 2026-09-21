@@ -162,33 +162,18 @@ class AgentCycleCloseMergeRecoveryTests(unittest.TestCase):
             with mock.patch.object(Path, "read_text", return_value=json.dumps({"workRef": {"workId": "r0-2-governed-delivery"}})):
                 self.assertEqual(recovery._work_expectation("context.json", transport=object()), (289, MERGE))
 
-    def test_hosted_compatibility_uses_internal_recovery_carrier_only(self):
+    def test_hosted_workflow_has_one_canonical_close_path(self):
         root = Path(__file__).resolve().parents[2]
-        workflow = (root / ".github" / "workflows" / "hosted-agent-cycle.yml").read_text(encoding="utf-8")
-        marker = "- name: Run canonical close compatibility recovery"
-        initial, compatibility = workflow.split(marker, 1)
-        self.assertIn("python tools/hosted_agent_cycle.py close", initial)
-        self.assertIn("python -m tools.agent_cycle_close_recovery.hosted close", compatibility)
-        self.assertFalse((root / "tools" / "hosted_agent_cycle_close_recovery.py").exists())
-
-    def test_hosted_compatibility_admits_exact_pre_r6g_lifecycle_signature(self):
-        root = Path(__file__).resolve().parents[2]
-        workflow = (root / ".github" / "workflows" / "hosted-agent-cycle.yml").read_text(encoding="utf-8")
-        eligibility = workflow.split("- name: Qualify observational close compatibility recovery", 1)[1]
-        eligibility = eligibility.split("- name: Restore current hosted-cycle carrier", 1)[0]
-        self.assertIn("'code': 'AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL'", eligibility)
-        self.assertIn("'source': 'agent-write-lifecycle-guard'", eligibility)
-        self.assertIn("'code': 'AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE'", eligibility)
-        self.assertIn("'source': 'hosted-agent-cycle'", eligibility)
-        self.assertIn("core.get('lossyProjection')", eligibility)
-        self.assertIn("recovery.get('operationReplay') == 'NOT_APPLICABLE'", eligibility)
-
-    def test_hosted_compatibility_does_not_admit_unknown_write_lease_failure(self):
-        root = Path(__file__).resolve().parents[2]
-        workflow = (root / ".github" / "workflows" / "hosted-agent-cycle.yml").read_text(encoding="utf-8")
-        eligibility = workflow.split("- name: Qualify observational close compatibility recovery", 1)[1]
-        eligibility = eligibility.split("- name: Restore current hosted-cycle carrier", 1)[0]
-        self.assertNotIn("'code': 'AGENT_WRITE_LIFECYCLE_UNKNOWN_FAILURE_AT_CLOSE'", eligibility)
+        workflow = (root / ".github" / "workflows" / "hosted-agent-cycle.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(1, workflow.count("python tools/hosted_agent_cycle.py close"))
+        self.assertNotIn("close_recovery", workflow)
+        self.assertNotIn("compatibility recovery", workflow)
+        self.assertNotIn("agent_cycle_close_recovery.hosted", workflow)
+        self.assertFalse(
+            (root / "tools" / "agent_cycle_close_recovery" / "hosted.py").exists()
+        )
 
 
 if __name__ == "__main__":
