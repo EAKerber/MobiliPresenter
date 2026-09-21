@@ -41,6 +41,22 @@ def _payload(body: Any, marker: str) -> Any | None:
         return None
 
 
+def _issue_comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
+    try:
+        return hosted_issue_bus.list_comments(
+            transport,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=issue_number,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = (
+            "AGENT_OWNERSHIP_COMMENTS_UNBOUNDED"
+            if exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED"
+            else "AGENT_OWNERSHIP_COMMENTS_INVALID"
+        )
+        raise AgentOwnershipError(code) from exc
+
+
 def _find_write_lease_request(
     comments: list[dict[str, Any]],
     request: dict[str, Any],
@@ -218,19 +234,7 @@ def ensure_ownership(
     branch_head = observed_branch["branchHead"]
     authority = GitHubCoordinationAuthority(transport=carrier)
     observation = authority.observe()
-    try:
-        comments = hosted_issue_bus.list_comments(
-            carrier,
-            repository=hosted_agent_cycle.REPOSITORY,
-            issue_number=issue_number,
-        )
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        code = (
-            "AGENT_OWNERSHIP_COMMENTS_UNBOUNDED"
-            if exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED"
-            else "AGENT_OWNERSHIP_COMMENTS_INVALID"
-        )
-        raise AgentOwnershipError(code) from exc
+    comments = _issue_comments(carrier, issue_number)
     latest = _latest_lifecycle_result(
         comments,
         begin=begin,
@@ -362,19 +366,7 @@ def _lifecycle_snapshot(
     authority = GitHubCoordinationAuthority(transport=transport)
     observation = authority.observe()
     issue_number = locator["issueNumber"]
-    try:
-        comments = hosted_issue_bus.list_comments(
-            transport,
-            repository=hosted_agent_cycle.REPOSITORY,
-            issue_number=issue_number,
-        )
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        code = (
-            "AGENT_OWNERSHIP_COMMENTS_UNBOUNDED"
-            if exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED"
-            else "AGENT_OWNERSHIP_COMMENTS_INVALID"
-        )
-        raise AgentOwnershipError(code) from exc
+    comments = _issue_comments(transport, issue_number)
     latest = _latest_lifecycle_result(
         comments,
         begin=begin,
