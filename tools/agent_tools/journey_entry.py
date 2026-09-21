@@ -34,6 +34,19 @@ def _text(value: Any, code: str) -> str:
     return value.strip()
 
 
+def _marker_payload(body: Any, marker: str) -> Any | None:
+    prefix = marker + "\n"
+    if not isinstance(body, str) or not body.startswith(prefix):
+        return None
+    raw = body[len(prefix):].strip()
+    if raw.startswith("```json") and raw.endswith("```"):
+        raw = raw[len("```json"):-len("```")].strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
 def _work(work_id: str, transport: Any) -> dict[str, Any]:
     work_id = _text(work_id, "JOURNEY_ENTRY_WORK_ID_INVALID")
     try:
