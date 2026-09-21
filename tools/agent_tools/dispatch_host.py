@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from tools import git_observation, hosted_agent_cycle, hosted_agent_tool, remote_canonical_issue
+from tools import git_observation, hosted_agent_cycle, hosted_agent_tool, hosted_issue_bus, remote_canonical_issue
 from tools.agent_tools import admission, contracts, mutation_dispatch, policy as tool_policy
 from tools.agent_tools.target_policy import validate_target
 from tools.canonical import stable_hash
@@ -122,38 +122,6 @@ def _issue(transport: Any, issue_number: int) -> dict[str, Any]:
     return value
 
 
-def _comment(transport: Any, comment_id: int) -> dict[str, Any]:
-    value = _json_response(
-        transport.request("GET", f"repos/{hosted_agent_tool.REPOSITORY}/issues/comments/{comment_id}"),
-        "AGENT_TOOL_DISPATCH_COMMENT_INVALID",
-    )
-    if not isinstance(value, dict):
-        raise DispatchHostError("AGENT_TOOL_DISPATCH_COMMENT_INVALID")
-    return value
-
-
-def _comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    page = 1
-    while True:
-        value = _json_response(
-            transport.request(
-                "GET",
-                f"repos/{hosted_agent_tool.REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
-            "AGENT_TOOL_DISPATCH_COMMENTS_INVALID",
-        )
-        if not isinstance(value, list):
-            raise DispatchHostError("AGENT_TOOL_DISPATCH_COMMENTS_INVALID")
-        batch = [item for item in value if isinstance(item, dict)]
-        result.extend(batch)
-        if len(value) < 100:
-            return result
-        page += 1
-        if page > 100:
-            raise DispatchHostError("AGENT_TOOL_DISPATCH_COMMENTS_UNBOUNDED")
-
-
 def _validate_original_request(
     request: dict[str, Any],
     dispatch: dict[str, Any],
@@ -168,7 +136,14 @@ def _validate_original_request(
     issue = _issue(transport, issue_number)
     if issue.get("pull_request") is not None or issue.get("title") != hosted_agent_tool.BUS_TITLE:
         raise DispatchHostError("AGENT_TOOL_DISPATCH_BUS_MISMATCH")
-    comment = _comment(transport, comment_id)
+    try:
+        comment = hosted_issue_bus.get_comment(
+            transport,
+            repository=hosted_agent_tool.REPOSITORY,
+            comment_id=comment_id,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_COMMENT_INVALID") from exc
     if comment.get("author_association") != "OWNER":
         raise DispatchHostError("AGENT_TOOL_DISPATCH_REQUEST_ACTOR_FORBIDDEN")
     body = comment.get("body")
@@ -381,7 +356,19 @@ def inspect_protocol(
         transport=carrier,
     )
     dispatch = bundle["dispatch"]
-    comments = _comments(carrier, dispatch["source"]["issueNumber"])
+    try:
+        comments = hosted_issue_bus.list_comments(
+            carrier,
+            repository=hosted_agent_tool.REPOSITORY,
+            issue_number=dispatch["source"]["issueNumber"],
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = (
+            "AGENT_TOOL_DISPATCH_COMMENTS_UNBOUNDED"
+            if exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED"
+            else "AGENT_TOOL_DISPATCH_COMMENTS_INVALID"
+        )
+        raise DispatchHostError(code) from exc
     terminals: list[dict[str, Any]] = []
     attempts: list[dict[str, Any]] = []
     for comment in comments:
@@ -474,9 +461,14 @@ def execute_dispatch(
         transport=base,
     )
     dispatch = bundle["dispatch"]
-    attempt_comment = _comment(
-        base, _positive_int(attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID")
-    )
+    try:
+        attempt_comment = hosted_issue_bus.get_comment(
+            base,
+            repository=hosted_agent_tool.REPOSITORY,
+            comment_id=attempt_comment_id,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise DispatchHostError("AGENT_TOOL_DISPATCH_COMMENT_INVALID") from exc
     user = attempt_comment.get("user")
     attempt = _json_after_marker(attempt_comment.get("body"), ATTEMPT_MARKER)
     if not isinstance(user, dict) or user.get("login") != "github-actions[bot]" or not isinstance(attempt, dict):
