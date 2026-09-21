@@ -40,7 +40,7 @@ Compared with `main=6f64fd3a07a1780a0de6cb7f32f8832a1eab494b` before documentati
 - runtime/workflow additions: 5 lines;
 - runtime/workflow deletions: 372 lines;
 - runtime/workflow net: **-367 lines**;
-- dedicated tests removed: 153 lines;
+- dedicated hosted-compatibility tests removed: 253 lines;
 - new runtime modules: 0;
 - new public APIs: 0;
 - new authorities/state/lifecycles/workflows: 0;
