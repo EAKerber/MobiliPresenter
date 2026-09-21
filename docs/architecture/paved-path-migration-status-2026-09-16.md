@@ -164,10 +164,10 @@ A stacked R6c qualification run subsequently exposed one missed environment edge
 
 ## Immediate next steps
 
-1. Qualify and integrate the R8 historical close-compatibility retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
-2. Preserve R6g BLOCKED-terminal reconciliation as canonical safety behavior; do not delete it merely because it originated during migration.
-3. Observe whether R6i-R6k non-interference evidence recurs for current-generation cycles. Retain it as a safety primitive if it does; otherwise treat the remaining recovery package as the next R8 deletion candidate.
-4. Re-inventory remaining CLI/provider coupling only where another independently measurable deletion or demotion exists; do not create a provider manager or replacement compatibility layer.
-5. Close R8 when every remaining layer has a unique justified responsibility and no migration-only productive path remains.
+1. Qualify and integrate the R8 close-recovery-generator retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
+2. Preserve R6g BLOCKED-terminal reconciliation and canonical AgentCycleNonInterferenceReadback verification as safety behavior; generation/retry orchestration is the retirement target, not evidence validation.
+3. After integration, run an R8 closeout inventory of remaining CLI/provider coupling and migration-only productive paths; open another runtime recut only when independent deletion/demotion is proven.
+4. Measure remaining agent operational friction separately from architecture debt so ToolSurface limitations are not encoded as repository compatibility layers.
+5. Close R8 when every remaining runtime layer has a unique justified responsibility and no migration-only productive path remains.
 
 The migration thesis remains: **one normal operational model — semantic paved intent over canonical primitives — with provider/guard/receipt mechanics hidden from normal-path cognitive input and legacy protocol mechanics retained only where recovery/debugging genuinely requires them.**
