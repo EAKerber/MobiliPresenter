@@ -449,12 +449,14 @@ jobs:
         run: |
           python - <<'PY'
           from tools import hosted_agent_cycle_waiting
+          from tools.coordination_remote import GhApiTransport
           hosted_agent_cycle_waiting.promote_close_result(
               command_path='/tmp/hosted-command.json',
               meta_path='/tmp/hosted-meta.json',
               begin_dir='/tmp/agent-cycle-begin',
               closure_path='/tmp/agent-cycle-close/closure.json',
               result_path='/tmp/hosted-result.json',
+              transport=GhApiTransport(),
           )
           PY
 
