@@ -1132,13 +1132,6 @@ def _emit_output(path: str, key: str, value: str) -> None:
 
 
 
-def _transport_json(response: Any, code: str) -> Any:
-    try:
-        return json.loads(response.body)
-    except (AttributeError, json.JSONDecodeError) as exc:
-        raise HostedAgentCycleError(code) from exc
-
-
 def close_evidence_comment_ids(
     handle: Any,
     *,
@@ -1244,25 +1237,17 @@ def compose_handle_close(
     submitted = False
     comment_id = existing
     if comment_id is None and submit:
-        response = _transport_json(
-            transport.request(
-                "POST",
-                f"repos/{REPOSITORY}/issues/{locator['issueNumber']}/comments",
-                payload={
-                    "body": REQUEST_MARKER_V02
-                    + "\n"
-                    + json.dumps(command, separators=(",", ":"), ensure_ascii=False)
-                },
-            ),
-            "HOSTED_AGENT_CLOSE_SUBMIT_INVALID",
-        )
-        comment_id = response.get("id") if isinstance(response, dict) else None
-        if (
-            not isinstance(comment_id, int)
-            or isinstance(comment_id, bool)
-            or comment_id <= 0
-        ):
-            raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_SUBMIT_INVALID")
+        try:
+            comment_id = hosted_issue_bus.post_comment(
+                transport,
+                repository=REPOSITORY,
+                issue_number=locator["issueNumber"],
+                body=REQUEST_MARKER_V02
+                + "\n"
+                + json.dumps(command, separators=(",", ":"), ensure_ascii=False),
+            )
+        except hosted_issue_bus.HostedIssueBusError as exc:
+            raise HostedAgentCycleError("HOSTED_AGENT_CLOSE_SUBMIT_INVALID") from exc
         submitted = True
 
     core = {
