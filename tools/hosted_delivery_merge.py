@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import delivery_merge
+from tools import hosted_issue_bus
 from tools.coordination_remote import GhApiTransport
 
 REQUEST_MARKER = "MOBILIPRESENTER_DELIVERY_MERGE_REQUEST_V0_1"
@@ -13,22 +14,25 @@ BUS_TITLE = "MobiliPresenter Remote Canonical Execution Bus"
 
 
 def parse_event(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise delivery_merge.DeliveryMergeError("DELIVERY_MERGE_EVENT_INVALID")
-    issue = value.get("issue")
-    comment = value.get("comment")
-    repository = value.get("repository")
-    if not isinstance(issue, dict) or not isinstance(comment, dict) or not isinstance(repository, dict):
-        raise delivery_merge.DeliveryMergeError("DELIVERY_MERGE_EVENT_INVALID")
-    if issue.get("pull_request") is not None or issue.get("title") != BUS_TITLE:
-        raise delivery_merge.DeliveryMergeError("DELIVERY_MERGE_BUS_MISMATCH")
-    if comment.get("author_association") != "OWNER":
-        raise delivery_merge.DeliveryMergeError("DELIVERY_MERGE_ACTOR_FORBIDDEN")
-    if repository.get("full_name") != delivery_merge.REPOSITORY:
-        raise delivery_merge.DeliveryMergeError("DELIVERY_MERGE_REPOSITORY_MISMATCH")
-    body = comment.get("body")
+    try:
+        envelope = hosted_issue_bus.validate_event_envelope(
+            value,
+            repository=delivery_merge.REPOSITORY,
+            bus_title=BUS_TITLE,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = {
+            "HOSTED_ISSUE_BUS_EVENT_INVALID": "DELIVERY_MERGE_EVENT_INVALID",
+            "HOSTED_ISSUE_BUS_PR_FORBIDDEN": "DELIVERY_MERGE_BUS_MISMATCH",
+            "HOSTED_ISSUE_BUS_TITLE_MISMATCH": "DELIVERY_MERGE_BUS_MISMATCH",
+            "HOSTED_ISSUE_BUS_ACTOR_FORBIDDEN": "DELIVERY_MERGE_ACTOR_FORBIDDEN",
+            "HOSTED_ISSUE_BUS_REPOSITORY_MISMATCH": "DELIVERY_MERGE_REPOSITORY_MISMATCH",
+            "HOSTED_ISSUE_BUS_BODY_INVALID": "DELIVERY_MERGE_MARKER_INVALID",
+        }.get(exc.code, "DELIVERY_MERGE_EVENT_INVALID")
+        raise delivery_merge.DeliveryMergeError(code) from exc
+    body = envelope["body"]
     prefix = REQUEST_MARKER + "\n"
-    if not isinstance(body, str) or not body.startswith(prefix):
+    if not body.startswith(prefix):
         raise delivery_merge.DeliveryMergeError("DELIVERY_MERGE_MARKER_INVALID")
     try:
         request = json.loads(body[len(prefix):].strip())
