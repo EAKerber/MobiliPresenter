@@ -108,6 +108,7 @@ def multi_path_command(*, expected_head=HEAD):
         "payload": {
             "changes": [
                 {"path": "a.txt", "content": "added\n"},
+                {"path": "b.txt", "content": "second\n"},
                 {"path": "probe.txt", "delete": True},
             ],
             "message": "atomic multi-path mutation",
@@ -203,7 +204,19 @@ class FakeGitTransport:
             base = copy.deepcopy(self.trees[payload["base_tree"]])
             by_path = {item["path"]: item for item in base}
             for item in payload["tree"]:
-                if item["sha"] is None:
+                if "content" in item:
+                    content = item["content"]
+                    raw = content.encode("utf-8")
+                    blob_sha = hashlib.sha1(
+                        f"blob {len(raw)}\0".encode("ascii") + raw
+                    ).hexdigest()
+                    self.blobs[blob_sha] = content
+                    by_path[item["path"]] = {
+                        "path": item["path"],
+                        "type": "blob",
+                        "sha": blob_sha,
+                    }
+                elif item.get("sha") is None:
                     by_path.pop(item["path"], None)
                 else:
                     by_path[item["path"]] = {
@@ -306,7 +319,7 @@ class RemoteCanonicalExecutionTests(unittest.TestCase):
             hashlib.sha256(NEW_CONTENT.encode("utf-8")).hexdigest(),
         )
         methods = [item[0] for item in transport.mutable_calls]
-        self.assertEqual(methods, ["POST", "POST", "POST", "PATCH"])
+        self.assertEqual(methods, ["POST", "POST", "PATCH"])
         patch = transport.mutable_calls[-1]
         self.assertIs(patch[2]["force"], False)
         self.assertNotIn("contents/", "\n".join(item[1] for item in transport.mutable_calls))
@@ -330,15 +343,20 @@ class RemoteCanonicalExecutionTests(unittest.TestCase):
         self.assertEqual(receipt["route"]["action"], "mutate-files")
         self.assertEqual(
             receipt["aggregateReadback"]["changedPaths"],
-            ["a.txt", "probe.txt"],
+            ["a.txt", "b.txt", "probe.txt"],
         )
         self.assertEqual(receipt["evidence"]["plan"]["operation"], "mutate-files")
         methods = [item[0] for item in transport.mutable_calls]
-        self.assertEqual(methods, ["POST", "POST", "POST", "PATCH"])
+        self.assertEqual(methods, ["POST", "POST", "PATCH"])
+        self.assertFalse(
+            any(item[1].endswith("git/blobs") for item in transport.mutable_calls)
+        )
         tree_calls = [item for item in transport.mutable_calls if item[1].endswith("git/trees")]
         self.assertEqual(len(tree_calls), 1)
-        self.assertEqual(len(tree_calls[0][2]["tree"]), 2)
-        self.assertIs(tree_calls[0][2]["tree"][1]["sha"], None)
+        self.assertEqual(len(tree_calls[0][2]["tree"]), 3)
+        self.assertEqual(tree_calls[0][2]["tree"][0]["content"], "added\n")
+        self.assertEqual(tree_calls[0][2]["tree"][1]["content"], "second\n")
+        self.assertIs(tree_calls[0][2]["tree"][2]["sha"], None)
 
     def test_create_branch_requires_absence_and_reads_back_exact_sha(self):
         transport = FakeGitTransport()
