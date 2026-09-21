@@ -1,6 +1,6 @@
 # Paved-path migration status — 2026-09-16
 
-Status: **R6 is live-proven through PR #328 and R7 is promoted through PR #329. R8 is active as measurable subtraction; its first slice retires the R2 `journey_shadow` measurement scaffolding with no runtime replacement.**
+Status: **R6 is live-proven through PR #328 and R7 is promoted through PR #329. R8 is active as measurable subtraction: `journey_shadow` is retired, and the next slice removes direct `agent.py begin` from the stable public façade without replacing the canonical Hosted Agent Cycle recovery carrier.**
 
 This file is a narrative checkpoint only. Work, Coordination, Agent Cycle, Delivery, CI and Project state remain owned by their canonical structured authorities.
 
@@ -119,7 +119,7 @@ The lifecycle discontinuity discovered during R6a remains engine/recovery behavi
 | `ensure_ownership` | manual lease request/CAS/binding construction | make manual lease choreography internal/recovery-only |
 | authoring composition | direct canonical Git mutation/CAS plumbing | make direct request construction internal/recovery-only |
 | delivery composition | manual Delivery precondition/request assembly | make manual Delivery request construction internal/recovery-only |
-| R6a entry composition | issue/marker/version/runtime-envelope/begin identity mechanics | make direct Agent Cycle bus entry internal/recovery-only |
+| R6a entry composition | issue/marker/version/runtime-envelope/begin identity mechanics | direct `agent.py begin` retired from the public façade in R8; lower-level Hosted Agent Cycle carrier remains internal/recovery-only |
 | CLI-coupled defaults | shell `gh` as implicit execution transport | remove from normal path; retain only explicit recovery use where justified |
 | duplicated hosted-bus I/O | repeated issue discovery/comment submission/result correlation | consolidate only when at least two clients are materially reduced in the same window |
 
@@ -164,9 +164,9 @@ A stacked R6c qualification run subsequently exposed one missed environment edge
 
 ## Immediate next steps
 
-1. Qualify and integrate the R8 `journey_shadow` retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
-2. Inventory remaining direct-entry callers and demote/delete only callers that no longer serve explicit recovery/test purposes.
-3. Inventory duplicated hosted-bus I/O and CLI-coupled defaults; consolidate only where at least two concrete clients are actually reduced.
+1. Qualify and integrate the R8 direct-`begin` retirement with exact-head Agent Ops, Coordination Guard and Supervisor Snapshot PASS.
+2. Inventory duplicated hosted-bus I/O and CLI-coupled defaults; consolidate only where at least two concrete clients are actually reduced.
+3. Keep lower-level Hosted Agent Cycle entry only where recovery/debugging genuinely requires it; do not re-advertise it through bootstrap.
 4. Keep R8 subtractive: no replacement Journey layer, compatibility framework, alternate authority or new lifecycle.
 5. Close the migration cycle only after the remaining normal-path/public surfaces are demonstrably smaller than the pre-R7 baseline.
 
