@@ -9,6 +9,7 @@ from tools import (
     agent_failure,
     continuation_remote,
     hosted_agent_cycle,
+    hosted_issue_bus,
     hosted_cycle_artifact,
     hosted_cycle_handle,
 )
@@ -31,77 +32,6 @@ def _text(value: Any, code: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise JourneyEntryError(code)
     return value.strip()
-
-
-def _json_response(response: Any, code: str) -> Any:
-    try:
-        return json.loads(response.body)
-    except (AttributeError, json.JSONDecodeError) as exc:
-        raise JourneyEntryError(code) from exc
-
-
-def _marker_payload(body: Any, marker: str) -> Any | None:
-    prefix = marker + "\n"
-    if not isinstance(body, str) or not body.startswith(prefix):
-        return None
-    raw = body[len(prefix):].strip()
-    if raw.startswith("```json") and raw.endswith("```"):
-        raw = raw[len("```json"):-len("```")].strip()
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return None
-
-
-def _bus_issue(transport: Any) -> int:
-    matches: list[int] = []
-    for page in range(1, 101):
-        value = _json_response(
-            transport.request(
-                "GET",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues?state=open&per_page=100&page={page}",
-            ),
-            "JOURNEY_ENTRY_BUS_ISSUES_INVALID",
-        )
-        if not isinstance(value, list):
-            raise JourneyEntryError("JOURNEY_ENTRY_BUS_ISSUES_INVALID")
-        for issue in value:
-            if not isinstance(issue, dict):
-                continue
-            number = issue.get("number")
-            if (
-                issue.get("title") == hosted_agent_cycle.BUS_TITLE
-                and issue.get("pull_request") is None
-                and isinstance(number, int)
-                and not isinstance(number, bool)
-                and number > 0
-            ):
-                matches.append(number)
-        if len(value) < 100:
-            break
-    if len(matches) != 1:
-        raise JourneyEntryError(
-            "JOURNEY_ENTRY_BUS_MISSING" if not matches else "JOURNEY_ENTRY_BUS_AMBIGUOUS"
-        )
-    return matches[0]
-
-
-def _comments(transport: Any, issue_number: int) -> list[dict[str, Any]]:
-    comments: list[dict[str, Any]] = []
-    for page in range(1, 101):
-        value = _json_response(
-            transport.request(
-                "GET",
-                f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
-            "JOURNEY_ENTRY_COMMENTS_INVALID",
-        )
-        if not isinstance(value, list):
-            raise JourneyEntryError("JOURNEY_ENTRY_COMMENTS_INVALID")
-        comments.extend(item for item in value if isinstance(item, dict))
-        if len(value) < 100:
-            return comments
-    raise JourneyEntryError("JOURNEY_ENTRY_COMMENTS_UNBOUNDED")
 
 
 def _work(work_id: str, transport: Any) -> dict[str, Any]:
@@ -306,8 +236,24 @@ def compose_entry(
         tool_surfaces=tool_surfaces,
         inventory_complete=True,
     )
-    issue_number = _bus_issue(carrier)
-    comments = _comments(carrier, issue_number)
+    try:
+        issue_number = hosted_issue_bus.find_open_issue(
+            carrier,
+            repository=hosted_agent_cycle.REPOSITORY,
+            title=hosted_agent_cycle.BUS_TITLE,
+        )
+        comments = hosted_issue_bus.list_comments(
+            carrier,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=issue_number,
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        code = {
+            "HOSTED_ISSUE_BUS_MISSING": "JOURNEY_ENTRY_BUS_MISSING",
+            "HOSTED_ISSUE_BUS_AMBIGUOUS": "JOURNEY_ENTRY_BUS_AMBIGUOUS",
+            "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED": "JOURNEY_ENTRY_COMMENTS_UNBOUNDED",
+        }.get(exc.code, "JOURNEY_ENTRY_COMMENTS_INVALID")
+        raise JourneyEntryError(code) from exc
     request_comment_id = _find_request(comments, command)
     if request_comment_id is not None:
         status, result_comment_id, handle, blockers = _observe_result(
@@ -328,15 +274,17 @@ def compose_entry(
             status="PENDING", disposition="BUILD_ONLY", work_id=work_id, request=command,
             request_comment_id=None, result_comment_id=None, handle=None, blockers=[], submitted=False,
         )
-    response = carrier.request(
-        "POST",
-        f"repos/{hosted_agent_cycle.REPOSITORY}/issues/{issue_number}/comments",
-        payload={"body": hosted_agent_cycle.REQUEST_MARKER_V04 + "\n" + json.dumps(command, separators=(",", ":"))},
-    )
-    value = _json_response(response, "JOURNEY_ENTRY_SUBMIT_RESPONSE_INVALID")
-    comment_id = value.get("id") if isinstance(value, dict) else None
-    if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
-        raise JourneyEntryError("JOURNEY_ENTRY_SUBMIT_RESPONSE_INVALID")
+    try:
+        comment_id = hosted_issue_bus.post_comment(
+            carrier,
+            repository=hosted_agent_cycle.REPOSITORY,
+            issue_number=issue_number,
+            body=hosted_agent_cycle.REQUEST_MARKER_V04
+            + "\n"
+            + json.dumps(command, separators=(",", ":")),
+        )
+    except hosted_issue_bus.HostedIssueBusError as exc:
+        raise JourneyEntryError("JOURNEY_ENTRY_SUBMIT_RESPONSE_INVALID") from exc
     return _result(
         status="PENDING", disposition="REQUESTED", work_id=work_id, request=command,
         request_comment_id=comment_id, result_comment_id=None, handle=None, blockers=[], submitted=True,
