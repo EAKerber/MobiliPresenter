@@ -2,14 +2,32 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from tools import agent
+from tools import agent, agent_commands
 
 
 class R7PavedDefaultEntryTests(unittest.TestCase):
     def test_direct_begin_is_no_longer_advertised_as_public_toolbox_surface(self) -> None:
         self.assertNotIn("begin", agent.TOOLBOX_COMMANDS)
         self.assertIn("continue", agent.TOOLBOX_COMMANDS)
+
+    def test_direct_begin_is_retired_from_public_agent_cli(self) -> None:
+        with mock.patch("sys.argv", ["agent", "begin"]):
+            with self.assertRaises(SystemExit) as raised:
+                agent_commands.main()
+        self.assertEqual(2, raised.exception.code)
+
+    def test_runtime_surface_binding_no_longer_accepts_direct_begin(self) -> None:
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "RUNTIME_TOOL_SURFACES_REQUIRE_CONTINUE_OR_DOCTOR",
+        ):
+            agent._runtime_surface_base(
+                ["agent", "begin"],
+                ["github-connector-tools"],
+                inventory_complete=True,
+            )
 
     def test_bootstrap_without_work_requires_work_observation(self) -> None:
         value = agent._bootstrap_projection()
@@ -19,10 +37,7 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
             value["commandTemplate"],
         )
         self.assertIsNone(value["pavedEntry"])
-        self.assertEqual(
-            {"surface": "agent.py begin", "disposition": "RECOVERY_ONLY"},
-            value["legacyDirectBegin"],
-        )
+        self.assertNotIn("legacyDirectBegin", value)
 
     def test_work_bound_new_cycle_projects_host_provider_semantic_entry(self) -> None:
         reentry = {
@@ -44,7 +59,7 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
             },
             value["pavedEntry"],
         )
-        self.assertEqual("RECOVERY_ONLY", value["legacyDirectBegin"]["disposition"])
+        self.assertNotIn("legacyDirectBegin", value)
 
     def test_manager_role_demotes_direct_begin(self) -> None:
         root = Path(__file__).resolve().parents[2]
@@ -53,7 +68,8 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("bootstrap.pavedEntry", content)
         self.assertIn("journey-entry", content)
-        self.assertIn("recovery explícito", content)
+        self.assertIn("foi retirado em R8", content)
+        self.assertIn("Hosted Agent Cycle", content)
 
 
 if __name__ == "__main__":

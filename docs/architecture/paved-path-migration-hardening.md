@@ -98,7 +98,7 @@ R7 should also address bounded hosted-bus/CLI duplication only when the same mig
 
 ### R8 — retire and delete
 
-R8 must produce measurable subtraction. The first concrete subtraction retires `tools/agent_tools/journey_shadow.py` and its dedicated regression module after R6 live proof and R7 promotion; no replacement runtime surface is introduced. Further targets include removing duplicated hosted-bus plumbing where consolidation has replaced it, and deleting or privatizing legacy entry/request-construction/CLI-coupled paths that no normal-path caller needs.
+R8 must produce measurable subtraction. The first concrete subtraction retires `tools/agent_tools/journey_shadow.py` and its dedicated regression module after R6 live proof and R7 promotion; no replacement runtime surface is introduced. The next subtraction retires direct `agent.py begin` from the stable public façade and removes its recovery-only bootstrap projection while retaining the lower-level Hosted Agent Cycle carrier for internal recovery. Further targets include removing duplicated hosted-bus plumbing where consolidation has replaced it, and deleting or privatizing legacy request-construction/CLI-coupled paths that no normal-path caller needs.
 
 If R8 cannot identify code/API surface that can be removed or demoted because the new layer depends permanently on both models, the migration thesis is considered unproven and must be re-evaluated rather than extended with more compatibility code.
 

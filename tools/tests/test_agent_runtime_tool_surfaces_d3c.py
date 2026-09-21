@@ -27,7 +27,7 @@ class AgentRuntimeToolSurfacesD3CTests(unittest.TestCase):
             return_value=provider_payload(),
         ):
             base = agent._runtime_surface_base(
-                ["agent", "begin"],
+                ["agent", "doctor"],
                 [SURFACE],
                 inventory_complete=True,
             )
@@ -50,7 +50,7 @@ class AgentRuntimeToolSurfacesD3CTests(unittest.TestCase):
             return_value=provider_payload(),
         ):
             base = agent._runtime_surface_base(
-                ["agent", "begin"],
+                ["agent", "doctor"],
                 [SURFACE],
                 inventory_complete=False,
             )
@@ -83,7 +83,7 @@ class AgentRuntimeToolSurfacesD3CTests(unittest.TestCase):
                     "RUNTIME_PROVIDER_OBSERVATION_SOURCE_CONFLICT:github-connector",
                 ):
                     agent._runtime_surface_base(
-                        ["agent", "begin", "--runtime-providers", str(path)],
+                        ["agent", "doctor", "--runtime-providers", str(path)],
                         [SURFACE],
                         inventory_complete=True,
                     )
@@ -100,7 +100,7 @@ class AgentRuntimeToolSurfacesD3CTests(unittest.TestCase):
         try:
             sys.argv = [
                 "agent",
-                "begin",
+                "doctor",
                 "--runtime-tool-surface",
                 SURFACE,
                 "--runtime-tool-surfaces-complete",
@@ -115,24 +115,24 @@ class AgentRuntimeToolSurfacesD3CTests(unittest.TestCase):
             sys.argv = original_argv
 
         self.assertEqual(result, 17)
-        self.assertEqual(observed["argv"], ["agent", "begin"])
+        self.assertEqual(observed["argv"], ["agent", "doctor"])
         self.assertEqual(
             observed["providers"]["providers"]["github-connector"]["status"],
             "PASS",
         )
 
     def test_no_surface_flags_preserve_existing_delegate(self):
-        argv = ["agent", "begin", "--runtime-providers", "providers.json"]
+        argv = ["agent", "doctor", "--runtime-providers", "providers.json"]
         clean, surfaces, complete, observed = agent._extract_runtime_tool_surfaces(argv)
         self.assertEqual(clean, argv)
         self.assertEqual(surfaces, [])
         self.assertFalse(complete)
         self.assertFalse(observed)
 
-    def test_surface_flags_fail_closed_outside_begin_or_doctor(self):
+    def test_surface_flags_fail_closed_outside_continue_or_doctor(self):
         with self.assertRaisesRegex(
             RuntimeError,
-            "RUNTIME_TOOL_SURFACES_REQUIRE_BEGIN_OR_DOCTOR",
+            "RUNTIME_TOOL_SURFACES_REQUIRE_CONTINUE_OR_DOCTOR",
         ):
             agent._runtime_surface_base(
                 ["agent", "status"],

@@ -22,7 +22,7 @@ Esse modo observa a Work authority e o histórico completo do Hosted Agent Cycle
 
 Quando a orientação exigir um novo ciclo, consuma `bootstrap.pavedEntry`. A entrada normal Work-bound é `journey-entry` pela ToolSurface configurada do host (`github-connector-tools`), mantendo issue/marker/version/handle/CAS fora da superfície cognitiva do caller.
 
-`agent.py begin` direto continua disponível para diagnóstico, testes e recovery explícito, mas não é mais o caminho operacional normal anunciado pelo bootstrap. `bootstrap.pavedEntry` é somente uma projeção read-only: ela não concede authority nem autoriza mutação.
+O comando público `agent.py begin` foi retirado em R8. Recovery de Agent Cycle continua nos carriers/contratos internos de Hosted Agent Cycle e não faz parte da superfície normal de bootstrap. `bootstrap.pavedEntry` é somente uma projeção read-only: ela não concede authority nem autoriza mutação.
 
 Authorities e contratos de entrada:
 

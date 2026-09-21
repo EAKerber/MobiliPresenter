@@ -102,10 +102,6 @@ def _bootstrap_projection(reentry: dict | None = None) -> dict:
         "nextSafeAction": "OBSERVE_WORK",
         "commandTemplate": "python3 tools/agent.py status --work-id <work-id> --json",
         "pavedEntry": None,
-        "legacyDirectBegin": {
-            "surface": "agent.py begin",
-            "disposition": "RECOVERY_ONLY",
-        },
         "roleContractPattern": "docs/kickstarts/roles/<role>.md",
         "entryProfiles": entry_profiles,
         "readOnly": True,
@@ -487,8 +483,8 @@ def _runtime_surface_base(
     inventory_complete: bool,
 ) -> dict:
     command = argv[1] if len(argv) > 1 else None
-    if command not in {"begin", "continue", "doctor"}:
-        raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRE_BEGIN_OR_DOCTOR")
+    if command not in {"continue", "doctor"}:
+        raise RuntimeError("RUNTIME_TOOL_SURFACES_REQUIRE_CONTINUE_OR_DOCTOR")
     derived = runtime_provider_adapter.observations_from_tool_surfaces(
         surfaces,
         inventory_complete=inventory_complete,
