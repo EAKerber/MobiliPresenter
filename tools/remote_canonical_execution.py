@@ -413,21 +413,6 @@ def _content_sha256(transport: Any, path: str, ref: str) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _create_blob(transport: Any, content: str) -> str:
-    try:
-        payload = _json(
-            transport.request(
-                "POST",
-                f"repos/{REPOSITORY}/git/blobs",
-                payload={"content": content, "encoding": "utf-8"},
-            ),
-            "REMOTE_GIT_BLOB_CREATE_INVALID",
-        )
-    except ApiError as exc:
-        raise RemoteCanonicalExecutionError("REMOTE_GIT_BLOB_CREATE_FAILED", exc.detail) from exc
-    return _git_sha(payload.get("sha"), "REMOTE_GIT_BLOB_CREATE_INVALID")
-
-
 def _create_tree(
     transport: Any,
     base_tree_sha: str,
@@ -626,19 +611,22 @@ def _execute_multi_path(
         if "content" in change
     }
     git_mutation_bundle.verify_materialized_content(bundle, content_by_path)
-    bundle_entries = {entry["path"]: entry for entry in bundle["entries"]}
     tree_entries: list[dict[str, Any]] = []
     for change in changes:
         path = change["path"]
         if "content" in change:
-            blob_sha = _create_blob(transport, change["content"])
-            if blob_sha != bundle_entries[path]["gitBlobSha"]:
-                raise RemoteCanonicalExecutionError("REMOTE_GIT_BLOB_HASH_MISMATCH")
+            tree_entries.append(
+                {
+                    "path": path,
+                    "mode": "100644",
+                    "type": "blob",
+                    "content": change["content"],
+                }
+            )
         else:
-            blob_sha = None
-        tree_entries.append(
-            {"path": path, "mode": "100644", "type": "blob", "sha": blob_sha}
-        )
+            tree_entries.append(
+                {"path": path, "mode": "100644", "type": "blob", "sha": None}
+            )
     candidate_tree_sha = _create_tree(
         transport,
         base_commit["treeSha"],
@@ -777,16 +765,19 @@ def _execute_git_direct(
         git_mutation_bundle.verify_materialized_content(
             bundle, {path: command["payload"]["content"]}
         )
-        blob_sha = _create_blob(transport, command["payload"]["content"])
-        if blob_sha != bundle["entries"][0]["gitBlobSha"]:
-            raise RemoteCanonicalExecutionError("REMOTE_GIT_BLOB_HASH_MISMATCH")
+        tree_entry = {
+            "path": path,
+            "mode": "100644",
+            "type": "blob",
+            "content": command["payload"]["content"],
+        }
     else:
-        blob_sha = None
+        tree_entry = {"path": path, "mode": "100644", "type": "blob", "sha": None}
 
     candidate_tree_sha = _create_tree(
         transport,
         base_commit["treeSha"],
-        entries=[{"path": path, "mode": "100644", "type": "blob", "sha": blob_sha}],
+        entries=[tree_entry],
     )
     candidate_tree_entries = _tree_entries(transport, candidate_tree_sha)
     tree_proof = git_mutation_bundle.verify_tree(
