@@ -19,10 +19,7 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
             value["commandTemplate"],
         )
         self.assertIsNone(value["pavedEntry"])
-        self.assertEqual(
-            {"surface": "agent.py begin", "disposition": "RECOVERY_ONLY"},
-            value["legacyDirectBegin"],
-        )
+        self.assertNotIn("legacyDirectBegin", value)
 
     def test_work_bound_new_cycle_projects_host_provider_semantic_entry(self) -> None:
         reentry = {
@@ -44,7 +41,7 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
             },
             value["pavedEntry"],
         )
-        self.assertEqual("RECOVERY_ONLY", value["legacyDirectBegin"]["disposition"])
+        self.assertNotIn("legacyDirectBegin", value)
 
     def test_manager_role_demotes_direct_begin(self) -> None:
         root = Path(__file__).resolve().parents[2]
@@ -53,7 +50,8 @@ class R7PavedDefaultEntryTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("bootstrap.pavedEntry", content)
         self.assertIn("journey-entry", content)
-        self.assertIn("recovery explícito", content)
+        self.assertNotIn("agent.py begin", content)
+        self.assertIn("Hosted Agent Cycle", content)
 
 
 if __name__ == "__main__":
