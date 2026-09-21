@@ -87,11 +87,15 @@ def get_comment(
     comment_id = _positive_int(
         comment_id, "HOSTED_ISSUE_BUS_COMMENT_ID_INVALID"
     )
-    value = _json_response(
-        transport.request(
+    try:
+        response = transport.request(
             "GET",
             f"repos/{repository}/issues/comments/{comment_id}",
-        ),
+        )
+    except Exception as exc:
+        raise HostedIssueBusError("HOSTED_ISSUE_BUS_TRANSPORT_UNAVAILABLE") from exc
+    value = _json_response(
+        response,
         "HOSTED_ISSUE_BUS_COMMENT_INVALID",
     )
     if not isinstance(value, dict):
@@ -112,11 +116,15 @@ def list_comments(
     )
     comments: list[dict[str, Any]] = []
     for page in range(1, 101):
-        value = _json_response(
-            transport.request(
+        try:
+            response = transport.request(
                 "GET",
                 f"repos/{repository}/issues/{issue_number}/comments?per_page=100&page={page}",
-            ),
+            )
+        except Exception as exc:
+            raise HostedIssueBusError("HOSTED_ISSUE_BUS_TRANSPORT_UNAVAILABLE") from exc
+        value = _json_response(
+            response,
             "HOSTED_ISSUE_BUS_COMMENTS_INVALID",
         )
         if not isinstance(value, list):
