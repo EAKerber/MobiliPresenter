@@ -27,7 +27,7 @@ class AgentProjectionTests(unittest.TestCase):
         self.assertEqual(bootstrap["nextSafeAction"],"OBSERVE_WORK")
         self.assertEqual(bootstrap["commandTemplate"],"python3 tools/agent.py status --work-id <work-id> --json")
         self.assertIsNone(bootstrap["pavedEntry"])
-        self.assertEqual(bootstrap["legacyDirectBegin"]["disposition"],"RECOVERY_ONLY")
+        self.assertNotIn("legacyDirectBegin",bootstrap)
         self.assertEqual(bootstrap["roleContractPattern"],"docs/kickstarts/roles/<role>.md")
         self.assertIn("manager-gitops",bootstrap["entryProfiles"])
         self.assertIn("bootstrap-discovery",bootstrap["entryProfiles"]["manager-gitops"])
