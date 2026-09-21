@@ -239,8 +239,8 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
                 "attempts": [{"matched": False, "kind": "agent-tool"}],
             }
             with patch.object(
-                hosted_agent_cycle_waiting.trace_collect,
-                "fetch_issue_comments",
+                hosted_agent_cycle_waiting.hosted_issue_bus,
+                "list_comments",
                 return_value=[],
             ), patch.object(
                 hosted_agent_cycle_waiting.trace_collect,
