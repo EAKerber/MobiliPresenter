@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import agent_cycle_identity, hosted_agent_cycle, hosted_cycle_handle, hosted_issue_bus
+from tools import agent_cycle_identity, hosted_agent_cycle, hosted_cycle_handle
 from tools.coordination_remote import GhApiTransport
 from tools.agent_tools import admission, contracts, mutation_dispatch, resolver
 from tools.canonical import stable_hash
@@ -120,23 +120,24 @@ def derive_handle_request(
 
 
 def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
-    try:
-        envelope = hosted_issue_bus.validate_event_envelope(
-            value,
-            repository=REPOSITORY,
-            bus_title=BUS_TITLE,
-        )
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        code = {
-            "HOSTED_ISSUE_BUS_EVENT_INVALID": "HOSTED_AGENT_TOOL_EVENT_INVALID",
-            "HOSTED_ISSUE_BUS_PR_COMMENT_FORBIDDEN": "HOSTED_AGENT_TOOL_PR_COMMENT_FORBIDDEN",
-            "HOSTED_ISSUE_BUS_BUS_MISMATCH": "HOSTED_AGENT_TOOL_BUS_MISMATCH",
-            "HOSTED_ISSUE_BUS_ACTOR_FORBIDDEN": "HOSTED_AGENT_TOOL_ACTOR_FORBIDDEN",
-            "HOSTED_ISSUE_BUS_REPOSITORY_MISMATCH": "HOSTED_AGENT_TOOL_REPOSITORY_MISMATCH",
-            "HOSTED_ISSUE_BUS_BODY_INVALID": "HOSTED_AGENT_TOOL_MARKER_INVALID",
-        }.get(exc.code, "HOSTED_AGENT_TOOL_EVENT_INVALID")
-        raise HostedAgentToolError(code) from exc
-    body = envelope["body"]
+    if not isinstance(value, dict):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_EVENT_INVALID")
+    issue = value.get("issue")
+    comment = value.get("comment")
+    repository = value.get("repository")
+    if not isinstance(issue, dict) or not isinstance(comment, dict) or not isinstance(repository, dict):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_EVENT_INVALID")
+    if issue.get("pull_request") is not None:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_PR_COMMENT_FORBIDDEN")
+    if issue.get("title") != BUS_TITLE:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_BUS_MISMATCH")
+    if comment.get("author_association") != "OWNER":
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_ACTOR_FORBIDDEN")
+    if repository.get("full_name") != REPOSITORY:
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_REPOSITORY_MISMATCH")
+    body = comment.get("body")
+    if not isinstance(body, str):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_MARKER_INVALID")
     marker = next(
         (item for item in (REQUEST_MARKER, REQUEST_MARKER_V02) if body.startswith(item + "\n")),
         None,
@@ -156,11 +157,14 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, int]]:
         raise HostedAgentToolError(getattr(exc, "code", str(exc).split(":", 1)[0])) from exc
     if (marker == REQUEST_MARKER_V02) != (request.get("schemaVersion") == HANDLE_REQUEST_SCHEMA):
         raise HostedAgentToolError("HOSTED_AGENT_TOOL_MARKER_SCHEMA_MISMATCH")
-    try:
-        meta = hosted_issue_bus.event_identity(envelope)
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        raise HostedAgentToolError("HOSTED_AGENT_TOOL_EVENT_IDENTITY_INVALID") from exc
-    return request, meta
+    issue_number = issue.get("number")
+    comment_id = comment.get("id")
+    if (
+        not isinstance(issue_number, int) or isinstance(issue_number, bool) or issue_number <= 0
+        or not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0
+    ):
+        raise HostedAgentToolError("HOSTED_AGENT_TOOL_EVENT_IDENTITY_INVALID")
+    return request, {"issueNumber": issue_number, "commentId": comment_id}
 
 
 def validate_begin_binding(request: dict[str, Any], manifest: dict[str, Any], context: dict[str, Any]) -> None:
