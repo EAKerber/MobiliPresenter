@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import copy
-import json
 from typing import Any
 
-from tools import agent_cycle_identity, hosted_cycle_records, hosted_issue_bus, remote_canonical_execution
+from tools import agent_cycle_identity, hosted_cycle_records, remote_canonical_execution
 from tools.agent_tools import contracts, mutation_dispatch, trace
 from tools.canonical import stable_hash
 
@@ -316,32 +315,3 @@ def agent_tool_mutation_evidence_comment_ids(
     if missing:
         raise AgentTraceCollectionError("AGENT_TRACE_MUTATION_RECEIPT_MISSING")
     return sorted(found.values())
-
-
-def fetch_issue_comments(
-    repository: str,
-    issue_number: int,
-    *,
-    transport: Any | None = None,
-) -> list[dict[str, Any]]:
-    if transport is None:
-        raise AgentTraceCollectionError("BLOCKED_EXECUTION_SURFACE")
-    try:
-        return hosted_issue_bus.list_comments(
-            transport,
-            repository=repository,
-            issue_number=issue_number,
-        )
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        if exc.code == "BLOCKED_EXECUTION_SURFACE":
-            code = exc.code
-        elif exc.code in {
-            "HOSTED_ISSUE_BUS_COMMENTS_INVALID",
-            "HOSTED_ISSUE_BUS_ISSUE_ID_INVALID",
-        }:
-            code = "AGENT_TRACE_COMMENTS_INVALID"
-        elif exc.code == "HOSTED_ISSUE_BUS_COMMENTS_UNBOUNDED":
-            code = "AGENT_TRACE_COMMENTS_UNBOUNDED"
-        else:
-            code = "AGENT_TRACE_COMMENTS_UNAVAILABLE"
-        raise AgentTraceCollectionError(code) from exc
