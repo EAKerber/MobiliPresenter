@@ -820,11 +820,16 @@ def _observe_write_lifecycle_close(
 
     last_report: dict[str, Any] | None = None
     for attempt in range(hosted_agent_cycle_trace.TRACE_STABILIZATION_ATTEMPTS):
-        comments = trace_collect.fetch_issue_comments(
-            REPOSITORY,
-            issue_number,
-            transport=transport,
-        )
+        try:
+            comments = hosted_issue_bus.list_comments(
+                transport,
+                repository=REPOSITORY,
+                issue_number=issue_number,
+            )
+        except hosted_issue_bus.HostedIssueBusError as exc:
+            raise HostedAgentCycleError(
+                "AGENT_WRITE_LIFECYCLE_COMMENTS_INVALID"
+            ) from exc
         try:
             report = agent_write_lifecycle_guard.inspect_cycle(
                 comments,
