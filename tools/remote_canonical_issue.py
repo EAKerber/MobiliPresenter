@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import hosted_issue_bus
 from tools.agent_commands.agent_owned_git import execute_agent_owned_git
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport
@@ -102,23 +101,24 @@ def _parse_event_transport(value: Any) -> tuple[Any, dict[str, Any], dict[str, A
     command retain deterministic request identity without weakening parse_event's
     fail-closed admission contract.
     """
-    try:
-        envelope = hosted_issue_bus.validate_event_envelope(
-            value,
-            repository="EAKerber/MobiliPresenter",
-            bus_title=BUS_TITLE,
-        )
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        code = {
-            "HOSTED_ISSUE_BUS_EVENT_INVALID": "REMOTE_TRANSPORT_EVENT_INVALID",
-            "HOSTED_ISSUE_BUS_PR_COMMENT_FORBIDDEN": "REMOTE_TRANSPORT_PR_COMMENT_FORBIDDEN",
-            "HOSTED_ISSUE_BUS_BUS_MISMATCH": "REMOTE_TRANSPORT_BUS_MISMATCH",
-            "HOSTED_ISSUE_BUS_ACTOR_FORBIDDEN": "REMOTE_TRANSPORT_ACTOR_FORBIDDEN",
-            "HOSTED_ISSUE_BUS_REPOSITORY_MISMATCH": "REMOTE_TRANSPORT_REPOSITORY_MISMATCH",
-            "HOSTED_ISSUE_BUS_BODY_INVALID": "REMOTE_TRANSPORT_BODY_INVALID",
-        }.get(exc.code, "REMOTE_TRANSPORT_EVENT_INVALID")
-        raise RemoteCanonicalExecutionError(code) from exc
-    body = envelope["body"]
+    if not isinstance(value, dict):
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_EVENT_INVALID")
+    issue = value.get("issue")
+    comment = value.get("comment")
+    repository = value.get("repository")
+    if not isinstance(issue, dict) or not isinstance(comment, dict) or not isinstance(repository, dict):
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_EVENT_INVALID")
+    if issue.get("pull_request") is not None:
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_PR_COMMENT_FORBIDDEN")
+    if issue.get("title") != BUS_TITLE:
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_BUS_MISMATCH")
+    if comment.get("author_association") != "OWNER":
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_ACTOR_FORBIDDEN")
+    if repository.get("full_name") != "EAKerber/MobiliPresenter":
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_REPOSITORY_MISMATCH")
+    body = comment.get("body")
+    if not isinstance(body, str):
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_BODY_INVALID")
     prefix = REQUEST_MARKER + "\n"
     if not body.startswith(prefix):
         raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_MARKER_INVALID")
@@ -127,16 +127,25 @@ def _parse_event_transport(value: Any) -> tuple[Any, dict[str, Any], dict[str, A
         command = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_JSON_INVALID") from exc
-    return command, envelope["issue"], envelope["comment"]
+    return command, issue, comment
 
 
 def _event_meta(issue: dict[str, Any], comment: dict[str, Any]) -> dict[str, Any]:
-    try:
-        return hosted_issue_bus.event_identity(
-            {"issue": issue, "comment": comment}
-        )
-    except hosted_issue_bus.HostedIssueBusError as exc:
-        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_IDENTITY_INVALID") from exc
+    issue_number = issue.get("number")
+    comment_id = comment.get("id")
+    if (
+        not isinstance(issue_number, int)
+        or isinstance(issue_number, bool)
+        or issue_number <= 0
+        or not isinstance(comment_id, int)
+        or isinstance(comment_id, bool)
+        or comment_id <= 0
+    ):
+        raise RemoteCanonicalExecutionError("REMOTE_TRANSPORT_IDENTITY_INVALID")
+    return {
+        "issueNumber": issue_number,
+        "commentId": comment_id,
+    }
 
 
 def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
