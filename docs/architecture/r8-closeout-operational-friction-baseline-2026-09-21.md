@@ -117,3 +117,29 @@ For each, record:
 - retries caused by plumbing rather than semantics.
 
 If the same execution-edge gap dominates those samples, design the smallest tool/composition that removes it. If friction remains task-specific, keep the current architecture and improve locally rather than creating another permanent layer.
+
+
+## Discovery result — live atomic Git-data experiment
+
+The follow-up discovery confirmed the repository already contains the correct semantic capability and the connected GitHub ToolSurface already contains the required raw provider primitives.
+
+Two coherent multi-path documentation mutations were executed through the Git Data API shape:
+
+1. create a tree containing two new discovery documents, create one commit with the exact observed parent, publish the branch ref non-force, and read back exactly two changed paths;
+2. update this closeout plus the migration status together as a second atomic tree/commit/ref mutation.
+
+The first experiment produced one commit for two paths with exact parent/readback, instead of one Contents API commit per file. The second experiment exercises the same shape on updates to existing paths.
+
+This strengthens the conclusion: the remaining gap is a **ToolSurface composition gap**. The repository already has `GitMutationPlan.mutate-files`, `GitMutationBundle`, canonical tree/readback verification, and governed Agent-owned Git execution.
+
+Accordingly:
+
+- do not create a second repository mutation module;
+- do not generalize across providers/forges yet;
+- a future ergonomic capability should expose the existing governed multi-path mutation as one host action;
+- it should return canonical plan/bundle/readback proof rather than only a success boolean;
+- PR/CI/merge remain outside this first ergonomic surface.
+
+See:
+- `post-r8-operational-ergonomics-discovery-2026-09-21.md`;
+- `governed-multi-path-tool-surface-candidate-2026-09-21.md`.
