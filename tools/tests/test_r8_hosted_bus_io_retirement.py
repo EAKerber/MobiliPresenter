@@ -17,6 +17,7 @@ CLIENTS = [
     "tools/agent_write_lifecycle.py",
     "tools/agent_write_lifecycle_host.py",
     "tools/hosted_agent_cycle.py",
+    "tools/hosted_agent_cycle_waiting.py",
 ]
 
 
