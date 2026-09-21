@@ -131,8 +131,8 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
             ],
         }
         with patch.object(
-            hosted_agent_cycle_waiting.trace_collect,
-            "fetch_issue_comments",
+            hosted_agent_cycle_waiting.hosted_issue_bus,
+            "list_comments",
             return_value=[],
         ), patch.object(
             hosted_agent_cycle_waiting.trace_collect,
@@ -147,6 +147,7 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
                 meta={"commentId": 200},
                 manifest=manifest(),
                 output_path="/tmp/closure.json",
+                transport=object(),
             )
         self.assertEqual(observed, ["AGENT_TOOL_RESULT"])
 
@@ -252,6 +253,7 @@ class HostedAgentCycleWaitingR4BTests(unittest.TestCase):
                     begin_dir=str(begin),
                     closure_path=str(root / "closure.json"),
                     result_path=str(result_path),
+                    transport=object(),
                 )
             self.assertTrue(promoted)
             waiting = json.loads(result_path.read_text(encoding="utf-8"))
