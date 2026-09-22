@@ -3535,6 +3535,13 @@
         },
         {
           "targetKind": "workflow",
+          "target": ".github/workflows/governed-mutation-service.yml",
+          "capabilities": [
+            "agent.tools.hosted"
+          ]
+        },
+        {
+          "targetKind": "workflow",
           "target": ".github/workflows/hosted-agent-cycle.yml",
           "capabilities": [
             "agent.cycle.hosted"
@@ -3734,6 +3741,13 @@
           "target": "git-mutation-bundle",
           "capabilities": [
             "git.direct-mutation.plan"
+          ]
+        },
+        {
+          "targetKind": "component",
+          "target": "governed-mutation-service-cli",
+          "capabilities": [
+            "agent.tools.hosted"
           ]
         },
         {
