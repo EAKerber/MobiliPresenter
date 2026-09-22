@@ -40,6 +40,9 @@ observe -> plan -> validate -> apply -> readback
 - Mudanças normais de conteúdo usam branch explícito + PR. Writers de authority operam somente nas refs que seus contratos declaram.
 - Branch names são descritivos; não concedem por si sós retenção, authority, proteção ou elegibilidade de deleção.
 - PR/CI são observados no GitHub, não duplicados como verdade local.
+- Para qualificação de PR no caminho normal, prefira uma projeção dos `check-runs` vinculados ao `head_sha` exato do PR em vez de reconstruir o estado por workflow/run IDs. Antes de qualificar, derive quais gates são aplicáveis pelas definições correntes dos workflows e pelos paths efetivamente alterados; não mantenha um registry paralelo de applicability.
+- Um gate aplicável só é `PASS` quando existe check-run materializado para o mesmo `head_sha`, com `status=completed` e `conclusion=success`. Check esperado ausente permanece `UNKNOWN`; check não terminal permanece `WAITING`; conclusão de falha/cancelamento/timeout/action-required bloqueia. `skipped` nunca substitui `success` para gate aplicável.
+- Se houver duplicidade, conflito, ausência inesperada, alteração dos próprios workflows de qualificação ou qualquer ambiguidade na projeção de `check-runs`, faça drill-down em workflow/run/job até obter evidência inequívoca; a projeção reduz plumbing, não reduz a disciplina fail-closed.
 - Trabalho recuperável deve ser persistido na authority/branch apropriada antes de depender da continuidade de uma conversa ou runtime efêmero.
 - Branch Hygiene é o writer normal de coleta de branches após integração/abandono. Agentes não competem com essa coleta por deleção manual; remoção direta de ref é break-glass/recovery e exige observação + readback explícitos.
 
