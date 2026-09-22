@@ -25,6 +25,7 @@ if str(ROOT) not in sys.path:
 from tools import (
     agent_cycle,
     agent_reentry_guidance,
+    continuation_remote,
     git_observation,
     hosted_agent_cycle,
     hosted_agent_tool,
@@ -35,6 +36,7 @@ from tools import (
 from tools.agent_tools import contracts, mutation_host, resolver, target_policy
 from tools.canonical import stable_hash
 from tools.coordination_remote import ApiError, GhApiTransport
+from tools.semantics.work import WorkStatus
 
 REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = hosted_agent_cycle.BUS_TITLE
@@ -280,14 +282,28 @@ def validate_preparation(value: Any) -> dict[str, Any]:
     return value
 
 
+def _observe_work(work_id: str, transport: Any) -> dict[str, Any]:
+    try:
+        observed = continuation_remote.GitHubContinuationAuthority(
+            transport=transport,
+            repository=REPOSITORY,
+        ).observe()
+    except continuation_remote.ContinuationRemoteError as exc:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_WORK_AUTHORITY_UNAVAILABLE", exc.code
+        ) from exc
+    work = observed.items.get(work_id)
+    if not isinstance(work, dict):
+        raise GovernedMutationServiceError("GOVERNED_MUTATION_WORK_NOT_FOUND")
+    return copy.deepcopy(work)
+
+
 def prepare_request(request: dict[str, Any], *, transport: Any | None = None) -> dict[str, Any]:
     request = validate_request(request)
     if transport is None:
         raise GovernedMutationServiceError("BLOCKED_EXECUTION_SURFACE")
     try:
-        turnover = agent_reentry_guidance.observe_turnover_context(
-            request["workId"], repository=REPOSITORY, transport=transport
-        )
+        work = _observe_work(request["workId"], transport)
     except Exception as exc:
         code = _code(exc)
         state = "UNKNOWN" if "UNKNOWN" in code or "UNAVAILABLE" in code else "BLOCKED"
@@ -304,10 +320,6 @@ def prepare_request(request: dict[str, Any], *, transport: Any | None = None) ->
             semantic_host_supported=None,
         )
 
-    work = turnover["work"]
-    reentry = turnover["reentry"]
-    handle = turnover["handle"]
-    bus_issue_number = turnover["busIssueNumber"]
     if work.get("branch") != request["branch"]:
         return _preparation(
             request,
@@ -315,12 +327,80 @@ def prepare_request(request: dict[str, Any], *, transport: Any | None = None) ->
             blockers=["GOVERNED_MUTATION_WORK_BRANCH_MISMATCH"],
             next_safe_action="ALIGN_WORK_BRANCH",
             work=work,
-            reentry=reentry,
-            handle=handle,
+            reentry=None,
+            handle=None,
             locator=None,
-            bus_issue_number=bus_issue_number,
+            bus_issue_number=None,
             semantic_host_supported=None,
         )
+
+    try:
+        work_status = WorkStatus.parse(str(work.get("status") or ""))
+    except RuntimeError as exc:
+        return _preparation(
+            request,
+            state="UNKNOWN",
+            blockers=["GOVERNED_MUTATION_WORK_STATUS_INVALID"],
+            next_safe_action="INSPECT_WORK",
+            work=work,
+            reentry=None,
+            handle=None,
+            locator=None,
+            bus_issue_number=None,
+            semantic_host_supported=None,
+        )
+
+    if work_status.terminal:
+        return _preparation(
+            request,
+            state="BLOCKED",
+            blockers=["GOVERNED_MUTATION_WORK_TERMINAL"],
+            next_safe_action="NONE",
+            work=work,
+            reentry=None,
+            handle=None,
+            locator=None,
+            bus_issue_number=None,
+            semantic_host_supported=None,
+        )
+
+    try:
+        turnover = agent_reentry_guidance.observe_turnover_context(
+            request["workId"], repository=REPOSITORY, transport=transport
+        )
+    except Exception as exc:
+        code = _code(exc)
+        state = "UNKNOWN" if "UNKNOWN" in code or "UNAVAILABLE" in code else "BLOCKED"
+        return _preparation(
+            request,
+            state=state,
+            blockers=[code],
+            next_safe_action="INSPECT_WORK",
+            work=work,
+            reentry=None,
+            handle=None,
+            locator=None,
+            bus_issue_number=None,
+            semantic_host_supported=None,
+        )
+
+    if turnover["work"] != work:
+        return _preparation(
+            request,
+            state="UNKNOWN",
+            blockers=["GOVERNED_MUTATION_WORK_DRIFT"],
+            next_safe_action="INSPECT_WORK",
+            work=work,
+            reentry=turnover.get("reentry"),
+            handle=None,
+            locator=None,
+            bus_issue_number=turnover.get("busIssueNumber"),
+            semantic_host_supported=None,
+        )
+
+    reentry = turnover["reentry"]
+    handle = turnover["handle"]
+    bus_issue_number = turnover["busIssueNumber"]
     if reentry.get("nextSafeAction") != "RESUME_EXACT_CYCLE" or handle is None:
         return _preparation(
             request,
