@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5-governed-mutation-request-client",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "WAITING",
   "branch": "work/operations/e5-governed-mutation-request-client",
   "prNumber": null,
   "dependsOn": [],
@@ -17,6 +17,8 @@
     "sha": null,
     "checkpoint": null
   },
-  "blockers": [],
+  "blockers": [
+    "HOSTED_AGENT_BEGIN_PUBLIC_FACADE_RETIRED"
+  ],
   "handoffToWorkerId": null
 }
