@@ -78,6 +78,12 @@
       "owner": "operations-core",
       "definition": "Hash-bound non-authoritative result of resolving or read-only executing one Agent Tool request."
     },
+    "artifact.agent-tool-governed-mutation-host-outcome": {
+      "term": "AgentToolGovernedMutationHostOutcome",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Hash-bound non-authoritative outcome of the shared governed mutation host, preserving guard proofs, canonical receipt lineage, mutable-call evidence, and BLOCKED/UNKNOWN classification without authorizing mutation."
+    },
     "artifact.agent-tool-guard-proof-set": {
       "term": "AgentToolGuardProofSet",
       "kind": "artifact",
@@ -167,6 +173,24 @@
       "kind": "artifact",
       "owner": "git-governance",
       "definition": "Read-only exact-content Git mutation intent and tree/readback proof; it never authorizes mutation."
+    },
+    "artifact.governed-mutation-preparation": {
+      "term": "GovernedMutationServicePreparation",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Read-only preparation projection that binds one ergonomic governed-mutation request to canonical Work re-entry and an exact resumable Agent Cycle, or returns a fail-closed next safe action."
+    },
+    "artifact.governed-mutation-service-result": {
+      "term": "GovernedMutationServiceResult",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Compact hash-bound service result exposing mutation status, branch/readback summary, next safe action, and kitchen-window references while retaining no semantic authority."
+    },
+    "artifact.governed-mutation-window-ref": {
+      "term": "GovernedMutationWindowRef",
+      "kind": "artifact",
+      "owner": "operations-core",
+      "definition": "Hash-bound locator for one member of the exact workflow evidence artifact used by a governed mutation execution; it is a pull-based inspection reference, not a state store or authority."
     },
     "artifact.inspection": {
       "term": "Inspection",
@@ -758,6 +782,35 @@
       "canonicalWriterFor": [],
       "delegatesTo": []
     },
+    "agent-tool-mutation-host": {
+      "module": "tools.agent_tools.mutation_host",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "coordination-leases"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [
+        "agent-tool-policy-catalog",
+        "git-branch-refs"
+      ],
+      "writesResources": [
+        "git-branch-refs"
+      ],
+      "produces": [
+        "artifact.agent-tool-execution-result",
+        "artifact.agent-tool-governed-mutation-host-outcome",
+        "artifact.agent-tool-guard-proof-set",
+        "artifact.remote-canonical-execution-receipt"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "agent-tool-resolver",
+        "agent-write-lifecycle-guard",
+        "remote-canonical-executor"
+      ]
+    },
     "agent-tool-resolver": {
       "module": "tools.agent_tools.resolver",
       "owner": "operations-core",
@@ -1063,6 +1116,33 @@
       ],
       "canonicalWriterFor": [],
       "delegatesTo": []
+    },
+    "governed-mutation-service-cli": {
+      "module": "tools.governed_mutation_service",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": true,
+      "readsAuthorities": [
+        "continuations",
+        "coordination-leases"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [
+        "agent-tool-policy-catalog",
+        "git-branch-refs"
+      ],
+      "writesResources": [
+        "git-branch-refs"
+      ],
+      "produces": [
+        "artifact.governed-mutation-preparation",
+        "artifact.governed-mutation-service-result",
+        "artifact.governed-mutation-window-ref"
+      ],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "agent-tool-mutation-host"
+      ]
     },
     "hosted-agent-cycle-cli": {
       "module": "tools.hosted_agent_cycle",
