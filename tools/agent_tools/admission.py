@@ -19,6 +19,12 @@ def _prove_agent_write_lifecycle_bound(*args: Any, **kwargs: Any) -> dict[str, A
     return agent_write_lifecycle_guard.prove_active_binding(*args, **kwargs)
 
 
+def _prove_agent_write_lifecycle_result(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    from tools import agent_write_lifecycle_guard
+
+    return agent_write_lifecycle_guard.prove_binding_result(*args, **kwargs)
+
+
 # Proof providers materialize admission evidence only. Their availability does
 # not authorize a write: mutation-execute still requires an intent-scoped plan,
 # a positive proof set, dispatch to the canonical host, and execution-time
@@ -52,12 +58,31 @@ def _lifecycle_context(value: Any) -> dict[str, Any]:
     return {"cycleInstanceId":cycle_id,"issueNumber":issue,"beforeCommentId":before}
 
 
+def _lifecycle_result_context(value: Any) -> dict[str, Any]:
+    fields = {"cycleInstanceId", "lifecycleResult", "lifecycleResultRef"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise RuntimeError("AGENT_WRITE_LIFECYCLE_RESULT_CONTEXT_REQUIRED")
+    cycle_id = value.get("cycleInstanceId")
+    result = value.get("lifecycleResult")
+    result_ref = value.get("lifecycleResultRef")
+    if not isinstance(cycle_id, str) or not cycle_id:
+        raise RuntimeError("AGENT_WRITE_LIFECYCLE_RESULT_CONTEXT_INVALID")
+    if not isinstance(result, dict) or not isinstance(result_ref, dict):
+        raise RuntimeError("AGENT_WRITE_LIFECYCLE_RESULT_CONTEXT_INVALID")
+    return {
+        "cycleInstanceId": cycle_id,
+        "lifecycleResult": copy.deepcopy(result),
+        "lifecycleResultRef": copy.deepcopy(result_ref),
+    }
+
+
 def collect_guard_proofs(
     plan: dict[str, Any],
     *,
     transport: Any | None = None,
     authority_factory: Callable[[Any], Any] | None = None,
     lifecycle_context: dict[str, Any] | None = None,
+    lifecycle_result_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     contracts.validate_plan(plan)
     if plan["effectClass"] != MUTATION_EFFECT:
@@ -70,14 +95,32 @@ def collect_guard_proofs(
     for guard in plan["guards"]:
         provider = GUARD_PROOF_PROVIDERS[guard]
         if guard == "agent-write-lifecycle-bound":
-            context=_lifecycle_context(lifecycle_context)
-            proof=provider(
-                plan,
-                cycle_instance_id=context["cycleInstanceId"],
-                issue_number=context["issueNumber"],
-                before_comment_id=context["beforeCommentId"],
-                transport=transport,
-            )
+            if lifecycle_context is not None and lifecycle_result_context is not None:
+                raise RuntimeError("AGENT_WRITE_LIFECYCLE_CONTEXT_AMBIGUOUS")
+            if lifecycle_result_context is not None:
+                context = _lifecycle_result_context(lifecycle_result_context)
+                authority = (
+                    authority_factory(transport)
+                    if authority_factory is not None
+                    else None
+                )
+                proof = _prove_agent_write_lifecycle_result(
+                    plan,
+                    cycle_instance_id=context["cycleInstanceId"],
+                    lifecycle_result=context["lifecycleResult"],
+                    lifecycle_result_ref=context["lifecycleResultRef"],
+                    transport=transport,
+                    authority=authority,
+                )
+            else:
+                context = _lifecycle_context(lifecycle_context)
+                proof = provider(
+                    plan,
+                    cycle_instance_id=context["cycleInstanceId"],
+                    issue_number=context["issueNumber"],
+                    before_comment_id=context["beforeCommentId"],
+                    transport=transport,
+                )
         elif guard == "coordination-lease-owned":
             proof = provider(
                 plan,

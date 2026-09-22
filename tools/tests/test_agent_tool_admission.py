@@ -93,5 +93,54 @@ class AgentToolAdmissionTests(unittest.TestCase):
         self.assertEqual(resolved["plan"]["effectClass"], "read-only")
 
 
+    @patch("tools.agent_tools.admission._prove_agent_write_lifecycle_result")
+    @patch("tools.agent_tools.admission.guard_proofs.validate_proof_set")
+    def test_portable_lifecycle_result_is_supported_without_hosted_context(
+        self, validate_set, prove_lifecycle
+    ):
+        plan = {
+            "schemaVersion": contracts.PLAN_SCHEMA,
+            "requestHash": "1" * 64,
+            "begin": {"runId": 123, "sourceSha": "a" * 40, "contextHash": "b" * 64},
+            "actor": {
+                "role": "manager-gitops",
+                "workerId": "manager-gitops-a",
+                "sessionId": "session-1",
+            },
+            "toolId": "git.files.mutate",
+            "effectClass": "shared-durable-mutation",
+            "mode": "mutation-execute",
+            "adapter": "remote-git-files",
+            "requiredCapabilities": [],
+            "eligibleToolSurfaces": [],
+            "targetPolicy": "manager-git-mutation",
+            "guards": ["agent-write-lifecycle-bound"],
+            "target": {"branch": "work/operations/e3"},
+            "input": {"changes": [{"path": "docs/e3.txt", "content": "x"}], "message": "e3"},
+            "concrete": {},
+            "status": "READY",
+            "readOnly": True,
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        body = dict(plan)
+        from tools.canonical import stable_hash
+        plan["planHash"] = stable_hash(body)
+        with patch("tools.agent_tools.admission.contracts.validate_plan", return_value=plan):
+            prove_lifecycle.return_value = {"kind": "lifecycle"}
+            validate_set.side_effect = lambda value, plan=None: value
+            result = admission.collect_guard_proofs(
+                plan,
+                transport=object(),
+                lifecycle_result_context={
+                    "cycleInstanceId": "cycle-instance-" + "1" * 24,
+                    "lifecycleResult": {"resultHash": "2" * 64},
+                    "lifecycleResultRef": {"kind": "provided-result", "value": "2" * 64},
+                },
+            )
+        self.assertEqual(result["status"], "PASS")
+        prove_lifecycle.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
