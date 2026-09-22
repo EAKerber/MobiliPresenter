@@ -226,7 +226,24 @@ class GovernedMutationHostTests(unittest.TestCase):
             patch.object(
                 mutation_host.agent_owned_git,
                 "execute_agent_owned_git",
-                return_value=canonical_receipt,
+                side_effect=lambda command, *, source, transport, authority_factory=None: (
+                    transport.request(
+                        "POST",
+                        "repos/EAKerber/MobiliPresenter/git/trees",
+                        payload={},
+                    ),
+                    transport.request(
+                        "POST",
+                        "repos/EAKerber/MobiliPresenter/git/commits",
+                        payload={},
+                    ),
+                    transport.request(
+                        "PATCH",
+                        "repos/EAKerber/MobiliPresenter/git/refs/heads/work/operations/e3",
+                        payload={},
+                    ),
+                    canonical_receipt,
+                )[-1],
             ) as execute,
             patch.object(
                 mutation_host.guard_proofs,
