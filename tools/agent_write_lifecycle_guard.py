@@ -14,7 +14,8 @@ from tools.canonical import stable_hash
 from tools.coordination_remote import GitHubCoordinationAuthority
 
 REPORT_SCHEMA = "AgentWriteLeaseCloseReport 0.1"
-PROOF_SCHEMA = "AgentWriteLifecycleGuardProof 0.1"
+LEGACY_PROOF_SCHEMA = "AgentWriteLifecycleGuardProof 0.1"
+PROOF_SCHEMA = "AgentWriteLifecycleGuardProof 0.2"
 CURRENT_REPOSITORY = hosted_cycle_records.CURRENT_REPOSITORY
 AGENT_TOOL_REQUEST_MARKER = hosted_cycle_records.AGENT_TOOL_REQUEST_MARKER
 AGENT_TOOL_REQUEST_MARKER_V02 = hosted_cycle_records.AGENT_TOOL_REQUEST_MARKER_V02
@@ -31,6 +32,23 @@ class AgentWriteLifecycleGuardError(RuntimeError):
 
 
 _payload = hosted_cycle_records.json_after_marker
+
+
+def _lifecycle_result_ref(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict) or set(value) != {"kind", "value"}:
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_REF_INVALID")
+    kind = value.get("kind")
+    ref_value = value.get("value")
+    if (
+        not isinstance(kind, str)
+        or not kind.strip()
+        or kind != kind.strip()
+        or not isinstance(ref_value, str)
+        or not ref_value.strip()
+        or ref_value != ref_value.strip()
+    ):
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_REF_INVALID")
+    return {"kind": kind, "value": ref_value}
 
 
 def _json_response(response: Any, code: str) -> Any:
@@ -302,6 +320,73 @@ def _migration_release_proven(
     return False
 
 
+def prove_binding_result(
+    plan: dict[str, Any],
+    *,
+    cycle_instance_id: str,
+    lifecycle_result: dict[str, Any],
+    lifecycle_result_ref: dict[str, str],
+    transport: Any | None = None,
+    authority: Any | None = None,
+) -> dict[str, Any]:
+    result_ref = _lifecycle_result_ref(lifecycle_result_ref)
+    try:
+        result = lifecycle.validate_result(lifecycle_result)
+    except RuntimeError as exc:
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID") from exc
+
+    if (
+        result.get("cycleInstanceId") != cycle_instance_id
+        or result.get("begin") != plan.get("begin")
+        or result.get("actor") != plan.get("actor")
+        or result.get("branch") != plan.get("target", {}).get("branch")
+    ):
+        raise AgentWriteLifecycleGuardError(
+            "AGENT_WRITE_LIFECYCLE_RESULT_BINDING_MISMATCH"
+        )
+
+    binding = result["binding"]
+    if binding["state"] != "ACTIVE":
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_NOT_ACTIVE")
+
+    current_authority = authority
+    if current_authority is None:
+        if transport is None:
+            raise AgentWriteLifecycleGuardError("BLOCKED_EXECUTION_SURFACE")
+        current_authority = GitHubCoordinationAuthority(transport=transport)
+
+    observation = current_authority.observe()
+    if lifecycle.binding_is_expired(binding, observation.authority_now):
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_EXPIRED")
+
+    active = coordination.active_leases(observation.state, observation.authority_now)
+    matching = _matching_exact_leases(active, binding=binding)
+    if len(matching) != 1:
+        raise AgentWriteLifecycleGuardError(
+            "AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH"
+        )
+
+    core = {
+        "schemaVersion": PROOF_SCHEMA,
+        "cycleInstanceId": cycle_instance_id,
+        "requestHash": plan["requestHash"],
+        "planHash": plan["planHash"],
+        "actor": copy.deepcopy(plan["actor"]),
+        "branch": binding["branch"],
+        "bindingHash": binding["bindingHash"],
+        "lifecycleResultHash": result["resultHash"],
+        "lifecycleResultRef": result_ref,
+        "leaseId": binding["leaseId"],
+        "authorityHead": observation.head_sha,
+        "authorityNow": observation.authority_now.isoformat().replace("+00:00", "Z"),
+        "status": "PASS",
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    return {**core, "proofHash": stable_hash(core)}
+
+
 def prove_active_binding(
     plan: dict[str, Any],
     *,
@@ -333,82 +418,93 @@ def prove_active_binding(
         try:
             lifecycle.validate_result(value)
         except RuntimeError as exc:
-            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_INVALID") from exc
+            raise AgentWriteLifecycleGuardError(
+                "AGENT_WRITE_LIFECYCLE_RESULT_INVALID"
+            ) from exc
         if value["branch"] != plan["target"].get("branch"):
             continue
         comment_id = hosted_cycle_records.comment_id(comment)
         if comment_id is None:
-            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_RESULT_COMMENT_INVALID")
+            raise AgentWriteLifecycleGuardError(
+                "AGENT_WRITE_LIFECYCLE_RESULT_COMMENT_INVALID"
+            )
         candidates.append((comment_id, value))
 
     if not candidates:
         raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_REQUIRED")
 
     comment_id, result = candidates[-1]
-    binding = result["binding"]
-    if binding["state"] != "ACTIVE":
-        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_NOT_ACTIVE")
-
-    authority = GitHubCoordinationAuthority(transport=carrier)
-    observation = authority.observe()
-    if lifecycle.binding_is_expired(binding, observation.authority_now):
-        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_EXPIRED")
-
-    active = coordination.active_leases(observation.state, observation.authority_now)
-    matching = _matching_exact_leases(active, binding=binding)
-    if len(matching) != 1:
-        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
-
-    core = {
-        "schemaVersion": PROOF_SCHEMA,
-        "cycleInstanceId": cycle_instance_id,
-        "requestHash": plan["requestHash"],
-        "planHash": plan["planHash"],
-        "actor": copy.deepcopy(plan["actor"]),
-        "branch": binding["branch"],
-        "bindingHash": binding["bindingHash"],
-        "lifecycleResultHash": result["resultHash"],
-        "lifecycleResultCommentId": comment_id,
-        "leaseId": binding["leaseId"],
-        "authorityHead": observation.head_sha,
-        "authorityNow": observation.authority_now.isoformat().replace("+00:00", "Z"),
-        "status": "PASS",
-        "readOnly": True,
-        "semanticAuthority": False,
-        "authorizesMutation": False,
-    }
-    return {**core, "proofHash": stable_hash(core)}
+    return prove_binding_result(
+        plan,
+        cycle_instance_id=cycle_instance_id,
+        lifecycle_result=result,
+        lifecycle_result_ref={
+            "kind": "hosted-comment",
+            "value": str(comment_id),
+        },
+        transport=carrier,
+    )
 
 
 def validate_active_binding_proof(value: Any) -> dict[str, Any]:
-    fields = {
+    common_fields = {
         "schemaVersion", "cycleInstanceId", "requestHash", "planHash", "actor",
-        "branch", "bindingHash", "lifecycleResultHash",
-        "lifecycleResultCommentId", "leaseId", "authorityHead", "authorityNow",
-        "status", "readOnly", "semanticAuthority", "authorizesMutation", "proofHash",
+        "branch", "bindingHash", "lifecycleResultHash", "leaseId",
+        "authorityHead", "authorityNow", "status", "readOnly",
+        "semanticAuthority", "authorizesMutation", "proofHash",
     }
-    if not isinstance(value, dict) or set(value) != fields or value.get("schemaVersion") != PROOF_SCHEMA:
+    if not isinstance(value, dict):
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
+
+    schema = value.get("schemaVersion")
+    if schema == PROOF_SCHEMA:
+        fields = common_fields | {"lifecycleResultRef"}
+    elif schema == LEGACY_PROOF_SCHEMA:
+        fields = common_fields | {"lifecycleResultCommentId"}
+    else:
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
+
+    if set(value) != fields:
         raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
     if value.get("status") != "PASS" or value.get("readOnly") is not True:
         raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
-    if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
-        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
-    for field in ("requestHash", "planHash", "bindingHash", "lifecycleResultHash", "proofHash"):
-        raw = value.get(field)
-        if not isinstance(raw, str) or len(raw) != 64 or any(ch not in "0123456789abcdef" for ch in raw):
-            raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
     if (
+        value.get("semanticAuthority") is not False
+        or value.get("authorizesMutation") is not False
+    ):
+        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
+    for field in (
+        "requestHash", "planHash", "bindingHash", "lifecycleResultHash", "proofHash"
+    ):
+        raw = value.get(field)
+        if (
+            not isinstance(raw, str)
+            or len(raw) != 64
+            or any(ch not in "0123456789abcdef" for ch in raw)
+        ):
+            raise AgentWriteLifecycleGuardError(
+                "AGENT_WRITE_LIFECYCLE_PROOF_INVALID"
+            )
+
+    if schema == PROOF_SCHEMA:
+        _lifecycle_result_ref(value.get("lifecycleResultRef"))
+    elif (
         not isinstance(value.get("lifecycleResultCommentId"), int)
         or isinstance(value["lifecycleResultCommentId"], bool)
         or value["lifecycleResultCommentId"] <= 0
     ):
         raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_INVALID")
 
-    core = {key: copy.deepcopy(item) for key, item in value.items() if key != "proofHash"}
+    core = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "proofHash"
+    }
     if value.get("proofHash") != stable_hash(core):
-        raise AgentWriteLifecycleGuardError("AGENT_WRITE_LIFECYCLE_PROOF_HASH_MISMATCH")
+        raise AgentWriteLifecycleGuardError(
+            "AGENT_WRITE_LIFECYCLE_PROOF_HASH_MISMATCH"
+        )
     return value
-
 
 def inspect_cycle(
     comments: list[dict[str, Any]],
