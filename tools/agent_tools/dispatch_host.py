@@ -7,7 +7,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-from tools import git_observation, hosted_agent_cycle, hosted_agent_tool, hosted_issue_bus, remote_canonical_issue
+from tools import (
+    git_observation,
+    hosted_agent_cycle,
+    hosted_agent_tool,
+    hosted_issue_bus,
+    remote_canonical_execution,
+    remote_canonical_issue,
+)
 from tools.agent_tools import admission, contracts, mutation_dispatch, policy as tool_policy
 from tools.agent_tools.target_policy import validate_target
 from tools.canonical import stable_hash
@@ -488,15 +495,17 @@ def execute_dispatch(
             lifecycle_context=_lifecycle_context(dispatch, before_comment_id=None),
         )
         admission.assert_execution_admitted(bundle["plan"], execution_proofs)
-        source = {
-            "workflow": "agent-tool-mutation-dispatch",
-            "sourceSha": host_sha,
-            "runId": str(_positive_int(run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID")),
-            "issueNumber": dispatch["source"]["issueNumber"],
-            "commentId": _positive_int(
+        source = remote_canonical_execution.build_hosted_comment_source(
+            host="agent-tool-mutation-dispatch",
+            source_sha=host_sha,
+            invocation_id=str(
+                _positive_int(run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID")
+            ),
+            issue_number=dispatch["source"]["issueNumber"],
+            comment_id=_positive_int(
                 attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID"
             ),
-        }
+        )
         receipt = remote_canonical_issue.execute_command(
             dispatch["command"], source=source, transport=tracked
         )

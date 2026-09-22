@@ -32,7 +32,8 @@ from tools.coordination_remote import (
 )
 
 COMMAND_SCHEMA = "RemoteCanonicalCommand 0.1"
-RECEIPT_SCHEMA = "RemoteCanonicalExecutionReceipt 0.1"
+LEGACY_RECEIPT_SCHEMA = "RemoteCanonicalExecutionReceipt 0.1"
+RECEIPT_SCHEMA = "RemoteCanonicalExecutionReceipt 0.2"
 REPOSITORY = "EAKerber/MobiliPresenter"
 CONTROL_BRANCH = "main"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -940,7 +941,114 @@ def _execute_domain(
     return plan, evidence, aggregate
 
 
+def _positive_source_id(value: Any) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_INVALID")
+    return value
+
+
+def _source_ref(value: Any, *, source_kind: str) -> dict[str, str]:
+    if not isinstance(value, dict) or set(value) != {"kind", "value"}:
+        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_REF_INVALID")
+    ref_kind = _nonempty(
+        value.get("kind"), "REMOTE_EXECUTION_SOURCE_REF_INVALID"
+    )
+    ref_value = _nonempty(
+        value.get("value"), "REMOTE_EXECUTION_SOURCE_REF_INVALID"
+    )
+    if source_kind == "hosted-comment":
+        if ref_kind != "issue-comment":
+            raise RemoteCanonicalExecutionError(
+                "REMOTE_EXECUTION_SOURCE_REF_INVALID"
+            )
+        parts = ref_value.split(":")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            raise RemoteCanonicalExecutionError(
+                "REMOTE_EXECUTION_SOURCE_REF_INVALID"
+            )
+        issue_number, comment_id = (int(part) for part in parts)
+        _positive_source_id(issue_number)
+        _positive_source_id(comment_id)
+        ref_value = f"{issue_number}:{comment_id}"
+    elif source_kind == "agent-tool-host":
+        if (
+            ref_kind != "agent-tool-request"
+            or not re.fullmatch(r"[0-9a-f]{64}", ref_value)
+        ):
+            raise RemoteCanonicalExecutionError(
+                "REMOTE_EXECUTION_SOURCE_REF_INVALID"
+            )
+    else:
+        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_KIND_INVALID")
+    return {"kind": ref_kind, "value": ref_value}
+
+
+def build_execution_source(
+    *,
+    kind: str,
+    host: str,
+    source_sha: str,
+    invocation_id: str,
+    ref: dict[str, str],
+) -> dict[str, Any]:
+    source_kind = _nonempty(kind, "REMOTE_EXECUTION_SOURCE_KIND_INVALID")
+    if source_kind not in {"hosted-comment", "agent-tool-host"}:
+        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_KIND_INVALID")
+    value = {
+        "kind": source_kind,
+        "host": _nonempty(host, "REMOTE_EXECUTION_SOURCE_HOST_INVALID"),
+        "sourceSha": _git_sha(
+            source_sha, "REMOTE_EXECUTION_SOURCE_SHA_INVALID"
+        ),
+        "invocationId": _nonempty(
+            invocation_id, "REMOTE_EXECUTION_INVOCATION_ID_INVALID"
+        ),
+        "ref": _source_ref(ref, source_kind=source_kind),
+    }
+    return value
+
+
+def build_hosted_comment_source(
+    *,
+    host: str,
+    source_sha: str,
+    invocation_id: str,
+    issue_number: int,
+    comment_id: int,
+) -> dict[str, Any]:
+    issue_number = _positive_source_id(issue_number)
+    comment_id = _positive_source_id(comment_id)
+    return build_execution_source(
+        kind="hosted-comment",
+        host=host,
+        source_sha=source_sha,
+        invocation_id=invocation_id,
+        ref={
+            "kind": "issue-comment",
+            "value": f"{issue_number}:{comment_id}",
+        },
+    )
+
+
 def _source(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {
+        "kind",
+        "host",
+        "sourceSha",
+        "invocationId",
+        "ref",
+    }:
+        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_INVALID")
+    return build_execution_source(
+        kind=value["kind"],
+        host=value["host"],
+        source_sha=value["sourceSha"],
+        invocation_id=value["invocationId"],
+        ref=value["ref"],
+    )
+
+
+def _legacy_source(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {
         "workflow",
         "sourceSha",
@@ -949,20 +1057,17 @@ def _source(value: Any) -> dict[str, Any]:
         "commentId",
     }:
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_INVALID")
-    workflow = _nonempty(value.get("workflow"), "REMOTE_EXECUTION_SOURCE_INVALID")
-    source_sha = _git_sha(value.get("sourceSha"), "REMOTE_EXECUTION_SOURCE_SHA_INVALID")
-    run_id = _nonempty(value.get("runId"), "REMOTE_EXECUTION_RUN_ID_INVALID")
-    issue_number = value.get("issueNumber")
-    comment_id = value.get("commentId")
-    if (
-        not isinstance(issue_number, int)
-        or isinstance(issue_number, bool)
-        or issue_number <= 0
-        or not isinstance(comment_id, int)
-        or isinstance(comment_id, bool)
-        or comment_id <= 0
-    ):
-        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_SOURCE_INVALID")
+    workflow = _nonempty(
+        value.get("workflow"), "REMOTE_EXECUTION_SOURCE_INVALID"
+    )
+    source_sha = _git_sha(
+        value.get("sourceSha"), "REMOTE_EXECUTION_SOURCE_SHA_INVALID"
+    )
+    run_id = _nonempty(
+        value.get("runId"), "REMOTE_EXECUTION_RUN_ID_INVALID"
+    )
+    issue_number = _positive_source_id(value.get("issueNumber"))
+    comment_id = _positive_source_id(value.get("commentId"))
     return {
         "workflow": workflow,
         "sourceSha": source_sha,
@@ -971,6 +1076,35 @@ def _source(value: Any) -> dict[str, Any]:
         "commentId": comment_id,
     }
 
+
+def hosted_comment_source_binding(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict) and set(value) == {
+        "workflow",
+        "sourceSha",
+        "runId",
+        "issueNumber",
+        "commentId",
+    }:
+        legacy = _legacy_source(value)
+        return {
+            "host": legacy["workflow"],
+            "sourceSha": legacy["sourceSha"],
+            "invocationId": legacy["runId"],
+            "issueNumber": legacy["issueNumber"],
+            "commentId": legacy["commentId"],
+        }
+
+    current = _source(value)
+    if current["kind"] != "hosted-comment":
+        return None
+    issue_raw, comment_raw = current["ref"]["value"].split(":")
+    return {
+        "host": current["host"],
+        "sourceSha": current["sourceSha"],
+        "invocationId": current["invocationId"],
+        "issueNumber": int(issue_raw),
+        "commentId": int(comment_raw),
+    }
 
 def _route(command: dict[str, Any]) -> dict[str, str]:
     if command["kind"] == "domain":
@@ -986,16 +1120,24 @@ def _route(command: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def build_receipt(
+def _build_receipt(
     command: dict[str, Any],
     *,
     source: dict[str, Any],
     plan: dict[str, Any],
     evidence: dict[str, Any],
     aggregate_readback: dict[str, Any],
+    schema_version: str,
 ) -> dict[str, Any]:
     validate_command(command)
-    source_value = _source(source)
+    if schema_version == RECEIPT_SCHEMA:
+        source_value = _source(source)
+    elif schema_version == LEGACY_RECEIPT_SCHEMA:
+        source_value = _legacy_source(source)
+    else:
+        raise RemoteCanonicalExecutionError(
+            "REMOTE_EXECUTION_RECEIPT_SCHEMA_UNSUPPORTED"
+        )
     route = _route(command)
     if command["kind"] == "domain":
         transition_protocol.validate_plan(plan)
@@ -1061,7 +1203,7 @@ def build_receipt(
     if aggregate_readback != expected_aggregate:
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_AGGREGATE_READBACK_MISMATCH")
     body = {
-        "schemaVersion": RECEIPT_SCHEMA,
+        "schemaVersion": schema_version,
         "executionId": command["executionId"],
         "command": copy.deepcopy(command),
         "commandHash": command_hash(command),
@@ -1078,11 +1220,32 @@ def build_receipt(
     return {**body, "receiptHash": stable_hash(body)}
 
 
+def build_receipt(
+    command: dict[str, Any],
+    *,
+    source: dict[str, Any],
+    plan: dict[str, Any],
+    evidence: dict[str, Any],
+    aggregate_readback: dict[str, Any],
+) -> dict[str, Any]:
+    return _build_receipt(
+        command,
+        source=source,
+        plan=plan,
+        evidence=evidence,
+        aggregate_readback=aggregate_readback,
+        schema_version=RECEIPT_SCHEMA,
+    )
+
+
 def validate_receipt(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != RECEIPT_FIELDS:
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_RECEIPT_FIELDS_INVALID")
-    if value.get("schemaVersion") != RECEIPT_SCHEMA:
-        raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_RECEIPT_SCHEMA_UNSUPPORTED")
+    schema_version = value.get("schemaVersion")
+    if schema_version not in {RECEIPT_SCHEMA, LEGACY_RECEIPT_SCHEMA}:
+        raise RemoteCanonicalExecutionError(
+            "REMOTE_EXECUTION_RECEIPT_SCHEMA_UNSUPPORTED"
+        )
     command = validate_command(value.get("command"))
     if value.get("executionId") != command["executionId"]:
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_ID_MISMATCH")
@@ -1092,19 +1255,23 @@ def validate_receipt(value: Any) -> dict[str, Any]:
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_RECEIPT_STATUS_INVALID")
     if value.get("semanticAuthority") is not False or value.get("authorizesMutation") is not False:
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_RECEIPT_MUST_NOT_AUTHORIZE")
-    _source(value.get("source"))
+    if schema_version == RECEIPT_SCHEMA:
+        _source(value.get("source"))
+    else:
+        _legacy_source(value.get("source"))
     plan_hash = value.get("planHash")
     if not isinstance(plan_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", plan_hash):
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_PLAN_HASH_INVALID")
     receipt_hash = value.get("receiptHash")
     if not isinstance(receipt_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", receipt_hash):
         raise RemoteCanonicalExecutionError("REMOTE_EXECUTION_RECEIPT_HASH_INVALID")
-    expected = build_receipt(
+    expected = _build_receipt(
         command,
         source=value["source"],
         plan=value["evidence"]["plan"],
         evidence=value["evidence"],
         aggregate_readback=value["aggregateReadback"],
+        schema_version=schema_version,
     )
     if value != expected:
         if stable_hash({key: copy.deepcopy(item) for key, item in value.items() if key != "receiptHash"}) != receipt_hash:

@@ -211,11 +211,53 @@ class FakeAuthority:
         return self.value
 
 
+def current_hosted_migration_receipt() -> dict:
+    value = migration_receipt()
+    value["schemaVersion"] = guard.remote_canonical_execution.RECEIPT_SCHEMA
+    value["source"] = guard.remote_canonical_execution.build_hosted_comment_source(
+        host="remote-canonical-execution",
+        source_sha="3" * 40,
+        invocation_id="456",
+        issue_number=145,
+        comment_id=20,
+    )
+    return value
+
+
 class MigrationReleaseReceiptTests(unittest.TestCase):
     @patch("tools.agent_write_lifecycle_guard.remote_canonical_execution.validate_receipt")
     def test_exact_canonical_migration_release_matches(self, validate_receipt) -> None:
         value = migration_receipt()
         self.assertTrue(
+            guard._migration_release_receipt_matches(
+                value, manifest=manifest(), binding=binding()
+            )
+        )
+        validate_receipt.assert_called_once_with(value)
+
+    @patch("tools.agent_write_lifecycle_guard.remote_canonical_execution.validate_receipt")
+    def test_current_hosted_provenance_matches(self, validate_receipt) -> None:
+        value = current_hosted_migration_receipt()
+        self.assertTrue(
+            guard._migration_release_receipt_matches(
+                value, manifest=manifest(), binding=binding()
+            )
+        )
+        validate_receipt.assert_called_once_with(value)
+
+    @patch("tools.agent_write_lifecycle_guard.remote_canonical_execution.validate_receipt")
+    def test_direct_host_provenance_is_not_historical_migration_evidence(
+        self, validate_receipt
+    ) -> None:
+        value = current_hosted_migration_receipt()
+        value["source"] = guard.remote_canonical_execution.build_execution_source(
+            kind="agent-tool-host",
+            host="agent-tool-mutation-host",
+            source_sha="3" * 40,
+            invocation_id="direct-1",
+            ref={"kind": "agent-tool-request", "value": "9" * 64},
+        )
+        self.assertFalse(
             guard._migration_release_receipt_matches(
                 value, manifest=manifest(), binding=binding()
             )
