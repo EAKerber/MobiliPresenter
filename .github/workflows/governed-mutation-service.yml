@@ -109,7 +109,7 @@ jobs:
             --result /tmp/governed-mutation/result.json
 
       - name: Serve blocked preparation
-        if: steps.prepare.outputs.state != 'READY'
+        if: steps.parse.outcome == 'success' && steps.prepare.outputs.state != 'READY'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -146,7 +146,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ ! -f /tmp/governed-mutation/result.json ]; then exit 0; fi
-          python tools/governed_mutation_service.py publish \
+          service=tools/governed_mutation_service.py
+          if [ -f semantic-host/tools/governed_mutation_service.py ] && [ "${{ steps.prepare.outputs.state }}" = "READY" ]; then
+            service=semantic-host/tools/governed_mutation_service.py
+          fi
+          python "$service" publish \
             --meta /tmp/governed-mutation/meta.json \
             --result /tmp/governed-mutation/result.json
 
@@ -168,4 +172,8 @@ jobs:
         if: always()
         run: |
           if [ ! -f /tmp/governed-mutation/result.json ]; then exit 2; fi
-          python tools/governed_mutation_service.py check-result --result /tmp/governed-mutation/result.json
+          service=tools/governed_mutation_service.py
+          if [ -f semantic-host/tools/governed_mutation_service.py ] && [ "${{ steps.prepare.outputs.state }}" = "READY" ]; then
+            service=semantic-host/tools/governed_mutation_service.py
+          fi
+          python "$service" check-result --result /tmp/governed-mutation/result.json

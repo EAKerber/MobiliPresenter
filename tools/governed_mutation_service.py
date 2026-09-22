@@ -477,6 +477,13 @@ def validate_result(value: Any) -> dict[str, Any]:
         "branch", "parentHead", "branchHead", "changedPaths"
     }:
         raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
+    branch = summary.get("branch")
+    if branch is not None:
+        try:
+            if git_observation.canonical_branch(branch) != branch:
+                raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
+        except RuntimeError as exc:
+            raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID") from exc
     for field in ("parentHead", "branchHead"):
         raw = summary.get(field)
         if raw is not None:
@@ -500,19 +507,21 @@ def validate_result(value: Any) -> dict[str, Any]:
         or evidence.get("kind") != "github-actions-artifact"
     ):
         raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
-    _positive(evidence.get("runId"), "GOVERNED_MUTATION_RESULT_INVALID")
-    _positive(evidence.get("runAttempt"), "GOVERNED_MUTATION_RESULT_INVALID")
+    run_id = _positive(evidence.get("runId"), "GOVERNED_MUTATION_RESULT_INVALID")
+    run_attempt = _positive(evidence.get("runAttempt"), "GOVERNED_MUTATION_RESULT_INVALID")
+    if evidence.get("artifactName") != f"governed-mutation-{run_id}-{run_attempt}":
+        raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
     windows = value.get("windows")
     if not isinstance(windows, dict) or set(windows) != set(WINDOW_NAMES):
         raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
-    for item in windows.values():
+    for name, item in windows.items():
         if item is None:
             continue
         if (
             not isinstance(item, dict)
             or item.get("schemaVersion") != WINDOW_SCHEMA
             or item.get("kind") != "artifact-member"
-            or not isinstance(item.get("member"), str)
+            or item.get("member") != f"{name}.json"
         ):
             raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
         _hash(item.get("hash"), "GOVERNED_MUTATION_RESULT_INVALID")
