@@ -212,6 +212,12 @@ def _migration_release_receipt_matches(
     payload = command.get("payload")
     target = command.get("target")
     source = receipt.get("source")
+    try:
+        source_binding = remote_canonical_execution.hosted_comment_source_binding(
+            source
+        )
+    except RuntimeError:
+        return False
     evidence = receipt.get("evidence")
     aggregate = receipt.get("aggregateReadback")
     if (
@@ -241,9 +247,9 @@ def _migration_release_receipt_matches(
             "domain": "coordination",
             "action": "release",
         }
-        or not isinstance(source, dict)
-        or source.get("workflow") != "remote-canonical-execution"
-        or source.get("issueNumber") != manifest["source"]["issueNumber"]
+        or source_binding is None
+        or source_binding["host"] != "remote-canonical-execution"
+        or source_binding["issueNumber"] != manifest["source"]["issueNumber"]
         or not isinstance(evidence, dict)
         or evidence.get("kind") != "transition-receipt"
         or not isinstance(aggregate, dict)

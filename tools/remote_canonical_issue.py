@@ -18,6 +18,7 @@ from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport
 from tools.remote_canonical_execution import (
     RemoteCanonicalExecutionError,
+    build_hosted_comment_source,
     command_hash,
     execute_command as execute_remote_command,
     validate_command,
@@ -157,13 +158,13 @@ def parse_event(value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
 def build_source(event_meta: dict[str, Any]) -> dict[str, Any]:
     source_sha = os.environ.get("GITHUB_SHA", "")
     run_id = os.environ.get("GITHUB_RUN_ID", "")
-    return {
-        "workflow": "remote-canonical-execution",
-        "sourceSha": source_sha,
-        "runId": run_id,
-        "issueNumber": event_meta["issueNumber"],
-        "commentId": event_meta["commentId"],
-    }
+    return build_hosted_comment_source(
+        host="remote-canonical-execution",
+        source_sha=source_sha,
+        invocation_id=run_id,
+        issue_number=event_meta["issueNumber"],
+        comment_id=event_meta["commentId"],
+    )
 
 
 def _error_code(exc: BaseException) -> str:

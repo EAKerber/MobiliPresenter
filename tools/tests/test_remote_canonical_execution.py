@@ -22,7 +22,14 @@ OLD_BLOB = hashlib.sha1(
     f"blob {len(OLD_CONTENT.encode('utf-8'))}\0".encode("ascii")
     + OLD_CONTENT.encode("utf-8")
 ).hexdigest()
-SOURCE = {
+SOURCE = bridge.build_hosted_comment_source(
+    host="remote-canonical-execution",
+    source_sha="f" * 40,
+    invocation_id="123",
+    issue_number=7,
+    comment_id=11,
+)
+LEGACY_SOURCE = {
     "workflow": "remote-canonical-execution",
     "sourceSha": "f" * 40,
     "runId": "123",
@@ -384,6 +391,41 @@ class RemoteCanonicalExecutionTests(unittest.TestCase):
         self.assertEqual(receipt["evidence"]["request"]["schemaVersion"], remote_canonical.REQUEST_SCHEMA)
         self.assertEqual(len(fake.applied), 1)
         self.assertEqual(fake.applied[0], receipt["evidence"]["plan"])
+
+    def test_portable_agent_tool_source_needs_no_issue_identity(self):
+        transport = FakeGitTransport()
+        source = bridge.build_execution_source(
+            kind="agent-tool-host",
+            host="agent-tool-mutation-host",
+            source_sha="f" * 40,
+            invocation_id="direct-1",
+            ref={"kind": "agent-tool-request", "value": "9" * 64},
+        )
+        receipt = bridge.execute_command(
+            git_command(), source=source, transport=transport
+        )
+        self.assertEqual(receipt["schemaVersion"], bridge.RECEIPT_SCHEMA)
+        self.assertEqual(receipt["source"], source)
+        self.assertNotIn("issueNumber", receipt["source"])
+        self.assertNotIn("commentId", receipt["source"])
+        bridge.validate_receipt(receipt)
+
+    def test_legacy_v01_receipt_remains_readable(self):
+        transport = FakeGitTransport()
+        current = bridge.execute_command(
+            git_command(), source=SOURCE, transport=transport
+        )
+        legacy = copy.deepcopy(current)
+        legacy["schemaVersion"] = bridge.LEGACY_RECEIPT_SCHEMA
+        legacy["source"] = copy.deepcopy(LEGACY_SOURCE)
+        body = {
+            key: copy.deepcopy(value)
+            for key, value in legacy.items()
+            if key != "receiptHash"
+        }
+        from tools.canonical import stable_hash
+        legacy["receiptHash"] = stable_hash(body)
+        self.assertEqual(bridge.validate_receipt(legacy), legacy)
 
     def test_receipt_tampering_is_rejected(self):
         transport = FakeGitTransport()
