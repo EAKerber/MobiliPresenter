@@ -503,7 +503,7 @@ def validate_result(value: Any) -> dict[str, Any]:
     _positive(evidence.get("runId"), "GOVERNED_MUTATION_RESULT_INVALID")
     _positive(evidence.get("runAttempt"), "GOVERNED_MUTATION_RESULT_INVALID")
     windows = value.get("windows")
-    if not isinstance(windows, dict) or tuple(windows.keys()) != WINDOW_NAMES:
+    if not isinstance(windows, dict) or set(windows) != set(WINDOW_NAMES):
         raise GovernedMutationServiceError("GOVERNED_MUTATION_RESULT_INVALID")
     for item in windows.values():
         if item is None:
@@ -709,6 +709,36 @@ def execute_prepared(
     )
 
 
+def event_failure_result(
+    event: dict[str, Any],
+    *,
+    blocker: str,
+    run_id: int,
+    run_attempt: int,
+    evidence_dir: str | Path,
+) -> tuple[dict[str, Any], dict[str, int]]:
+    meta = _transport_meta(event)
+    windows = _materialize_windows(
+        evidence_dir,
+        {name: None for name in WINDOW_NAMES},
+    )
+    value = _result(
+        request=None,
+        status="BLOCKED",
+        summary={
+            "branch": None,
+            "parentHead": None,
+            "branchHead": None,
+            "changedPaths": [],
+        },
+        blockers=[blocker],
+        next_safe_action="FIX_REQUEST",
+        evidence=_evidence_ref(run_id, run_attempt),
+        windows=windows,
+    )
+    return value, meta
+
+
 def transport_failure_result(
     request: dict[str, Any],
     preparation: dict[str, Any],
@@ -818,6 +848,15 @@ def _parser() -> argparse.ArgumentParser:
     execute.add_argument("--evidence-dir", required=True)
     execute.add_argument("--result", required=True)
 
+    event_failure = sub.add_parser("event-failure")
+    event_failure.add_argument("--event", required=True)
+    event_failure.add_argument("--blocker", required=True)
+    event_failure.add_argument("--run-id", required=True)
+    event_failure.add_argument("--run-attempt", required=True)
+    event_failure.add_argument("--evidence-dir", required=True)
+    event_failure.add_argument("--meta-out", required=True)
+    event_failure.add_argument("--result", required=True)
+
     failure = sub.add_parser("transport-failure")
     failure.add_argument("--request", required=True)
     failure.add_argument("--preparation", required=True)
@@ -886,6 +925,17 @@ def main(argv: list[str] | None = None) -> int:
                 run_attempt=_positive(args.run_attempt, "GOVERNED_MUTATION_RUN_ATTEMPT_INVALID"),
                 evidence_dir=args.evidence_dir,
             )
+        _write(args.result, value)
+        return 0
+    if args.command_name == "event-failure":
+        value, meta = event_failure_result(
+            _load(args.event),
+            blocker=args.blocker,
+            run_id=_positive(args.run_id, "GOVERNED_MUTATION_RUN_ID_INVALID"),
+            run_attempt=_positive(args.run_attempt, "GOVERNED_MUTATION_RUN_ATTEMPT_INVALID"),
+            evidence_dir=args.evidence_dir,
+        )
+        _write(args.meta_out, meta)
         _write(args.result, value)
         return 0
     if args.command_name == "transport-failure":

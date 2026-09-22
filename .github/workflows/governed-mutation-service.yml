@@ -34,6 +34,7 @@ jobs:
 
       - name: Parse service request
         id: parse
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -44,7 +45,23 @@ jobs:
             --meta-out /tmp/governed-mutation/meta.json \
             --github-output "$GITHUB_OUTPUT"
 
+      - name: Materialize parse blocker
+        if: steps.parse.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/governed-mutation/evidence
+          python tools/governed_mutation_service.py event-failure \
+            --event "$GITHUB_EVENT_PATH" \
+            --blocker GOVERNED_MUTATION_PARSE_FAILED \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --evidence-dir /tmp/governed-mutation/evidence \
+            --meta-out /tmp/governed-mutation/meta.json \
+            --result /tmp/governed-mutation/result.json
+
       - name: Observe Work, re-entry and exact cycle
+        if: steps.parse.outcome == 'success'
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
@@ -124,10 +141,11 @@ jobs:
             --result /tmp/governed-mutation/result.json
 
       - name: Publish compact service result
-        if: always() && hashFiles('/tmp/governed-mutation/result.json') != ''
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [ ! -f /tmp/governed-mutation/result.json ]; then exit 0; fi
           python tools/governed_mutation_service.py publish \
             --meta /tmp/governed-mutation/meta.json \
             --result /tmp/governed-mutation/result.json
@@ -147,5 +165,7 @@ jobs:
           retention-days: 14
 
       - name: Fail closed on non-PASS result
-        if: always() && hashFiles('/tmp/governed-mutation/result.json') != ''
-        run: python tools/governed_mutation_service.py check-result --result /tmp/governed-mutation/result.json
+        if: always()
+        run: |
+          if [ ! -f /tmp/governed-mutation/result.json ]; then exit 2; fi
+          python tools/governed_mutation_service.py check-result --result /tmp/governed-mutation/result.json

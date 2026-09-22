@@ -24,7 +24,23 @@ REQUEST = {
 }
 
 
+def locator():
+    return {
+        "artifactName": "agent-cycle-begin-123",
+        "runId": 123,
+        "sourceSha": "4" * 40,
+        "issueNumber": 145,
+        "beginCommentId": 200,
+        "contextHash": "3" * 64,
+        "cycleInstanceId": "cycle-instance-" + "2" * 24,
+    }
+
+
 def handle():
+    loc = locator()
+    token = service.hosted_cycle_handle.HOSTED_TOKEN_PREFIX + json.dumps(
+        loc, sort_keys=True, separators=(",", ":")
+    )
     body = {
         "schemaVersion": "AgentCycleHandle 0.1",
         "repository": service.REPOSITORY,
@@ -39,7 +55,7 @@ def handle():
             "workerId": "manager-gitops-a",
             "sessionId": "session-e4",
         },
-        "resumeToken": "hosted-v1:{}",
+        "resumeToken": token,
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -64,15 +80,7 @@ class GovernedMutationServiceTests(unittest.TestCase):
         self, observe, decode, supports
     ):
         h = handle()
-        locator = {
-            "artifactName": "agent-cycle-begin-123",
-            "runId": 123,
-            "sourceSha": "4" * 40,
-            "issueNumber": 145,
-            "beginCommentId": 200,
-            "contextHash": "3" * 64,
-            "cycleInstanceId": "cycle-instance-" + "2" * 24,
-        }
+        loc = locator()
         observe.return_value = {
             "work": {
                 "id": REQUEST["workId"],
@@ -85,11 +93,11 @@ class GovernedMutationServiceTests(unittest.TestCase):
             "currentIntent": "governed-mutation",
             "busIssueNumber": 145,
         }
-        decode.return_value = (h, locator)
+        decode.return_value = (h, loc)
         value = service.prepare_request(REQUEST, transport=object())
         self.assertEqual(value["state"], "READY")
         self.assertEqual(value["nextSafeAction"], "EXECUTE_MUTATION")
-        self.assertEqual(value["locator"], locator)
+        self.assertEqual(value["locator"], loc)
         self.assertEqual(supports.call_args.args[0], "4" * 40)
 
     @patch("tools.governed_mutation_service.agent_reentry_guidance.observe_turnover_context")
@@ -169,15 +177,7 @@ class GovernedMutationServiceTests(unittest.TestCase):
         self, validate_manifest, bind, derive, resolve, execute_plan
     ):
         h = handle()
-        locator = {
-            "artifactName": "agent-cycle-begin-123",
-            "runId": 123,
-            "sourceSha": "4" * 40,
-            "issueNumber": 145,
-            "beginCommentId": 200,
-            "contextHash": "3" * 64,
-            "cycleInstanceId": "cycle-instance-" + "2" * 24,
-        }
+        loc = locator()
         preparation = service._preparation(
             REQUEST,
             state="READY",
@@ -186,7 +186,7 @@ class GovernedMutationServiceTests(unittest.TestCase):
             work={"id": REQUEST["workId"], "branch": REQUEST["branch"]},
             reentry={"nextSafeAction": "RESUME_EXACT_CYCLE"},
             handle=h,
-            locator=locator,
+            locator=loc,
             bus_issue_number=145,
             semantic_host_supported=True,
         )
@@ -212,7 +212,7 @@ class GovernedMutationServiceTests(unittest.TestCase):
         }
         derive.return_value = canonical_request
         resolve.return_value = {"plan": plan, "result": {}}
-        bind.return_value = {"locator": locator}
+        bind.return_value = {"locator": loc}
         execute_plan.return_value = {
             "status": "PASS",
             "blockers": [],
