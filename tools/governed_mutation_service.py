@@ -42,9 +42,13 @@ REPOSITORY = "EAKerber/MobiliPresenter"
 BUS_TITLE = hosted_agent_cycle.BUS_TITLE
 REQUEST_MARKER = "MOBILIPRESENTER_GOVERNED_MUTATION_REQUEST_V0_1"
 RESULT_MARKER = "MOBILIPRESENTER_GOVERNED_MUTATION_RESULT_V0_1"
+INSPECTION_REQUEST_MARKER = "MOBILIPRESENTER_GOVERNED_MUTATION_INSPECT_V0_1"
+INSPECTION_RESULT_MARKER = "MOBILIPRESENTER_GOVERNED_MUTATION_INSPECTION_V0_1"
 REQUEST_SCHEMA = "GovernedMutationServiceRequest 0.1"
 PREPARATION_SCHEMA = "GovernedMutationServicePreparation 0.1"
 RESULT_SCHEMA = "GovernedMutationServiceResult 0.1"
+INSPECTION_REQUEST_SCHEMA = "GovernedMutationInspectionRequest 0.1"
+INSPECTION_RESULT_SCHEMA = "GovernedMutationInspectionResult 0.1"
 WINDOW_SCHEMA = "GovernedMutationWindowRef 0.1"
 EVIDENCE_SCHEMA = "GovernedMutationEvidenceRef 0.1"
 WINDOW_NAMES = ("work", "cycle", "decision", "authority", "execution", "git")
@@ -62,6 +66,15 @@ RESULT_FIELDS = {
     "schemaVersion", "requestHash", "status", "summary", "blockers",
     "nextSafeAction", "evidence", "windows", "readOnly",
     "semanticAuthority", "authorizesMutation", "resultHash",
+}
+INSPECTION_REQUEST_FIELDS = {
+    "schemaVersion", "runId", "runAttempt", "resultHash", "window",
+    "semanticAuthority", "authorizesMutation",
+}
+INSPECTION_RESULT_FIELDS = {
+    "schemaVersion", "requestHash", "runId", "runAttempt", "resultHash",
+    "window", "windowRef", "payload", "status", "readOnly",
+    "semanticAuthority", "authorizesMutation", "inspectionHash",
 }
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -192,6 +205,55 @@ def parse_event(event: Any) -> tuple[dict[str, Any], dict[str, int]]:
     meta = _transport_meta(event)
     request = validate_request(
         _json_after_marker((event.get("comment") or {}).get("body"), REQUEST_MARKER)
+    )
+    return request, meta
+
+
+def validate_inspection_request(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != INSPECTION_REQUEST_FIELDS:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_REQUEST_INVALID"
+        )
+    if value.get("schemaVersion") != INSPECTION_REQUEST_SCHEMA:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_REQUEST_INVALID"
+        )
+    _positive(value.get("runId"), "GOVERNED_MUTATION_INSPECTION_REQUEST_INVALID")
+    _positive(
+        value.get("runAttempt"),
+        "GOVERNED_MUTATION_INSPECTION_REQUEST_INVALID",
+    )
+    _hash(
+        value.get("resultHash"),
+        "GOVERNED_MUTATION_INSPECTION_REQUEST_INVALID",
+    )
+    if value.get("window") not in WINDOW_NAMES:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_WINDOW_INVALID"
+        )
+    if (
+        value.get("semanticAuthority") is not False
+        or value.get("authorizesMutation") is not False
+    ):
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_REQUEST_MUST_NOT_AUTHORIZE"
+        )
+    return value
+
+
+def inspection_request_hash(value: dict[str, Any]) -> str:
+    return stable_hash(validate_inspection_request(value))
+
+
+def parse_inspection_event(
+    event: Any,
+) -> tuple[dict[str, Any], dict[str, int]]:
+    meta = _transport_meta(event)
+    request = validate_inspection_request(
+        _json_after_marker(
+            (event.get("comment") or {}).get("body"),
+            INSPECTION_REQUEST_MARKER,
+        )
     )
     return request, meta
 
@@ -882,6 +944,146 @@ def inspect_window(
     return payload
 
 
+def validate_inspection_result(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != INSPECTION_RESULT_FIELDS:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID"
+        )
+    if (
+        value.get("schemaVersion") != INSPECTION_RESULT_SCHEMA
+        or value.get("status") != "PASS"
+    ):
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID"
+        )
+    _hash(
+        value.get("requestHash"),
+        "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID",
+    )
+    _positive(
+        value.get("runId"),
+        "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID",
+    )
+    _positive(
+        value.get("runAttempt"),
+        "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID",
+    )
+    _hash(
+        value.get("resultHash"),
+        "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID",
+    )
+    window = value.get("window")
+    if window not in WINDOW_NAMES:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID"
+        )
+    ref = value.get("windowRef")
+    if (
+        not isinstance(ref, dict)
+        or ref.get("schemaVersion") != WINDOW_SCHEMA
+        or ref.get("kind") != "artifact-member"
+        or ref.get("member") != f"{window}.json"
+    ):
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID"
+        )
+    _hash(
+        ref.get("hash"),
+        "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID",
+    )
+    if stable_hash(value.get("payload")) != ref["hash"]:
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_PAYLOAD_HASH_MISMATCH"
+        )
+    if (
+        value.get("readOnly") is not True
+        or value.get("semanticAuthority") is not False
+        or value.get("authorizesMutation") is not False
+    ):
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID"
+        )
+    _hash(
+        value.get("inspectionHash"),
+        "GOVERNED_MUTATION_INSPECTION_RESULT_INVALID",
+    )
+    core = {
+        key: copy.deepcopy(item)
+        for key, item in value.items()
+        if key != "inspectionHash"
+    }
+    if value["inspectionHash"] != stable_hash(core):
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_HASH_MISMATCH"
+        )
+    return value
+
+
+def inspect_artifact(
+    request: dict[str, Any],
+    *,
+    artifact_dir: str | Path,
+) -> dict[str, Any]:
+    request = validate_inspection_request(request)
+    root = Path(artifact_dir)
+    result = validate_result(_load(root / "result.json"))
+    evidence = result["evidence"]
+    if (
+        evidence["runId"] != request["runId"]
+        or evidence["runAttempt"] != request["runAttempt"]
+        or result["resultHash"] != request["resultHash"]
+    ):
+        raise GovernedMutationServiceError(
+            "GOVERNED_MUTATION_INSPECTION_RESULT_MISMATCH"
+        )
+    window = request["window"]
+    payload = inspect_window(
+        result,
+        window=window,
+        evidence_dir=root / "evidence",
+    )
+    ref = copy.deepcopy(result["windows"][window])
+    core = {
+        "schemaVersion": INSPECTION_RESULT_SCHEMA,
+        "requestHash": inspection_request_hash(request),
+        "runId": request["runId"],
+        "runAttempt": request["runAttempt"],
+        "resultHash": request["resultHash"],
+        "window": window,
+        "windowRef": ref,
+        "payload": copy.deepcopy(payload),
+        "status": "PASS",
+        "readOnly": True,
+        "semanticAuthority": False,
+        "authorizesMutation": False,
+    }
+    value = {**core, "inspectionHash": stable_hash(core)}
+    return validate_inspection_result(value)
+
+
+def publish_inspection_result(
+    result: dict[str, Any],
+    *,
+    issue_number: int,
+    transport: Any | None = None,
+) -> int:
+    if transport is None:
+        raise GovernedMutationServiceError("BLOCKED_EXECUTION_SURFACE")
+    value = validate_inspection_result(result)
+    body = (
+        INSPECTION_RESULT_MARKER
+        + "\n```json\n"
+        + json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n```"
+    )
+    return hosted_issue_bus.post_comment(
+        transport,
+        repository=REPOSITORY,
+        issue_number=issue_number,
+        body=body,
+    )
+
+
 def publish_result(
     result: dict[str, Any],
     *,
@@ -921,6 +1123,21 @@ def _parser() -> argparse.ArgumentParser:
     parse.add_argument("--request-out", required=True)
     parse.add_argument("--meta-out", required=True)
     parse.add_argument("--github-output")
+
+    parse_inspection = sub.add_parser("parse-inspection-event")
+    parse_inspection.add_argument("--event", required=True)
+    parse_inspection.add_argument("--request-out", required=True)
+    parse_inspection.add_argument("--meta-out", required=True)
+    parse_inspection.add_argument("--github-output")
+
+    inspect_artifact_parser = sub.add_parser("inspect-artifact")
+    inspect_artifact_parser.add_argument("--request", required=True)
+    inspect_artifact_parser.add_argument("--artifact-dir", required=True)
+    inspect_artifact_parser.add_argument("--result", required=True)
+
+    publish_inspection = sub.add_parser("publish-inspection")
+    publish_inspection.add_argument("--meta", required=True)
+    publish_inspection.add_argument("--result", required=True)
 
     prepare = sub.add_parser("prepare")
     prepare.add_argument("--request", required=True)
@@ -978,6 +1195,39 @@ def main(argv: list[str] | None = None) -> int:
         _write(args.request_out, request)
         _write(args.meta_out, meta)
         _emit(args.github_output, "request_hash", request_hash(request))
+        return 0
+    if args.command_name == "parse-inspection-event":
+        request, meta = parse_inspection_event(_load(args.event))
+        _write(args.request_out, request)
+        _write(args.meta_out, meta)
+        _emit(
+            args.github_output,
+            "run_id",
+            str(request["runId"]),
+        )
+        _emit(
+            args.github_output,
+            "artifact_name",
+            f"governed-mutation-{request['runId']}-{request['runAttempt']}",
+        )
+        return 0
+    if args.command_name == "inspect-artifact":
+        value = inspect_artifact(
+            _load(args.request),
+            artifact_dir=args.artifact_dir,
+        )
+        _write(args.result, value)
+        return 0
+    if args.command_name == "publish-inspection":
+        meta = _load(args.meta)
+        publish_inspection_result(
+            _load(args.result),
+            issue_number=_positive(
+                meta.get("issueNumber"),
+                "GOVERNED_MUTATION_ISSUE_INVALID",
+            ),
+            transport=transport,
+        )
         return 0
     if args.command_name == "prepare":
         request = _load(args.request)
