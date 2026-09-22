@@ -122,3 +122,18 @@ Initial promotion requires exact-head Agent Ops, Coordination Guard and Supervis
 Positive live promotion should occur on the next suitable Work/cycle created from a semantic host containing E4. E4 does not manufacture a new Work or Agent Cycle merely to satisfy a canary.
 
 A negative live request against a terminal/no-reentry Work may be used to prove fail-closed transport without changing authority.
+
+## E4a — terminal Work fast path
+
+The counter observes canonical Work before reading hosted cycle history.
+
+If Work is terminal, mutation is BLOCKED immediately with
+`GOVERNED_MUTATION_WORK_TERMINAL / NONE`. Agent Cycle history is not
+reconstructed because it cannot change the decision.
+
+For non-terminal Work, re-entry is then observed. If Work changes between the
+counter observation and re-entry observation, the preparation is UNKNOWN with
+`GOVERNED_MUTATION_WORK_DRIFT`.
+
+This keeps the service counter independent from unnecessary kitchen history
+while preserving fail-closed behavior under concurrent Work changes.

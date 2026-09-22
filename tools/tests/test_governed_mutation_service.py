@@ -76,17 +76,20 @@ class GovernedMutationServiceTests(unittest.TestCase):
     @patch("tools.governed_mutation_service._semantic_host_supports_service", return_value=True)
     @patch("tools.governed_mutation_service.hosted_cycle_handle.decode_handle")
     @patch("tools.governed_mutation_service.agent_reentry_guidance.observe_turnover_context")
+    @patch("tools.governed_mutation_service._observe_work")
     def test_prepare_reuses_exact_cycle_without_creating_authority(
-        self, observe, decode, supports
+        self, observe_work, observe, decode, supports
     ):
         h = handle()
         loc = locator()
+        observed_work = {
+            "id": REQUEST["workId"],
+            "branch": REQUEST["branch"],
+            "status": "IN_PROGRESS",
+        }
+        observe_work.return_value = observed_work
         observe.return_value = {
-            "work": {
-                "id": REQUEST["workId"],
-                "branch": REQUEST["branch"],
-                "status": "IN_PROGRESS",
-            },
+            "work": observed_work,
             "reentry": {"nextSafeAction": "RESUME_EXACT_CYCLE"},
             "handle": h,
             "actor": h["actor"],
@@ -101,13 +104,18 @@ class GovernedMutationServiceTests(unittest.TestCase):
         self.assertEqual(supports.call_args.args[0], "4" * 40)
 
     @patch("tools.governed_mutation_service.agent_reentry_guidance.observe_turnover_context")
-    def test_prepare_blocks_when_canonical_reentry_requires_new_cycle(self, observe):
+    @patch("tools.governed_mutation_service._observe_work")
+    def test_prepare_blocks_when_canonical_reentry_requires_new_cycle(
+        self, observe_work, observe
+    ):
+        observed_work = {
+            "id": REQUEST["workId"],
+            "branch": REQUEST["branch"],
+            "status": "IN_PROGRESS",
+        }
+        observe_work.return_value = observed_work
         observe.return_value = {
-            "work": {
-                "id": REQUEST["workId"],
-                "branch": REQUEST["branch"],
-                "status": "IN_PROGRESS",
-            },
+            "work": observed_work,
             "reentry": {"nextSafeAction": "BEGIN_NEW_CYCLE"},
             "handle": None,
             "actor": None,
@@ -120,22 +128,59 @@ class GovernedMutationServiceTests(unittest.TestCase):
         self.assertIn("GOVERNED_MUTATION_EXACT_CYCLE_REQUIRED", value["blockers"])
 
     @patch("tools.governed_mutation_service.agent_reentry_guidance.observe_turnover_context")
-    def test_prepare_blocks_work_branch_mismatch(self, observe):
-        observe.return_value = {
-            "work": {
-                "id": REQUEST["workId"],
-                "branch": "work/operations/other",
-                "status": "IN_PROGRESS",
-            },
-            "reentry": {"nextSafeAction": "RESUME_EXACT_CYCLE"},
-            "handle": handle(),
-            "actor": None,
-            "currentIntent": "governed-mutation",
-            "busIssueNumber": 145,
+    @patch("tools.governed_mutation_service._observe_work")
+    def test_prepare_blocks_work_branch_mismatch(self, observe_work, observe):
+        observe_work.return_value = {
+            "id": REQUEST["workId"],
+            "branch": "work/operations/other",
+            "status": "IN_PROGRESS",
         }
         value = service.prepare_request(REQUEST, transport=object())
         self.assertEqual(value["state"], "BLOCKED")
         self.assertEqual(value["nextSafeAction"], "ALIGN_WORK_BRANCH")
+
+    @patch("tools.governed_mutation_service.agent_reentry_guidance.observe_turnover_context")
+    @patch("tools.governed_mutation_service._observe_work")
+    def test_terminal_work_blocks_before_reentry_history(
+        self, observe_work, observe_reentry
+    ):
+        observed_work = {
+            "id": REQUEST["workId"],
+            "branch": REQUEST["branch"],
+            "status": "DONE",
+        }
+        observe_work.return_value = observed_work
+        value = service.prepare_request(REQUEST, transport=object())
+        self.assertEqual(value["state"], "BLOCKED")
+        self.assertEqual(value["blockers"], ["GOVERNED_MUTATION_WORK_TERMINAL"])
+        self.assertEqual(value["nextSafeAction"], "NONE")
+        self.assertEqual(value["work"], observed_work)
+        self.assertIsNone(value["reentry"])
+        observe_reentry.assert_not_called()
+
+    @patch("tools.governed_mutation_service.agent_reentry_guidance.observe_turnover_context")
+    @patch("tools.governed_mutation_service._observe_work")
+    def test_work_drift_between_counter_and_reentry_is_unknown(
+        self, observe_work, observe_reentry
+    ):
+        first = {
+            "id": REQUEST["workId"],
+            "branch": REQUEST["branch"],
+            "status": "IN_PROGRESS",
+        }
+        observe_work.return_value = first
+        observe_reentry.return_value = {
+            "work": {**first, "status": "WAITING"},
+            "reentry": {"nextSafeAction": "WAIT"},
+            "handle": None,
+            "actor": None,
+            "currentIntent": None,
+            "busIssueNumber": 145,
+        }
+        value = service.prepare_request(REQUEST, transport=object())
+        self.assertEqual(value["state"], "UNKNOWN")
+        self.assertEqual(value["blockers"], ["GOVERNED_MUTATION_WORK_DRIFT"])
+        self.assertEqual(value["nextSafeAction"], "INSPECT_WORK")
 
     def test_blocked_result_is_compact_and_windows_are_pull_based(self):
         preparation = service._preparation(
