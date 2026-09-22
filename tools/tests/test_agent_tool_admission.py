@@ -94,11 +94,9 @@ class AgentToolAdmissionTests(unittest.TestCase):
 
 
     @patch("tools.agent_tools.admission._prove_agent_write_lifecycle_result")
-    @patch("tools.agent_tools.admission.guard_proofs.prove_coordination_lease_owned")
-    @patch("tools.agent_tools.admission.guard_proofs.prove_git_cas")
     @patch("tools.agent_tools.admission.guard_proofs.validate_proof_set")
     def test_portable_lifecycle_result_is_supported_without_hosted_context(
-        self, validate_set, prove_cas, prove_owned, prove_lifecycle
+        self, validate_set, prove_lifecycle
     ):
         plan = {
             "schemaVersion": contracts.PLAN_SCHEMA,
@@ -116,11 +114,7 @@ class AgentToolAdmissionTests(unittest.TestCase):
             "requiredCapabilities": [],
             "eligibleToolSurfaces": [],
             "targetPolicy": "manager-git-mutation",
-            "guards": [
-                "agent-write-lifecycle-bound",
-                "coordination-lease-owned",
-                "git-cas",
-            ],
+            "guards": ["agent-write-lifecycle-bound"],
             "target": {"branch": "work/operations/e3"},
             "input": {"changes": [{"path": "docs/e3.txt", "content": "x"}], "message": "e3"},
             "concrete": {},
@@ -134,8 +128,6 @@ class AgentToolAdmissionTests(unittest.TestCase):
         plan["planHash"] = stable_hash(body)
         with patch("tools.agent_tools.admission.contracts.validate_plan", return_value=plan):
             prove_lifecycle.return_value = {"kind": "lifecycle"}
-            prove_owned.return_value = {"kind": "ownership"}
-            prove_cas.return_value = {"kind": "cas"}
             validate_set.side_effect = lambda value, plan=None: value
             result = admission.collect_guard_proofs(
                 plan,

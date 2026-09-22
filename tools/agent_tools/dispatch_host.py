@@ -405,22 +405,6 @@ def inspect_protocol(
     }
 
 
-def mutation_host.observe_branch_head(plan: dict[str, Any], transport: Any) -> str | None:
-    try:
-        if "path" in plan["target"]:
-            observed = git_observation.observe_file(
-                plan["target"]["branch"], plan["target"]["path"], transport=transport
-            )
-        else:
-            observed = git_observation.observe_branch(
-                plan["target"]["branch"], transport=transport
-            )
-    except Exception:
-        return None
-    value = observed.get("branchHead") if isinstance(observed, dict) else None
-    return value if isinstance(value, str) else None
-
-
 def execute_dispatch(
     bundle: dict[str, dict[str, Any]],
     *,
