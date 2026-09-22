@@ -15,6 +15,9 @@ class GovernedMutationServiceBoundaryTests(unittest.TestCase):
         self.assertIn("governed_mutation_service.py prepare", text)
         self.assertIn("semantic-host/tools/governed_mutation_service.py execute", text)
         self.assertIn("actions/download-artifact@v4", text)
+        self.assertIn("MOBILIPRESENTER_GOVERNED_MUTATION_INSPECT_V0_1", text)
+        self.assertIn("parse-inspection-event", text)
+        self.assertIn("inspect-artifact", text)
         self.assertNotIn("gh api", text)
         self.assertNotIn("git commit", text)
         self.assertNotIn("git update-ref", text)
@@ -32,6 +35,14 @@ class GovernedMutationServiceBoundaryTests(unittest.TestCase):
         self.assertIn("mutation_host.execute_plan(", text)
         self.assertIn("observe_turnover_context(", text)
         self.assertIn("hosted_cycle_handle.bind(", text)
+
+    def test_kitchen_window_reader_is_read_only(self):
+        text = WORKFLOW.read_text(encoding="utf-8")
+        reader = text.split("  inspect_window:", 1)[1]
+        self.assertIn("contents: read", reader)
+        self.assertIn("actions: read", reader)
+        self.assertNotIn("contents: write", reader)
+        self.assertNotIn("mutation_host.execute_plan", reader)
 
 
 if __name__ == "__main__":

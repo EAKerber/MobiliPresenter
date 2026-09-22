@@ -177,3 +177,62 @@ jobs:
             service=semantic-host/tools/governed_mutation_service.py
           fi
           python "$service" check-result --result /tmp/governed-mutation/result.json
+
+
+  inspect_window:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.title == 'MobiliPresenter Remote Canonical Execution Bus' &&
+      github.event.comment.author_association == 'OWNER' &&
+      startsWith(github.event.comment.body, 'MOBILIPRESENTER_GOVERNED_MUTATION_INSPECT_V0_1')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout inspection reader
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Parse kitchen-window request
+        id: inspect_request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/governed-inspection
+          python tools/governed_mutation_service.py parse-inspection-event \
+            --event "$GITHUB_EVENT_PATH" \
+            --request-out /tmp/governed-inspection/request.json \
+            --meta-out /tmp/governed-inspection/meta.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Download referenced evidence artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.inspect_request.outputs.artifact_name }}
+          path: /tmp/governed-inspection/artifact
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.inspect_request.outputs.run_id }}
+
+      - name: Validate and open kitchen window
+        run: |
+          python tools/governed_mutation_service.py inspect-artifact \
+            --request /tmp/governed-inspection/request.json \
+            --artifact-dir /tmp/governed-inspection/artifact \
+            --result /tmp/governed-inspection/result.json
+
+      - name: Publish kitchen-window evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/governed_mutation_service.py publish-inspection \
+            --meta /tmp/governed-inspection/meta.json \
+            --result /tmp/governed-inspection/result.json

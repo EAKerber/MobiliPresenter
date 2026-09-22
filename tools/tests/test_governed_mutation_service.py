@@ -314,6 +314,107 @@ class GovernedMutationServiceTests(unittest.TestCase):
                 },
             )
 
+    def test_inspection_request_opens_exact_historical_window(self):
+        preparation = service._preparation(
+            REQUEST,
+            state="BLOCKED",
+            blockers=["GOVERNED_MUTATION_WORK_TERMINAL"],
+            next_safe_action="NONE",
+            work={
+                "id": REQUEST["workId"],
+                "branch": REQUEST["branch"],
+                "status": "DONE",
+            },
+            reentry=None,
+            handle=None,
+            locator=None,
+            bus_issue_number=None,
+            semantic_host_supported=None,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = root / "evidence"
+            result = service.result_from_preparation(
+                REQUEST,
+                preparation,
+                run_id=35791736004,
+                run_attempt=1,
+                evidence_dir=evidence,
+            )
+            (root / "result.json").write_text(
+                json.dumps(result, sort_keys=True),
+                encoding="utf-8",
+            )
+            request = {
+                "schemaVersion": service.INSPECTION_REQUEST_SCHEMA,
+                "runId": 35791736004,
+                "runAttempt": 1,
+                "resultHash": result["resultHash"],
+                "window": "work",
+                "semanticAuthority": False,
+                "authorizesMutation": False,
+            }
+            opened = service.inspect_artifact(
+                request,
+                artifact_dir=root,
+            )
+            self.assertEqual(opened["status"], "PASS")
+            self.assertEqual(opened["window"], "work")
+            self.assertEqual(
+                opened["payload"]["work"]["status"],
+                "DONE",
+            )
+            self.assertEqual(
+                opened["windowRef"],
+                result["windows"]["work"],
+            )
+
+    def test_inspection_rejects_result_hash_mismatch(self):
+        preparation = service._preparation(
+            REQUEST,
+            state="BLOCKED",
+            blockers=["GOVERNED_MUTATION_WORK_TERMINAL"],
+            next_safe_action="NONE",
+            work={
+                "id": REQUEST["workId"],
+                "branch": REQUEST["branch"],
+                "status": "DONE",
+            },
+            reentry=None,
+            handle=None,
+            locator=None,
+            bus_issue_number=None,
+            semantic_host_supported=None,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            evidence = root / "evidence"
+            result = service.result_from_preparation(
+                REQUEST,
+                preparation,
+                run_id=10,
+                run_attempt=1,
+                evidence_dir=evidence,
+            )
+            (root / "result.json").write_text(
+                json.dumps(result, sort_keys=True),
+                encoding="utf-8",
+            )
+            request = {
+                "schemaVersion": service.INSPECTION_REQUEST_SCHEMA,
+                "runId": 10,
+                "runAttempt": 1,
+                "resultHash": "f" * 64,
+                "window": "work",
+                "semanticAuthority": False,
+                "authorizesMutation": False,
+            }
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "INSPECTION_RESULT_MISMATCH",
+            ):
+                service.inspect_artifact(request, artifact_dir=root)
+
     def test_window_hash_tamper_fails_closed(self):
         preparation = service._preparation(
             REQUEST,
