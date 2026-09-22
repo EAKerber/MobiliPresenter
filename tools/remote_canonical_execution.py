@@ -1048,6 +1048,11 @@ def _source(value: Any) -> dict[str, Any]:
     )
 
 
+def validate_execution_source(value: Any) -> dict[str, Any]:
+    """Validate current portable execution provenance before any mutation."""
+    return _source(value)
+
+
 def _legacy_source(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != {
         "workflow",

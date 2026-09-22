@@ -8,21 +8,24 @@ from pathlib import Path
 from typing import Any
 
 from tools import (
-    git_observation,
     hosted_agent_cycle,
     hosted_agent_tool,
     hosted_issue_bus,
     remote_canonical_execution,
-    remote_canonical_issue,
 )
-from tools.agent_tools import admission, contracts, mutation_dispatch, policy as tool_policy
+from tools.agent_tools import (
+    admission,
+    contracts,
+    mutation_dispatch,
+    mutation_host,
+    policy as tool_policy,
+)
 from tools.agent_tools.target_policy import validate_target
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport
 
 ATTEMPT_MARKER = "MOBILIPRESENTER_AGENT_TOOL_MUTATION_ATTEMPT_V0_1"
 ATTEMPT_SCHEMA = "AgentToolMutationAttempt 0.1"
-MUTABLE_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -32,14 +35,6 @@ class DispatchHostError(RuntimeError):
         self.code = code
         self.detail = detail
         super().__init__(f"{code}:{detail}" if detail else code)
-
-
-def _code(exc: BaseException) -> str:
-    value = getattr(exc, "code", None)
-    if isinstance(value, str) and value:
-        return value
-    text = str(exc)
-    return text.split(":", 1)[0] if text else exc.__class__.__name__
 
 
 def _positive_int(value: Any, code: str) -> int:
@@ -94,29 +89,6 @@ def load_bundle(root: str | Path) -> dict[str, dict[str, Any]]:
     if outer_path.is_file():
         result["outerRequest"] = _load(outer_path)
     return result
-
-
-class MutationTrackingTransport:
-    def __init__(self, transport: Any) -> None:
-        self.transport = transport
-        self.mutable_calls: list[dict[str, str]] = []
-
-    def request(
-        self,
-        method: str,
-        endpoint: str,
-        *,
-        payload: Any = None,
-        include_headers: bool = False,
-    ) -> Any:
-        if method.upper() in MUTABLE_METHODS:
-            self.mutable_calls.append({"method": method.upper(), "endpoint": endpoint})
-        return self.transport.request(
-            method,
-            endpoint,
-            payload=payload,
-            include_headers=include_headers,
-        )
 
 
 def _issue(transport: Any, issue_number: int) -> dict[str, Any]:
@@ -403,7 +375,7 @@ def inspect_protocol(
             "authorizesMutation": False,
         }
     if attempts:
-        observed_head = _observe_branch_head(bundle["plan"], carrier)
+        observed_head = mutation_host.observe_branch_head(bundle["plan"], carrier)
         result = mutation_dispatch.build_execution_result(
             bundle["plan"],
             dispatch,
@@ -433,7 +405,7 @@ def inspect_protocol(
     }
 
 
-def _observe_branch_head(plan: dict[str, Any], transport: Any) -> str | None:
+def mutation_host.observe_branch_head(plan: dict[str, Any], transport: Any) -> str | None:
     try:
         if "path" in plan["target"]:
             observed = git_observation.observe_file(
@@ -478,67 +450,48 @@ def execute_dispatch(
         raise DispatchHostError("AGENT_TOOL_DISPATCH_COMMENT_INVALID") from exc
     user = attempt_comment.get("user")
     attempt = _json_after_marker(attempt_comment.get("body"), ATTEMPT_MARKER)
-    if not isinstance(user, dict) or user.get("login") != "github-actions[bot]" or not isinstance(attempt, dict):
+    if (
+        not isinstance(user, dict)
+        or user.get("login") != "github-actions[bot]"
+        or not isinstance(attempt, dict)
+    ):
         raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID")
     validate_attempt(attempt, dispatch)
-    if attempt["runId"] != _positive_int(run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID"):
+    if attempt["runId"] != _positive_int(
+        run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID"
+    ):
         raise DispatchHostError("AGENT_TOOL_DISPATCH_ATTEMPT_RUN_MISMATCH")
 
-    tracked = MutationTrackingTransport(base)
-    execution_proofs: dict[str, Any] | None = None
-    receipt: dict[str, Any] | None = None
-    observed_head: str | None = None
-    try:
-        execution_proofs = admission.collect_guard_proofs(
-            bundle["plan"],
-            transport=tracked,
-            lifecycle_context=_lifecycle_context(dispatch, before_comment_id=None),
-        )
-        admission.assert_execution_admitted(bundle["plan"], execution_proofs)
-        source = remote_canonical_execution.build_hosted_comment_source(
-            host="agent-tool-mutation-dispatch",
-            source_sha=host_sha,
-            invocation_id=str(
-                _positive_int(run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID")
-            ),
-            issue_number=dispatch["source"]["issueNumber"],
-            comment_id=_positive_int(
-                attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID"
-            ),
-        )
-        receipt = remote_canonical_issue.execute_command(
-            dispatch["command"], source=source, transport=tracked
-        )
-        observed_head = receipt["aggregateReadback"].get("branchHead")
-        result = mutation_dispatch.build_execution_result(
-            bundle["plan"],
-            dispatch,
-            status="PASS",
-            blockers=[],
-            execution_proof_set=execution_proofs,
-            receipt=receipt,
-            mutable_call_count=len(tracked.mutable_calls),
-            observed_branch_head=observed_head,
-        )
-    except Exception as exc:
-        observed_head = _observe_branch_head(bundle["plan"], tracked)
-        expected_head = dispatch["command"]["expected"].get("branchHead")
-        if not tracked.mutable_calls or observed_head == expected_head:
-            status = "BLOCKED"
-        else:
-            status = "UNKNOWN"
-        result = mutation_dispatch.build_execution_result(
-            bundle["plan"],
-            dispatch,
-            status=status,
-            blockers=[_code(exc)],
-            execution_proof_set=execution_proofs,
-            mutable_call_count=len(tracked.mutable_calls),
-            observed_branch_head=observed_head,
-        )
+    source = remote_canonical_execution.build_hosted_comment_source(
+        host="agent-tool-mutation-dispatch",
+        source_sha=host_sha,
+        invocation_id=str(
+            _positive_int(run_id, "AGENT_TOOL_DISPATCH_RUN_ID_INVALID")
+        ),
+        issue_number=dispatch["source"]["issueNumber"],
+        comment_id=_positive_int(
+            attempt_comment_id, "AGENT_TOOL_DISPATCH_ATTEMPT_COMMENT_INVALID"
+        ),
+    )
+    outcome = mutation_host.execute_plan(
+        bundle["plan"],
+        source=source,
+        transport=base,
+        lifecycle_context=_lifecycle_context(
+            dispatch, before_comment_id=None
+        ),
+    )
+    result = mutation_dispatch.build_execution_result(
+        bundle["plan"],
+        dispatch,
+        status=outcome["status"],
+        blockers=outcome["blockers"],
+        execution_proof_set=outcome["executionProofSet"],
+        receipt=outcome["remoteReceipt"],
+        mutable_call_count=outcome["mutableCallCount"],
+        observed_branch_head=outcome["observedBranchHead"],
+    )
     return _hosted_terminal(bundle["request"], bundle["plan"], result)
-
-
 def _write(path: str | Path, value: dict[str, Any]) -> None:
     Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
