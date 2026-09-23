@@ -215,7 +215,7 @@ class AgentCycleIdentityR2ATests(unittest.TestCase):
             context_path = root / "context.json"
             manifest_path = root / "manifest.json"
             with (
-                mock.patch.object(hosted_agent_cycle, "_run_agent", return_value=(0, context)),
+                mock.patch.object(hosted_agent_cycle, "_build_begin_context", return_value=context),
                 mock.patch.object(hosted_agent_cycle.agent_cycle, "validate_context"),
                 mock.patch.dict(
                     os.environ,
