@@ -38,7 +38,9 @@ from tools import hosted_agent_cycle_trace
 from tools import hosted_cycle_handle
 from tools import hosted_issue_bus
 from tools import remote_canonical_execution
+from tools import runtime_capabilities
 from tools import runtime_provider_adapter
+from tools import project_machine
 from tools.agent_tools import trace_collect
 from tools.canonical import stable_hash
 from tools.coordination_remote import GhApiTransport
@@ -399,6 +401,52 @@ def _run_agent(args: list[str]) -> tuple[int, dict[str, Any]]:
     return proc.returncode, payload
 
 
+def _build_begin_context(command: dict[str, Any]) -> dict[str, Any]:
+    """Compose canonical Agent Cycle begin semantics inside the hosted carrier.
+
+    R8 retired the public agent.py begin facade. Hosted begin still needs the
+    same semantic composition, but it must call canonical modules directly.
+    """
+    command = validate_transport_command(command)
+    role = command["actor"]["role"]
+    declared_intent = command["declaredIntent"]
+    try:
+        profile = agent_cycle.entry_profile(role, declared_intent)
+        machine = project_machine.inspect_live()
+        providers = runtime_capabilities.local_provider_observations()
+        if command["schemaVersion"] == COMMAND_SCHEMA_V04:
+            runtime_environment = validate_runtime_environment(
+                command["runtimeEnvironment"]
+            )
+            derived = runtime_provider_adapter.observations_from_tool_surfaces(
+                runtime_environment["toolSurfaces"],
+                inventory_complete=runtime_environment["inventoryComplete"],
+            )
+            overlap = sorted(
+                set(providers["providers"]) & set(derived["providers"])
+            )
+            if overlap:
+                raise RuntimeError(
+                    f"RUNTIME_PROVIDER_OBSERVATION_SOURCE_CONFLICT:{overlap[0]}"
+                )
+            providers = runtime_capabilities.merge_provider_observations(
+                providers, derived
+            )
+        runtime = runtime_capabilities.build_inspection(providers)
+        return agent_cycle.build_context(
+            role=role,
+            declared_intent=declared_intent,
+            lifecycle_phase=profile["lifecyclePhase"],
+            objects=profile["objects"],
+            operations=profile["operations"],
+            scopes=profile["scope"],
+            machine=machine,
+            runtime_inspection=runtime,
+        )
+    except RuntimeError as exc:
+        code = str(exc).split(":", 1)[0] or "HOSTED_AGENT_CANONICAL_BEGIN_FAILED"
+        raise HostedAgentCycleError(code, str(exc)) from exc
+
 def _begin_manifest(command: dict[str, Any], context: dict[str, Any], meta: dict[str, int]) -> dict[str, Any]:
     source = _source(meta)
     artifact_name = f"agent-cycle-begin-{source['runId']}"
@@ -589,36 +637,7 @@ def begin_from_envelope(
         if command["schemaVersion"] in {COMMAND_SCHEMA_V03, COMMAND_SCHEMA_V04}
         else None
     )
-    agent_args = [
-        "begin",
-        "--role", command["actor"]["role"],
-        "--intent", command["declaredIntent"],
-        "--machine-scope", "live",
-    ]
-    if command["schemaVersion"] == COMMAND_SCHEMA_V04:
-        runtime_environment = validate_runtime_environment(command["runtimeEnvironment"])
-        for surface_id in runtime_environment["toolSurfaces"]:
-            agent_args.extend(["--runtime-tool-surface", surface_id])
-        if runtime_environment["inventoryComplete"]:
-            agent_args.append("--runtime-tool-surfaces-complete")
-    agent_args.append("--json")
-    rc, context = _run_agent(agent_args)
-    if rc != 0:
-        try:
-            failure_core = _context_failure_core(context)
-        except Exception:
-            failure_core = _failure_core(
-                phase="BEGIN",
-                causes=[
-                    _hosted_cause("HOSTED_AGENT_CANONICAL_BEGIN_FAILED", "BEGIN"),
-                    _hosted_cause("HOSTED_AGENT_BEGIN_NOT_READY", "BEGIN"),
-                ],
-                lossy_projection=True,
-            )
-        raise HostedAgentCycleError(
-            "HOSTED_AGENT_BEGIN_NOT_READY",
-            failure_core=failure_core,
-        )
+    context = _build_begin_context(command)
     agent_cycle.validate_context(context)
     if context["status"] != "READY":
         raise HostedAgentCycleError(
