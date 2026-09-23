@@ -95,9 +95,9 @@ class HostedAgentCycleTests(unittest.TestCase):
             hosted.parse_event(fenced)
 
     @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
-    @patch("tools.hosted_agent_cycle._run_agent")
-    def test_begin_delegates_to_canonical_agent_and_preserves_hash_bound_manifest(
-        self, run_agent, validate_context
+    @patch("tools.hosted_agent_cycle._build_begin_context")
+    def test_begin_delegates_to_internal_canonical_composition_and_preserves_hash_bound_manifest(
+        self, build_context, validate_context
     ):
         context = {
             "schemaVersion": hosted.agent_cycle.SCHEMA_VERSION,
@@ -106,7 +106,7 @@ class HostedAgentCycleTests(unittest.TestCase):
             "contextHash": "d" * 64,
             "status": "READY",
         }
-        run_agent.return_value = (0, context)
+        build_context.return_value = context
         with tempfile.TemporaryDirectory() as tmp, patch.dict(
             os.environ,
             {"GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123"},
@@ -118,10 +118,7 @@ class HostedAgentCycleTests(unittest.TestCase):
                 context_path=f"{tmp}/context.json",
                 manifest_path=f"{tmp}/manifest.json",
             )
-            args = run_agent.call_args.args[0]
-            self.assertEqual(args[0], "begin")
-            self.assertIn("--machine-scope", args)
-            self.assertEqual(args[args.index("--machine-scope") + 1], "live")
+            build_context.assert_called_once_with(begin_command())
             manifest = json.loads(Path(f"{tmp}/manifest.json").read_text())
             self.assertEqual(manifest["schemaVersion"], hosted.BEGIN_MANIFEST_SCHEMA)
             self.assertEqual(manifest["contextHash"], context["contextHash"])
@@ -144,20 +141,17 @@ class HostedAgentCycleTests(unittest.TestCase):
             validate_context.assert_called()
 
     @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
-    @patch("tools.hosted_agent_cycle._run_agent")
+    @patch("tools.hosted_agent_cycle._build_begin_context")
     def test_begin_failure_preserves_structured_blockers_root_to_wrapper(
-        self, run_agent, validate_context
+        self, build_context, validate_context
     ):
-        run_agent.return_value = (
-            2,
-            {
-                "status": "BLOCKED",
-                "blockingUnknowns": [
-                    "ROOT_PROVIDER_SCOPE_MISSING",
-                    "ROUTINE_INSPECTION_FAIL",
-                ],
-            },
-        )
+        build_context.return_value = {
+            "status": "BLOCKED",
+            "blockingUnknowns": [
+                "ROOT_PROVIDER_SCOPE_MISSING",
+                "ROUTINE_INSPECTION_FAIL",
+            ],
+        }
         with self.assertRaises(hosted.HostedAgentCycleError) as raised:
             hosted.begin_from_envelope(
                 begin_command(),
@@ -178,6 +172,133 @@ class HostedAgentCycleTests(unittest.TestCase):
         self.assertFalse(core["lossyProjection"])
         self.assertEqual("BEGIN", core["phase"])
         validate_context.assert_called()
+
+    def test_begin_path_does_not_resurrect_public_agent_begin_facade(self):
+        import inspect
+
+        source = inspect.getsource(hosted.begin_from_envelope)
+        self.assertIn("_build_begin_context(command)", source)
+        self.assertNotIn("_run_agent(", source)
+
+    @patch("tools.hosted_agent_cycle.agent_cycle.build_context")
+    @patch("tools.hosted_agent_cycle.runtime_capabilities.build_inspection")
+    @patch("tools.hosted_agent_cycle.runtime_capabilities.merge_provider_observations")
+    @patch("tools.hosted_agent_cycle.runtime_capabilities.local_provider_observations")
+    @patch("tools.hosted_agent_cycle.runtime_provider_adapter.observations_from_tool_surfaces")
+    @patch("tools.hosted_agent_cycle.project_machine.inspect_live")
+    @patch("tools.hosted_agent_cycle.agent_cycle.entry_profile")
+    def test_v04_begin_composes_runtime_surfaces_without_public_facade(
+        self, entry_profile, inspect_live, surface_observations,
+        local_observations, merge_observations, build_inspection, build_context
+    ):
+        command = {
+            "schemaVersion": hosted.COMMAND_SCHEMA_V04,
+            "requestId": "hosted-cycle-runtime-begin",
+            "action": "begin",
+            "actor": {
+                "role": "manager-gitops",
+                "workerId": "manager-gitops-chat",
+                "sessionId": "runtime-begin",
+            },
+            "declaredIntent": "governed-mutation",
+            "machineScope": "live",
+            "workRef": {"workId": "e5-governed-mutation-request-client"},
+            "runtimeEnvironment": {
+                "toolSurfaces": ["github-connector-tools"],
+                "inventoryComplete": True,
+            },
+            "evidenceCommentIds": [],
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        entry_profile.return_value = {
+            "lifecyclePhase": "execution",
+            "objects": ["branch"],
+            "operations": ["authority-mutation"],
+            "scope": ["repository:read"],
+        }
+        inspect_live.return_value = {"machine": "live"}
+        local_observations.return_value = {
+            "schemaVersion": "RuntimeProviderObservations 0.1",
+            "providers": {"local-python": {"status": "PASS", "features": ["python-module-execution"], "reason": None}},
+        }
+        surface_observations.return_value = {
+            "schemaVersion": "RuntimeProviderObservations 0.1",
+            "providers": {"github-connector": {"status": "PASS", "features": ["repository-read"], "reason": None}},
+        }
+        merge_observations.return_value = {"merged": "providers"}
+        build_inspection.return_value = {"runtime": "inspection"}
+        build_context.return_value = {"status": "READY"}
+
+        value = hosted._build_begin_context(command)
+
+        self.assertEqual(value, {"status": "READY"})
+        surface_observations.assert_called_once_with(
+            ["github-connector-tools"], inventory_complete=True
+        )
+        merge_observations.assert_called_once()
+        build_context.assert_called_once_with(
+            role="manager-gitops",
+            declared_intent="governed-mutation",
+            lifecycle_phase="execution",
+            objects=["branch"],
+            operations=["authority-mutation"],
+            scopes=["repository:read"],
+            machine={"machine": "live"},
+            runtime_inspection={"runtime": "inspection"},
+        )
+
+    @patch("tools.hosted_agent_cycle.runtime_capabilities.local_provider_observations")
+    @patch("tools.hosted_agent_cycle.runtime_provider_adapter.observations_from_tool_surfaces")
+    @patch("tools.hosted_agent_cycle.project_machine.inspect_live")
+    @patch("tools.hosted_agent_cycle.agent_cycle.entry_profile")
+    def test_v04_begin_preserves_historical_provider_source_conflict(
+        self, entry_profile, inspect_live, surface_observations, local_observations
+    ):
+        command = {
+            "schemaVersion": hosted.COMMAND_SCHEMA_V04,
+            "requestId": "hosted-cycle-runtime-conflict",
+            "action": "begin",
+            "actor": {
+                "role": "manager-gitops",
+                "workerId": "manager-gitops-chat",
+                "sessionId": "runtime-conflict",
+            },
+            "declaredIntent": "governed-mutation",
+            "machineScope": "live",
+            "workRef": {"workId": "e5-governed-mutation-request-client"},
+            "runtimeEnvironment": {
+                "toolSurfaces": ["python-module-cli"],
+                "inventoryComplete": True,
+            },
+            "evidenceCommentIds": [],
+            "semanticAuthority": False,
+            "authorizesMutation": False,
+        }
+        entry_profile.return_value = {
+            "lifecyclePhase": "execution",
+            "objects": ["branch"],
+            "operations": ["authority-mutation"],
+            "scope": ["repository:read"],
+        }
+        inspect_live.return_value = {"machine": "live"}
+        provider = {
+            "status": "PASS",
+            "features": ["python-module-execution"],
+            "reason": None,
+        }
+        local_observations.return_value = {
+            "schemaVersion": "RuntimeProviderObservations 0.1",
+            "providers": {"local-python": provider},
+        }
+        surface_observations.return_value = {
+            "schemaVersion": "RuntimeProviderObservations 0.1",
+            "providers": {"local-python": provider},
+        }
+        with self.assertRaisesRegex(
+            RuntimeError, "RUNTIME_PROVIDER_OBSERVATION_SOURCE_CONFLICT"
+        ):
+            hosted._build_begin_context(command)
 
     def test_work_ref_observation_fails_closed_without_provider(self):
         with self.assertRaisesRegex(RuntimeError, "BLOCKED_EXECUTION_SURFACE"):

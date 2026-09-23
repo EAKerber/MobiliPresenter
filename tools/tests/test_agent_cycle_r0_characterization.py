@@ -205,8 +205,8 @@ class AgentCycleR0CharacterizationTests(unittest.TestCase):
             hosted_agent_cycle.validate_command(command)
 
     @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
-    @patch("tools.hosted_agent_cycle._run_agent")
-    def test_hosted_begin_failure_preserves_the_root_blocker(self, run_agent, validate_context):
+    @patch("tools.hosted_agent_cycle._build_begin_context")
+    def test_hosted_begin_failure_preserves_the_root_blocker(self, build_context, validate_context):
         command = {
             "schemaVersion": hosted_agent_cycle.COMMAND_SCHEMA,
             "requestId": "r0-begin-failure",
@@ -219,13 +219,10 @@ class AgentCycleR0CharacterizationTests(unittest.TestCase):
             "semanticAuthority": False,
             "authorizesMutation": False,
         }
-        run_agent.return_value = (
-            2,
-            {
-                "status": "BLOCKED",
-                "blockingUnknowns": ["ROOT_PROVIDER_SCOPE_MISSING"],
-            },
-        )
+        build_context.return_value = {
+            "status": "BLOCKED",
+            "blockingUnknowns": ["ROOT_PROVIDER_SCOPE_MISSING"],
+        }
 
         with self.assertRaises(hosted_agent_cycle.HostedAgentCycleError) as raised:
             hosted_agent_cycle.begin_from_envelope(

@@ -92,9 +92,9 @@ class HostedRuntimeObservationIngressR5A1Tests(unittest.TestCase):
 
     @patch("tools.hosted_agent_cycle.agent_cycle.bind_work_ref")
     @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
-    @patch("tools.hosted_agent_cycle._run_agent")
-    def test_complete_runtime_environment_reduces_to_existing_d3c_surface_flags(
-        self, run_agent, validate_context, bind_work_ref
+    @patch("tools.hosted_agent_cycle._build_begin_context")
+    def test_complete_runtime_environment_reaches_internal_begin_seam(
+        self, build_context, validate_context, bind_work_ref
     ):
         context = {
             "schemaVersion": hosted.agent_cycle.SCHEMA_VERSION,
@@ -103,7 +103,7 @@ class HostedRuntimeObservationIngressR5A1Tests(unittest.TestCase):
             "contextHash": "d" * 64,
             "status": "READY",
         }
-        run_agent.return_value = (0, context)
+        build_context.return_value = context
         bind_work_ref.return_value = context
         with tempfile.TemporaryDirectory() as tmp, patch.dict(
             os.environ,
@@ -116,21 +116,16 @@ class HostedRuntimeObservationIngressR5A1Tests(unittest.TestCase):
                 context_path=f"{tmp}/context.json",
                 manifest_path=f"{tmp}/manifest.json",
             )
-        args = run_agent.call_args.args[0]
-        self.assertEqual(args[0], "begin")
-        self.assertEqual(args.count("--runtime-tool-surface"), 1)
-        self.assertEqual(args[args.index("--runtime-tool-surface") + 1], SURFACE)
-        self.assertIn("--runtime-tool-surfaces-complete", args)
-        self.assertEqual(args[-1], "--json")
+        build_context.assert_called_once_with(runtime_begin_command())
         self.assertEqual(result["status"], "READY")
         bind_work_ref.assert_called_once_with(context, None)
         validate_context.assert_called()
 
     @patch("tools.hosted_agent_cycle.agent_cycle.bind_work_ref")
     @patch("tools.hosted_agent_cycle.agent_cycle.validate_context")
-    @patch("tools.hosted_agent_cycle._run_agent")
-    def test_incomplete_runtime_environment_preserves_incomplete_d3c_ingress(
-        self, run_agent, validate_context, bind_work_ref
+    @patch("tools.hosted_agent_cycle._build_begin_context")
+    def test_incomplete_runtime_environment_reaches_internal_begin_seam(
+        self, build_context, validate_context, bind_work_ref
     ):
         context = {
             "schemaVersion": hosted.agent_cycle.SCHEMA_VERSION,
@@ -139,7 +134,7 @@ class HostedRuntimeObservationIngressR5A1Tests(unittest.TestCase):
             "contextHash": "d" * 64,
             "status": "READY",
         }
-        run_agent.return_value = (0, context)
+        build_context.return_value = context
         bind_work_ref.return_value = context
         with tempfile.TemporaryDirectory() as tmp, patch.dict(
             os.environ,
@@ -152,9 +147,7 @@ class HostedRuntimeObservationIngressR5A1Tests(unittest.TestCase):
                 context_path=f"{tmp}/context.json",
                 manifest_path=f"{tmp}/manifest.json",
             )
-        args = run_agent.call_args.args[0]
-        self.assertIn("--runtime-tool-surface", args)
-        self.assertNotIn("--runtime-tool-surfaces-complete", args)
+        build_context.assert_called_once_with(runtime_begin_command(complete=False))
         bind_work_ref.assert_called_once_with(context, None)
         validate_context.assert_called()
 
