@@ -414,9 +414,7 @@ def _build_begin_context(command: dict[str, Any]) -> dict[str, Any]:
         machine = project_machine.inspect_live()
         providers = runtime_capabilities.local_provider_observations()
         if command["schemaVersion"] == COMMAND_SCHEMA_V04:
-            runtime_environment = validate_runtime_environment(
-                command["runtimeEnvironment"]
-            )
+            runtime_environment = command["runtimeEnvironment"]
             derived = runtime_provider_adapter.observations_from_tool_surfaces(
                 runtime_environment["toolSurfaces"],
                 inventory_complete=runtime_environment["inventoryComplete"],
