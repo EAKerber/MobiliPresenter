@@ -407,7 +407,6 @@ def _build_begin_context(command: dict[str, Any]) -> dict[str, Any]:
     R8 retired the public agent.py begin facade. Hosted begin still needs the
     same semantic composition, but it must call canonical modules directly.
     """
-    command = validate_transport_command(command)
     role = command["actor"]["role"]
     declared_intent = command["declaredIntent"]
     try:
