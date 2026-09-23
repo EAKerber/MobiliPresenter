@@ -148,11 +148,11 @@ class AgentCycleWorkBindingR3B0bTests(unittest.TestCase):
             )
 
     @patch("tools.hosted_agent_cycle._observe_work_ref")
-    @patch("tools.hosted_agent_cycle._run_agent")
-    def test_hosted_v03_binds_work_before_manifest_and_handle(self, run_agent, observe_work):
+    @patch("tools.hosted_agent_cycle._build_begin_context")
+    def test_hosted_v03_binds_work_before_manifest_and_handle(self, build_context, observe_work):
         context = _context()
         self.assertEqual("READY", context["status"])
-        run_agent.return_value = (0, context)
+        build_context.return_value = context
         observe_work.return_value = {"workId": WORK_ID}
 
         with patch.dict(
