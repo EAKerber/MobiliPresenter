@@ -3825,6 +3825,13 @@
         },
         {
           "targetKind": "component",
+          "target": "governed-mutation-request-client-cli",
+          "capabilities": [
+            "agent.tools.hosted"
+          ]
+        },
+        {
+          "targetKind": "component",
           "target": "governed-mutation-service-cli",
           "capabilities": [
             "agent.tools.hosted"
