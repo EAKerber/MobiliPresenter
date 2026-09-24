@@ -3635,6 +3635,13 @@
         },
         {
           "targetKind": "workflow",
+          "target": ".github/workflows/hosted-agent-cycle-recovery.yml",
+          "capabilities": [
+            "agent.cycle.hosted"
+          ]
+        },
+        {
+          "targetKind": "workflow",
           "target": ".github/workflows/hosted-agent-cycle.yml",
           "capabilities": [
             "agent.cycle.hosted"
@@ -3853,6 +3860,13 @@
         {
           "targetKind": "component",
           "target": "hosted-agent-cycle-cli",
+          "capabilities": [
+            "agent.cycle.hosted"
+          ]
+        },
+        {
+          "targetKind": "component",
+          "target": "hosted-agent-cycle-recovery-cli",
           "capabilities": [
             "agent.cycle.hosted"
           ]

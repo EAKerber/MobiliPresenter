@@ -14,6 +14,7 @@ from tools import agent_failure
 from tools import continuation
 from tools import hosted_agent_cycle
 from tools import hosted_agent_cycle_waiting
+from tools import hosted_cycle_failure_recovery
 from tools import hosted_cycle_frontier
 from tools import hosted_cycle_handle
 from tools import hosted_cycle_lineage
@@ -40,6 +41,7 @@ ACTIONS = {
 OUTCOME_STATES = {
     "OPEN",
     "PASS",
+    "RECOVERED",
     "WAITING",
     "FAILURE",
     "PENDING_CLOSE_RESULT",
@@ -321,6 +323,85 @@ def _outcome_for_candidate(
     reasons: set[str] = set()
     for _, _, _, items in matches:
         reasons.update(items)
+
+    if state == "FAILURE":
+        failure_matches = [
+            (cid, result_hash)
+            for cid, item_state, result_hash, _ in matches
+            if item_state == "FAILURE"
+        ]
+        if len(failure_matches) != 1:
+            return {
+                **base,
+                "state": "AMBIGUOUS_CLOSE_RESULT",
+                "closeRequestCommentId": close_comment_id,
+                "resultCommentIds": [cid for cid, *_ in matches],
+                "resultHash": None,
+                "reasonCodes": ["HOSTED_CLOSE_RESULT_AMBIGUOUS"],
+            }
+        failure_comment_id, failure_hash = failure_matches[0]
+        recoveries: list[tuple[int, dict[str, Any]]] = []
+        for comment in sorted(comments, key=_comment_id):
+            cid = _comment_id(comment)
+            if (
+                cid <= failure_comment_id
+                or not hosted_cycle_records.result_comment_allowed(comment)
+            ):
+                continue
+            payload = hosted_cycle_records.json_after_marker(
+                comment.get("body"),
+                hosted_cycle_failure_recovery.RESULT_MARKER,
+            )
+            if not isinstance(payload, dict):
+                continue
+            try:
+                certificate = (
+                    hosted_cycle_failure_recovery.validate_certificate(payload)
+                )
+            except RuntimeError:
+                continue
+            handle = candidate.get("handle")
+            if (
+                certificate["cycleInstanceId"] != candidate["cycleInstanceId"]
+                or not isinstance(handle, dict)
+                or certificate["handleHash"] != handle.get("handleHash")
+                or certificate["beginRequestCommentId"]
+                != candidate["requestCommentId"]
+                or certificate["closeRequestCommentId"] != close_comment_id
+                or certificate["closeCommandHash"] != command_hash
+                or certificate["failedCloseResultCommentId"]
+                != failure_comment_id
+                or certificate["failedCloseFailureHash"] != failure_hash
+            ):
+                continue
+            recoveries.append((cid, certificate))
+        recovery_hashes = {item["recoveryHash"] for _, item in recoveries}
+        if len(recovery_hashes) > 1:
+            return {
+                **base,
+                "state": "AMBIGUOUS_CLOSE_RESULT",
+                "closeRequestCommentId": close_comment_id,
+                "resultCommentIds": sorted(
+                    [cid for cid, *_ in matches]
+                    + [cid for cid, _ in recoveries]
+                ),
+                "resultHash": None,
+                "reasonCodes": ["HOSTED_CYCLE_RECOVERY_AMBIGUOUS"],
+            }
+        if recoveries:
+            certificate = recoveries[-1][1]
+            return {
+                **base,
+                "state": "RECOVERED",
+                "closeRequestCommentId": close_comment_id,
+                "resultCommentIds": sorted(
+                    [failure_comment_id]
+                    + [cid for cid, _ in recoveries]
+                ),
+                "resultHash": certificate["recoveryHash"],
+                "reasonCodes": list(certificate["reasonCodes"]),
+            }
+
     return {
         **base,
         "state": state,
@@ -520,7 +601,7 @@ def _validate_outcome(value: Any) -> dict[str, Any]:
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOME_BINDING_INVALID")
     if value["state"] == "PENDING_CLOSE_RESULT" and (close_id is None or result_ids or digest is not None):
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOME_BINDING_INVALID")
-    if value["state"] in {"PASS", "WAITING", "FAILURE"} and (
+    if value["state"] in {"PASS", "RECOVERED", "WAITING", "FAILURE"} and (
         close_id is None or not result_ids or digest is None
     ):
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_OUTCOME_BINDING_INVALID")
@@ -531,7 +612,11 @@ def _validate_frontier_bindings(
     frontier: dict[str, Any], outcomes: list[dict[str, Any]]
 ) -> None:
     by_id = {item["cycleInstanceId"]: item for item in outcomes}
-    terminal = sorted(item["cycleInstanceId"] for item in outcomes if item["state"] == "PASS")
+    terminal = sorted(
+        item["cycleInstanceId"]
+        for item in outcomes
+        if item["state"] in hosted_cycle_frontier.TERMINAL_STATES
+    )
     active = sorted(item["cycleInstanceId"] for item in outcomes if item["state"] != "PASS")
     if frontier["terminalCycleIds"] != terminal or frontier["activeCycleIds"] != active:
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_BINDING_MISMATCH")
