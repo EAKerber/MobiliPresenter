@@ -296,7 +296,13 @@ class UnknownAcquireCleanupCloseTests(unittest.TestCase):
                 {
                     "leaseId": "lease-live",
                     "resource": f"branch:{BRANCH}",
+                    "mode": "exclusive-write",
                     "owner": owner(),
+                    "reason": "E5c active lease regression",
+                    "acquiredAt": "2026-09-24T13:30:00Z",
+                    "renewedAt": "2026-09-24T13:30:00Z",
+                    "expiresAt": "2026-09-24T15:00:00Z",
+                    "ttlSeconds": 5400,
                 }
             ],
         )
