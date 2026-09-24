@@ -1179,6 +1179,24 @@
         "agent-write-lifecycle-guard"
       ]
     },
+    "hosted-agent-cycle-recovery-cli": {
+      "module": "tools.hosted_cycle_failure_recovery",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": false,
+      "readsAuthorities": [
+        "coordination-leases"
+      ],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": [
+        "agent-write-lifecycle-guard",
+        "hosted-agent-cycle-cli"
+      ]
+    },
     "hosted-agent-cycle-trace-cli": {
       "module": "tools.hosted_agent_cycle_trace",
       "owner": "operations-core",
