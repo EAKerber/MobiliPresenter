@@ -1,0 +1,66 @@
+name: Hosted Agent Cycle Recovery
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  recover:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.title == 'MobiliPresenter Remote Canonical Execution Bus' &&
+      github.event.comment.author_association == 'OWNER' &&
+      startsWith(github.event.comment.body, 'MOBILIPRESENTER_AGENT_CYCLE_RECOVERY_REQUEST_V0_1')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current recovery carrier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Parse recovery request
+        id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/hosted_cycle_failure_recovery.py parse-event \
+            --event "$GITHUB_EVENT_PATH" \
+            --request /tmp/cycle-recovery-request.json \
+            --meta /tmp/cycle-recovery-meta.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Download exact begin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.request.outputs.begin_artifact_name }}
+          path: /tmp/cycle-recovery-begin
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.request.outputs.begin_run_id }}
+
+      - name: Prove current recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/hosted_cycle_failure_recovery.py recover \
+            --request /tmp/cycle-recovery-request.json \
+            --begin-dir /tmp/cycle-recovery-begin \
+            --result /tmp/cycle-recovery-result.json
+
+      - name: Publish recovery certificate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tools/hosted_cycle_failure_recovery.py publish \
+            --meta /tmp/cycle-recovery-meta.json \
+            --result /tmp/cycle-recovery-result.json

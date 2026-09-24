@@ -14,7 +14,7 @@ from tools.canonical import stable_hash
 
 SCHEMA = "HostedCycleFrontier 0.1"
 STATES = {"NONE", "SINGLE", "CONCURRENT", "SUCCESSION_UNPROVEN"}
-TERMINAL_STATES = {"PASS"}
+TERMINAL_STATES = {"PASS", "RECOVERED"}
 FIELDS = {
     "schemaVersion",
     "terminalCycleIds",
