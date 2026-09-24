@@ -271,10 +271,13 @@ def build_work_lineage(
             continue
         try:
             command, meta = hosted_agent_cycle.parse_event(_request_event(comment, issue_number))
-        except hosted_agent_cycle.HostedAgentCycleError as exc:
-            raise HostedCycleLineageError(
-                "HOSTED_CYCLE_LINEAGE_REQUEST_INVALID:" + exc.code
-            ) from exc
+        except hosted_agent_cycle.HostedAgentCycleError:
+            # A transport-invalid request never acquired semantic identity and
+            # therefore cannot become a lineage candidate or pending cycle.
+            # Ignoring it here is fail-closed: it grants no authority and
+            # prevents one malformed bus record from poisoning later valid
+            # Work-bound lineage forever.
+            continue
         if (
             command.get("schemaVersion") not in {
                 hosted_agent_cycle.COMMAND_SCHEMA_V03,
