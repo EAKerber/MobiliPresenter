@@ -326,6 +326,170 @@ def _migration_release_proven(
     return False
 
 
+def _unknown_acquire_cleanup_receipt_matches(
+    receipt: dict[str, Any],
+    *,
+    manifest: dict[str, Any],
+    request: dict[str, Any],
+) -> bool:
+    if request.get("action") != "acquire":
+        return False
+    try:
+        remote_canonical_execution.validate_receipt(receipt)
+    except RuntimeError:
+        return False
+
+    actor = request.get("actor")
+    branch = request.get("branch")
+    if (
+        actor != manifest.get("actor")
+        or not isinstance(actor, dict)
+        or not isinstance(branch, str)
+        or not branch
+    ):
+        return False
+    expected_owner = _expected_owner(actor, branch)
+    resource = f"branch:{branch}"
+
+    command = receipt.get("command")
+    source = receipt.get("source")
+    evidence = receipt.get("evidence")
+    aggregate = receipt.get("aggregateReadback")
+    if not isinstance(command, dict):
+        return False
+    try:
+        source_binding = remote_canonical_execution.hosted_comment_source_binding(
+            source
+        )
+    except RuntimeError:
+        return False
+
+    payload = command.get("payload")
+    target = command.get("target")
+    if (
+        receipt.get("status") != "PASS"
+        or receipt.get("blockers") != []
+        or command.get("kind") != "domain"
+        or command.get("actor") != actor
+        or target != {
+            "domain": "coordination",
+            "action": "release",
+            "subject": {"kind": "coordination", "id": "leases"},
+        }
+        or not isinstance(payload, dict)
+        or set(payload) != {"owner", "transitionId", "resources", "mine"}
+        or payload.get("owner") != expected_owner
+        or payload.get("resources") != [resource]
+        or payload.get("mine") is not False
+        or payload.get("transitionId") != command.get("executionId")
+        or receipt.get("route") != {
+            "kind": "domain",
+            "domain": "coordination",
+            "action": "release",
+        }
+        or source_binding is None
+        or source_binding["host"] != "remote-canonical-execution"
+        or source_binding["issueNumber"] != manifest["source"]["issueNumber"]
+        or not isinstance(evidence, dict)
+        or evidence.get("kind") != "transition-receipt"
+        or not isinstance(aggregate, dict)
+        or aggregate.get("kind") != "authority-state"
+        or aggregate.get("status") != "PASS"
+    ):
+        return False
+
+    plan = evidence.get("plan")
+    transition_receipt = evidence.get("receipt")
+    if not isinstance(plan, dict) or not isinstance(transition_receipt, dict):
+        return False
+    candidate = plan.get("candidate")
+    plan_intent = plan.get("intent")
+    if (
+        plan.get("domain") != "coordination"
+        or plan.get("action") != "release"
+        or plan.get("subject") != {"kind": "coordination", "id": "leases"}
+        or not isinstance(plan_intent, dict)
+        or plan_intent.get("transitionId") != command.get("executionId")
+        or plan_intent.get("owner") != expected_owner
+        or plan_intent.get("resources") != [resource]
+        or plan_intent.get("mine") is not False
+        or not isinstance(candidate, dict)
+        or not isinstance(candidate.get("leases"), list)
+        or any(
+            lease.get("resource") == resource
+            and lease.get("owner") == expected_owner
+            for lease in candidate["leases"]
+            if isinstance(lease, dict)
+        )
+        or transition_receipt.get("domain") != "coordination"
+        or transition_receipt.get("action") != "release"
+        or transition_receipt.get("subject") != {
+            "kind": "coordination",
+            "id": "leases",
+        }
+        or transition_receipt.get("verified") is not True
+        or transition_receipt.get("authorityRevision")
+        != aggregate.get("authorityRevision")
+    ):
+        return False
+    return True
+
+
+def _unknown_acquire_cleanup_proven(
+    comments: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    *,
+    close_comment_id: int,
+    failure_comment_id: int,
+    request: dict[str, Any],
+) -> bool:
+    begin_comment_id = manifest.get("source", {}).get("commentId")
+    if not isinstance(begin_comment_id, int) or isinstance(begin_comment_id, bool):
+        raise AgentWriteLifecycleGuardError(
+            "AGENT_WRITE_LIFECYCLE_WINDOW_INVALID"
+        )
+    window = _window(comments, begin_comment_id, close_comment_id)
+    after_failure = False
+    for comment in window:
+        comment_id = hosted_cycle_records.comment_id(comment)
+        if comment_id == failure_comment_id:
+            after_failure = True
+            continue
+        if (
+            not after_failure
+            or not hosted_cycle_records.result_comment_allowed(comment)
+        ):
+            continue
+        value = _payload(comment.get("body"), REMOTE_RESULT_MARKER)
+        if not isinstance(value, dict):
+            continue
+        if _unknown_acquire_cleanup_receipt_matches(
+            value,
+            manifest=manifest,
+            request=request,
+        ):
+            return True
+    return False
+
+
+def _active_request_leases(
+    active: list[dict[str, Any]],
+    request: dict[str, Any],
+) -> list[dict[str, Any]]:
+    actor = request.get("actor")
+    branch = request.get("branch")
+    if not isinstance(actor, dict) or not isinstance(branch, str) or not branch:
+        return []
+    expected_owner = _expected_owner(actor, branch)
+    resource = f"branch:{branch}"
+    return [
+        lease
+        for lease in active
+        if lease.get("resource") == resource
+        and lease.get("owner") == expected_owner
+    ]
+
+
 def prove_binding_result(
     plan: dict[str, Any],
     *,
@@ -584,8 +748,28 @@ def inspect_cycle(
         state = "UNKNOWN"
         blockers.append("AGENT_WRITE_LIFECYCLE_REQUEST_WITHOUT_TERMINAL")
     elif unknown_failure_hashes:
-        state = "UNKNOWN"
-        blockers.append("AGENT_WRITE_LIFECYCLE_UNKNOWN_FAILURE_AT_CLOSE")
+        recovered_unknowns = True
+        for request_hash in unknown_failure_hashes:
+            request = request_by_hash[request_hash]
+            failure_comment_id = terminal_by_hash[request_hash][0]
+            if (
+                request.get("action") != "acquire"
+                or _active_request_leases(active, request)
+                or not _unknown_acquire_cleanup_proven(
+                    comments,
+                    manifest,
+                    close_comment_id=close_comment_id,
+                    failure_comment_id=failure_comment_id,
+                    request=request,
+                )
+            ):
+                recovered_unknowns = False
+                break
+        if recovered_unknowns:
+            state = "RELEASED"
+        else:
+            state = "UNKNOWN"
+            blockers.append("AGENT_WRITE_LIFECYCLE_UNKNOWN_FAILURE_AT_CLOSE")
     elif results:
         latest_result_comment_id, latest_result = results[-1]
         latest_binding = latest_result["binding"]
