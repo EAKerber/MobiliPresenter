@@ -1117,6 +1117,19 @@
       "canonicalWriterFor": [],
       "delegatesTo": []
     },
+    "governed-mutation-client-cli": {
+      "module": "tools.governed_mutation_client",
+      "owner": "operations-core",
+      "kind": "cli-adapter",
+      "sideEffects": false,
+      "readsAuthorities": [],
+      "writesAuthorities": [],
+      "readsResources": [],
+      "writesResources": [],
+      "produces": [],
+      "canonicalWriterFor": [],
+      "delegatesTo": []
+    },
     "governed-mutation-service-cli": {
       "module": "tools.governed_mutation_service",
       "owner": "operations-core",
@@ -1603,19 +1616,6 @@
       "produces": [
         "artifact.inspection"
       ],
-      "canonicalWriterFor": [],
-      "delegatesTo": []
-    },
-    "governed-mutation-client-cli": {
-      "module": "tools.governed_mutation_client",
-      "owner": "operations-core",
-      "kind": "cli-adapter",
-      "sideEffects": false,
-      "readsAuthorities": [],
-      "writesAuthorities": [],
-      "readsResources": [],
-      "writesResources": [],
-      "produces": [],
       "canonicalWriterFor": [],
       "delegatesTo": []
     }
