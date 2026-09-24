@@ -617,7 +617,11 @@ def _validate_frontier_bindings(
         for item in outcomes
         if item["state"] in hosted_cycle_frontier.TERMINAL_STATES
     )
-    active = sorted(item["cycleInstanceId"] for item in outcomes if item["state"] != "PASS")
+    active = sorted(
+        item["cycleInstanceId"]
+        for item in outcomes
+        if item["state"] not in hosted_cycle_frontier.TERMINAL_STATES
+    )
     if frontier["terminalCycleIds"] != terminal or frontier["activeCycleIds"] != active:
         raise HostedCycleReentryError("HOSTED_CYCLE_REENTRY_FRONTIER_BINDING_MISMATCH")
     for evidence in frontier["successionEvidence"]:
