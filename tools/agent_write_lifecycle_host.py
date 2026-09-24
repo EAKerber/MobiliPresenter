@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import agent_write_lifecycle as lifecycle
-from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, hosted_cycle_records, hosted_issue_bus, remote_canonical_issue
+from tools import coordination, hosted_agent_cycle, hosted_agent_write_lease, hosted_cycle_records, hosted_issue_bus, remote_canonical_execution, remote_canonical_issue
 from tools.agent_tools import contracts, policy as tool_policy
 from tools.coordination_remote import GhApiTransport, GitHubCoordinationAuthority
 
@@ -574,13 +574,13 @@ def execute_dispatch(
         )
         receipt = remote_canonical_issue.execute_command(
             dispatch["command"],
-            source={
-                "workflow": "agent-write-lease-dispatch",
-                "sourceSha": host_sha,
-                "runId": str(run_id),
-                "issueNumber": dispatch["source"]["issueNumber"],
-                "commentId": attempt_comment_id,
-            },
+            source=remote_canonical_execution.build_hosted_comment_source(
+                host="agent-write-lease-dispatch",
+                source_sha=host_sha,
+                invocation_id=str(run_id),
+                issue_number=dispatch["source"]["issueNumber"],
+                comment_id=attempt_comment_id,
+            ),
             transport=tracked,
         )
         authority = GitHubCoordinationAuthority(
