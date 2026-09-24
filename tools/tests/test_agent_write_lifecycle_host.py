@@ -302,6 +302,69 @@ class AgentWriteLifecycleHostTests(unittest.TestCase):
     @patch("tools.agent_write_lifecycle_host._validate_bundle")
     @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.get_comment")
     @patch("tools.agent_write_lifecycle.validate_attempt")
+    def test_execute_dispatch_uses_portable_hosted_comment_source(
+        self, validate_attempt, comment, validate_bundle
+    ):
+        value = bundle()
+        expected_attempt = attempt(value["dispatch"], run_id=901)
+        comment.return_value = bot_comment(
+            lifecycle.ATTEMPT_MARKER, expected_attempt
+        )
+        receipt = {"receiptHash": "9" * 64}
+        observation = SimpleNamespace(head_sha="e" * 40)
+        authority = SimpleNamespace(observe=lambda: observation)
+        binding = {"bindingHash": "f" * 64}
+        terminal = {"status": "PASS"}
+
+        with (
+            patch(
+                "tools.agent_write_lifecycle_host.remote_canonical_issue.execute_command",
+                return_value=receipt,
+            ) as execute,
+            patch(
+                "tools.agent_write_lifecycle_host.GitHubCoordinationAuthority",
+                return_value=authority,
+            ),
+            patch(
+                "tools.agent_write_lifecycle_host._active_bound_lease",
+                return_value={"leaseId": "lease-1"},
+            ),
+            patch(
+                "tools.agent_write_lifecycle.build_binding",
+                return_value=binding,
+            ),
+            patch(
+                "tools.agent_write_lifecycle.build_success_result",
+                return_value=terminal,
+            ),
+        ):
+            result = host.execute_dispatch(
+                value,
+                host_sha="a" * 40,
+                hosted_run_id=456,
+                run_id=901,
+                attempt_comment_id=500,
+                transport=FakeTransport(),
+            )
+
+        self.assertEqual(result, terminal)
+        source = execute.call_args.kwargs["source"]
+        self.assertEqual(source["kind"], "hosted-comment")
+        self.assertEqual(source["host"], "agent-write-lease-dispatch")
+        self.assertEqual(source["sourceSha"], "a" * 40)
+        self.assertEqual(source["invocationId"], "901")
+        self.assertEqual(
+            source["ref"],
+            {"kind": "issue-comment", "value": "145:500"},
+        )
+        self.assertNotIn("workflow", source)
+        self.assertNotIn("issueNumber", source)
+        self.assertNotIn("commentId", source)
+
+
+    @patch("tools.agent_write_lifecycle_host._validate_bundle")
+    @patch("tools.agent_write_lifecycle_host.hosted_issue_bus.get_comment")
+    @patch("tools.agent_write_lifecycle.validate_attempt")
     def test_failure_after_mutable_call_is_unknown(self, validate_attempt, comment, validate_bundle):
         value = bundle()
         expected_attempt = attempt(value["dispatch"], run_id=901)
