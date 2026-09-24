@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "610864be25acda2c5d45e73c62332f97ec32dcbb",
+  "leases": [
+    {
+      "leaseId": "agent-write-f04df1e82868666d497cfb3e:0",
+      "resource": "branch:work/operations/e5-governed-mutation-request-client",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "e5-governed-mutation-request-client-20260924-r2",
+        "branch": "work/operations/e5-governed-mutation-request-client",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-4ee3b5706f0ad471e00e4490",
+      "acquiredAt": "2026-09-24T15:04:52Z",
+      "renewedAt": "2026-09-24T15:04:52Z",
+      "expiresAt": "2026-09-24T16:04:52Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "9e09f0087b49ca452d4e68a81f489f4c3dcd7be7",
   "schemaVersion": "CoordinationState 0.1"
 }
