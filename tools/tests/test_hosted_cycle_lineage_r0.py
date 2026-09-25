@@ -223,14 +223,37 @@ class HostedCycleLineageR0Tests(unittest.TestCase):
                 [request, result_comment], work_ref={"workId": WORK_ID}, issue_number=ISSUE_NUMBER
             )
 
-    def test_malformed_canonical_request_fails_closed(self):
+    def test_malformed_canonical_request_is_not_semantic_lineage(self):
         command = _command(WORK_ID, "bad-marker")
         request = _request_comment(command, 1030)
         request["body"] = hosted.REQUEST_MARKER_V04 + "\n" + json.dumps(command)
-        with self.assertRaisesRegex(RuntimeError, "HOSTED_CYCLE_LINEAGE_REQUEST_INVALID"):
-            hosted_cycle_lineage.build_work_lineage(
-                [request], work_ref={"workId": WORK_ID}, issue_number=ISSUE_NUMBER
-            )
+        lineage = hosted_cycle_lineage.build_work_lineage(
+            [request], work_ref={"workId": WORK_ID}, issue_number=ISSUE_NUMBER
+        )
+        self.assertEqual([], lineage["candidates"])
+        self.assertEqual([], lineage["pendingRequests"])
+
+    def test_malformed_request_cannot_poison_later_valid_begin(self):
+        malformed = _command(WORK_ID, "bad-before-valid")
+        bad_request = _request_comment(malformed, 1030)
+        bad_request["body"] = hosted.REQUEST_MARKER_V04 + "\n" + json.dumps(malformed)
+        _, valid_request, valid_result = _pair(
+            request_id="valid-after-bad",
+            begin_comment_id=1040,
+            result_comment_id=2040,
+            run_id=3040,
+            source_hex="e",
+        )
+        lineage = hosted_cycle_lineage.build_work_lineage(
+            [bad_request, valid_request, valid_result],
+            work_ref={"workId": WORK_ID},
+            issue_number=ISSUE_NUMBER,
+        )
+        self.assertEqual([], lineage["pendingRequests"])
+        self.assertEqual(
+            [1040],
+            [item["requestCommentId"] for item in lineage["candidates"]],
+        )
 
     def test_duplicate_identical_result_comments_are_transport_duplicates_not_cycles(self):
         _, request, result = _pair()
