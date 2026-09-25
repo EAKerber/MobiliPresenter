@@ -9,7 +9,7 @@ import copy
 import json
 from typing import Any
 
-from tools import agent_cycle, hosted_agent_cycle, hosted_cycle_artifact, hosted_cycle_handle
+from tools import agent_cycle, agent_failure, hosted_agent_cycle, hosted_cycle_artifact, hosted_cycle_handle
 from tools.canonical import stable_hash
 
 LINEAGE_KIND = "work-bound-hosted-cycle-lineage-v0.1"
@@ -108,6 +108,33 @@ def _result_payload(comment: dict[str, Any]) -> dict[str, Any] | None:
     ):
         return None
     return value
+
+
+def _failure_payload(comment: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a validated terminal Hosted Agent Cycle failure envelope."""
+    body = _body(comment)
+    marker = hosted_agent_cycle.RESULT_MARKER + "\n"
+    user = comment.get("user")
+    if (
+        not body.startswith(marker)
+        or not isinstance(user, dict)
+        or user.get("login") != "github-actions[bot]"
+    ):
+        return None
+    try:
+        value = json.loads(body[len(marker):].strip())
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    if value.get("schemaVersion") != agent_failure.HOSTED_CYCLE_FAILURE_SCHEMA:
+        return None
+    try:
+        return agent_failure.validate_hosted_cycle_failure(value)
+    except RuntimeError as exc:
+        raise HostedCycleLineageError(
+            "HOSTED_CYCLE_LINEAGE_FAILURE_INVALID"
+        ) from exc
 
 
 def _validate_begin_result(
@@ -336,8 +363,35 @@ def build_work_lineage(
         else:
             raise HostedCycleLineageError("HOSTED_CYCLE_LINEAGE_BEGIN_RESULT_AMBIGUOUS")
 
+    terminal_failures: set[int] = set()
+    for comment in ordered:
+        failure = _failure_payload(comment)
+        if failure is None:
+            continue
+        request_id = failure.get("requestId")
+        command_hash = failure.get("commandHash")
+        if request_id is None or command_hash is None:
+            continue
+        claim = (request_id, command_hash)
+        if claim not in target_claims:
+            continue
+        exact = [
+            key
+            for key, item in requests.items()
+            if (item["requestId"], item["commandHash"]) == claim
+        ]
+        if len(exact) != 1:
+            raise HostedCycleLineageError(
+                "HOSTED_CYCLE_LINEAGE_FAILURE_BINDING_AMBIGUOUS"
+            )
+        terminal_failures.add(exact[0])
+
     candidates = [matched[key] for key in sorted(matched)]
-    pending = [copy.deepcopy(requests[key]) for key in sorted(requests) if key not in matched]
+    pending = [
+        copy.deepcopy(requests[key])
+        for key in sorted(requests)
+        if key not in matched and key not in terminal_failures
+    ]
     core = {
         "kind": LINEAGE_KIND,
         "workRef": copy.deepcopy(work_ref),

@@ -118,6 +118,20 @@ def _result_comment(result: dict, comment_id: int) -> dict:
     }
 
 
+def _failure_comment(command: dict, comment_id: int) -> dict:
+    failure = hosted.failure_payload(
+        hosted.HostedAgentCycleError("HOSTED_AGENT_BEGIN_NOT_READY"),
+        command,
+        phase="BEGIN",
+    )
+    return {
+        "id": comment_id,
+        "author_association": "CONTRIBUTOR",
+        "user": {"login": "github-actions[bot]"},
+        "body": hosted.RESULT_MARKER + "\n" + json.dumps(failure),
+    }
+
+
 def _pair(
     *,
     work_id: str = WORK_ID,
@@ -166,6 +180,35 @@ class HostedCycleLineageR0Tests(unittest.TestCase):
         self.assertFalse(lineage["ambiguous"])
         self.assertEqual(1010, lineage["pendingRequests"][0]["commentId"])
         self.assertEqual(hosted.transport_command_hash(command), lineage["pendingRequests"][0]["commandHash"])
+
+    def test_terminal_begin_failure_is_not_pending_or_candidate(self):
+        command = _command(WORK_ID, "lineage-failed-begin")
+        request = _request_comment(command, 1011)
+        failure = _failure_comment(command, 2011)
+        lineage = hosted_cycle_lineage.build_work_lineage(
+            [request, failure],
+            work_ref={"workId": WORK_ID},
+            issue_number=ISSUE_NUMBER,
+        )
+        self.assertEqual([], lineage["candidates"])
+        self.assertEqual([], lineage["pendingRequests"])
+        self.assertFalse(lineage["ambiguous"])
+
+    def test_unrelated_failure_does_not_terminalize_pending_request(self):
+        command = _command(WORK_ID, "lineage-still-pending")
+        request = _request_comment(command, 1012)
+        other_command = _command(WORK_ID, "lineage-other-failure")
+        failure = _failure_comment(other_command, 2012)
+        lineage = hosted_cycle_lineage.build_work_lineage(
+            [request, failure],
+            work_ref={"workId": WORK_ID},
+            issue_number=ISSUE_NUMBER,
+        )
+        self.assertEqual([], lineage["candidates"])
+        self.assertEqual(
+            [1012],
+            [item["commentId"] for item in lineage["pendingRequests"]],
+        )
 
     def test_multiple_materialized_begins_remain_explicit_ambiguity(self):
         _, request_a, result_a = _pair()
