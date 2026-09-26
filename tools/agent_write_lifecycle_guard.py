@@ -170,6 +170,16 @@ def _matching_exact_leases(
     ]
 
 
+def _resource_leases(
+    leases: list[dict[str, Any]], *, binding: dict[str, Any]
+) -> list[dict[str, Any]]:
+    resource = f"branch:{binding['branch']}"
+    return [
+        lease for lease in leases
+        if lease.get("resource") == resource
+    ]
+
+
 def _unbound_target_leases(
     active: list[dict[str, Any]],
     *,
@@ -577,8 +587,6 @@ def prove_active_binding(
         value = _payload(comment.get("body"), lifecycle.RESULT_MARKER)
         if not isinstance(value, dict) or value.get("schemaVersion") != lifecycle.RESULT_SCHEMA:
             continue
-        # Establish exact cycle claim before validating the full payload so a
-        # malformed result from another cycle cannot poison this admission.
         if (
             value.get("cycleInstanceId") != cycle_instance_id
             or value.get("begin") != plan["begin"]
@@ -675,6 +683,7 @@ def validate_active_binding_proof(value: Any) -> dict[str, Any]:
             "AGENT_WRITE_LIFECYCLE_PROOF_HASH_MISMATCH"
         )
     return value
+
 
 def inspect_cycle(
     comments: list[dict[str, Any]],
@@ -774,6 +783,12 @@ def inspect_cycle(
         latest_result_comment_id, latest_result = results[-1]
         latest_binding = latest_result["binding"]
         matching = _matching_exact_leases(active, binding=latest_binding)
+        raw_exact = _matching_exact_leases(
+            observation.state["leases"], binding=latest_binding
+        )
+        raw_resource = _resource_leases(
+            observation.state["leases"], binding=latest_binding
+        )
         if latest_binding["state"] == "RELEASED":
             if matching:
                 state = "UNKNOWN"
@@ -792,8 +807,13 @@ def inspect_cycle(
             if matching:
                 state = "UNKNOWN"
                 blockers.append("AGENT_WRITE_LIFECYCLE_EXPIRED_BUT_LEASE_ACTIVE")
-            else:
+            elif len(raw_exact) == 1:
                 state = "EXPIRED"
+            elif raw_resource:
+                state = "UNKNOWN"
+                blockers.append("AGENT_WRITE_LIFECYCLE_BINDING_AUTHORITY_MISMATCH")
+            else:
+                state = "RELEASED"
         elif len(matching) == 1:
             state = "ACTIVE"
             blockers.append("AGENT_WRITE_LIFECYCLE_ACTIVE_AT_CLOSE")
