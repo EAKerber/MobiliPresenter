@@ -3,7 +3,7 @@
   "id": "e5g-sealed-close-external-delta-recovery",
   "workerId": "manager-gitops-chat",
   "status": "READY",
-  "branch": null,
+  "branch": "work/operations/e5g-sealed-close-external-delta-recovery",
   "prNumber": null,
   "dependsOn": [],
   "completed": [],
