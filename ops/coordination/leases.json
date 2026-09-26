@@ -1,23 +1,6 @@
 {
   "intents": [],
-  "leases": [
-    {
-      "leaseId": "e5g-recovery-lease-acquire-20260926:0",
-      "resource": "branch:work/operations/e5g-sealed-close-external-delta-recovery",
-      "mode": "exclusive-write",
-      "owner": {
-        "role": "manager-gitops",
-        "session": "chat-20260926-e5g-recovery",
-        "branch": "work/operations/e5g-sealed-close-external-delta-recovery",
-        "pr": null
-      },
-      "reason": "Implement fail-closed recovery for sealed close with proven external durable delta.",
-      "acquiredAt": "2026-09-26T15:54:44Z",
-      "renewedAt": "2026-09-26T15:54:44Z",
-      "expiresAt": "2026-09-26T16:54:44Z",
-      "ttlSeconds": 3600
-    }
-  ],
-  "revision": "470b394b34d02bc8a75a139920e30200a0fb0b02",
+  "leases": [],
+  "revision": "bca99ef4758c201d277bfefb87cfa8ecd7856808",
   "schemaVersion": "CoordinationState 0.1"
 }
