@@ -1,8 +1,7 @@
 """Provider observations for sealed-close external-delta recovery.
 
-The functions here are transport adapters only. They create no semantic
-authority and return observations that are revalidated by the canonical close
-policy in ``hosted_cycle_external_delta_recovery``.
+These adapters create no semantic authority. Their observations are revalidated
+by the canonical close policy before any recovery certificate can be emitted.
 """
 from __future__ import annotations
 
@@ -17,7 +16,7 @@ from urllib.parse import quote
 from tools import hosted_agent_cycle, hosted_cycle_records
 
 REPOSITORY = hosted_agent_cycle.REPOSITORY
-WORKFLOW_PATH = ".github/workflows/hosted-agent-cycle.yml"
+WORKFLOW_ID = "hosted-agent-cycle.yml"
 WORKFLOW_NAME = "Hosted Agent Cycle"
 
 
@@ -44,10 +43,7 @@ def _get(transport: Any, endpoint: str, code: str) -> Any:
 
 
 def continuation_readback(
-    *,
-    before_sha: str,
-    work_id: str,
-    transport: Any,
+    *, before_sha: str, work_id: str, transport: Any
 ) -> tuple[str, list[str]]:
     ref = _get(
         transport,
@@ -65,24 +61,18 @@ def continuation_readback(
         f"repos/{REPOSITORY}/compare/{before_sha}...{after_sha}",
         "HOSTED_CYCLE_EXTERNAL_DELTA_CONTINUATION_UNAVAILABLE",
     )
-    if not isinstance(comparison, dict) or comparison.get("status") != "ahead":
+    files = comparison.get("files") if isinstance(comparison, dict) else None
+    if comparison.get("status") != "ahead" or not isinstance(files, list):
         raise HostedCycleExternalDeltaProviderError(
             "HOSTED_CYCLE_EXTERNAL_DELTA_CONTINUATION_UNAVAILABLE"
         )
-    files = comparison.get("files")
-    if not isinstance(files, list):
-        raise HostedCycleExternalDeltaProviderError(
-            "HOSTED_CYCLE_EXTERNAL_DELTA_CONTINUATION_UNAVAILABLE"
-        )
-    paths = sorted({
+    raw_paths = [
         item.get("filename")
         for item in files
         if isinstance(item, dict) and isinstance(item.get("filename"), str)
-    })
-    if len(paths) != len([
-        item for item in files
-        if isinstance(item, dict) and isinstance(item.get("filename"), str)
-    ]):
+    ]
+    paths = sorted(set(raw_paths))
+    if len(paths) != len(raw_paths):
         raise HostedCycleExternalDeltaProviderError(
             "HOSTED_CYCLE_EXTERNAL_DELTA_CONTINUATION_UNAVAILABLE"
         )
@@ -187,19 +177,18 @@ def _created_at(comment: dict[str, Any]) -> datetime:
             "HOSTED_CYCLE_EXTERNAL_DELTA_CLOSE_TIME_UNAVAILABLE"
         )
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
+            timezone.utc
+        )
     except ValueError as exc:
         raise HostedCycleExternalDeltaProviderError(
             "HOSTED_CYCLE_EXTERNAL_DELTA_CLOSE_TIME_UNAVAILABLE"
         ) from exc
-    return parsed.astimezone(timezone.utc)
 
 
 def close_run_candidates(
     comments: list[dict[str, Any]],
-    *,
-    close_comment_id: int,
-    transport: Any,
+    *, close_comment_id: int, transport: Any
 ) -> list[dict[str, Any]]:
     matches = [
         item for item in comments
@@ -212,11 +201,11 @@ def close_run_candidates(
     when = _created_at(matches[0])
     start = (when - timedelta(seconds=2)).isoformat().replace("+00:00", "Z")
     end = (when + timedelta(seconds=20)).isoformat().replace("+00:00", "Z")
-    created = quote(f"{start}..{end}", safe=".:T-Z")
+    created = quote(f"{start}..{end}", safe=".:TZ-")
     payload = _get(
         transport,
         (
-            f"repos/{REPOSITORY}/actions/workflows/{quote(WORKFLOW_PATH, safe='')}/runs"
+            f"repos/{REPOSITORY}/actions/workflows/{WORKFLOW_ID}/runs"
             f"?event=issue_comment&created={created}&per_page=100"
         ),
         "HOSTED_CYCLE_EXTERNAL_DELTA_RUNS_UNAVAILABLE",
@@ -241,7 +230,11 @@ def close_run_candidates(
             f"repos/{REPOSITORY}/actions/runs/{run_id}/artifacts",
             "HOSTED_CYCLE_EXTERNAL_DELTA_ARTIFACT_UNAVAILABLE",
         )
-        artifacts = artifacts_payload.get("artifacts") if isinstance(artifacts_payload, dict) else None
+        artifacts = (
+            artifacts_payload.get("artifacts")
+            if isinstance(artifacts_payload, dict)
+            else None
+        )
         if not isinstance(artifacts, list):
             continue
         exact = [
@@ -264,9 +257,7 @@ def close_run_candidates(
 
 
 def download_close_artifact(
-    candidate: dict[str, Any],
-    *,
-    destination: str | Path,
+    candidate: dict[str, Any], *, destination: str | Path
 ) -> Path:
     run_id = candidate.get("runId")
     name = candidate.get("artifactName")
@@ -279,7 +270,10 @@ def download_close_artifact(
         shutil.rmtree(root)
     root.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
-        ["gh", "run", "download", str(run_id), "-R", REPOSITORY, "-n", name, "-D", str(root)],
+        [
+            "gh", "run", "download", str(run_id), "-R", REPOSITORY,
+            "-n", name, "-D", str(root),
+        ],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
