@@ -35,11 +35,11 @@ def work():
     }
 
 
-def context(work_value=None):
+def context(work_value=None, *, cycle_id=CYCLE_ID, work_ref=None):
     item = copy.deepcopy(work_value or work())
     return {
-        "cycleId": CYCLE_ID,
-        "workRef": {"workId": WORK_ID},
+        "cycleId": cycle_id,
+        "workRef": copy.deepcopy(work_ref or {"workId": WORK_ID}),
         "projectMachine": {
             "sensors": {
                 "continuations": {
@@ -173,6 +173,33 @@ class AgentCycleNonInterferenceVerifierTests(unittest.TestCase):
         value["evidenceHash"] = stable_hash(body)
         with self.assertRaisesRegex(RuntimeError, "EVIDENCE_INVALID"):
             agent_cycle_close.verify_evidence(value)
+
+    def test_context_binding_allows_rebuilt_after_cycle_id(self):
+        value = evidence()
+        agent_cycle_close._validate_noninterference_binding(
+            value,
+            context(),
+            context(cycle_id="cycle-" + "b" * 20),
+        )
+
+    def test_context_binding_rejects_evidence_cycle_mismatch(self):
+        value = evidence()
+        value["cycleId"] = "cycle-" + "c" * 20
+        with self.assertRaisesRegex(RuntimeError, "BINDING_MISMATCH"):
+            agent_cycle_close._validate_noninterference_binding(
+                value,
+                context(),
+                context(cycle_id="cycle-" + "b" * 20),
+            )
+
+    def test_context_binding_rejects_work_ref_change(self):
+        value = evidence()
+        with self.assertRaisesRegex(RuntimeError, "BINDING_MISMATCH"):
+            agent_cycle_close._validate_noninterference_binding(
+                value,
+                context(),
+                context(work_ref={"workId": "other-work"}),
+            )
 
     def test_context_binding_rejects_changed_work(self):
         value = evidence()

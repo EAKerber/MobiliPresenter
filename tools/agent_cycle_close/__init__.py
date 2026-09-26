@@ -356,7 +356,6 @@ def _validate_noninterference_binding(
         or before_ref.get("workId") != work_id
         or after_ref != before_ref
         or evidence.get("cycleId") != before.get("cycleId")
-        or after.get("cycleId") != before.get("cycleId")
     ):
         raise RuntimeError("AGENT_CYCLE_NONINTERFERENCE_BINDING_MISMATCH")
     before_work = _context_work_item(before, work_id)
