@@ -6,6 +6,7 @@ import argparse
 import copy
 import json
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,8 @@ from tools import (
     agent_failure,
     agent_write_lifecycle_guard,
     hosted_agent_cycle,
+    hosted_cycle_external_delta_provider,
+    hosted_cycle_external_delta_recovery,
     hosted_cycle_handle,
     hosted_cycle_records,
     hosted_issue_bus,
@@ -30,6 +33,7 @@ REQUEST_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RECOVERY_REQUEST_V0_1"
 RESULT_MARKER = "MOBILIPRESENTER_AGENT_CYCLE_RECOVERY_V0_1"
 REQUEST_SCHEMA = "HostedAgentCycleRecoveryRequest 0.1"
 RESULT_SCHEMA = "HostedAgentCycleRecovery 0.1"
+RESULT_SCHEMA_V02 = "HostedAgentCycleRecovery 0.2"
 REQUEST_FIELDS = {
     "schemaVersion", "requestId", "handle", "closeRequestCommentId",
     "semanticAuthority", "authorizesMutation",
@@ -41,11 +45,22 @@ RESULT_FIELDS = {
     "writeLifecycleReportHash", "authorityHead", "state", "reasonCodes",
     "readOnly", "semanticAuthority", "authorizesMutation", "recoveryHash",
 }
+RESULT_V02_EXTRA_FIELDS = {
+    "failedCloseRunId", "failedCloseClosureHash", "failedCloseReceiptHash",
+    "nonInterferenceEvidenceHash", "reconciledClosureHash",
+    "reconciledReceiptHash",
+}
+RESULT_V02_FIELDS = RESULT_FIELDS | RESULT_V02_EXTRA_FIELDS
 RECOVERABLE_CAUSES = {
     "AGENT_WRITE_LIFECYCLE_UNKNOWN_FAILURE_AT_CLOSE",
     "AGENT_WRITE_LIFECYCLE_UNKNOWN_AT_CLOSE",
 }
+EXTERNAL_RECOVERABLE_CAUSES = {
+    "UNATTRIBUTED_DURABLE_DELTA",
+    "HOSTED_AGENT_CLOSE_NOT_PASS",
+}
 RECOVERY_REASON = "WRITE_AUTHORITY_CANONICALLY_NEUTRALIZED"
+EXTERNAL_RECOVERY_REASON = "EXTERNAL_DURABLE_DELTA_RECONCILED"
 
 
 class HostedCycleFailureRecoveryError(RuntimeError):
@@ -139,15 +154,9 @@ def validate_request(value: Any) -> dict[str, Any]:
     return value
 
 
-def validate_certificate(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != RESULT_FIELDS:
-        raise HostedCycleFailureRecoveryError(
-            "HOSTED_CYCLE_RECOVERY_RESULT_INVALID"
-        )
+def _validate_certificate_common(value: dict[str, Any]) -> None:
     if (
-        value.get("schemaVersion") != RESULT_SCHEMA
-        or value.get("state") != "RECOVERED"
-        or value.get("reasonCodes") != [RECOVERY_REASON]
+        value.get("state") != "RECOVERED"
         or value.get("readOnly") is not True
         or value.get("semanticAuthority") is not False
         or value.get("authorizesMutation") is not False
@@ -183,6 +192,42 @@ def validate_certificate(value: Any) -> dict[str, Any]:
         raise HostedCycleFailureRecoveryError(
             "HOSTED_CYCLE_RECOVERY_ORDER_INVALID"
         )
+
+
+def validate_certificate(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise HostedCycleFailureRecoveryError(
+            "HOSTED_CYCLE_RECOVERY_RESULT_INVALID"
+        )
+    schema = value.get("schemaVersion")
+    if schema == RESULT_SCHEMA:
+        if set(value) != RESULT_FIELDS or value.get("reasonCodes") != [RECOVERY_REASON]:
+            raise HostedCycleFailureRecoveryError(
+                "HOSTED_CYCLE_RECOVERY_RESULT_INVALID"
+            )
+    elif schema == RESULT_SCHEMA_V02:
+        if (
+            set(value) != RESULT_V02_FIELDS
+            or value.get("reasonCodes") != [EXTERNAL_RECOVERY_REASON]
+        ):
+            raise HostedCycleFailureRecoveryError(
+                "HOSTED_CYCLE_RECOVERY_RESULT_INVALID"
+            )
+        _positive(
+            value.get("failedCloseRunId"),
+            "HOSTED_CYCLE_RECOVERY_RESULT_INVALID",
+        )
+        for field in (
+            "failedCloseClosureHash", "failedCloseReceiptHash",
+            "nonInterferenceEvidenceHash", "reconciledClosureHash",
+            "reconciledReceiptHash",
+        ):
+            _hash(value.get(field), "HOSTED_CYCLE_RECOVERY_RESULT_INVALID")
+    else:
+        raise HostedCycleFailureRecoveryError(
+            "HOSTED_CYCLE_RECOVERY_RESULT_INVALID"
+        )
+    _validate_certificate_common(value)
     core = {
         key: copy.deepcopy(item)
         for key, item in value.items()
@@ -254,8 +299,8 @@ def _exact_failed_close(
     close_comment_id: int,
     close_command: dict[str, Any],
     close_command_hash: str,
-) -> tuple[int, dict[str, Any]]:
-    found: list[tuple[int, dict[str, Any]]] = []
+) -> tuple[int, dict[str, Any], set[str]]:
+    found: list[tuple[int, dict[str, Any], set[str]]] = []
     for comment in comments:
         cid = hosted_cycle_records.comment_id(comment)
         if (
@@ -287,16 +332,145 @@ def _exact_failed_close(
             for item in failure["failureCore"]["causes"]
             if isinstance(item, dict) and isinstance(item.get("code"), str)
         }
-        if not RECOVERABLE_CAUSES.issubset(causes):
+        if not (
+            RECOVERABLE_CAUSES.issubset(causes)
+            or EXTERNAL_RECOVERABLE_CAUSES.issubset(causes)
+        ):
             raise HostedCycleFailureRecoveryError(
                 "HOSTED_CYCLE_RECOVERY_FAILURE_NOT_SUPPORTED"
             )
-        found.append((cid, failure))
+        found.append((cid, failure, causes))
     if len(found) != 1:
         raise HostedCycleFailureRecoveryError(
             "HOSTED_CYCLE_RECOVERY_FAILURE_AMBIGUOUS"
         )
     return found[0]
+
+
+def _context_work(context: dict[str, Any]) -> dict[str, Any]:
+    work_ref = context.get("workRef")
+    work_id = work_ref.get("workId") if isinstance(work_ref, dict) else None
+    sensors = context.get("projectMachine", {}).get("sensors", {})
+    continuation = sensors.get("continuations", {}) if isinstance(sensors, dict) else {}
+    items = continuation.get("data", {}).get("items", []) if isinstance(continuation, dict) else []
+    matches = [
+        item for item in items
+        if isinstance(item, dict) and item.get("id") == work_id
+    ]
+    if not isinstance(work_id, str) or len(matches) != 1:
+        raise HostedCycleFailureRecoveryError(
+            "HOSTED_CYCLE_RECOVERY_WORK_UNAVAILABLE"
+        )
+    return copy.deepcopy(matches[0])
+
+
+def _external_control_interval(closure: dict[str, Any]) -> tuple[str, str]:
+    try:
+        delta = closure["receipt"]["delta"]["durableChanges"]
+        uncovered = closure["receipt"]["aggregateReadback"]["uncoveredDurableChanges"]
+    except (KeyError, TypeError) as exc:
+        raise HostedCycleFailureRecoveryError(
+            "HOSTED_CYCLE_RECOVERY_ARTIFACT_INVALID"
+        ) from exc
+    for index, change in enumerate(delta):
+        if not isinstance(change, dict):
+            continue
+        change_id = f"{change.get('kind')}:{change.get('name') or 'project-state'}:{index}"
+        if (
+            change_id in uncovered
+            and change.get("kind") == "source-head"
+            and change.get("name") == "control"
+            and change.get("branch") == "main"
+        ):
+            before = change.get("before")
+            after = change.get("after")
+            if isinstance(before, str) and isinstance(after, str):
+                return before, after
+    raise HostedCycleFailureRecoveryError(
+        "HOSTED_CYCLE_RECOVERY_EXTERNAL_DELTA_UNAVAILABLE"
+    )
+
+
+def _external_reconciliation(
+    *,
+    context: dict[str, Any],
+    comments: list[dict[str, Any]],
+    close_comment_id: int,
+    failure: dict[str, Any],
+    transport: Any,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    candidates = hosted_cycle_external_delta_provider.close_run_candidates(
+        comments,
+        close_comment_id=close_comment_id,
+        transport=transport,
+    )
+    qualified: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for candidate in candidates:
+        try:
+            with tempfile.TemporaryDirectory(prefix="mobilipresenter-close-recovery-") as tmp:
+                root = hosted_cycle_external_delta_provider.download_close_artifact(
+                    candidate,
+                    destination=tmp,
+                )
+                artifact_result = _load(root / "result.json")
+                try:
+                    artifact_failure = agent_failure.validate_hosted_cycle_failure(
+                        artifact_result
+                    )
+                except RuntimeError:
+                    continue
+                if artifact_failure != failure:
+                    continue
+                closure = _load(root / "closure.json")
+                work = _context_work(context)
+                work_ref = context.get("workRef") or {}
+                work_id = work_ref.get("workId")
+                continuation_before = (
+                    context.get("baseline", {})
+                    .get("sourceHeads", {})
+                    .get("continuation", {})
+                    .get("sha")
+                )
+                if not isinstance(work_id, str) or not isinstance(continuation_before, str):
+                    continue
+                continuation_after, changed_paths = (
+                    hosted_cycle_external_delta_provider.continuation_readback(
+                        before_sha=continuation_before,
+                        work_id=work_id,
+                        transport=transport,
+                    )
+                )
+                control_before, control_after = _external_control_interval(closure)
+                pulls = hosted_cycle_external_delta_provider.merged_pull_request_chain(
+                    before_sha=control_before,
+                    after_sha=control_after,
+                    work_branch=work.get("branch"),
+                    work_pr_number=work.get("prNumber"),
+                    transport=transport,
+                )
+                reconciled = (
+                    hosted_cycle_external_delta_recovery.reconcile_failed_closure(
+                        before_context=context,
+                        failed_closure=closure,
+                        comments=comments,
+                        close_comment_id=close_comment_id,
+                        continuation_after_sha=continuation_after,
+                        continuation_changed_paths=changed_paths,
+                        merged_pull_requests=pulls,
+                    )
+                )
+                qualified.append((candidate, reconciled))
+        except (
+            HostedCycleFailureRecoveryError,
+            hosted_cycle_external_delta_provider.HostedCycleExternalDeltaProviderError,
+            hosted_cycle_external_delta_recovery.HostedCycleExternalDeltaRecoveryError,
+        ):
+            continue
+    if len(qualified) != 1:
+        raise HostedCycleFailureRecoveryError(
+            "HOSTED_CYCLE_RECOVERY_EXTERNAL_DELTA_AMBIGUOUS"
+        )
+    return qualified[0]
 
 
 def recover(
@@ -328,7 +502,7 @@ def recover(
         request,
         issue_number=locator["issueNumber"],
     )
-    failure_comment_id, failure = _exact_failed_close(
+    failure_comment_id, failure, causes = _exact_failed_close(
         comments,
         close_comment_id=request["closeRequestCommentId"],
         close_command=close_command,
@@ -346,8 +520,7 @@ def recover(
             "HOSTED_CYCLE_RECOVERY_RESIDUAL_AUTHORITY_NOT_CLEAN"
         )
 
-    core = {
-        "schemaVersion": RESULT_SCHEMA,
+    common = {
         "requestId": request["requestId"],
         "cycleInstanceId": manifest["cycleInstanceId"],
         "handleHash": request["handle"]["handleHash"],
@@ -359,11 +532,47 @@ def recover(
         "writeLifecycleReportHash": report["reportHash"],
         "authorityHead": report["authorityHead"],
         "state": "RECOVERED",
-        "reasonCodes": [RECOVERY_REASON],
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
+
+    if RECOVERABLE_CAUSES.issubset(causes):
+        core = {
+            "schemaVersion": RESULT_SCHEMA,
+            **common,
+            "reasonCodes": [RECOVERY_REASON],
+        }
+    else:
+        candidate, reconciliation = _external_reconciliation(
+            context=context,
+            comments=comments,
+            close_comment_id=request["closeRequestCommentId"],
+            failure=failure,
+            transport=transport,
+        )
+        proof = reconciliation["nonInterferenceEvidence"]
+        reconciled = reconciliation["reconciledClosure"]
+        failed_closure_hash = reconciled.get("closureHash")
+        # The reconciled closure is a new read-only derivation; bind the original
+        # historical closure separately from its receipt retained in the proof.
+        with tempfile.TemporaryDirectory(prefix="mobilipresenter-close-bind-") as tmp:
+            root = hosted_cycle_external_delta_provider.download_close_artifact(
+                candidate,
+                destination=tmp,
+            )
+            original_closure = _load(root / "closure.json")
+        core = {
+            "schemaVersion": RESULT_SCHEMA_V02,
+            **common,
+            "reasonCodes": [EXTERNAL_RECOVERY_REASON],
+            "failedCloseRunId": candidate["runId"],
+            "failedCloseClosureHash": original_closure["closureHash"],
+            "failedCloseReceiptHash": original_closure["receipt"]["receiptHash"],
+            "nonInterferenceEvidenceHash": proof["evidenceHash"],
+            "reconciledClosureHash": failed_closure_hash,
+            "reconciledReceiptHash": reconciled["receipt"]["receiptHash"],
+        }
     return validate_certificate(
         {**core, "recoveryHash": stable_hash(core)}
     )
