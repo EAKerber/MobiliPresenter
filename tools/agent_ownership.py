@@ -135,6 +135,39 @@ def _matching_leases(
     ]
 
 
+def _resource_leases(
+    leases: list[dict[str, Any]],
+    *,
+    branch: str,
+) -> list[dict[str, Any]]:
+    resource = f"branch:{branch}"
+    return [
+        copy.deepcopy(lease)
+        for lease in leases
+        if lease.get("resource") == resource
+    ]
+
+
+def _expired_binding_authority_state(
+    leases: list[dict[str, Any]],
+    *,
+    binding: dict[str, Any],
+    actor: dict[str, Any],
+    branch: str,
+) -> str:
+    exact = _matching_leases(
+        leases,
+        lease_id=binding["leaseId"],
+        actor=actor,
+        branch=branch,
+    )
+    if len(exact) == 1:
+        return "EXPIRED"
+    if exact:
+        return "UNKNOWN"
+    return "RELEASED" if not _resource_leases(leases, branch=branch) else "UNKNOWN"
+
+
 def _outer_request(
     *,
     request_id: str,
@@ -268,17 +301,17 @@ def ensure_ownership(
             disposition = "NEW_CYCLE_REQUIRED"
             blockers = ["AGENT_OWNERSHIP_REACQUIRE_REQUIRES_NEW_CYCLE"]
         elif lifecycle.binding_is_expired(binding, observation.authority_now):
-            materialized = _matching_leases(
+            expired_state = _expired_binding_authority_state(
                 observation.state["leases"],
-                lease_id=binding["leaseId"],
+                binding=binding,
                 actor=actor,
                 branch=branch,
             )
-            if len(materialized) != 1:
-                status = "UNKNOWN"
-                disposition = "UNKNOWN"
-                blockers = ["AGENT_OWNERSHIP_BINDING_AUTHORITY_MISMATCH"]
-            else:
+            if expired_state == "RELEASED":
+                status = "BLOCKED"
+                disposition = "NEW_CYCLE_REQUIRED"
+                blockers = ["AGENT_OWNERSHIP_REACQUIRE_REQUIRES_NEW_CYCLE"]
+            elif expired_state == "EXPIRED":
                 request = _outer_request(
                     request_id=request_id,
                     handle=handle,
@@ -290,6 +323,10 @@ def ensure_ownership(
                 )
                 status = "PENDING"
                 disposition = "RELEASE_REQUESTED"
+            else:
+                status = "UNKNOWN"
+                disposition = "UNKNOWN"
+                blockers = ["AGENT_OWNERSHIP_BINDING_AUTHORITY_MISMATCH"]
         else:
             active = coordination.active_leases(
                 observation.state, observation.authority_now
@@ -381,13 +418,12 @@ def _lifecycle_snapshot(
         if binding["state"] == "RELEASED":
             state = "RELEASED"
         elif lifecycle.binding_is_expired(binding, observation.authority_now):
-            materialized = _matching_leases(
+            state = _expired_binding_authority_state(
                 observation.state["leases"],
-                lease_id=binding["leaseId"],
+                binding=binding,
                 actor=actor,
                 branch=branch,
             )
-            state = "EXPIRED" if len(materialized) == 1 else "UNKNOWN"
         else:
             active = coordination.active_leases(
                 observation.state, observation.authority_now
