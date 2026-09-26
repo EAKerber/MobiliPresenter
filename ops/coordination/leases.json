@@ -2,22 +2,22 @@
   "intents": [],
   "leases": [
     {
-      "leaseId": "agent-write-d6be87fa5927b5b919c183c8:0",
-      "resource": "branch:work/operations/e5-governed-mutation-request-client",
+      "leaseId": "e5g-recovery-lease-acquire-20260926:0",
+      "resource": "branch:work/operations/e5g-sealed-close-external-delta-recovery",
       "mode": "exclusive-write",
       "owner": {
         "role": "manager-gitops",
-        "session": "e5-governed-mutation-request-client-20260926-r3",
-        "branch": "work/operations/e5-governed-mutation-request-client",
+        "session": "chat-20260926-e5g-recovery",
+        "branch": "work/operations/e5g-sealed-close-external-delta-recovery",
         "pr": null
       },
-      "reason": "Agent write lifecycle cycle-instance-3c678b8a096ec6867345ee5d",
-      "acquiredAt": "2026-09-26T14:44:02Z",
-      "renewedAt": "2026-09-26T14:44:02Z",
-      "expiresAt": "2026-09-26T15:44:02Z",
+      "reason": "Implement fail-closed recovery for sealed close with proven external durable delta.",
+      "acquiredAt": "2026-09-26T15:54:44Z",
+      "renewedAt": "2026-09-26T15:54:44Z",
+      "expiresAt": "2026-09-26T16:54:44Z",
       "ttlSeconds": 3600
     }
   ],
-  "revision": "cd06fa307c3129dde5f7489d9a0249eedb75ee0d",
+  "revision": "470b394b34d02bc8a75a139920e30200a0fb0b02",
   "schemaVersion": "CoordinationState 0.1"
 }
