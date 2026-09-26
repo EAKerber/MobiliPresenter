@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "bca99ef4758c201d277bfefb87cfa8ecd7856808",
+  "leases": [
+    {
+      "leaseId": "agent-write-23a2d3f62b677f8d0769a9e0:0",
+      "resource": "branch:work/operations/e5g-sealed-close-external-delta-recovery",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "chat-20260926-e5g-recovery",
+        "branch": "work/operations/e5g-sealed-close-external-delta-recovery",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-2d866c322f9ffbcda87b2828",
+      "acquiredAt": "2026-09-26T16:05:06Z",
+      "renewedAt": "2026-09-26T16:05:06Z",
+      "expiresAt": "2026-09-26T17:05:06Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "7711298f466b73c835f0a074452ea17006aed71d",
   "schemaVersion": "CoordinationState 0.1"
 }
