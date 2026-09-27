@@ -75,21 +75,30 @@ def _work_state_compatible(before: dict[str, Any], after: dict[str, Any]) -> boo
 
     The begin Work remains the semantic anchor for branch/PR-chain validation.
     A merged PR may be canonically unbound before close, so the after snapshot
-    can differ only by ``prNumber: <positive int> -> None``.  Any other Work
+    may differ only by ``prNumber: <positive int> -> None`` and the derived
+    ``stateHash`` that necessarily follows that binding change.  Any other Work
     mutation still fails closed.
     """
     if before == after:
         return True
     before_pr = before.get("prNumber")
+    before_state = before.get("stateHash")
+    after_state = after.get("stateHash")
     if (
         not isinstance(before_pr, int)
         or isinstance(before_pr, bool)
         or before_pr <= 0
         or after.get("prNumber") is not None
+        or not isinstance(before_state, str)
+        or len(before_state) != 64
+        or not isinstance(after_state, str)
+        or len(after_state) != 64
+        or before_state == after_state
     ):
         return False
     normalized = copy.deepcopy(before)
     normalized["prNumber"] = None
+    normalized["stateHash"] = after_state
     return normalized == after
 
 
