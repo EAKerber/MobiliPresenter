@@ -8,15 +8,14 @@
   "dependsOn": [],
   "completed": [
     "add-request-builder-cli",
-    "add-client-regressions"
-  ],
-  "remaining": [
+    "add-client-regressions",
     "qualify-e4-positive-pass-and-integrate-e5"
   ],
-  "nextAction": "Reconcile the historical E4 positive-PASS qualification gate against the current R8 Journey/Agent Tool paved path. Do not create a legacy E4 mutation solely to satisfy archaeology; require explicit equivalence evidence or semantic disposition before terminalizing this Work.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
     "sha": "7a171a938ffb31993246db0afcabd5c61674233e",
-    "checkpoint": "pr:347;agent-tool-semantic-pass:b7ce2ed9a8e61e3f07ed7a02a84ee78ac59a084645f8a158c3eb797c17ac8cdc"
+    "checkpoint": "semantic-disposition:r8-agent-tool-governed-mutation-pass:b7ce2ed9a8e61e3f07ed7a02a84ee78ac59a084645f8a158c3eb797c17ac8cdc"
   },
   "blockers": [],
   "handoffToWorkerId": null
