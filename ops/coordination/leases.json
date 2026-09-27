@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "4527f5b9a2c850ae33ddf82a09121c76e290179b",
+  "leases": [
+    {
+      "leaseId": "agent-write-895b8145751ff31c04bdde8a:0",
+      "resource": "branch:work/operations/e5i-own-work-multi-pr-chain-recovery",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "e5i-live-recovery-pr-binding-fix-20260927",
+        "branch": "work/operations/e5i-own-work-multi-pr-chain-recovery",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-d3d22b76356c79c2cd09da36",
+      "acquiredAt": "2026-09-27T19:12:48Z",
+      "renewedAt": "2026-09-27T19:12:48Z",
+      "expiresAt": "2026-09-27T19:42:48Z",
+      "ttlSeconds": 1800
+    }
+  ],
+  "revision": "29620efeff86ae670da947ae94a100d401f437d5",
   "schemaVersion": "CoordinationState 0.1"
 }
