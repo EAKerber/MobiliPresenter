@@ -6,17 +6,17 @@
   "branch": "work/operations/e5h-own-work-integrated-delta-recovery-r2",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "add-own-work-integrated-delta-proof",
     "wire-recovery-terminalization",
     "add-fail-closed-regressions",
     "qualify-live-e5g-cycle"
   ],
-  "nextAction": "Implement a read-only own-Work integrated-delta recovery proof for a close whose main movement is exactly the Work branch PR chain merged while the cycle held valid write authority; preserve external non-interference policy unchanged.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "0dbacaaee051b0e5eb9b85f95172f17a303fcbea",
+    "checkpoint": "hosted-cycle-recovery:15faff292e2fada36503fddef1fd10a6c90f3f9b79975663dc6d9c0cbc1d0e67;e5i-agent-cycle-pass:b7ce2ed9a8e61e3f07ed7a02a84ee78ac59a084645f8a158c3eb797c17ac8cdc"
   },
   "blockers": [],
   "handoffToWorkerId": null
