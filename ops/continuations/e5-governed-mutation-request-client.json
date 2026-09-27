@@ -6,16 +6,17 @@
   "branch": "work/operations/e5-governed-mutation-request-client",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "add-request-builder-cli",
-    "add-client-regressions",
+    "add-client-regressions"
+  ],
+  "remaining": [
     "qualify-e4-positive-pass-and-integrate-e5"
   ],
-  "nextAction": "Create a thin governed mutation request client that canonicalizes the four semantic caller inputs into the existing E4 service request/comment format, adds no authority/state/writer, and use the E4 counter itself for the code mutation; then qualify exact-head CI and record the first live E4 PASS.",
+  "nextAction": "Reconcile the historical E4 positive-PASS qualification gate against the current R8 Journey/Agent Tool paved path. Do not create a legacy E4 mutation solely to satisfy archaeology; require explicit equivalence evidence or semantic disposition before terminalizing this Work.",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "7a171a938ffb31993246db0afcabd5c61674233e",
+    "checkpoint": "pr:347;agent-tool-semantic-pass:b7ce2ed9a8e61e3f07ed7a02a84ee78ac59a084645f8a158c3eb797c17ac8cdc"
   },
   "blockers": [],
   "handoffToWorkerId": null
