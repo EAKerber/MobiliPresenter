@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "e5h-own-work-integrated-delta-recovery",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/e5h-own-work-integrated-delta-recovery",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "add-own-work-integrated-delta-proof",
+    "wire-recovery-terminalization",
+    "add-fail-closed-regressions",
+    "qualify-live-e5g-cycle"
+  ],
+  "nextAction": "Implement a read-only own-Work integrated-delta recovery proof for a close whose main movement is exactly the Work branch PR chain merged while the cycle held valid write authority; preserve external non-interference policy unchanged.",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
