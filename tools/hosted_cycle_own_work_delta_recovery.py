@@ -70,6 +70,29 @@ def _work_item(context: Any, work_id: str) -> dict[str, Any]:
     return copy.deepcopy(matches[0])
 
 
+def _work_state_compatible(before: dict[str, Any], after: dict[str, Any]) -> bool:
+    """Allow only the terminal PR unbind that normal Work cleanup performs.
+
+    The begin Work remains the semantic anchor for branch/PR-chain validation.
+    A merged PR may be canonically unbound before close, so the after snapshot
+    can differ only by ``prNumber: <positive int> -> None``.  Any other Work
+    mutation still fails closed.
+    """
+    if before == after:
+        return True
+    before_pr = before.get("prNumber")
+    if (
+        not isinstance(before_pr, int)
+        or isinstance(before_pr, bool)
+        or before_pr <= 0
+        or after.get("prNumber") is not None
+    ):
+        return False
+    normalized = copy.deepcopy(before)
+    normalized["prNumber"] = None
+    return normalized == after
+
+
 def _control_change(closure: dict[str, Any]) -> dict[str, Any]:
     try:
         receipt = closure["receipt"]
@@ -400,7 +423,8 @@ def reconcile_failed_closure(
     work_id = work_ref["workId"]
     before_work = _work_item(before_context, work_id)
     after = failed_closure.get("afterContext")
-    if before_work != _work_item(after, work_id):
+    after_work = _work_item(after, work_id)
+    if not _work_state_compatible(before_work, after_work):
         raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_CHANGED")
     work_branch = before_work.get("branch")
     work_pr = before_work.get("prNumber")
