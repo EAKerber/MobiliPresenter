@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5h-own-work-integrated-delta-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "WAITING",
   "branch": "work/operations/e5h-own-work-integrated-delta-recovery-r2",
   "prNumber": 358,
   "dependsOn": [],
@@ -18,6 +18,8 @@
     "sha": null,
     "checkpoint": null
   },
-  "blockers": [],
+  "blockers": [
+    "e5i-own-work-multi-pr-chain-recovery"
+  ],
   "handoffToWorkerId": null
 }
