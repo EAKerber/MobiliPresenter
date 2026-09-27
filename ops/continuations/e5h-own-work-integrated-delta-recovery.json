@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/e5h-own-work-integrated-delta-recovery-r2",
-  "prNumber": null,
+  "prNumber": 357,
   "dependsOn": [],
   "completed": [],
   "remaining": [
