@@ -1,10 +1,11 @@
-"""Read-only recovery proof for own-Work PRs integrated during valid authority.
+"""Read-only proof for own-Work durable deltas integrated under valid authority.
 
-This module does not grant authority, mutate Git, or rewrite a historical close.
-It proves a narrow case where the only uncovered durable delta is `main`, every
-first-parent merge in that interval belongs to the Work branch, and every merge
-occurred while the exact cycle held valid write authority. It then re-evaluates
-the historical close using existing `git-mutation-plan-readback` evidence.
+This module grants no authority and rewrites no historical close.  It supports
+only the narrow case where the sole uncovered durable change is ``main``, every
+first-parent merge in that interval belongs to the exact Work branch/PR, and all
+those merges occurred while the exact hosted cycle held continuous write
+authority.  The historical close is then rebuilt through the existing canonical
+close verifier.
 """
 from __future__ import annotations
 
@@ -48,35 +49,24 @@ def _parse_time(value: Any, code: str) -> datetime:
 def _get(transport: Any, endpoint: str, code: str) -> Any:
     try:
         response = transport.request("GET", endpoint)
-        value = json.loads(response.body)
+        return json.loads(response.body)
     except Exception as exc:
         raise HostedCycleOwnWorkDeltaRecoveryError(code) from exc
-    return value
 
 
 def _work_item(context: Any, work_id: str) -> dict[str, Any]:
     if not isinstance(context, dict):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CONTEXT_INVALID"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTEXT_INVALID")
     machine = context.get("projectMachine")
     sensors = machine.get("sensors") if isinstance(machine, dict) else None
     continuation = sensors.get("continuations") if isinstance(sensors, dict) else None
     data = continuation.get("data") if isinstance(continuation, dict) else None
     items = data.get("items") if isinstance(data, dict) else None
     if not isinstance(items, list):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE"
-        )
-    matches = [
-        item
-        for item in items
-        if isinstance(item, dict) and item.get("id") == work_id
-    ]
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE")
+    matches = [item for item in items if isinstance(item, dict) and item.get("id") == work_id]
     if len(matches) != 1:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE")
     return copy.deepcopy(matches[0])
 
 
@@ -84,28 +74,22 @@ def _control_change(closure: dict[str, Any]) -> dict[str, Any]:
     try:
         receipt = closure["receipt"]
         blockers = receipt["blockers"]
-        delta = receipt["delta"]["durableChanges"]
+        changes = receipt["delta"]["durableChanges"]
         uncovered = receipt["aggregateReadback"]["uncoveredDurableChanges"]
     except (KeyError, TypeError) as exc:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CLOSURE_INVALID"
-        ) from exc
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CLOSURE_INVALID") from exc
     if blockers != [BLOCKER] or len(uncovered) != 1:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_FAILURE_NOT_NARROW"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_FAILURE_NOT_NARROW")
     target = uncovered[0]
     matches: list[dict[str, Any]] = []
-    for index, change in enumerate(delta):
+    for index, change in enumerate(changes):
         if not isinstance(change, dict):
             continue
         change_id = f"{change.get('kind')}:{change.get('name') or 'project-state'}:{index}"
         if change_id == target:
             matches.append(change)
     if len(matches) != 1:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CHANGE_UNAVAILABLE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CHANGE_UNAVAILABLE")
     change = matches[0]
     if (
         change.get("kind") != "source-head"
@@ -115,9 +99,7 @@ def _control_change(closure: dict[str, Any]) -> dict[str, Any]:
         or not isinstance(change.get("after"), str)
         or change["before"] == change["after"]
     ):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CHANGE_UNSUPPORTED"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CHANGE_UNSUPPORTED")
     return copy.deepcopy(change)
 
 
@@ -128,9 +110,7 @@ def _planned_at(result: dict[str, Any]) -> datetime:
         raise HostedCycleOwnWorkDeltaRecoveryError(
             "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE"
         ) from exc
-    return _parse_time(
-        value, "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE"
-    )
+    return _parse_time(value, "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE")
 
 
 def _lifecycle_results(
@@ -151,19 +131,13 @@ def _lifecycle_results(
         payload = hosted_cycle_records.json_after_marker(
             comment.get("body"), agent_write_lifecycle.RESULT_MARKER
         )
-        if (
-            not isinstance(payload, dict)
-            or payload.get("schemaVersion") != agent_write_lifecycle.RESULT_SCHEMA
-        ):
+        if not isinstance(payload, dict) or payload.get("schemaVersion") != agent_write_lifecycle.RESULT_SCHEMA:
             continue
         try:
             result = agent_write_lifecycle.validate_result(payload)
         except RuntimeError:
             continue
-        if (
-            result.get("cycleInstanceId") == cycle_instance_id
-            and result.get("branch") == branch
-        ):
+        if result.get("cycleInstanceId") == cycle_instance_id and result.get("branch") == branch:
             found.append((cid, result))
     return [item for _, item in sorted(found, key=lambda pair: pair[0])]
 
@@ -182,84 +156,59 @@ def lifecycle_window(
         branch=branch,
     )
     if len(results) < 2 or results[0].get("action") != "acquire":
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INCOMPLETE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INCOMPLETE")
     if results[-1].get("action") != "release":
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_NOT_RELEASED"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_NOT_RELEASED")
     if any(item.get("action") not in {"acquire", "renew", "release"} for item in results):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID")
     if any(item.get("action") == "release" for item in results[:-1]):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID")
 
     first = results[0]
-    first_binding = first["binding"]
-    if (
-        first_binding.get("state") != "ACTIVE"
-        or first_binding.get("previousBindingHash") is not None
-    ):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID"
-        )
-    lease_id = first_binding["leaseId"]
+    binding = first["binding"]
+    if binding.get("state") != "ACTIVE" or binding.get("previousBindingHash") is not None:
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID")
+    lease_id = binding["leaseId"]
     active_from = _planned_at(first)
     current_expiry = _parse_time(
-        first_binding.get("expiresAt"),
-        "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE",
+        binding.get("expiresAt"), "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE"
     )
-    previous_hash = first_binding["bindingHash"]
+    previous_hash = binding["bindingHash"]
     result_hashes = [first["resultHash"]]
 
-    for item in results[1:-1]:
-        binding = item["binding"]
+    for result in results[1:-1]:
+        binding = result["binding"]
         if (
-            item.get("action") != "renew"
+            result.get("action") != "renew"
             or binding.get("state") != "ACTIVE"
             or binding.get("leaseId") != lease_id
             or binding.get("previousBindingHash") != previous_hash
         ):
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID"
-            )
-        renewed_at = _planned_at(item)
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID")
+        renewed_at = _planned_at(result)
         if renewed_at >= current_expiry:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_GAP"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_GAP")
         next_expiry = _parse_time(
-            binding.get("expiresAt"),
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE",
+            binding.get("expiresAt"), "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE"
         )
         if next_expiry <= current_expiry:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID")
         current_expiry = next_expiry
         previous_hash = binding["bindingHash"]
-        result_hashes.append(item["resultHash"])
+        result_hashes.append(result["resultHash"])
 
     release = results[-1]
-    release_binding = release["binding"]
+    binding = release["binding"]
     if (
-        release_binding.get("state") != "RELEASED"
-        or release_binding.get("leaseId") != lease_id
-        or release_binding.get("previousBindingHash") != previous_hash
+        binding.get("state") != "RELEASED"
+        or binding.get("leaseId") != lease_id
+        or binding.get("previousBindingHash") != previous_hash
     ):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_INVALID")
     released_at = _planned_at(release)
     active_until = min(current_expiry, released_at)
     if active_from >= active_until:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_WINDOW_INVALID"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_LIFECYCLE_WINDOW_INVALID")
     result_hashes.append(release["resultHash"])
     return {
         "leaseId": lease_id,
@@ -281,68 +230,42 @@ def validate_own_work_chain(
     active_until: str,
 ) -> list[dict[str, Any]]:
     if not isinstance(pulls, list) or not pulls:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID"
-        )
-    start = _parse_time(
-        active_from, "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE"
-    )
-    end = _parse_time(
-        active_until, "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE"
-    )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
+    start = _parse_time(active_from, "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE")
+    end = _parse_time(active_until, "HOSTED_CYCLE_OWN_WORK_LIFECYCLE_TIME_UNAVAILABLE")
     expected_base = before_sha
     seen_prs: set[int] = set()
     seen_commits: set[str] = set()
     normalized: list[dict[str, Any]] = []
     for pull in pulls:
         if not isinstance(pull, dict) or set(pull) != {
-            "commitSha",
-            "prNumber",
-            "headBranch",
-            "headSha",
-            "baseSha",
-            "mergedAt",
+            "commitSha", "prNumber", "headBranch", "headSha", "baseSha", "mergedAt"
         }:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
+        merged_at = _parse_time(
+            pull.get("mergedAt"), "HOSTED_CYCLE_OWN_WORK_MERGE_TIME_UNAVAILABLE"
+        )
         commit = pull.get("commitSha")
         number = pull.get("prNumber")
-        head_branch = pull.get("headBranch")
-        head_sha = pull.get("headSha")
         base = pull.get("baseSha")
-        merged_at = _parse_time(
-            pull.get("mergedAt"),
-            "HOSTED_CYCLE_OWN_WORK_MERGE_TIME_UNAVAILABLE",
-        )
         if (
-            not isinstance(commit, str)
-            or len(commit) != 40
-            or not isinstance(head_sha, str)
-            or len(head_sha) != 40
-            or not isinstance(base, str)
-            or len(base) != 40
-            or head_branch != work_branch
-            or not isinstance(number, int)
-            or isinstance(number, bool)
-            or number <= 0
-            or number in seen_prs
-            or commit in seen_commits
+            not isinstance(commit, str) or len(commit) != 40
+            or not isinstance(pull.get("headSha"), str) or len(pull["headSha"]) != 40
+            or not isinstance(base, str) or len(base) != 40
+            or pull.get("headBranch") != work_branch
+            or not isinstance(number, int) or isinstance(number, bool) or number <= 0
+            or number in seen_prs or commit in seen_commits
             or base != expected_base
             or (work_pr_number is not None and number != work_pr_number)
             or not (start <= merged_at < end)
         ):
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
         normalized.append(copy.deepcopy(pull))
         seen_prs.add(number)
         seen_commits.add(commit)
         expected_base = commit
     if expected_base != after_sha:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INCOMPLETE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INCOMPLETE")
     return normalized
 
 
@@ -363,9 +286,7 @@ def merged_pull_request_chain(
         if cursor == before_sha:
             break
         if cursor in seen:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
         seen.add(cursor)
         commit = _get(
             transport,
@@ -374,68 +295,49 @@ def merged_pull_request_chain(
         )
         parents = commit.get("parents") if isinstance(commit, dict) else None
         if not isinstance(parents, list) or len(parents) < 2:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_NOT_MERGE_ONLY"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_NOT_MERGE_ONLY")
         base_sha = parents[0].get("sha") if isinstance(parents[0], dict) else None
         if not isinstance(base_sha, str) or len(base_sha) != 40:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID"
-            )
-        pull_payload = _get(
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
+        payload = _get(
             transport,
             f"repos/{hosted_agent_cycle.REPOSITORY}/commits/{cursor}/pulls",
             "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_UNAVAILABLE",
         )
-        if not isinstance(pull_payload, list):
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID"
-            )
-        matches: list[dict[str, Any]] = []
-        for pull in pull_payload:
-            if not isinstance(pull, dict):
-                continue
-            head = pull.get("head")
-            base = pull.get("base")
-            number = pull.get("number")
+        if not isinstance(payload, list):
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
+        matches = []
+        for pull in payload:
+            head = pull.get("head") if isinstance(pull, dict) else None
+            base = pull.get("base") if isinstance(pull, dict) else None
+            number = pull.get("number") if isinstance(pull, dict) else None
             if (
-                pull.get("merged_at") is not None
+                isinstance(pull, dict)
+                and pull.get("merged_at") is not None
                 and pull.get("merge_commit_sha") == cursor
-                and isinstance(head, dict)
-                and head.get("ref") == work_branch
-                and isinstance(head.get("sha"), str)
-                and len(head["sha"]) == 40
-                and isinstance(base, dict)
-                and base.get("ref") == "main"
-                and isinstance(number, int)
-                and not isinstance(number, bool)
+                and isinstance(head, dict) and head.get("ref") == work_branch
+                and isinstance(head.get("sha"), str) and len(head["sha"]) == 40
+                and isinstance(base, dict) and base.get("ref") == "main"
+                and isinstance(number, int) and not isinstance(number, bool)
                 and (work_pr_number is None or number == work_pr_number)
             ):
                 matches.append(pull)
         if len(matches) != 1:
-            raise HostedCycleOwnWorkDeltaRecoveryError(
-                "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_AMBIGUOUS"
-            )
+            raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_AMBIGUOUS")
         pull = matches[0]
-        reverse.append(
-            {
-                "commitSha": cursor,
-                "prNumber": pull["number"],
-                "headBranch": pull["head"]["ref"],
-                "headSha": pull["head"]["sha"],
-                "baseSha": base_sha,
-                "mergedAt": pull["merged_at"],
-            }
-        )
+        reverse.append({
+            "commitSha": cursor,
+            "prNumber": pull["number"],
+            "headBranch": pull["head"]["ref"],
+            "headSha": pull["head"]["sha"],
+            "baseSha": base_sha,
+            "mergedAt": pull["merged_at"],
+        })
         cursor = base_sha
     else:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_TOO_DEEP"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_TOO_DEEP")
     if cursor != before_sha or not reverse:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INCOMPLETE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INCOMPLETE")
     return validate_own_work_chain(
         list(reversed(reverse)),
         before_sha=before_sha,
@@ -448,6 +350,12 @@ def merged_pull_request_chain(
 
 
 def build_merge_evidence(pull: dict[str, Any]) -> dict[str, Any]:
+    """Return raw canonical close evidence; verify it before returning.
+
+    ``agent_cycle_close.build_receipt`` owns normalization.  Returning its
+    normalized projection here would make the close attempt to verify an already
+    normalized object a second time and fail closed on field shape.
+    """
     plan = git_mutation_plan.merge_pr(
         pr_number=pull["prNumber"],
         head_sha=pull["headSha"],
@@ -469,11 +377,12 @@ def build_merge_evidence(pull: dict[str, Any]) -> dict[str, Any]:
         },
     }
     try:
-        return agent_cycle_close.verify_evidence(raw)
+        agent_cycle_close.verify_evidence(raw)
     except RuntimeError as exc:
         raise HostedCycleOwnWorkDeltaRecoveryError(
             "HOSTED_CYCLE_OWN_WORK_MERGE_EVIDENCE_INVALID"
         ) from exc
+    return raw
 
 
 def reconcile_failed_closure(
@@ -487,29 +396,20 @@ def reconcile_failed_closure(
 ) -> dict[str, Any]:
     work_ref = before_context.get("workRef")
     if not isinstance(work_ref, dict) or not isinstance(work_ref.get("workId"), str):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE")
     work_id = work_ref["workId"]
     before_work = _work_item(before_context, work_id)
-    after_context = failed_closure.get("afterContext")
-    after_work = _work_item(after_context, work_id)
-    if before_work != after_work:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_WORK_CHANGED"
-        )
+    after = failed_closure.get("afterContext")
+    if before_work != _work_item(after, work_id):
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_CHANGED")
     work_branch = before_work.get("branch")
     work_pr = before_work.get("prNumber")
     if not isinstance(work_branch, str) or not work_branch or work_branch == "main":
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE")
     if work_pr is not None and (
         not isinstance(work_pr, int) or isinstance(work_pr, bool) or work_pr <= 0
     ):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_WORK_UNAVAILABLE")
 
     original = hosted_cycle_external_delta_recovery.reconstruct_original_evidence(
         comments,
@@ -517,17 +417,11 @@ def reconcile_failed_closure(
         close_comment_id=close_comment_id,
     )
     try:
-        agent_cycle_close.validate_closure(
-            failed_closure, before_context, evidence=original
-        )
+        agent_cycle_close.validate_closure(failed_closure, before_context, evidence=original)
     except RuntimeError as exc:
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_CLOSURE_MISMATCH"
-        ) from exc
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CLOSURE_MISMATCH") from exc
     if failed_closure.get("status") != "UNKNOWN":
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_FAILURE_NOT_NARROW"
-        )
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_FAILURE_NOT_NARROW")
 
     change = _control_change(failed_closure)
     window = lifecycle_window(
@@ -545,12 +439,12 @@ def reconcile_failed_closure(
         active_until=window["activeUntil"],
         transport=transport,
     )
-    merge_evidence = [build_merge_evidence(pull) for pull in pulls]
-    evidence = [*original, *merge_evidence]
-    after = failed_closure["afterContext"]
-    receipt = agent_cycle_close.build_receipt(
-        before_context, after, evidence=evidence
-    )
+    raw_merge_evidence = [build_merge_evidence(pull) for pull in pulls]
+    verified_merge_evidence = [
+        agent_cycle_close.verify_evidence(item) for item in raw_merge_evidence
+    ]
+    evidence = [*original, *raw_merge_evidence]
+    receipt = agent_cycle_close.build_receipt(before_context, after, evidence=evidence)
     closure_body = {
         "schemaVersion": agent_cycle_close.CLOSURE_SCHEMA,
         "cycleId": before_context["cycleId"],
@@ -562,25 +456,15 @@ def reconcile_failed_closure(
         "semanticAuthority": False,
         "authorizesMutation": False,
     }
-    reconciled = {
-        **closure_body,
-        "closureHash": stable_hash(closure_body),
-    }
+    reconciled = {**closure_body, "closureHash": stable_hash(closure_body)}
     try:
-        agent_cycle_close.validate_closure(
-            reconciled, before_context, evidence=evidence
-        )
+        agent_cycle_close.validate_closure(reconciled, before_context, evidence=evidence)
     except RuntimeError as exc:
         raise HostedCycleOwnWorkDeltaRecoveryError(
             "HOSTED_CYCLE_OWN_WORK_RECONCILIATION_INVALID"
         ) from exc
-    if (
-        reconciled["status"] != "PASS"
-        or reconciled["receipt"]["aggregateReadback"]["uncoveredDurableChanges"]
-    ):
-        raise HostedCycleOwnWorkDeltaRecoveryError(
-            "HOSTED_CYCLE_OWN_WORK_NOT_RECONCILED"
-        )
+    if reconciled["status"] != "PASS" or reconciled["receipt"]["aggregateReadback"]["uncoveredDurableChanges"]:
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_NOT_RECONCILED")
 
     proof_body = {
         "schemaVersion": PROOF_SCHEMA,
@@ -597,9 +481,7 @@ def reconcile_failed_closure(
         "controlBefore": change["before"],
         "controlAfter": change["after"],
         "mergedPullRequests": copy.deepcopy(pulls),
-        "mergeEvidenceHashes": [
-            item["evidenceHash"] for item in merge_evidence
-        ],
+        "mergeEvidenceHashes": sorted(item["evidenceHash"] for item in verified_merge_evidence),
         "readOnly": True,
         "semanticAuthority": False,
         "authorizesMutation": False,
@@ -607,7 +489,7 @@ def reconcile_failed_closure(
     proof = {**proof_body, "proofHash": stable_hash(proof_body)}
     return {
         "ownWorkIntegrationProof": proof,
-        "mergeEvidence": merge_evidence,
+        "mergeEvidence": verified_merge_evidence,
         "reconciledClosure": reconciled,
         "readOnly": True,
         "semanticAuthority": False,
