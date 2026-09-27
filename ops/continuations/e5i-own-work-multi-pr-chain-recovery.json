@@ -4,7 +4,7 @@
   "workerId": "manager-gitops-chat",
   "status": "READY",
   "branch": "work/operations/e5i-own-work-multi-pr-chain-recovery",
-  "prNumber": 362,
+  "prNumber": null,
   "dependsOn": [],
   "completed": [],
   "remaining": [
