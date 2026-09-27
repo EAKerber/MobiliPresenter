@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "2618c578709ecb47f205af01a685ae6b91fb31ee",
+  "leases": [
+    {
+      "leaseId": "agent-write-66311d09554d1d04a5ad5e37:0",
+      "resource": "branch:work/operations/e5h-own-work-integrated-delta-recovery-r2",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "e5h-pr357-finalize-20260927",
+        "branch": "work/operations/e5h-own-work-integrated-delta-recovery-r2",
+        "pr": null
+      },
+      "reason": "Agent write lifecycle cycle-instance-00035c6557fb88c0a03f8160",
+      "acquiredAt": "2026-09-27T04:13:17Z",
+      "renewedAt": "2026-09-27T04:13:17Z",
+      "expiresAt": "2026-09-27T05:13:17Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "0be52332170857278727d6caf0b7f2682cb34dd3",
   "schemaVersion": "CoordinationState 0.1"
 }
