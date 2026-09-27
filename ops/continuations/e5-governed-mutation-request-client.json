@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5-governed-mutation-request-client",
   "workerId": "manager-gitops-chat",
-  "status": "WAITING",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/e5-governed-mutation-request-client",
   "prNumber": null,
   "dependsOn": [],
@@ -18,8 +18,6 @@
     "sha": "7a171a938ffb31993246db0afcabd5c61674233e",
     "checkpoint": "pr:347;agent-tool-semantic-pass:b7ce2ed9a8e61e3f07ed7a02a84ee78ac59a084645f8a158c3eb797c17ac8cdc"
   },
-  "blockers": [
-    "E5_LEGACY_E4_GATE_REQUIRES_SEMANTIC_DISPOSITION"
-  ],
+  "blockers": [],
   "handoffToWorkerId": null
 }
