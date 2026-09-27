@@ -2,22 +2,22 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5i-own-work-multi-pr-chain-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/e5i-own-work-multi-pr-chain-recovery",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "allow-exact-work-multi-pr-chain",
     "preserve-pr-anchor-and-branch-binding",
     "add-multi-pr-fail-closed-regressions",
     "recover-live-e5h-close",
     "qualify-governed-mutation-pass"
   ],
-  "nextAction": "Repair own-Work integrated-delta recovery so an exact Work branch may contribute multiple sequential PR merges during one continuously-authorized cycle; if Work prNumber is present require it as an anchor in the chain rather than requiring every merge to have that number. Preserve exact branch, first-parent chain, lifecycle-window and external non-interference gates.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "ea3aeaeb2d05d4e7503c1e3b6611586fdce8869c",
+    "checkpoint": "agent-cycle-pass:b7ce2ed9a8e61e3f07ed7a02a84ee78ac59a084645f8a158c3eb797c17ac8cdc"
   },
   "blockers": [],
   "handoffToWorkerId": null
