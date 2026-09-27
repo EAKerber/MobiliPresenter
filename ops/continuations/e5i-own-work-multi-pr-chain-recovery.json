@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5i-own-work-multi-pr-chain-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/e5i-own-work-multi-pr-chain-recovery",
   "prNumber": null,
   "dependsOn": [],
