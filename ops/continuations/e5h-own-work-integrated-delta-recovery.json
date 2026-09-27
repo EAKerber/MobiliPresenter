@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5h-own-work-integrated-delta-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "branch": "work/operations/e5h-own-work-integrated-delta-recovery-r2",
   "prNumber": null,
   "dependsOn": [],
