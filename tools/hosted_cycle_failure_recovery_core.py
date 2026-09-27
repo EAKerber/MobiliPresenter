@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Current-carrier recovery certificate for a failed Hosted Agent Cycle close."""
+"""Internal stable recovery implementation for Hosted Agent Cycle close failures."""
 from __future__ import annotations
 
-import argparse
+from argparse import ArgumentParser
 import copy
 import json
 import sys
@@ -554,8 +554,6 @@ def recover(
         proof = reconciliation["nonInterferenceEvidence"]
         reconciled = reconciliation["reconciledClosure"]
         failed_closure_hash = reconciled.get("closureHash")
-        # The reconciled closure is a new read-only derivation; bind the original
-        # historical closure separately from its receipt retained in the proof.
         with tempfile.TemporaryDirectory(prefix="mobilipresenter-close-bind-") as tmp:
             root = hosted_cycle_external_delta_provider.download_close_artifact(
                 candidate,
@@ -639,8 +637,8 @@ def publish(
     )
 
 
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+def _parser() -> ArgumentParser:
+    parser = ArgumentParser()
     sub = parser.add_subparsers(dest="command_name", required=True)
     event = sub.add_parser("parse-event")
     event.add_argument("--event", required=True)
@@ -713,11 +711,3 @@ def main(argv: list[str] | None = None) -> int:
     raise HostedCycleFailureRecoveryError(
         "HOSTED_CYCLE_RECOVERY_COMMAND_UNSUPPORTED"
     )
-
-
-if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except HostedCycleFailureRecoveryError as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(2)
