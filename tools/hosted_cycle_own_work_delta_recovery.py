@@ -2,10 +2,10 @@
 
 This module grants no authority and rewrites no historical close.  It supports
 only the narrow case where the sole uncovered durable change is ``main``, every
-first-parent merge in that interval belongs to the exact Work branch/PR, and all
-those merges occurred while the exact hosted cycle held continuous write
-authority.  The historical close is then rebuilt through the existing canonical
-close verifier.
+first-parent merge in that interval belongs to the exact Work branch, any bound
+Work PR is present as an anchor in that chain, and all merges occurred while the
+exact hosted cycle held continuous write authority.  The historical close is
+then rebuilt through the existing canonical close verifier.
 """
 from __future__ import annotations
 
@@ -256,7 +256,6 @@ def validate_own_work_chain(
             or not isinstance(number, int) or isinstance(number, bool) or number <= 0
             or number in seen_prs or commit in seen_commits
             or base != expected_base
-            or (work_pr_number is not None and number != work_pr_number)
             or not (start <= merged_at < end)
         ):
             raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
@@ -264,6 +263,8 @@ def validate_own_work_chain(
         seen_prs.add(number)
         seen_commits.add(commit)
         expected_base = commit
+    if work_pr_number is not None and work_pr_number not in seen_prs:
+        raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INVALID")
     if expected_base != after_sha:
         raise HostedCycleOwnWorkDeltaRecoveryError("HOSTED_CYCLE_OWN_WORK_CONTROL_CHAIN_INCOMPLETE")
     return normalized
@@ -319,7 +320,6 @@ def merged_pull_request_chain(
                 and isinstance(head.get("sha"), str) and len(head["sha"]) == 40
                 and isinstance(base, dict) and base.get("ref") == "main"
                 and isinstance(number, int) and not isinstance(number, bool)
-                and (work_pr_number is None or number == work_pr_number)
             ):
                 matches.append(pull)
         if len(matches) != 1:
