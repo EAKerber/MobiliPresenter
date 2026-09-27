@@ -2,20 +2,20 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "e5g-sealed-close-external-delta-recovery",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": "work/operations/e5g-sealed-close-external-delta-recovery",
   "prNumber": null,
   "dependsOn": [],
-  "completed": [],
-  "remaining": [
+  "completed": [
     "Extend sealed-close recovery to consume exact failed-close closure evidence and explicit non-interference proof for external durable deltas.",
     "Add fail-closed regressions proving RELEASED authority plus unchanged Work plus external-only deltas recover, while own-Work deltas remain blocked.",
     "Validate the repair on cycle-instance-4ee3b5706f0ad471e00e4490 and publish a RECOVERED certificate without retroactive PASS."
   ],
-  "nextAction": "Implement the minimum fail-closed sealed-close recovery extension on an isolated execution branch.",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "2f403aec0240a29e38f372a6cb67c14a07d57e6f",
+    "checkpoint": "hosted-cycle-recovery:60cdd904d7b96b16193408ea3a9c7695c1025124597bcfd41427b1dc85b24194"
   },
   "blockers": [],
   "handoffToWorkerId": null
