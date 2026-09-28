@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "pcs-02-configurable-accessories-reassessment",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": "work/operations/pcs-02-configurable-accessories-reassessment",
+  "prNumber": null,
+  "dependsOn": [],
+  "completed": [],
+  "remaining": [
+    "qualify-reassessment",
+    "integrate-reassessment",
+    "verify-project-state-readback"
+  ],
+  "nextAction": "qualify-reassessment",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
