@@ -1,6 +1,23 @@
 {
   "intents": [],
-  "leases": [],
-  "revision": "5e5d4676b50fe758fbb0b82dd4ebab01c4ac3fe2",
+  "leases": [
+    {
+      "leaseId": "pcs-02-reassessment-lease-v0-1:0",
+      "resource": "branch:work/operations/pcs-02-configurable-accessories-reassessment",
+      "mode": "exclusive-write",
+      "owner": {
+        "role": "manager-gitops",
+        "session": "pcs-02-reassessment-v0-1",
+        "branch": "work/operations/pcs-02-configurable-accessories-reassessment",
+        "pr": null
+      },
+      "reason": "PCS-02 configurable accessories admission reassessment checkpoint",
+      "acquiredAt": "2026-09-28T01:50:45Z",
+      "renewedAt": "2026-09-28T01:50:45Z",
+      "expiresAt": "2026-09-28T02:50:45Z",
+      "ttlSeconds": 3600
+    }
+  ],
+  "revision": "f64f75e1495a67d8ed4dd18a4aba7488fedfbcfe",
   "schemaVersion": "CoordinationState 0.1"
 }
