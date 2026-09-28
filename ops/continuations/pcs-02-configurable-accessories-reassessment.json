@@ -7,16 +7,16 @@
   "prNumber": 365,
   "dependsOn": [],
   "completed": [
-    "qualify-reassessment"
+    "qualify-reassessment",
+    "integrate-reassessment"
   ],
   "remaining": [
-    "integrate-reassessment",
     "verify-project-state-readback"
   ],
-  "nextAction": "integrate-reassessment",
+  "nextAction": "verify-project-state-readback",
   "lastKnownGood": {
-    "sha": "e0cf8d0fa8a2413aa07e34cc35fbcfb1c420c362",
-    "checkpoint": "pcs-02-reassessment-ci-green"
+    "sha": "f7b953a0252a32f1e850fda2e4c3be18eae8d45d",
+    "checkpoint": "pcs-02-reassessment-integrated"
   },
   "blockers": [],
   "handoffToWorkerId": null
