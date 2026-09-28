@@ -15,7 +15,7 @@
   "development": {
     "initiative": "Viewer Next — Responsive Fixed-Frame",
     "phase": "between-increments",
-    "checkpoint": "PCS-01B-MODULE-PRESENTATION-REASSESSMENT-0.1-CLOSED",
-    "nextTransition": "reassess-pcs-02-configurable-accessories-admission-v0.1"
+    "checkpoint": "PCS-02-CONFIGURABLE-ACCESSORIES-REASSESSMENT-0.1-CLOSED",
+    "nextTransition": "plan-pcs-02a-configurable-accessories-semantics-v0.1"
   }
 }
