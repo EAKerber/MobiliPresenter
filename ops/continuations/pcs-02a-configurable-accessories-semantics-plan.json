@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ContinuationState 0.2",
+  "id": "pcs-02a-configurable-accessories-semantics-plan",
+  "workerId": "manager-gitops-chat",
+  "status": "READY",
+  "branch": null,
+  "prNumber": null,
+  "dependsOn": [
+    "pcs-02-configurable-accessories-reassessment"
+  ],
+  "completed": [],
+  "remaining": [
+    "resolve-pcs-02a-semantic-owner",
+    "materialize-accepted-pcs-02a-requirements",
+    "handoff-pcs-02a-plan-to-semantic-owner"
+  ],
+  "nextAction": "resolve-pcs-02a-semantic-owner",
+  "lastKnownGood": {
+    "sha": null,
+    "checkpoint": null
+  },
+  "blockers": [],
+  "handoffToWorkerId": null
+}
