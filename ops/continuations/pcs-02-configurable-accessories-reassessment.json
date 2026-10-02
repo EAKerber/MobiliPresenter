@@ -8,15 +8,14 @@
   "dependsOn": [],
   "completed": [
     "qualify-reassessment",
-    "integrate-reassessment"
-  ],
-  "remaining": [
+    "integrate-reassessment",
     "verify-project-state-readback"
   ],
-  "nextAction": "verify-project-state-readback",
+  "remaining": [],
+  "nextAction": null,
   "lastKnownGood": {
     "sha": "f7b953a0252a32f1e850fda2e4c3be18eae8d45d",
-    "checkpoint": "pcs-02-reassessment-integrated"
+    "checkpoint": "pcs-02-project-state-readback-pass"
   },
   "blockers": [],
   "handoffToWorkerId": null
