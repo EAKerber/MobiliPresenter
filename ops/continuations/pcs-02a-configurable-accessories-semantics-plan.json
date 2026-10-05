@@ -2,22 +2,23 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "pcs-02a-configurable-accessories-semantics-plan",
   "workerId": "manager-gitops-chat",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "branch": null,
   "prNumber": null,
   "dependsOn": [
     "pcs-02-configurable-accessories-reassessment"
   ],
-  "completed": [],
+  "completed": [
+    "resolve-pcs-02a-semantic-owner"
+  ],
   "remaining": [
-    "resolve-pcs-02a-semantic-owner",
     "materialize-accepted-pcs-02a-requirements",
     "handoff-pcs-02a-plan-to-semantic-owner"
   ],
-  "nextAction": "resolve-pcs-02a-semantic-owner",
+  "nextAction": "Materialize only the already-accepted PCS-02A requirements on Issue #22 for Developer / Viewer Engine+API; do not choose schema or invent accessory data",
   "lastKnownGood": {
-    "sha": null,
-    "checkpoint": null
+    "sha": "f7b953a0252a32f1e850fda2e4c3be18eae8d45d",
+    "checkpoint": "pcs-02a-semantic-owner-developer-viewer-engine-api"
   },
   "blockers": [],
   "handoffToWorkerId": null
