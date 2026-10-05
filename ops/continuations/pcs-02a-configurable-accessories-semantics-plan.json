@@ -9,16 +9,16 @@
     "pcs-02-configurable-accessories-reassessment"
   ],
   "completed": [
-    "resolve-pcs-02a-semantic-owner"
+    "resolve-pcs-02a-semantic-owner",
+    "materialize-accepted-pcs-02a-requirements"
   ],
   "remaining": [
-    "materialize-accepted-pcs-02a-requirements",
     "handoff-pcs-02a-plan-to-semantic-owner"
   ],
-  "nextAction": "Materialize only the already-accepted PCS-02A requirements on Issue #22 for Developer / Viewer Engine+API; do not choose schema or invent accessory data",
+  "nextAction": "Resolve an observable concrete Developer / Viewer Engine+API worker or scheduler routing, then hand off the PCS-02A plan; do not invent a worker identifier",
   "lastKnownGood": {
     "sha": "f7b953a0252a32f1e850fda2e4c3be18eae8d45d",
-    "checkpoint": "pcs-02a-semantic-owner-developer-viewer-engine-api"
+    "checkpoint": "pcs-02a-requirements-materialized-issue-22-comment-5993317859"
   },
   "blockers": [],
   "handoffToWorkerId": null
