@@ -2,7 +2,7 @@
   "schemaVersion": "ContinuationState 0.2",
   "id": "pcs-02a-configurable-accessories-semantics-plan",
   "workerId": "manager-gitops-chat",
-  "status": "IN_PROGRESS",
+  "status": "WAITING",
   "branch": null,
   "prNumber": null,
   "dependsOn": [
@@ -20,6 +20,8 @@
     "sha": "f7b953a0252a32f1e850fda2e4c3be18eae8d45d",
     "checkpoint": "pcs-02a-requirements-materialized-issue-22-comment-5993317859"
   },
-  "blockers": [],
+  "blockers": [
+    "NO_OBSERVABLE_DEVELOPER_WORKER_OR_SCHEDULER_ROUTE"
+  ],
   "handoffToWorkerId": null
 }
